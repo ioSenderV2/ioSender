@@ -579,6 +579,23 @@ namespace CNC.Controls
             return lines;
         }
 
+        // Even-odd ray cast along +X against a single closed ring - for assigning carve passes to the
+        // glyph that contains them.
+        private static bool PointInRing(List<Point2D> ring, Point2D pt)
+        {
+            bool inside = false;
+            for (int i = 0, j = ring.Count - 1; i < ring.Count; j = i++)
+            {
+                double yi = ring[i].Y, yj = ring[j].Y;
+                if ((yi > pt.Y) == (yj > pt.Y))
+                    continue;
+                double xInt = ring[i].X + (pt.Y - yi) / (yj - yi) * (ring[j].X - ring[i].X);
+                if (pt.X < xInt)
+                    inside = !inside;
+            }
+            return inside;
+        }
+
         // Grid cell for the carve's distance field. 0.1 mm keeps the field's error an order below anything
         // a V-bit leaves in wood, and text-sized fields build in well under a second at it.
         private const double CarveResolution = 0.1d;
@@ -638,6 +655,40 @@ namespace CNC.Controls
             double ox = -(minX + maxX) / 2d, oy = -(minY + maxY) / 2d;
             double rad = tp.Angle * Math.PI / 180d;
             double cos = Math.Cos(rad), sin = Math.Sin(rad);
+
+            // Cut each letter COMPLETELY before moving to the next. The engine's global shallow-to-deep
+            // order keeps the "step down into material already opened" invariant, but that invariant only
+            // matters WITHIN a connected region - across separate glyphs it just interleaves, so the
+            // machine hopped letter to letter at every depth level, filling in bits and pieces until the
+            // very end. Passes are regrouped by the outer glyph contour that contains them, letters
+            // ordered left to right along the (unrotated) baseline, keeping the original relative order -
+            // regular passes shallow to deep, then that glyph's clearing generations - inside each.
+            var outers = new List<List<Point2D>>();
+            foreach (var c in outline)
+                if (c.IsOuter)
+                    outers.Add(c.Points);
+            outers.Sort((a, b) =>
+            {
+                double ax = double.MaxValue, bx = double.MaxValue;
+                foreach (var p in a) if (p.X < ax) ax = p.X;
+                foreach (var p in b) if (p.X < bx) bx = p.X;
+                return ax.CompareTo(bx);
+            });
+            var grouped = new List<CNC.Core.VCarvePass>(passes.Count);
+            var claimed = new bool[passes.Count];
+            foreach (var outer in outers)
+                for (int i = 0; i < passes.Count; i++)
+                    if (!claimed[i] && passes[i].Path.Count > 0 && PointInRing(outer, passes[i].Path[0]))
+                    {
+                        claimed[i] = true;
+                        grouped.Add(passes[i]);
+                    }
+            // A pass no outer claims (a boundary ring's first point can sit a hair outside) still gets
+            // cut - losing the grouping nicety must never lose a cut.
+            for (int i = 0; i < passes.Count; i++)
+                if (!claimed[i])
+                    grouped.Add(passes[i]);
+            passes = grouped;
 
             int cutPasses = 0;
             foreach (var p in passes)
