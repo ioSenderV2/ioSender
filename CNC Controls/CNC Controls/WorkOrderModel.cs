@@ -32,7 +32,7 @@ namespace CNC.Controls
     // which forks an independent copy instead. Surface is a facing pass over a Width x Depth area (reuses
     // those two fields, same as Oval/Rect) - it isn't cut relative to any enclosed shape, so it only ever
     // carries the one Surface operation (see WorkOrderRules.AvailableOperations).
-    public enum WorkOrderGeometryKind { Line, Circle, Oval, Square, Rect, Surface, Indirect }
+    public enum WorkOrderGeometryKind { Line, Circle, Oval, Square, Rect, Surface, Indirect, Text }
 
     // Which point of a toolpath's own bounding box its X/Y names. Front is -Y and back is +Y, matching the
     // corner order OddJobsGeometry.RectPoints already walks and the front/back sense pcorner.macro uses for
@@ -42,7 +42,7 @@ namespace CNC.Controls
     // Repeats a whole toolpath - geometry AND every operation on it - at a set of offsets.
     public enum WorkOrderPatternKind { None, Grid, Circular }
 
-    public enum WorkOrderOpKind { Pocket, Contour, Drill, Bore, SideFinish, BottomFinish, Chamfer, Countersink, Surface }
+    public enum WorkOrderOpKind { Pocket, Contour, Drill, Bore, SideFinish, BottomFinish, Chamfer, Countersink, Surface, Engrave }
 
     // Conventional cuts against the cutter's rotation (chip thins to nothing at the end of the cut) - more
     // forgiving of a machine with backlash/flex, since the cutter is always being pushed away from new
@@ -109,6 +109,14 @@ namespace CNC.Controls
         public double WallStockToLeave = 0.3d;    // SideFinish
         public double FloorStockToLeave = 0.3d;   // BottomFinish
         public double ChamferDepth = 0.5d;        // Chamfer
+
+        // Engrave - the WIDTH of the cut stroke in mm, which is what an operator can see and measure. The
+        // plunge depth is derived from it and the tool's own included angle (see
+        // WorkOrderCompiler.BuildEngrave), because depth is the number that produces the width rather than
+        // the one anybody wants to specify: the same 0.8 mm line needs 0.40 mm of depth on a 90-degree bit
+        // and 0.69 mm on a 60. Getting that backwards is how the same job cuts differently after a bit
+        // change.
+        public double EngraveWidth = 0.8d;        // Engrave
         // Countersink - the FINISHED diameter the operator wants (e.g. to seat a specific screw head), not a
         // raw plunge depth - WorkOrderCompiler.BuildCountersink converts it (depth = diameter / 2, same
         // 45-deg-per-side cone math as Chamfer's V-bit, just specified the other way around since a
@@ -161,6 +169,12 @@ namespace CNC.Controls
         public double Depth = 25d;       // Oval, Rect (the Y dimension - "D" in the picker)
         public double Size = 30d;        // Square
 
+        // Text only. CapHeight is the height of a capital letter in mm - the size an operator actually
+        // means by "10 mm lettering" - and the baseline direction reuses Angle above, same meaning as it
+        // has for a Line (degrees from +X). Multi-line text is a plain newline in Text.
+        public string Text = "TEXT";
+        public double CapHeight = 10d;
+
         // Pattern: the whole toolpath repeats at each instance position. The X/Y above is instance one, and
         // stays the anchor - a Grid grows from it, a Circular pattern orbits it.
         public WorkOrderPatternKind Pattern = WorkOrderPatternKind.None;
@@ -175,7 +189,11 @@ namespace CNC.Controls
 
         public List<WorkOrderOperation> Operations = new List<WorkOrderOperation>();
 
-        public bool IsClosed { get { return Geometry != WorkOrderGeometryKind.Line; } }
+        // Text is OPEN, like a Line. This matters more than it looks: IsClosed gates the operations a
+        // toolpath is offered (Pocket and Bottom finish need an enclosed area) and whether a Contour gets
+        // tabs. A stroke font's glyphs are pen strokes, not loops - there is no interior to clear - so
+        // letting Text read as closed would have offered to pocket the inside of the letter "S".
+        public bool IsClosed { get { return Geometry != WorkOrderGeometryKind.Line && Geometry != WorkOrderGeometryKind.Text; } }
         public bool IsIndirect { get { return Geometry == WorkOrderGeometryKind.Indirect; } }
 
         // X/Y resolved to the shape's CENTER, whatever Anchor names. Everything downstream - the compiler's
@@ -199,6 +217,11 @@ namespace CNC.Controls
                     case WorkOrderGeometryKind.Oval:
                     case WorkOrderGeometryKind.Rect:
                     case WorkOrderGeometryKind.Surface: return Width / 2d;
+                    // Text has no Width/Depth of its own - its extent is whatever the string renders to at
+                    // this cap height, so ask the font. Measured on the UNROTATED text deliberately: the
+                    // baseline angle rotates the result about the anchor, and taking extents after rotation
+                    // would make the anchor drift sideways every time the text was edited.
+                    case WorkOrderGeometryKind.Text: return CNC.Core.StrokeFont.Measure(Text, CapHeight).X / 2d;
                     default: return 0d;
                 }
             }
@@ -215,6 +238,7 @@ namespace CNC.Controls
                     case WorkOrderGeometryKind.Oval:
                     case WorkOrderGeometryKind.Rect:
                     case WorkOrderGeometryKind.Surface: return Depth / 2d;
+                    case WorkOrderGeometryKind.Text: return CNC.Core.StrokeFont.Measure(Text, CapHeight).Y / 2d;
                     default: return 0d;
                 }
             }
@@ -299,6 +323,9 @@ namespace CNC.Controls
                 switch (Geometry)
                 {
                     case WorkOrderGeometryKind.Line: return double.MaxValue;
+                    // Nothing constrains the cutter: a V-bit engraves with its TIP, and the stroke width is
+                    // chosen by depth rather than limited by the bit's nominal diameter.
+                    case WorkOrderGeometryKind.Text: return double.MaxValue;
                     case WorkOrderGeometryKind.Circle: return Diameter;
                     case WorkOrderGeometryKind.Square: return Size;
                     default: return Math.Min(Width, Depth);
@@ -519,6 +546,7 @@ namespace CNC.Controls
                 case WorkOrderGeometryKind.Rect: return "Rectangle (width, depth)";
                 case WorkOrderGeometryKind.Surface: return "Surface (width, depth) - face the whole area";
                 case WorkOrderGeometryKind.Indirect: return "Indirect (repeat another toolpath here)";
+                case WorkOrderGeometryKind.Text: return "Text (engrave with a V-bit)";
                 default: return kind.ToString();
             }
         }
@@ -542,6 +570,7 @@ namespace CNC.Controls
         {
             switch (kind)
             {
+                case WorkOrderOpKind.Engrave: return "Engrave (V-bit, single pass along the strokes)";
                 case WorkOrderOpKind.Pocket: return "Pocket (clear the enclosed area)";
                 case WorkOrderOpKind.Contour: return "Contour (follow the outline)";
                 case WorkOrderOpKind.Drill: return "Drill (straight peck)";
@@ -607,6 +636,15 @@ namespace CNC.Controls
             if (tp.Geometry == WorkOrderGeometryKind.Surface)
             {
                 yield return WorkOrderOpKind.Surface;
+                yield break;
+            }
+
+            // Text is engraved and nothing else. Its glyphs are pen strokes along a centreline, so there is
+            // no outline to contour, no interior to pocket and no edge to chamfer - every other operation
+            // here would be tracing a path that does not describe the letter's shape.
+            if (tp.Geometry == WorkOrderGeometryKind.Text)
+            {
+                yield return WorkOrderOpKind.Engrave;
                 yield break;
             }
 

@@ -127,6 +127,12 @@ namespace CNC.Controls
                 case WorkOrderGeometryKind.Line:
                     // A line has no interior, so an inset would only shorten it - the tool straddles it.
                     return OddJobsGeometry.LinePoints(cx, cy, tp.Length, tp.Angle, SegmentMm);
+                case WorkOrderGeometryKind.Text:
+                    // Text is many disjoint strokes, not one outline, so it has no meaningful single path -
+                    // BuildEngrave goes to StrokeFont directly. Returning empty rather than falling through
+                    // to the Rect default below, which would have quietly traced a rectangle around the
+                    // words for any caller that asked.
+                    return new List<double[]>();
                 case WorkOrderGeometryKind.Circle:
                     return OddJobsGeometry.CirclePoints(cx, cy, Math.Max(0.1d, tp.Diameter / 2d - inset), CircleSegments);
                 case WorkOrderGeometryKind.Oval:
@@ -484,6 +490,75 @@ namespace CNC.Controls
                 if (!tp.IsClosed)
                     previousZ = 0d;
             }
+            return lines;
+        }
+
+        // Engrave text with a V-bit: follow each glyph stroke once, at a single depth. The stroke font gives
+        // centreline paths (see CNC.Core.StrokeFont), so the cut IS the letter - there is no outline to
+        // offset and no interior to clear, which is why this shares nothing with BuildContour.
+        //
+        // DEPTH IS DERIVED, NOT SPECIFIED. The operator asks for a stroke WIDTH, because that is what they
+        // can see and measure on the finished part; a V-bit produces that width by plunging until its cone
+        // is that wide, which depends entirely on the tool's included angle:
+        //
+        //     width = 2 * depth * tan(halfAngle)   =>   depth = (width / 2) / tan(halfAngle)
+        //
+        // The same 0.8 mm line is 0.40 mm deep on a 90-degree bit and 0.69 mm on a 60. Specifying depth
+        // instead would mean the same job cutting a different width after a bit change, silently.
+        //
+        // Single pass on purpose: a V-bit at engraving depths removes very little, and stepping down would
+        // just retrace the same groove. DepthOfCut is not consulted, and no tabs - there is nothing being
+        // cut free.
+        private static List<string> BuildEngrave(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
+        {
+            var lines = new List<string>();
+
+            var strokes = CNC.Core.StrokeFont.Render(tp.Text, tp.CapHeight);
+            if (strokes.Count == 0)
+                return lines;   // empty or wholly unrenderable text - emit nothing rather than a bare plunge
+
+            var tool = CustomTools.Find(op.Tool);
+            double halfAngle = tool != null ? tool.HalfAngleRad : Math.PI / 4d;
+            double depth = Math.Max(0.01d, (Math.Max(0.01d, op.EngraveWidth) / 2d) / Math.Tan(halfAngle));
+
+            // StrokeFont lays the text out with its baseline starting at the origin and running along +X.
+            // Move it so the toolpath's anchor lands on (cx,cy), then rotate about that same anchor - so
+            // the point the operator pinned stays pinned as the angle changes. Anything else makes lining
+            // text up against an edge an exercise in trial and error.
+            var size = CNC.Core.StrokeFont.Measure(tp.Text, tp.CapHeight);
+            double originX = -size.X / 2d, originY = -size.Y / 2d + tp.CapHeight / 2d;
+            double rad = tp.Angle * Math.PI / 180d;
+            double cos = Math.Cos(rad), sin = Math.Sin(rad);
+
+            lines.Add(string.Format(CultureInfo.InvariantCulture,
+                "(ENGRAVE \"{0}\" cap {1:0.###} mm, stroke {2:0.###} mm wide -> {3:0.###} mm deep at {4:0.#} deg included)",
+                // grblHAL ends a comment at the FIRST ')' (see the note on this file's comment helper), so
+                // brackets in the operator's own text would truncate the block and let the rest parse as
+                // g-code. Newlines are folded to '|' for the same reason - one comment, one line.
+                (tp.Text ?? string.Empty).Replace('(', '[').Replace(')', ']')
+                                         .Replace((char)13, ' ').Replace((char)10, '|'),
+                tp.CapHeight, op.EngraveWidth, depth, halfAngle * 360d / Math.PI));
+
+            foreach (var stroke in strokes)
+            {
+                for (int i = 0; i < stroke.Count; i++)
+                {
+                    double lx = stroke[i].X + originX, ly = stroke[i].Y + originY;
+                    double x = cx + lx * cos - ly * sin;
+                    double y = cy + lx * sin + ly * cos;
+
+                    if (i == 0)
+                    {
+                        lines.Add("G0 Z" + F(SafeZ()));
+                        lines.Add("G0 X" + F(x) + " Y" + F(y));
+                        lines.Add("G1 Z" + F(-depth) + " F" + F(op.PlungeFeed));
+                    }
+                    else
+                        lines.Add("G1 X" + F(x) + " Y" + F(y) + " F" + F(op.Feed));
+                }
+            }
+            lines.Add("G0 Z" + F(SafeZ()));
+
             return lines;
         }
 
@@ -865,6 +940,7 @@ namespace CNC.Controls
                     case WorkOrderOpKind.Countersink: lines.AddRange(BuildCountersink(tp, op, cx, cy)); break;
                     // EntireSpoilboard never reaches here - BuildOperation returns early for it, above.
                     case WorkOrderOpKind.Surface: lines.AddRange(BuildSurface(tp, op, cx, cy)); break;
+                    case WorkOrderOpKind.Engrave: lines.AddRange(BuildEngrave(tp, op, cx, cy)); break;
                 }
             }
 
