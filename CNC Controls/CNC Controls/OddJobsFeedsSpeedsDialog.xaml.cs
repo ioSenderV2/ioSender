@@ -344,6 +344,37 @@ namespace CNC.Controls
             ComputeRecommendation();
         }
 
+        // Open the selected tool's own DEFINITION - name, kind, diameter, flutes, and a V-bit's included
+        // angle. Those describe the cutter rather than how hard to push it, so they live with the tool and
+        // are edited in one place; this button only makes that place reachable. It was previously behind a
+        // right-click on the tool list, which nobody finds - you could set a V-bit's angle when creating it
+        // and then never see it again (reported 2026-08-07).
+        //
+        // The ComboBoxItem's Tag IS the live CustomTool, so the dialog edits the very object this one is
+        // reading. That makes the refresh below necessary rather than cosmetic: the label can go stale on a
+        // rename, and diameter/flutes feed the advisor, so a changed diameter must reach the recommendation
+        // instead of quietly comparing against the old one.
+        private void btnEditTool_Click(object sender, RoutedEventArgs e)
+        {
+            var ct = SelectedTool;
+            if (ct == null)
+                return;
+
+            var dlg = new CustomToolEditDialog(ct) { Owner = Window.GetWindow(this) };
+            if (dlg.ShowDialog() != true)
+                return;
+
+            CustomTools.Save();
+
+            var item = cbxTool.SelectedItem as ComboBoxItem;
+            if (item != null)
+                item.Content = ct.Name;
+
+            // Re-apply through the selection handler rather than repeating its field logic here - it reads
+            // SelectedTool and ignores its event args, so this is the same path a fresh selection takes.
+            cbxTool_SelectionChanged(this, null);
+        }
+
         // Runs FeedsSpeedsAdvisor.Evaluate and refreshes each field's highlight/tooltip against it. Called
         // whenever anything that could change the recommendation OR the fields being compared against it
         // changes (tool, diameter, flutes, or any of the 4 value fields themselves) - cheap, and keeps the
