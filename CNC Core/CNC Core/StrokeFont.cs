@@ -83,11 +83,16 @@ namespace CNC.Core
             // ---- uppercase ----
             { 'A', new Glyph(0.72, "M0,0 L0.36,1 L0.72,0 M0.13,0.36 L0.59,0.36") },
             { 'B', new Glyph(0.68, "M0,0 L0,1 L0.44,1 A0.44,0.75 0.25 90 -90 L0,0.5 L0.46,0.5 A0.46,0.25 0.25 90 -90 L0,0") },
-            { 'C', new Glyph(0.70, "M0.70,0.78 A0.35,0.65 0.35 45 170 L0.35,0.65 M0,0.65 L0,0.35 M0.35,0 A0.35,0.35 0.35 190 315") },
+            // C and G share a skeleton with O - two arcs of radius 0.38 whose centres sit at y 0.65 and
+            // 0.35, joined down the left by a straight run - so the round letters all read as one family.
+            // Every piece begins exactly where the last ended, which is what keeps them a single stroke:
+            // the old C had 0.156 and 0.450 em of stray straight line where its arcs failed to meet.
+            { 'C', new Glyph(0.70, "A0.38,0.65 0.38 45 180 L0,0.35 A0.38,0.35 0.38 180 315") },
             { 'D', new Glyph(0.70, "M0,0 L0,1 L0.35,1 A0.35,0.65 0.35 90 -90 L0,0") },
             { 'E', new Glyph(0.62, "M0.62,1 L0,1 L0,0 L0.62,0 M0,0.5 L0.50,0.5") },
             { 'F', new Glyph(0.60, "M0.60,1 L0,1 L0,0 M0,0.52 L0.48,0.52") },
-            { 'G', new Glyph(0.74, "M0.74,0.78 A0.37,0.65 0.37 45 170 L0.37,0.65 M0,0.65 L0,0.35 M0.37,0 A0.37,0.35 0.37 190 340 L0.74,0.35 L0.44,0.35") },
+            // G is C carried round to the right at mid-height, then the bar back in - still one stroke.
+            { 'G', new Glyph(0.74, "A0.38,0.65 0.38 45 180 L0,0.35 A0.38,0.35 0.38 180 360 L0.44,0.35") },
             { 'H', new Glyph(0.70, "M0,0 L0,1 M0.70,0 L0.70,1 M0,0.5 L0.70,0.5") },
             { 'I', new Glyph(0.20, "M0.10,0 L0.10,1 M0,1 L0.20,1 M0,0 L0.20,0") },
             { 'J', new Glyph(0.56, "M0.56,1 L0.56,0.25 A0.28,0.25 0.28 0 -180") },
@@ -99,7 +104,16 @@ namespace CNC.Core
             { 'P', new Glyph(0.66, "M0,0 L0,1 L0.40,1 A0.40,0.75 0.25 90 -90 L0,0.5") },
             { 'Q', new Glyph(0.76, "M0,0.65 L0,0.35 A0.38,0.35 0.38 180 360 L0.76,0.65 A0.38,0.65 0.38 0 180 M0.48,0.22 L0.78,-0.06") },
             { 'R', new Glyph(0.68, "M0,0 L0,1 L0.40,1 A0.40,0.75 0.25 90 -90 L0,0.5 M0.34,0.5 L0.68,0") },
-            { 'S', new Glyph(0.66, "M0.66,0.86 A0.33,0.76 0.24 40 200 A0.33,0.26 0.24 160 -20 M0,0.14 A0.33,0.24 0.24 200 340") },
+            // ONE stroke, two arcs meeting at the waist. It was three strokes with two M commands and arc
+            // endpoints that did not meet, so the bit lifted and re-plunged twice inside the letter and cut
+            // something closer to a 5 (reported from a real carve, 2026-08-07).
+            //
+            // The join is the whole design: two circles only meet at one point if they are tangent, which
+            // needs their centres 2r apart. r = 0.25 with centres at y = 0.75 and 0.25 puts that point at
+            // mid-height and makes the letter span the full em. Change one of those three numbers and the
+            // arcs stop meeting - the stroke will still be continuous, but it will have a kink where the
+            // second arc jumps to its own start.
+            { 'S', new Glyph(0.66, "A0.33,0.75 0.25 20 270 A0.33,0.25 0.25 90 -160") },
             { 'T', new Glyph(0.64, "M0,1 L0.64,1 M0.32,1 L0.32,0") },
             { 'U', new Glyph(0.70, "M0,1 L0,0.32 A0.35,0.32 0.35 180 360 L0.70,1") },
             { 'V', new Glyph(0.70, "M0,1 L0.35,0 L0.70,1") },
@@ -114,7 +128,10 @@ namespace CNC.Core
             { '2', new Glyph(0.62, "M0.02,0.78 A0.31,0.72 0.31 160 20 L0.62,0.64 L0,0 L0.62,0") },
             { '3', new Glyph(0.62, "M0.02,0.80 A0.31,0.74 0.28 160 -20 L0.31,0.52 A0.31,0.26 0.28 90 -160") },
             { '4', new Glyph(0.66, "M0.48,0 L0.48,1 L0,0.30 L0.66,0.30") },
-            { '5', new Glyph(0.62, "M0.60,1 L0.08,1 L0.04,0.56 A0.31,0.29 0.29 105 -110") },
+            // The stem lands exactly on the bowl: at 150 deg a circle of r 0.30 about (0.32,0.30) passes
+            // through (0.060,0.450), so the vertical can stop there and the arc continue from it. Picking
+            // the stem's x first and hoping the arc met it is what left the old 5 with a 0.195 em spur.
+            { '5', new Glyph(0.62, "M0.62,1 L0.06,1 L0.06,0.45 A0.32,0.30 0.30 150 -140") },
             // 6 and 9 are one shape and its 180-deg rotation: a bowl, plus a tail arc that starts exactly
             // on the bowl so the two join without a visible step. Built as a pair on purpose - drawing
             // them independently is how you end up with a 6 and a 9 that do not match.
