@@ -57,16 +57,21 @@ namespace CNC.Core
         private bool _isCameraVisible = false, _responseLogVerbose = false, _isProbing = false, _hasOutline = false, _isLoading = false;
         private bool _isDryRunMode = false;
         private bool _feedOverrideDisabled = false, _rpmOverrideDisabled = false, _feedHoldDisabled = false;
+        private int _line, _scrollpos, _blocks = 0, _startFromBlock = 0, _executingBlock = 0, _auxinValue = -2, _spindle_num = 0;
+        private double _rpmInput = 0d, _rpmDisplay = 0d, _jogStep = 0.1d;
+        private string _pb_avail, _rxb_avail;
+
+        // Machine truth, declared apart from the sender state above so slice 5d can move their storage to
+        // MachineState without touching the shared declaration lines.
         private bool? _mpg;
-        private int _pwm, _line, _scrollpos, _blocks = 0, _startFromBlock = 0, _executingBlock = 0, _auxinValue = -2, _spindle_num = 0;
+        private int _pwm;
         private double _feedrate = 0d;
-        private double _rpm = 0d, _rpmInput = 0d, _rpmDisplay = 0d, _jogStep = 0.1d;
+        private double _rpm = 0d;
         private double _rpmActual = double.NaN;
         private double _feedOverride = 100d;
         private double _rapidsOverride = 100d;
         private double _rpmOverride = 100d;
         private double _thcVoltage = double.NaN;
-        private string _pb_avail, _rxb_avail;
         private LatheMode _latheMode = LatheMode.Disabled;
         private HomedState _homedState = HomedState.Unknown;
         private GrblEncoderMode _encoder_ovr = GrblEncoderMode.Unknown;
@@ -229,7 +234,8 @@ namespace CNC.Core
             _pb_avail = _rxb_avail = _rtState[0] = _rtState[1] = _rtState[2] = _spindle = string.Empty;
             State.Probe = string.Empty;
             _mpg = null;
-            _line = _pwm = _scrollpos = _spindle_num = 0;
+            _line = _scrollpos = _spindle_num = 0;
+            _pwm = 0;
             _auxinValue = -2; // No value read (use a nullable type?)
 
             State.GrblState.Error = 0;
