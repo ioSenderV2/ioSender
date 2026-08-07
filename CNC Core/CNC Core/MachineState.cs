@@ -49,6 +49,21 @@ namespace CNC.Core
     /// </summary>
     public class MachineState
     {
+        /// <summary>
+        /// What the controller says it is doing: run state, substate, last alarm, error, MPG flag. Every
+        /// "can I do this now" question in the app resolves to this.
+        /// </summary>
+        /// <remarks>
+        /// A FIELD, not a property, and deliberately. GrblState is a struct, and the parser updates it a
+        /// member at a time - <c>State</c>, <c>Substate</c>, <c>Error</c>, <c>MPG</c>, <c>LastAlarm</c> are
+        /// each assigned on their own in the status/report paths. A struct-typed property cannot be mutated
+        /// that way (you would be assigning to the returned copy, which C# refuses outright), so making this
+        /// a property would force every one of those sites into a read-modify-write of the whole struct -
+        /// more code, and a race window that does not exist today. Keeping it a field makes the move a pure
+        /// rename of the backing field, which is the whole point of doing it this way.
+        /// </remarks>
+        public GrblState GrblState;
+
         // Machine coordinates, as last reported. IsSet() per axis distinguishes "not homed / never
         // reported" from a genuine zero, which is why this is a Position and not three doubles.
         public Position MachinePosition { get; private set; } = new Position();

@@ -67,7 +67,6 @@ namespace CNC.Core
         private double _rpmOverride = 100d;
         private double _thcVoltage = double.NaN;
         private string _pb_avail, _rxb_avail;
-        private GrblState _grblState;
         private LatheMode _latheMode = LatheMode.Disabled;
         private HomedState _homedState = HomedState.Unknown;
         private GrblEncoderMode _encoder_ovr = GrblEncoderMode.Unknown;
@@ -115,7 +114,7 @@ namespace CNC.Core
             // Polling itself happens on timer threadpool threads.
             Poller.Run();
 
-            _grblState.LastAlarm = 0;
+            State.GrblState.LastAlarm = 0;
 
             AxisLetter.PropertyChanged += Axisletter_PropertyChanged;
             Signals.PropertyChanged += Signals_PropertyChanged;
@@ -230,11 +229,11 @@ namespace CNC.Core
             _line = _pwm = _scrollpos = _spindle_num = 0;
             _auxinValue = -2; // No value read (use a nullable type?)
 
-            _grblState.Error = 0;
-            _grblState.State = GrblStates.Unknown;
-            _grblState.Substate = 0;
-            _grblState.MPG = false;
-            GrblState = _grblState;
+            State.GrblState.Error = 0;
+            State.GrblState.State = GrblStates.Unknown;
+            State.GrblState.Substate = 0;
+            State.GrblState.MPG = false;
+            GrblState = State.GrblState;
             IsMPGActive = null; //??
 
             ClearPosition();
@@ -513,21 +512,21 @@ namespace CNC.Core
         public bool IsCameraVisible { get { return _isCameraVisible; } set { if (_isCameraVisible != value) { _isCameraVisible = value; OnPropertyChanged(); } } }
 
         //        public bool CanReset { get { return _canReset; } private set { if(value != _canReset) { _canReset = value; OnPropertyChanged(); } } }
-        public bool GrblReset { get { return _reset; } set { if ((_reset = value)) { _grblState.Error = 0; OnPropertyChanged(); Message = ""; } } }
-        public GrblState GrblState { get { return _grblState; } set { _grblState = value; OnPropertyChanged(); } }
+        public bool GrblReset { get { return _reset; } set { if ((_reset = value)) { State.GrblState.Error = 0; OnPropertyChanged(); Message = ""; } } }
+        public GrblState GrblState { get { return State.GrblState; } set { State.GrblState = value; OnPropertyChanged(); } }
         public bool AutoReportingEnabled { get { return _autoReporting; } set { { _autoReporting = value; OnPropertyChanged(); } } }
         public int AutoReportInterval { get { return _autoReportInterval; } private set { { _autoReportInterval = value; OnPropertyChanged(); } } }
-        public bool IsGCLock { get { return _grblState.State == GrblStates.Hold || _grblState.State == GrblStates.Alarm; } }
+        public bool IsGCLock { get { return State.GrblState.State == GrblStates.Hold || State.GrblState.State == GrblStates.Alarm; } }
         public bool GcodeCommandsAllowed { get { return !(IsGCLock || IsJobRunning); } }
-        public bool SystemCommandsAllowed { get { return !(_grblState.State == GrblStates.Hold || (_grblState.State == GrblStates.Alarm && !IsGrblHAL)); } }
-        public bool IsCheckMode { get { return _grblState.State == GrblStates.Check; } }
+        public bool SystemCommandsAllowed { get { return !(State.GrblState.State == GrblStates.Hold || (State.GrblState.State == GrblStates.Alarm && !IsGrblHAL)); } }
+        public bool IsCheckMode { get { return State.GrblState.State == GrblStates.Check; } }
         // Sender-side toggle (not a grbl state): the NEXT run offsets Z clear of stock (G92) and forces
         // spindle/coolant off for the whole run regardless of program content - M3/M4/M7/M8 lines are
         // neutralised as they stream (StreamPump.SendNext / JobControl.SendNextLine, via
         // GCodeBlock.HasSpindleOrCoolantOn) and M5/M9 are sent as a preamble. Cleared (G92.1) at every
         // job-end path. See JobControl.CycleStart / miDryRun_Click.
         public bool IsDryRunMode { get { return _isDryRunMode; } set { if (_isDryRunMode != value) { _isDryRunMode = value; OnPropertyChanged(); } } }
-        public bool IsSleepMode { get { return _grblState.State == GrblStates.Sleep; } }
+        public bool IsSleepMode { get { return State.GrblState.State == GrblStates.Sleep; } }
         public bool IsG92Active { get { return GrblParserState.IsActive("G92") != null; } }
         public bool IsToolOffsetActive { get { return IsGrblHAL ? GrblParserState.IsActive("G49") == null : !(double.IsNaN(ToolOffset.Z) || ToolOffset.Z == 0d); } }
         public bool IsJobRunning {
@@ -545,7 +544,7 @@ namespace CNC.Core
         }
         public bool IsProbing { get { return _isProbing; } set { _isProbing = value; OnPropertyChanged(); } }
         public bool ProgramEnd { get { return _pgmEnd; } set { _pgmEnd = value; if (_pgmEnd) OnPropertyChanged(); } }
-        public int GrblError { get { return _grblState.Error; } set { _grblState.Error = value; OnPropertyChanged(); } }
+        public int GrblError { get { return State.GrblState.Error; } set { State.GrblState.Error = value; OnPropertyChanged(); } }
         public StreamingState StreamingState { get { return _streamingState; } set { if (_streamingState != value) { _streamingState = value; OnPropertyChanged(); } } }
         public string WorkCoordinateSystem { get { return _wcs; } private set { _wcs = value; OnPropertyChanged(); } }
         // The machine's own state, owned separately from this view model's display concerns - step 5 of
@@ -883,25 +882,25 @@ namespace CNC.Core
 
         public bool SetGRBLState(string newState, int substate, bool force)
         {
-            GrblStates newstate = _grblState.State;
+            GrblStates newstate = State.GrblState.State;
 
             Enum.TryParse(newState, true, out newstate);
 
-            if (newstate != _grblState.State || substate != _grblState.Substate || force)
+            if (newstate != State.GrblState.State || substate != State.GrblState.Substate || force)
             {
-                GrblStates prevState = _grblState.State;   // captured before the assignment below (demo cut markers)
-                bool checkChanged = _grblState.State == GrblStates.Check || newstate == GrblStates.Check;
-                bool sleepChanged = _grblState.State == GrblStates.Sleep || newstate == GrblStates.Sleep;
-                bool alarmChanged = _grblState.State == GrblStates.Alarm || newstate == GrblStates.Alarm;
+                GrblStates prevState = State.GrblState.State;   // captured before the assignment below (demo cut markers)
+                bool checkChanged = State.GrblState.State == GrblStates.Check || newstate == GrblStates.Check;
+                bool sleepChanged = State.GrblState.State == GrblStates.Sleep || newstate == GrblStates.Sleep;
+                bool alarmChanged = State.GrblState.State == GrblStates.Alarm || newstate == GrblStates.Alarm;
 
-                if (_grblState.State == GrblStates.Door && newstate != GrblStates.Door)
+                if (State.GrblState.State == GrblStates.Door && newstate != GrblStates.Door)
                     Message = string.Empty;
 
                 if (newstate == GrblStates.Alarm && substate > 0)
-                    _grblState.LastAlarm = substate;
+                    State.GrblState.LastAlarm = substate;
 
-                _grblState.State = newstate;
-                _grblState.Substate = substate;
+                State.GrblState.State = newstate;
+                State.GrblState.Substate = substate;
 
                 //                force = true;
 
@@ -1002,7 +1001,7 @@ namespace CNC.Core
             bool changed, wco_present = data.Contains("|WCO:");
             int rti = data.Contains("|WCO:") || data.Contains("|MPG:") ? 1 : (data.Contains("|Ov:") ? 2 : 0);
 
-            if ((changed = (_rtState[rti] != data) || _grblState.State == GrblStates.Unknown)) {
+            if ((changed = (_rtState[rti] != data) || State.GrblState.State == GrblStates.Unknown)) {
 
                 bool pos_changed = false;
                 string[] elements = data.TrimEnd('>').Split('|');
@@ -1316,8 +1315,8 @@ namespace CNC.Core
                     break;
 
                 case "MPG":
-                    GrblInfo.MPGMode = _grblState.MPG = value == "1";
-                    IsMPGActive = _grblState.MPG;
+                    GrblInfo.MPGMode = State.GrblState.MPG = value == "1";
+                    IsMPGActive = State.GrblState.MPG;
                     if (IsMPGActive == false && AutoReportingEnabled)
                     {
                         AutoReportingEnabled = false;
@@ -1543,7 +1542,7 @@ namespace CNC.Core
             {
                 if(Poller != null)
                     Poller.SetState(0);
-                _grblState.State = GrblStates.Unknown;
+                State.GrblState.State = GrblStates.Unknown;
                 var msg = Message;
                 // Capture BEFORE GrblReset, whose Message = "" runs the setter and clears the flag.
                 // The save/restore below exists so transient status text (the reconnect notice, say)
@@ -1609,8 +1608,8 @@ namespace CNC.Core
 
             if (!inAlarm && GrblState.State == GrblStates.Alarm) {
                 System.Threading.Interlocked.Increment(ref AlarmEventCounter);
-                SetErrorMessage(GrblAlarms.GetMessage(_grblState.Substate.ToString()));
-                ResponseLog.Add(string.Format("Alarm:{0} - {1}", _grblState.Substate, Message));
+                SetErrorMessage(GrblAlarms.GetMessage(State.GrblState.Substate.ToString()));
+                ResponseLog.Add(string.Format("Alarm:{0} - {1}", State.GrblState.Substate, Message));
             }
             else if ((!Silent || isBootBanner) && (ResponseLogVerbose || mdiQueryReply || !(data.First() == '<' || data.First() == '$' || data.First() == 'o' || (data.First() == '[' && (data.StartsWith("[GC") || DataIsEnumeration(data)))) || data.StartsWith("error")))
             {
