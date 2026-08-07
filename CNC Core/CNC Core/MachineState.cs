@@ -125,5 +125,36 @@ namespace CNC.Core
         // Status auto-reporting (grblHAL): whether the controller pushes reports unpolled, and its interval.
         public bool AutoReportingEnabled { get; set; }
         public int AutoReportInterval { get; set; }
+
+        // ---- Machine-truth telemetry (slice 5d). Same contract as the scalars above: storage only,
+        // notification stays on GrblViewModel. The operator-side spindle values (the RPM input box and
+        // the display-selection logic) are client policy and stay there.
+
+        // Feed rate and programmed spindle RPM, as last reported (the FS/F status report elements).
+        public double FeedRate { get; set; } = 0d;
+        public double ProgrammedRPM { get; set; } = 0d;
+
+        // Encoder-measured spindle RPM; NaN when this build does not report it.
+        public double ActualRPM { get; set; } = double.NaN;
+
+        // Spindle PWM output, as last reported.
+        public int PWM { get; set; }
+
+        // Override percentages, as last reported (the Ov status report element).
+        public double FeedOverride { get; set; } = 100d;
+        public double RapidsOverride { get; set; } = 100d;
+        public double RPMOverride { get; set; } = 100d;
+
+        // Torch height control arc voltage (plasma); NaN when not reported.
+        public double THCVoltage { get; set; } = double.NaN;
+
+        // Lathe radius/diameter mode; Disabled on non-lathe machines.
+        public LatheMode LatheMode { get; set; } = LatheMode.Disabled;
+
+        // Homing status, as last derived from reports and alarms.
+        public HomedState HomedState { get; set; } = HomedState.Unknown;
+
+        // Whether an MPG pendant currently has control; null until a report has said either way.
+        public bool? IsMPGActive { get; set; }
     }
 }

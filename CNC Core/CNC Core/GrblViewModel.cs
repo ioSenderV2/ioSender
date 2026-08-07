@@ -60,20 +60,6 @@ namespace CNC.Core
         private int _line, _scrollpos, _blocks = 0, _startFromBlock = 0, _executingBlock = 0, _auxinValue = -2, _spindle_num = 0;
         private double _rpmInput = 0d, _rpmDisplay = 0d, _jogStep = 0.1d;
         private string _pb_avail, _rxb_avail;
-
-        // Machine truth, declared apart from the sender state above so slice 5d can move their storage to
-        // MachineState without touching the shared declaration lines.
-        private bool? _mpg;
-        private int _pwm;
-        private double _feedrate = 0d;
-        private double _rpm = 0d;
-        private double _rpmActual = double.NaN;
-        private double _feedOverride = 100d;
-        private double _rapidsOverride = 100d;
-        private double _rpmOverride = 100d;
-        private double _thcVoltage = double.NaN;
-        private LatheMode _latheMode = LatheMode.Disabled;
-        private HomedState _homedState = HomedState.Unknown;
         private GrblEncoderMode _encoder_ovr = GrblEncoderMode.Unknown;
         private StreamingState _streamingState;
         public SpindleState _spindleStatePrev = GCode.SpindleState.Off;
@@ -200,7 +186,7 @@ namespace CNC.Core
 
         private void SpindleState_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            _rpmDisplay = _spindleStatePrev == GCode.SpindleState.Off ? _rpmInput : _rpm;
+            _rpmDisplay = _spindleStatePrev == GCode.SpindleState.Off ? _rpmInput : State.ProgrammedRPM;
             if (!(SpindleState.Value.HasFlag(GCode.SpindleState.Off | GCode.SpindleState.CW) || SpindleState.Value.HasFlag(GCode.SpindleState.Off | GCode.SpindleState.CCW)))
             {
                 OnPropertyChanged(nameof(SpindleState));
@@ -233,9 +219,9 @@ namespace CNC.Core
             _feedOverrideDisabled = _rpmOverrideDisabled = _feedHoldDisabled = false;
             _pb_avail = _rxb_avail = _rtState[0] = _rtState[1] = _rtState[2] = _spindle = string.Empty;
             State.Probe = string.Empty;
-            _mpg = null;
+            State.IsMPGActive = null;
             _line = _scrollpos = _spindle_num = 0;
-            _pwm = 0;
+            State.PWM = 0;
             _auxinValue = -2; // No value read (use a nullable type?)
 
             State.GrblState.Error = 0;
@@ -258,7 +244,7 @@ namespace CNC.Core
             FsCwd = "/";
             SDCardStatus = string.Empty;
             HomedState = HomedState.Unknown;
-            if (_latheMode != LatheMode.Disabled)
+            if (State.LatheMode != LatheMode.Disabled)
                 LatheMode = LatheMode.Radius;
 
             _thcv = _thcs = string.Empty;
@@ -616,21 +602,21 @@ namespace CNC.Core
         public bool IsLoading { get { return _isLoading; } set { if (_isLoading != value) { _isLoading = value; OnPropertyChanged(); } } }
         public string FsCwd { get { return _fsCwd; } private set { _fsCwd = value; OnPropertyChanged(); } }
         public bool IsPhysicalFileLoaded { get { return _fileName != string.Empty && (_fileName.StartsWith(@"\\") || _fileName[1] == ':'); } }
-        public bool? IsMPGActive { get { return _mpg; } private set { if (_mpg != value) { _mpg = value; OnPropertyChanged(); } } }
+        public bool? IsMPGActive { get { return State.IsMPGActive; } private set { if (State.IsMPGActive != value) { State.IsMPGActive = value; OnPropertyChanged(); } } }
         public string Scaling { get { return _sc; } private set { _sc = value; OnPropertyChanged(); } }
         public string SDCardStatus { get { return _sd; } private set { _sd = value; OnPropertyChanged(); } }
         public SDState SDCardMountStatus { get { return _sdMounted; } set { _sdMounted = value; OnPropertyChanged(); } }
         public bool IsHomingEnabled { get { return GrblInfo.HomingEnabled; } }
-        public HomedState HomedState { get { return _homedState; } private set { _homedState = value; OnPropertyChanged(); } }
+        public HomedState HomedState { get { return State.HomedState; } private set { State.HomedState = value; OnPropertyChanged(); } }
         public LatheMode LatheMode
         {
-            get { return _latheMode; }
+            get { return State.LatheMode; }
             private set
             {
-                if (_latheMode != value)
+                if (State.LatheMode != value)
                 {
-                    _latheMode = value;
-                    if (_latheMode != LatheMode.Disabled && NumAxes == 2)
+                    State.LatheMode = value;
+                    if (State.LatheMode != LatheMode.Disabled && NumAxes == 2)
                     {
                         Position.Y = MachinePosition.Y = WorkPosition.Y = WorkPositionOffset.Y = 0d;
                     }
@@ -676,7 +662,7 @@ namespace CNC.Core
         public bool Fan0 { get { return _fan0; } set { _fan0 = value; OnPropertyChanged(); } }
         public int LineNumber { get { return _line; } private set { _line = value; OnPropertyChanged(); } }
 
-        public double THCVoltage { get { return _thcVoltage; } private set { _thcVoltage = value; OnPropertyChanged(); } }
+        public double THCVoltage { get { return State.THCVoltage; } private set { State.THCVoltage = value; OnPropertyChanged(); } }
         public EnumFlags<THCSignals> THCSignals { get; private set; } = new EnumFlags<THCSignals>(Core.THCSignals.Off);
 
         #region Spindle
@@ -747,18 +733,18 @@ namespace CNC.Core
 
         #region FS - Feed and Speed (RPM)
 
-        public double FeedRate { get { return _feedrate; } private set { _feedrate = value; OnPropertyChanged(); } }
+        public double FeedRate { get { return State.FeedRate; } private set { State.FeedRate = value; OnPropertyChanged(); } }
         public double ProgrammedRPM
         {
-            get { return _rpm; }
+            get { return State.ProgrammedRPM; }
             set {
-                if (_rpm != value)
+                if (State.ProgrammedRPM != value)
                 {
-                    _rpm = value;
+                    State.ProgrammedRPM = value;
                     OnPropertyChanged();
 
-                    if (_rpm != 0d)
-                        _rpmInput = _rpm / (RPMOverride / 100d);
+                    if (State.ProgrammedRPM != 0d)
+                        _rpmInput = State.ProgrammedRPM / (RPMOverride / 100d);
                     else if (!IsGrblHAL && (_a == "S" || _a == "C")) // Hack for legacy Grbl no informing about spindle going off
                     {
                         _a = "";
@@ -767,7 +753,7 @@ namespace CNC.Core
 
                     if (double.IsNaN(ActualRPM))
                     {
-                        _rpmDisplay = _rpm == 0d ? _rpmInput : _rpm;
+                        _rpmDisplay = State.ProgrammedRPM == 0d ? _rpmInput : State.ProgrammedRPM;
                         OnPropertyChanged(nameof(RPM));
                     }
                 }
@@ -775,16 +761,16 @@ namespace CNC.Core
         }
         public double ActualRPM
         {
-            get { return _rpmActual; }
+            get { return State.ActualRPM; }
             private set
             {
-                if (_rpmActual != value)
+                if (State.ActualRPM != value)
                 {
-                    _rpmActual = value;
+                    State.ActualRPM = value;
                     OnPropertyChanged();
                     if (!double.IsNaN(ActualRPM))
                     {
-                        _rpmDisplay = _rpmActual == 0d ? _rpmInput : _rpmActual;
+                        _rpmDisplay = State.ActualRPM == 0d ? _rpmInput : State.ActualRPM;
                         OnPropertyChanged(nameof(RPM));
                     }
                 }
@@ -795,15 +781,15 @@ namespace CNC.Core
             set { _rpmDisplay = _rpmInput = value; OnPropertyChanged(); }
         }
 
-        public int PWM { get { return _pwm; } private set { _pwm = value; OnPropertyChanged(); } }
+        public int PWM { get { return State.PWM; } private set { State.PWM = value; OnPropertyChanged(); } }
         #endregion
 
         #region Ov - Feed and spindle overrides
 
-        public double FeedOverride { get { return _feedOverride; } private set { _feedOverride = value; OnPropertyChanged(); } }
+        public double FeedOverride { get { return State.FeedOverride; } private set { State.FeedOverride = value; OnPropertyChanged(); } }
         public bool FeedOverrideDisabled { get { return _feedOverrideDisabled; } private set { _feedOverrideDisabled = value; OnPropertyChanged(); } }
-        public double RapidsOverride { get { return _rapidsOverride; } private set { _rapidsOverride = value; OnPropertyChanged(); } }
-        public double RPMOverride { get { return _rpmOverride; } private set { _rpmOverride = value; OnPropertyChanged(); } }
+        public double RapidsOverride { get { return State.RapidsOverride; } private set { State.RapidsOverride = value; OnPropertyChanged(); } }
+        public double RPMOverride { get { return State.RPMOverride; } private set { State.RPMOverride = value; OnPropertyChanged(); } }
         public bool RPMOverrideDisabled { get { return _rpmOverrideDisabled; } private set { _rpmOverrideDisabled = value; OnPropertyChanged(); } }
         public bool FeedHoldDisabled { get { return _feedHoldDisabled; } private set { _feedHoldDisabled = value; OnPropertyChanged(); } }
 
@@ -899,7 +885,7 @@ namespace CNC.Core
                     WorkCoordinateSystem = GrblParserState.WorkOffset;
                 if (GrblParserState.Tool != State.Tool)
                     Tool = GrblParserState.Tool;
-                if (GrblParserState.LatheMode != _latheMode)
+                if (GrblParserState.LatheMode != State.LatheMode)
                     LatheMode = GrblParserState.LatheMode;
                 if (GrblParserState.IsActive("G51") != null)
                     Set("Sc", GrblParserState.IsActive("G51"));
@@ -1180,11 +1166,11 @@ namespace CNC.Core
                         else try
                         {
                             double[] values = dbl.ParseList(_fs);
-                            if (_feedrate != values[0])
+                            if (State.FeedRate != values[0])
                                 FeedRate = values[0];
-                            if (_rpm != values[1])
+                            if (State.ProgrammedRPM != values[1])
                                 ProgrammedRPM = values[1];
-                            if (values.Length > 2 && _rpmActual != values[2])
+                            if (values.Length > 2 && State.ActualRPM != values[2])
                                 ActualRPM = values[2];
                         }
                         catch { }
@@ -1263,11 +1249,11 @@ namespace CNC.Core
                         else try 
                         {
                             double[] values = dbl.ParseList(_ov);
-                            if (_feedOverride != values[0])
+                            if (State.FeedOverride != values[0])
                                 FeedOverride = values[0];
-                            if (_rapidsOverride != values[1])
+                            if (State.RapidsOverride != values[1])
                                 RapidsOverride = values[1];
-                            if (_rpmOverride != values[2])
+                            if (State.RPMOverride != values[2])
                                 RPMOverride = values[2];
                         }
                         catch { }
