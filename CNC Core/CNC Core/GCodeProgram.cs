@@ -135,6 +135,50 @@ namespace CNC.Core
 
             if (filename != "")
                 PushHeaderToSimulator();
+
+            EstimateRunTime(filename);
+        }
+
+        // Run-time estimate for whatever was just loaded - file, drag-drop, converter, restored program, all
+        // of which land here. Reuses the tokens the load ALREADY produced, so there is no second parse.
+        //
+        // Off the UI thread on purpose: the walk is proportional to program length, and this runs at the end
+        // of a load that is already the slowest thing the app does on a big file. The estimate simply appears
+        // a moment after the program does. The token list is SNAPSHOT first - the next load calls
+        // Parser.Reset(), which clears that very list out from under a walk in progress - and a generation
+        // counter makes sure a slow estimate for a file the operator has already replaced is discarded rather
+        // than labelling the new one.
+        private static int estimateGeneration;
+
+        private void EstimateRunTime(string filename)
+        {
+            if (Model == null)
+                return;
+
+            int generation = System.Threading.Interlocked.Increment(ref estimateGeneration);
+            var model = Model;
+
+            if (filename == "" || !Program.Loaded)
+            {
+                model.EstimatedRunTime = string.Empty;
+                return;
+            }
+
+            var snapshot = new List<GCodeToken>(Program.Parser.Tokens);
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                string text;
+                try
+                {
+                    text = GCodeRunTime.Format(GCodeRunTime.Estimate(snapshot));
+                }
+                catch
+                {
+                    text = string.Empty;   // an estimate is a nicety; it must never surface as a failure
+                }
+                if (System.Threading.Volatile.Read(ref estimateGeneration) == generation)
+                    model.EstimatedRunTime = text;
+            });
         }
 
         // When connected to the simulator, send the program's leading comment lines (e.g. (STOCK X=..) and

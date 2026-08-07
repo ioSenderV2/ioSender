@@ -820,6 +820,16 @@ namespace CNC.Core
         // Reset to false on every OTHER Message assignment so a stale error flag can't outlive its message.
         public bool IsMessageError { get; private set; } = false;
 
+        // Estimated run time of the loaded program, "~14 min" (see GCodeRunTime), or empty when nothing is
+        // loaded / the estimate hasn't landed yet. Computed off the UI thread after a load completes, so a
+        // big file's load is not made slower by it - it simply appears a moment later.
+        private string _estimatedRunTime = string.Empty;
+        public string EstimatedRunTime
+        {
+            get { return _estimatedRunTime; }
+            set { if (_estimatedRunTime != value) { _estimatedRunTime = value; OnPropertyChanged(); } }
+        }
+
         // Every non-empty status message since launch, timestamped, errors marked "!". The status line
         // shows one message at a time and later ones overwrite freely, so this is where "what did it say
         // a minute ago" gets answered - click the status line (MainWindow) to see it. Read on demand,
