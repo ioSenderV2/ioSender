@@ -144,6 +144,9 @@ namespace CNC.Controls
         // hover timers: show ~450 ms after the pointer settles on a row; close ~250 ms after it leaves the row
         // AND the balloon (the gap lets the pointer travel onto the balloon to click it).
         private System.Windows.Threading.DispatcherTimer _explainShow, _explainClose;
+        // Watchdog for a balloon that was opened and then never told to close. See EnsureExplainTimers.
+        private System.Windows.Threading.DispatcherTimer _explainWatch;
+        private int _explainIdleTicks;
         private DataGridRow _hoverRow;
         // Captured at MouseEnter, not re-read from _hoverRow.Item when the (450ms-delayed) show-timer fires -
         // EnableRowVirtualization means the SAME DataGridRow container can be recycled onto a DIFFERENT
@@ -163,6 +166,36 @@ namespace CNC.Controls
             _explainShow.Tick += (s, e) => { _explainShow.Stop(); ShowExplain(); };
             _explainClose = new System.Windows.Threading.DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(250) };
             _explainClose.Tick += (s, e) => { _explainClose.Stop(); explainPopup.IsOpen = false; };
+
+            // The only close path above is the anchor row's OWN MouseLeave, so an event that never arrives
+            // strands a StaysOpen popup permanently - anchored to a DataGridRow that may not even exist any
+            // more, which leaves no way to dismiss it short of restarting. That is not hypothetical here:
+            // _hoverBlock's note directly above already records that virtualization recycles a container onto
+            // a different block WITHOUT a matching MouseLeave/MouseEnter pair, and the end of a job
+            // re-templates every row at once as Sent flips to "ok". Seen 2026-08-06 - a work order finished
+            // and left the balloon on screen, undismissable.
+            //
+            // Rather than chase each way an event can go missing, watch the thing that actually matters: is
+            // anyone using this balloon? Closing only after NEITHER the anchor row NOR the balloon has been
+            // under the pointer for two consecutive ticks means it cannot fire while the balloon is genuinely
+            // being read, nor during the 250ms grace the pointer gets to travel onto it.
+            _explainWatch = new System.Windows.Threading.DispatcherTimer { Interval = System.TimeSpan.FromSeconds(1) };
+            _explainWatch.Tick += (s, e) =>
+            {
+                if (!explainPopup.IsOpen)
+                {
+                    _explainWatch.Stop();
+                    return;
+                }
+
+                bool inUse = (_hoverRow != null && _hoverRow.IsMouseOver) || explainPopup.IsMouseOver;
+                _explainIdleTicks = inUse ? 0 : _explainIdleTicks + 1;
+                if (_explainIdleTicks >= 2)
+                {
+                    _explainWatch.Stop();
+                    explainPopup.IsOpen = false;
+                }
+            };
         }
 
         private void Row_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
@@ -194,6 +227,8 @@ namespace CNC.Controls
             explainPopup.PlacementTarget = _hoverRow;
             explainPopup.IsOpen = false;   // force a reposition when moving between rows
             explainPopup.IsOpen = true;
+            _explainIdleTicks = 0;
+            _explainWatch.Start();
         }
 
         private void ExplainPopup_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
