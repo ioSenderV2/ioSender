@@ -22,6 +22,7 @@ static class Probe
     static readonly JsonSerializerOptions json = new JsonSerializerOptions
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        IncludeFields = true,   // GrblState is a fields-only struct; without this it serializes as {}
         Converters = { new JsonStringEnumConverter() }
     };
 
@@ -175,6 +176,13 @@ static class Probe
             Check((sd.Changed & MachineField.MachinePosition) != 0 && sd.State.MachinePosition[0] == 10.0
                   && sd.State.MachinePosition[1] == 20.0 && sd.State.MachinePosition[2] == 5.0,
                   "parsed machine position crosses");
+
+            // The wire FORM, not just object equality: the run state's NAME must appear in the JSON.
+            // Mirror-vs-source compares both sides through one serializer and cannot see a field the
+            // serializer drops - exactly how GrblState shipped as {} (fields-only struct + S.T.J
+            // defaults) and was only caught by reading the first live wire log.
+            string wire = JsonSerializer.Serialize(sd, json);
+            Check(wire.Contains("\"State\":\"Idle\""), "wire JSON literally carries the run state name");
 
             // An identical report changes nothing and must emit nothing.
             model.DataReceived("<Idle|MPos:10.000,20.000,5.000|FS:0,0>");

@@ -38,6 +38,11 @@ namespace CNC.Core
         private static readonly JsonSerializerOptions wireJson = new JsonSerializerOptions
         {
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            // NOT optional: GrblState is a struct with public FIELDS (the parser mutates its members
+            // individually - see MachineState's remarks), and System.Text.Json silently serializes a
+            // fields-only type as {} unless fields are enabled. Found live: the first real wire log
+            // had every run state as an empty object. Any future wire serializer needs the same.
+            IncludeFields = true,
             Converters = { new JsonStringEnumConverter() }
         };
 

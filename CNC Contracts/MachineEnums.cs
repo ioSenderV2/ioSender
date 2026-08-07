@@ -77,6 +77,10 @@ namespace CNC.Core
         FloatSwitch = 1 << 10
     }
 
+    // FIELDS, not properties, deliberately: the status parser mutates members individually, and C#
+    // forbids mutating members through a struct-typed property (see MachineState.GrblState's remarks).
+    // ⚠ Serializer consequence: System.Text.Json ignores fields by default and emits {} - every wire
+    // serializer must set IncludeFields = true (found live in the first -debuglog=delta wire log).
     public struct GrblState
     {
         public GrblStates State;
