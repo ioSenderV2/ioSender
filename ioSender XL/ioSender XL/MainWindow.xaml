@@ -114,13 +114,25 @@
                 </TextBlock>
             </StatusBarItem>
             <Separator Grid.Column="1" />
-            <StatusBarItem Grid.Column="2">
+            <StatusBarItem Grid.Column="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
                 <!-- msgFlashBorder: a new Message briefly flashes this background light green (normal) or
                      light red (error, GrblViewModel.IsMessageError) for 5s - see MainWindow.xaml.cs's
                      FlashMessage - instead of the old enlarge/shrink-font animation, which shifted the whole
                      window layout up/down every time a message arrived. lblMessage's font is now permanently
-                     large (doubled once at startup, see MainWindow_Loaded) rather than only during that window. -->
-                <Border x:Name="msgFlashBorder" Background="Transparent" Padding="2,0">
+                     large (doubled once at startup, see MainWindow_Loaded) rather than only during that window.
+                     The click handler, cursor and tooltip live HERE, not on lblMessage: a TextBlock only
+                     hit-tests its drawn glyphs, so on the TextBlock the click target shrank to the text
+                     itself (and to nothing while the line was empty). The StatusBarItem stretches its
+                     content so this transparent Border spans the whole message column. -->
+                <Border x:Name="msgFlashBorder" Background="Transparent" Padding="2,0"
+                        Cursor="Hand" MouseLeftButtonUp="Message_Click"
+                        ToolTipService.ShowDuration="60000" ToolTipService.InitialShowDelay="300">
+                    <Border.ToolTip>
+                        <StackPanel MaxWidth="540">
+                            <TextBlock Text="{Binding Path=Message}" TextWrapping="Wrap"/>
+                            <TextBlock x:Uid="lbl_messageHistoryHint" Text="Click for the full message history since launch." Foreground="#FF888888" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border.ToolTip>
                     <StackPanel Orientation="Horizontal">
                         <Button x:Uid="btn_copyMessage" x:Name="btnCopyMessage" Click="CopyMessage_Click" Cursor="Hand"
                                 ToolTip="Copy the full status message to the clipboard" Focusable="False"
@@ -135,15 +147,7 @@
                                    Foreground="ForestGreen" FontWeight="SemiBold" VerticalAlignment="Center"
                                    Margin="0,0,6,0"/>
                         <TextBlock x:Uid="lbl_message" x:Name="lblMessage" Text="{Binding Path=Message}" TextWrapping="NoWrap"
-                                   VerticalAlignment="Center" ToolTipService.ShowDuration="60000" ToolTipService.InitialShowDelay="300"
-                                   Cursor="Hand" MouseLeftButtonUp="Message_Click">
-                            <TextBlock.ToolTip>
-                                <StackPanel MaxWidth="540">
-                                    <TextBlock Text="{Binding Path=Message}" TextWrapping="Wrap"/>
-                                    <TextBlock x:Uid="lbl_messageHistoryHint" Text="Click for the full message history since launch." Foreground="#FF888888" Margin="0,4,0,0"/>
-                                </StackPanel>
-                            </TextBlock.ToolTip>
-                        </TextBlock>
+                                   VerticalAlignment="Center"/>
                     </StackPanel>
                 </Border>
             </StatusBarItem>

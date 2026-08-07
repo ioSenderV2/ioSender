@@ -2451,6 +2451,17 @@ namespace GCode_Sender
                 Content = text
             };
             win.Loaded += (s2, e2) => { text.CaretIndex = text.Text.Length; text.ScrollToEnd(); };
+            // Esc closes, like the console log and every other floating window here. Bubbling KeyDown,
+            // not PreviewKeyDown, for the reason ConsoleWindow.OnKeyDown documents: preview tunnels from
+            // the root and would steal the key from any child that wants it first.
+            win.KeyDown += (s2, e2) =>
+            {
+                if (e2.Key == System.Windows.Input.Key.Escape && !e2.Handled)
+                {
+                    e2.Handled = true;
+                    win.Close();
+                }
+            };
             win.Show();
         }
 
