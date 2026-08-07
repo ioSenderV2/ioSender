@@ -61,13 +61,6 @@ namespace CNC.Core
         private int _pwm, _line, _scrollpos, _blocks = 0, _startFromBlock = 0, _executingBlock = 0, _auxinValue = -2, _spindle_num = 0;
         private double _feedrate = 0d;
         private double _rpm = 0d, _rpmInput = 0d, _rpmDisplay = 0d, _jogStep = 0.1d;
-
-        // Machine truth, declared apart from the sender state above so slice 5c can move their storage to
-        // MachineState without touching the shared declaration lines.
-        private string _tool, _probe, _wcs;
-        private bool _isMPos, _isProbeSuccess, _isTloRefSet, _autoReporting = false;
-        private int _autoReportInterval = 0;
-        private double _tloReferenceOffset = double.NaN;
         private double _rpmActual = double.NaN;
         private double _feedOverride = 100d;
         private double _rapidsOverride = 100d;
@@ -104,7 +97,7 @@ namespace CNC.Core
         public GrblViewModel()
         {
             _a = _pn = _fs = _sc = string.Empty;
-            _tool = string.Empty;
+            State.Tool = string.Empty;
 
             Clear();
 
@@ -231,10 +224,10 @@ namespace CNC.Core
             _fileName = _mdiCommand = _mdiText = _programPath = string.Empty;
             _streamingState = StreamingState.NoFile;
             _reset = _isJobRunning = _pgmEnd = false;
-            _isMPos = _isProbeSuccess = _isTloRefSet = false;
+            State.IsMachinePosition = State.IsProbeSuccess = State.IsTloReferenceSet = false;
             _feedOverrideDisabled = _rpmOverrideDisabled = _feedHoldDisabled = false;
             _pb_avail = _rxb_avail = _rtState[0] = _rtState[1] = _rtState[2] = _spindle = string.Empty;
-            _probe = string.Empty;
+            State.Probe = string.Empty;
             _mpg = null;
             _line = _pwm = _scrollpos = _spindle_num = 0;
             _auxinValue = -2; // No value read (use a nullable type?)
@@ -490,18 +483,18 @@ namespace CNC.Core
         public ObservableCollection<Probe> Probes { get { return GrblInfo.Probes; } }
         public bool MultiProbe { get { return _multiProbe; } set { _multiProbe = value; OnPropertyChanged(); } }
         public ObservableCollection<string> SystemInfo { get { return GrblInfo.SystemInfo; } }
-        public string Tool { get { return _tool; } set { _tool = GrblParserState.Tool = value; OnPropertyChanged(); } }
-        public int Probe { get { return int.Parse(_probe); } set { _probe = (GrblParserState.Probe = value).ToString(); OnPropertyChanged(); } }
-        public double TloReference { get { return _tloReferenceOffset; } private set { _tloReferenceOffset = value; OnPropertyChanged(); OnPropertyChanged(nameof(TloReferenceTooltip)); } }
+        public string Tool { get { return State.Tool; } set { State.Tool = GrblParserState.Tool = value; OnPropertyChanged(); } }
+        public int Probe { get { return int.Parse(State.Probe); } set { State.Probe = (GrblParserState.Probe = value).ToString(); OnPropertyChanged(); } }
+        public double TloReference { get { return State.TloReference; } private set { State.TloReference = value; OnPropertyChanged(); OnPropertyChanged(nameof(TloReferenceTooltip)); } }
         public bool IsTloReferenceSet {
-            get { return _isTloRefSet; }
+            get { return State.IsTloReferenceSet; }
             private set
             {
-                if (_isTloRefSet != value)
+                if (State.IsTloReferenceSet != value)
                 {
-                    if (_isTloRefSet)
+                    if (State.IsTloReferenceSet)
                         TloReference = double.NaN;
-                    _isTloRefSet = value;
+                    State.IsTloReferenceSet = value;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(TloReferenceTooltip));
                 }
@@ -524,8 +517,8 @@ namespace CNC.Core
         //        public bool CanReset { get { return _canReset; } private set { if(value != _canReset) { _canReset = value; OnPropertyChanged(); } } }
         public bool GrblReset { get { return _reset; } set { if ((_reset = value)) { State.GrblState.Error = 0; OnPropertyChanged(); Message = ""; } } }
         public GrblState GrblState { get { return State.GrblState; } set { State.GrblState = value; OnPropertyChanged(); } }
-        public bool AutoReportingEnabled { get { return _autoReporting; } set { { _autoReporting = value; OnPropertyChanged(); } } }
-        public int AutoReportInterval { get { return _autoReportInterval; } private set { { _autoReportInterval = value; OnPropertyChanged(); } } }
+        public bool AutoReportingEnabled { get { return State.AutoReportingEnabled; } set { { State.AutoReportingEnabled = value; OnPropertyChanged(); } } }
+        public int AutoReportInterval { get { return State.AutoReportInterval; } private set { { State.AutoReportInterval = value; OnPropertyChanged(); } } }
         public bool IsGCLock { get { return State.GrblState.State == GrblStates.Hold || State.GrblState.State == GrblStates.Alarm; } }
         public bool GcodeCommandsAllowed { get { return !(IsGCLock || IsJobRunning); } }
         public bool SystemCommandsAllowed { get { return !(State.GrblState.State == GrblStates.Hold || (State.GrblState.State == GrblStates.Alarm && !IsGrblHAL)); } }
@@ -556,7 +549,7 @@ namespace CNC.Core
         public bool ProgramEnd { get { return _pgmEnd; } set { _pgmEnd = value; if (_pgmEnd) OnPropertyChanged(); } }
         public int GrblError { get { return State.GrblState.Error; } set { State.GrblState.Error = value; OnPropertyChanged(); } }
         public StreamingState StreamingState { get { return _streamingState; } set { if (_streamingState != value) { _streamingState = value; OnPropertyChanged(); } } }
-        public string WorkCoordinateSystem { get { return _wcs; } private set { _wcs = value; OnPropertyChanged(); } }
+        public string WorkCoordinateSystem { get { return State.WorkCoordinateSystem; } private set { State.WorkCoordinateSystem = value; OnPropertyChanged(); } }
         // The machine's own state, owned separately from this view model's display concerns - step 5 of
         // the client/server split. These properties forward to it and return the SAME instances they always
         // did, so every binding in the app is unaffected; see MachineState's header for why composition
@@ -566,7 +559,7 @@ namespace CNC.Core
         public Position MachinePosition { get { return State.MachinePosition; } }
         public Position WorkPosition { get { return State.WorkPosition; } }
         public Position Position { get { return State.Position; } }
-        public bool IsMachinePosition { get { return _isMPos; } private set { _isMPos = value; OnPropertyChanged(); } }
+        public bool IsMachinePosition { get { return State.IsMachinePosition; } private set { State.IsMachinePosition = value; OnPropertyChanged(); } }
         public bool IsMachinePositionKnown { get { return MachinePosition.IsSet(GrblInfo.AxisFlags); } }
         public bool SuspendPositionNotifications
         {
@@ -581,7 +574,7 @@ namespace CNC.Core
         public Position WorkPositionOffset { get { return State.WorkPositionOffset; } }
         public Position ToolOffset { get { return State.ToolOffset; } }
         public Position ProbePosition { get { return State.ProbePosition; } }
-        public bool IsProbeSuccess { get { return _isProbeSuccess; } private set { _isProbeSuccess = value; OnPropertyChanged(); } }
+        public bool IsProbeSuccess { get { return State.IsProbeSuccess; } private set { State.IsProbeSuccess = value; OnPropertyChanged(); } }
         public EnumFlags<Signals> Signals { get { return State.Signals; } }
         public EnumFlags<Signals> OptionalSignals { get { return State.OptionalSignals; } set { State.OptionalSignals = value; } }
         public EnumFlags<AxisFlags> AxisScaled { get { return State.AxisScaled; } }
@@ -651,7 +644,7 @@ namespace CNC.Core
             get { return GrblInfo.AxisFlags; }
             set {
                 OnPropertyChanged();
-                if (_isMPos)
+                if (State.IsMachinePosition)
                 {
                     if (has_wco)
                         Position.Set(MachinePosition - WorkPositionOffset);
@@ -896,9 +889,9 @@ namespace CNC.Core
             set
             {
                 _gc = value;
-                if (GrblParserState.WorkOffset != _wcs)
+                if (GrblParserState.WorkOffset != State.WorkCoordinateSystem)
                     WorkCoordinateSystem = GrblParserState.WorkOffset;
-                if (GrblParserState.Tool != _tool)
+                if (GrblParserState.Tool != State.Tool)
                     Tool = GrblParserState.Tool;
                 if (GrblParserState.LatheMode != _latheMode)
                     LatheMode = GrblParserState.LatheMode;
@@ -1064,7 +1057,7 @@ namespace CNC.Core
 
                     if (pos_changed)
                     {
-                        if(_isMPos)
+                        if(State.IsMachinePosition)
                         {
                             if (has_wco)
                                 Position.Set(MachinePosition - WorkPositionOffset);
@@ -1098,7 +1091,7 @@ namespace CNC.Core
                 case "MPos":
                     if ((pos_changed = _MPos != value))
                     {
-                        if (!_isMPos)
+                        if (!State.IsMachinePosition)
                             IsMachinePosition = true;
                         _MPos = value;
                         MachinePosition.Parse(_MPos);
@@ -1108,7 +1101,7 @@ namespace CNC.Core
                 case "WPos":
                     if ((pos_changed = _WPos != value))
                     {
-                        if (_isMPos)
+                        if (State.IsMachinePosition)
                             IsMachinePosition = false;
                         _WPos = value;
                         WorkPosition.Parse(_WPos);
@@ -1146,7 +1139,7 @@ namespace CNC.Core
                     break;
 
                 case "WCS":
-                    if (_wcs != value)
+                    if (State.WorkCoordinateSystem != value)
                         WorkCoordinateSystem = GrblParserState.WorkOffset = value;
                     break;
 
@@ -1216,7 +1209,7 @@ namespace CNC.Core
                     break;
 
                 case "P":
-                    if (_probe != value)
+                    if (State.Probe != value)
                     {
                         var state = value.Split(',');
                         Probe = int.Parse(state[0]);
@@ -1336,7 +1329,7 @@ namespace CNC.Core
                     break;
 
                 case "T":
-                    if (_tool != value)
+                    if (State.Tool != value)
                         Tool = value == "0" ? GrblConstants.NO_TOOL : value;
                     break;
 

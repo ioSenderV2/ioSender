@@ -81,8 +81,7 @@ namespace CNC.Core
         public Position ToolOffset { get; private set; } = new Position();
         public Position HomePosition { get; private set; } = new Position();
 
-        // Where the last probe triggered, in machine coordinates. Meaningless unless the probe succeeded -
-        // the success flag lives with the scalars for now.
+        // Where the last probe triggered, in machine coordinates. Meaningless unless IsProbeSuccess.
         public Position ProbePosition { get; private set; } = new Position();
 
         // Axis naming for this machine (letters, and the lathe remapping). A MACHINE property, not a
@@ -98,5 +97,33 @@ namespace CNC.Core
 
         // Axes currently under a scaling factor (G51).
         public EnumFlags<AxisFlags> AxisScaled { get; private set; } = new EnumFlags<AxisFlags>(AxisFlags.None);
+
+        // ---- Machine-truth scalars (slice 5c). Storage only, and deliberately without notification: the
+        // notifying setters stay on GrblViewModel, per the seam rule that has carried this split -
+        // MachineState holds the storage, GrblViewModel holds the notification. Defaults mirror the
+        // GrblViewModel fields they replaced.
+
+        // Active work coordinate system ("G54".."G59.3"), as last parsed/reported.
+        public string WorkCoordinateSystem { get; set; }
+
+        // Current tool, as reported. GrblConstants.NO_TOOL when none; empty until the first report.
+        public string Tool { get; set; }
+
+        // Active probe id, kept as the reported string (GrblViewModel.Probe exposes it as an int).
+        public string Probe { get; set; }
+
+        // True when status reports carry MPos (machine coordinates); false when they carry WPos.
+        public bool IsMachinePosition { get; set; }
+
+        // Whether the last probe cycle triggered.
+        public bool IsProbeSuccess { get; set; }
+
+        // Tool length reference offset, NaN until set.
+        public double TloReference { get; set; } = double.NaN;
+        public bool IsTloReferenceSet { get; set; }
+
+        // Status auto-reporting (grblHAL): whether the controller pushes reports unpolled, and its interval.
+        public bool AutoReportingEnabled { get; set; }
+        public int AutoReportInterval { get; set; }
     }
 }
