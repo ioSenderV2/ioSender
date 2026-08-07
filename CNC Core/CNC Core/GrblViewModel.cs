@@ -48,19 +48,26 @@ namespace CNC.Core
 {
     public class GrblViewModel : MeasureViewModel
     {
-        private string _tool, _probe, _message, _WPos, _MPos, _wco, _wcs, _a, _fs, _ov, _pn, _sc, _sd, _fans, _d, _gc, _h, _thcv, _thcs, _spindle;
+        private string _message, _WPos, _MPos, _wco, _a, _fs, _ov, _pn, _sc, _sd, _fans, _d, _gc, _h, _thcv, _thcs, _spindle;
         private string _mdiCommand, _mdiText, _fileName, _fsCwd, _programPath;
         private string[] _rtState = new string[3];
         private bool has_wco = false, _hasFans = false, _multiProbe = false;
         private SDState _sdMounted = SDState.Unmounted;
-        private bool _flood, _mist, _fan0, _toolChange, _reset, _isMPos, _isJobRunning, _isProbeSuccess, _pgmEnd, _isParserStateLive, _isTloRefSet;
-        private bool _isCameraVisible = false, _responseLogVerbose = false, _isProbing = false, _autoReporting = false, _hasOutline = false, _isLoading = false;
+        private bool _flood, _mist, _fan0, _toolChange, _reset, _isJobRunning, _pgmEnd, _isParserStateLive;
+        private bool _isCameraVisible = false, _responseLogVerbose = false, _isProbing = false, _hasOutline = false, _isLoading = false;
         private bool _isDryRunMode = false;
         private bool _feedOverrideDisabled = false, _rpmOverrideDisabled = false, _feedHoldDisabled = false;
         private bool? _mpg;
-        private int _pwm, _line, _scrollpos, _blocks = 0, _startFromBlock = 0, _executingBlock = 0, _auxinValue = -2, _autoReportInterval = 0, _spindle_num = 0;
+        private int _pwm, _line, _scrollpos, _blocks = 0, _startFromBlock = 0, _executingBlock = 0, _auxinValue = -2, _spindle_num = 0;
         private double _feedrate = 0d;
-        private double _rpm = 0d, _rpmInput = 0d, _rpmDisplay = 0d, _jogStep = 0.1d, _tloReferenceOffset = double.NaN;
+        private double _rpm = 0d, _rpmInput = 0d, _rpmDisplay = 0d, _jogStep = 0.1d;
+
+        // Machine truth, declared apart from the sender state above so slice 5c can move their storage to
+        // MachineState without touching the shared declaration lines.
+        private string _tool, _probe, _wcs;
+        private bool _isMPos, _isProbeSuccess, _isTloRefSet, _autoReporting = false;
+        private int _autoReportInterval = 0;
+        private double _tloReferenceOffset = double.NaN;
         private double _rpmActual = double.NaN;
         private double _feedOverride = 100d;
         private double _rapidsOverride = 100d;
@@ -96,7 +103,8 @@ namespace CNC.Core
 
         public GrblViewModel()
         {
-            _a = _pn = _fs = _sc = _tool = string.Empty;
+            _a = _pn = _fs = _sc = string.Empty;
+            _tool = string.Empty;
 
             Clear();
 
@@ -222,9 +230,11 @@ namespace CNC.Core
         {
             _fileName = _mdiCommand = _mdiText = _programPath = string.Empty;
             _streamingState = StreamingState.NoFile;
-            _isMPos = _reset = _isJobRunning = _isProbeSuccess = _pgmEnd = _isTloRefSet = false;
+            _reset = _isJobRunning = _pgmEnd = false;
+            _isMPos = _isProbeSuccess = _isTloRefSet = false;
             _feedOverrideDisabled = _rpmOverrideDisabled = _feedHoldDisabled = false;
-            _pb_avail = _rxb_avail = _rtState[0] = _rtState[1] = _rtState[2] = _spindle = _probe = string.Empty;
+            _pb_avail = _rxb_avail = _rtState[0] = _rtState[1] = _rtState[2] = _spindle = string.Empty;
+            _probe = string.Empty;
             _mpg = null;
             _line = _pwm = _scrollpos = _spindle_num = 0;
             _auxinValue = -2; // No value read (use a nullable type?)
