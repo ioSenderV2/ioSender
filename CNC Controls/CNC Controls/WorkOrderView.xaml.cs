@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using CNC.Core;
@@ -2036,7 +2037,24 @@ namespace CNC.Controls
                     "Work Order", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) != MessageBoxResult.Yes)
                 return false;
 
-            program = string.Join("\r\n", WorkOrderCompiler.BuildProgram(workOrder));
+            // The compile is synchronous on the UI thread and noticeably long for a V-carve, so say so -
+            // and the render flush is not optional: without it the "Compiling..." message and the wait
+            // cursor would only ever paint AFTER the work they announce is already done.
+            model.Message = "Compiling work order...";
+            Mouse.OverrideCursor = Cursors.Wait;
+            Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                var built = WorkOrderCompiler.BuildProgram(workOrder);
+                sw.Stop();
+                program = string.Join("\r\n", built);
+                model.Message = string.Format("Work order compiled - {0} lines in {1:0.0} s.", built.Count, sw.Elapsed.TotalSeconds);
+            }
+            finally
+            {
+                Mouse.OverrideCursor = null;
+            }
             return true;
         }
 
