@@ -456,7 +456,7 @@ namespace CNC.Controls
         public static readonly WorkOrderGeometryKind[] AllGeometries =
             { WorkOrderGeometryKind.Line, WorkOrderGeometryKind.Circle, WorkOrderGeometryKind.Oval,
               WorkOrderGeometryKind.Square, WorkOrderGeometryKind.Rect, WorkOrderGeometryKind.Surface,
-              WorkOrderGeometryKind.Indirect };
+              WorkOrderGeometryKind.Text, WorkOrderGeometryKind.Indirect };
 
         public static readonly WorkOrderAnchor[] AllAnchors =
             { WorkOrderAnchor.Center, WorkOrderAnchor.FrontLeft, WorkOrderAnchor.FrontRight,

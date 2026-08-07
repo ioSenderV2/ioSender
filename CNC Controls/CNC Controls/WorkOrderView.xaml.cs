@@ -73,7 +73,7 @@ namespace CNC.Controls
 
         private NumericField[] AllFields()
         {
-            return new[] { fldX, fldY, fldLength, fldAngle, fldDiameter, fldSize, fldWidth, fldDepthY,
+            return new[] { fldX, fldY, fldLength, fldAngle, fldDiameter, fldSize, fldWidth, fldDepthY, fldCapHeight, fldEngraveWidth,
                            fldColumns, fldColumnSpacing, fldRows, fldRowSpacing,
                            fldPatternCount, fldPatternRadius, fldPatternStartAngle, fldPatternArcSpan,
                            fldHoleDiameter, fldTotalDepth, fldDepthOfCut, fldPeckDepth, fldBoreStepDown, fldStepover,
@@ -711,6 +711,7 @@ namespace CNC.Controls
             fldLength.Value = tp.Length; fldAngle.Value = tp.Angle;
             fldDiameter.Value = tp.Diameter; fldSize.Value = tp.Size;
             fldWidth.Value = tp.Width; fldDepthY.Value = tp.Depth;
+            txtEngraveText.Text = tp.Text ?? string.Empty; fldCapHeight.Value = tp.CapHeight;
             chkEntireSpoilboard.IsChecked = tp.EntireSpoilboard;
 
             // Only the dimensions this geometry actually has. Indirect has none of its own - it borrows
@@ -723,8 +724,12 @@ namespace CNC.Controls
             bool entireSpoilboard = isSurface && tp.EntireSpoilboard;
             Show(fldX, !entireSpoilboard);
             Show(fldY, !entireSpoilboard);
+            bool isText = tp.Geometry == WorkOrderGeometryKind.Text;
             Show(fldLength, isLine);
-            Show(fldAngle, isLine);
+            // The baseline angle is the same field a Line uses - degrees from +X - so Text just shows it too.
+            Show(fldAngle, isLine || isText);
+            Show(pnlTextRow, isText);
+            Show(fldCapHeight, isText);
             Show(fldDiameter, isCircle);
             Show(fldSize, tp.Geometry == WorkOrderGeometryKind.Square);
             Show(fldWidth, isWD && !entireSpoilboard);
@@ -779,6 +784,7 @@ namespace CNC.Controls
             fldWallStockToLeave.Value = op.WallStockToLeave;
             fldFloorStockToLeave.Value = op.FloorStockToLeave;
             fldChamferDepth.Value = op.ChamferDepth;
+            fldEngraveWidth.Value = op.EngraveWidth;
             fldCountersinkDiameter.Value = op.CountersinkDiameter;
             chkThrough.IsChecked = op.Through;
 
@@ -818,6 +824,26 @@ namespace CNC.Controls
             Show(fldWallStockToLeave, op.Kind == WorkOrderOpKind.SideFinish);
             Show(fldFloorStockToLeave, op.Kind == WorkOrderOpKind.BottomFinish);
             Show(fldChamferDepth, op.Kind == WorkOrderOpKind.Chamfer);
+
+            // Engraving asks for a stroke WIDTH, but what gets cut is a depth - so show the depth the
+            // current V-bit will actually plunge to. It is not a detail: the same 0.8 mm line is 0.40 mm
+            // deep on a 90-degree bit and 0.69 on a 60, and that difference decides whether a shallow
+            // engraving goes through a veneer.
+            bool isEngrave = op.Kind == WorkOrderOpKind.Engrave;
+            Show(fldEngraveWidth, isEngrave);
+            Show(txtEngraveDepth, isEngrave);
+            if (isEngrave)
+            {
+                var vtool = CustomTools.Find(op.Tool);
+                double half = vtool != null ? vtool.HalfAngleRad : Math.PI / 4d;
+                double deg = half * 360d / Math.PI;
+                txtEngraveDepth.Text = string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "{0:0.###} mm deep with the {1:0.#}° bit.{2}",
+                    (Math.Max(0.01d, op.EngraveWidth) / 2d) / Math.Tan(half), deg,
+                    vtool == null ? "  (no tool selected - assuming 90°)"
+                                  : vtool.Kind == CustomToolKind.VBitOrChamfer || vtool.Kind == CustomToolKind.Countersink
+                                        ? string.Empty : "  Pick a V-bit for this operation.");
+            }
             Show(fldCountersinkDiameter, op.Kind == WorkOrderOpKind.Countersink);
             Show(pnlTabs, selectedToolpath != null && WorkOrderRules.SupportsTabs(selectedToolpath, op));
 
@@ -844,6 +870,7 @@ namespace CNC.Controls
                 op.WallStockToLeave = fldWallStockToLeave.Value;
                 op.FloorStockToLeave = fldFloorStockToLeave.Value;
                 op.ChamferDepth = fldChamferDepth.Value;
+                op.EngraveWidth = fldEngraveWidth.Value;
                 op.CountersinkDiameter = fldCountersinkDiameter.Value;
                 // The target diameter drives the bit choice, not the other way around - confirmed on real
                 // hardware 2026-07-30 (operator: a 19.5mm target should pick the 21mm bit automatically).
@@ -867,6 +894,7 @@ namespace CNC.Controls
                 else
                 {
                     tp.Length = fldLength.Value; tp.Angle = fldAngle.Value;
+                    tp.Text = txtEngraveText.Text; tp.CapHeight = fldCapHeight.Value;
                     tp.Diameter = fldDiameter.Value; tp.Size = fldSize.Value;
                     tp.Width = fldWidth.Value; tp.Depth = fldDepthY.Value;
                     tp.Columns = fldColumns.Value; tp.ColumnSpacing = fldColumnSpacing.Value;
@@ -1454,6 +1482,9 @@ namespace CNC.Controls
                         case WorkOrderGeometryKind.Square:
                             AddRect(center, geom.Size / 2d * scale, geom.Size / 2d * scale, stroke, thickness, null);
                             break;
+                        case WorkOrderGeometryKind.Text:
+                            AddTextStrokes(center, geom, scale, stroke, thickness);
+                            break;
                         default:
                             AddRect(center, geom.Width / 2d * scale, geom.Depth / 2d * scale, stroke, thickness, null);
                             break;
@@ -1562,6 +1593,44 @@ namespace CNC.Controls
                 Stroke = stroke, StrokeThickness = thickness,
                 StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round
             });
+        }
+
+        // Draw the engraving exactly as it will be cut - the real glyph strokes, not a bounding box. The
+        // canvas' default case draws a rectangle, which for text would have previewed a box where the words
+        // are: enough to check it fits the stock, useless for checking it reads right or clears a feature.
+        //
+        // Mirrors BuildEngrave's own transform so preview and g-code cannot disagree: centre the unrotated
+        // text on the anchor, then rotate about it. Screen Y grows DOWNWARD, hence the negated Y - the same
+        // flip AddLine already makes.
+        private void AddTextStrokes(Point center, WorkOrderToolpath tp, double scale, Brush stroke, double thickness)
+        {
+            var strokes = CNC.Core.StrokeFont.Render(tp.Text, tp.CapHeight);
+            if (strokes.Count == 0)
+                return;
+
+            var size = CNC.Core.StrokeFont.Measure(tp.Text, tp.CapHeight);
+            double ox = -size.X / 2d, oy = -size.Y / 2d + tp.CapHeight / 2d;
+            double rad = tp.Angle * Math.PI / 180d;
+            double cos = Math.Cos(rad), sin = Math.Sin(rad);
+
+            foreach (var st in strokes)
+            {
+                var poly = new Polyline
+                {
+                    Stroke = stroke,
+                    StrokeThickness = thickness,
+                    StrokeStartLineCap = PenLineCap.Round,
+                    StrokeEndLineCap = PenLineCap.Round,
+                    StrokeLineJoin = PenLineJoin.Round
+                };
+                foreach (var pt in st)
+                {
+                    double lx = pt.X + ox, ly = pt.Y + oy;
+                    poly.Points.Add(new Point(center.X + (lx * cos - ly * sin) * scale,
+                                              center.Y - (lx * sin + ly * cos) * scale));
+                }
+                canvasDiagram.Children.Add(poly);
+            }
         }
 
         private void AddEllipse(Point center, double rx, double ry, Brush stroke, double thickness, Brush fill)

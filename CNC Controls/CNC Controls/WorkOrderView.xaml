@@ -101,6 +101,14 @@
                         </StackPanel>
                         <local:NumericField x:Uid="fld_wox" x:Name="fldX" Label="X offset:" ColonAt="150" Format="-####0.0##" Unit="mm"/>
                         <local:NumericField x:Uid="fld_woy" x:Name="fldY" Label="Y offset:" ColonAt="150" Format="-####0.0##" Unit="mm"/>
+                        <StackPanel x:Name="pnlTextRow" Orientation="Horizontal" Margin="0,2,0,2">
+                            <Label x:Uid="lbl_wotext" Content="Text:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Top"/>
+                            <TextBox x:Uid="txt_wotext" x:Name="txtEngraveText" MinWidth="180" MinHeight="46" MaxWidth="240"
+                                     AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                                     ToolTip="What to engrave. Press Enter for a second line. Uppercase, digits and common punctuation are supported; lowercase is engraved as uppercase, and anything the font cannot draw is skipped rather than cut as a gap."/>
+                        </StackPanel>
+                        <local:NumericField x:Uid="fld_wocap" x:Name="fldCapHeight" Label="Cap height:" ColonAt="150" Format="###0.0##" Unit="mm"
+                                            ToolTip="Height of a capital letter - the size you actually mean by &quot;10 mm lettering&quot;. Round letters overshoot it very slightly, as they should."/>
                         <local:NumericField x:Uid="fld_wolen" x:Name="fldLength" Label="Length:" ColonAt="150" Format="###0.0##" Unit="mm"/>
                         <local:NumericField x:Uid="fld_woangle" x:Name="fldAngle" Label="Angle:" ColonAt="150" Format="-##0.0#" Unit="deg"
                                             ToolTip="Direction of the line, measured from +X counter-clockwise. 0 runs along X, 90 along Y."/>
@@ -175,6 +183,9 @@
                         <local:NumericField x:Uid="fld_wofloorleave" x:Name="fldFloorStockToLeave" Label="Floor stock to leave:" ColonAt="150" Format="##0.0##" Unit="mm"
                                             ToolTip="How much material the roughing operation leaves on the floor for this pass to remove. Roughing's depth stops this far short of true depth."/>
                         <local:NumericField x:Uid="fld_wochamferdepth" x:Name="fldChamferDepth" Label="Chamfer depth:" ColonAt="150" Format="##0.0##" Unit="mm"/>
+                        <local:NumericField x:Uid="fld_woengravewidth" x:Name="fldEngraveWidth" Label="Stroke width:" ColonAt="150" Format="##0.0##" Unit="mm"
+                                            ToolTip="How wide the engraved line should be. The plunge depth is worked out from this and the V-bit's included angle, because width is what you can measure on the part - the same 0.8 mm line is 0.40 mm deep on a 90 degree bit but 0.69 mm on a 60 degree one."/>
+                        <TextBlock x:Name="txtEngraveDepth" Foreground="#586069" FontSize="11" Margin="154,0,0,4" TextWrapping="Wrap" Visibility="Collapsed"/>
                         <local:NumericField x:Uid="fld_wocountersink" x:Name="fldCountersinkDiameter" Label="Countersink diameter:" ColonAt="150" Format="##0.0##" Unit="mm"
                                             ToolTip="Target finished diameter - the bit plunges straight down the hole's centerline until its cone reaches this width. Depth is computed automatically."/>
 
