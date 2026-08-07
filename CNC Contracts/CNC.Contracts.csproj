@@ -55,6 +55,7 @@
   <ItemGroup>
     <Compile Include="MachineEnums.cs" />
     <Compile Include="GCodeEnums.cs" />
+    <Compile Include="StateMessages.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
