@@ -2049,10 +2049,15 @@ namespace CNC.Controls
                 var built = WorkOrderCompiler.BuildProgram(workOrder);
                 sw.Stop();
                 program = string.Join("\r\n", built);
+                // Naive kinematic estimate (no acceleration model - see GCodeRunTime's header), so it
+                // reads optimistic; still the difference between a 4-minute and a 40-minute engraving,
+                // known before pressing Start.
+                string estimate = GCodeRunTime.Format(GCodeRunTime.EstimateText(program));
                 // Kept on MacroProcessor too so the "ready - press Cycle Start" prompt (which lands right
                 // after this and used to overwrite it) can carry the result along - both the Generate
                 // path (PublishGenerated re-sets it) and Run's hand-off to the Job tab read it there.
-                MacroProcessor.ActiveProgramStats = string.Format("{0} lines in {1:0.0} s", built.Count, sw.Elapsed.TotalSeconds);
+                MacroProcessor.ActiveProgramStats = string.Format("{0} lines in {1:0.0} s", built.Count, sw.Elapsed.TotalSeconds)
+                    + (estimate.Length > 0 ? ", est. run " + estimate : string.Empty);
                 model.Message = string.Format("Work order compiled - {0}.", MacroProcessor.ActiveProgramStats);
             }
             finally
