@@ -75,8 +75,18 @@ namespace CNC.Core
         /// <param name="maxDepth">Never go deeper than this, mm. The cut flattens off at the bottom.</param>
         /// <param name="resolutionMm">Grid cell size. Smaller is sharper and slower; 0.1 mm suits lettering.</param>
         /// <param name="depthStepMm">Depth between successive passes, mm.</param>
+        /// <param name="clearFlats">
+        /// Where the region is wider than the cone can span at <paramref name="maxDepth"/>, the deepest
+        /// rings only OUTLINE the too-wide area and the middle would be left standing at full height.
+        /// True (the default, and what any real cut wants) appends clearing passes: each such outline is
+        /// re-carved as if it were the shape, every resulting ring forced to maxDepth, generation by
+        /// generation until nothing remains. The floor this leaves is scalloped at the ring spacing - a
+        /// V-point is simply not a facing tool. False is for the recursion itself and for callers that
+        /// only want the true carve contours.
+        /// </param>
         public static List<VCarvePass> Build(IList<IList<Point2D>> contours, double halfAngleRad,
-                                             double maxDepth, double resolutionMm, double depthStepMm)
+                                             double maxDepth, double resolutionMm, double depthStepMm,
+                                             bool clearFlats = true)
         {
             var passes = new List<VCarvePass>();
             if (contours == null || contours.Count == 0)
@@ -129,7 +139,9 @@ namespace CNC.Core
             var spine = new List<VCarvePass>();
             foreach (var ridge in field.Ridges(maxDist))
             {
-                double level = ridge.Dist - halfCell;
+                // Level from the group's MINIMUM (one connected ring per stroke - see Ridge.MinDist),
+                // depth from its MAXIMUM (the whole ridge actually bottoms).
+                double level = ridge.MinDist - halfCell;
                 if (level <= 0d)
                     continue;
                 double depth = Math.Min(maxDepth, ridge.Dist / tan);
@@ -152,6 +164,27 @@ namespace CNC.Core
                 passes.AddRange(spine);
                 // Restore shallow-to-deep; List.Sort is unstable, so keep it deterministic by depth only.
                 passes.Sort((a, b) => a.Depth.CompareTo(b.Depth));
+            }
+
+            if (clearFlats)
+            {
+                var region = new List<IList<Point2D>>();
+                foreach (var p in passes)
+                    if (p.Depth >= maxDepth - 1e-9)
+                        region.Add(p.Path);
+                for (int gen = 0; gen < 20 && region.Count > 0; gen++)
+                {
+                    var inner = Build(region, halfAngleRad, maxDepth, resolutionMm, depthStepMm, false);
+                    region = new List<IList<Point2D>>();
+                    foreach (var p in inner)
+                    {
+                        if (p.Depth < 1e-9)
+                            continue;   // retraces the outline its parent generation already cut
+                        if (p.Depth >= maxDepth - 1e-9)
+                            region.Add(p.Path);
+                        passes.Add(new VCarvePass { Depth = maxDepth, Path = p.Path });
+                    }
+                }
             }
 
             return passes;
@@ -275,7 +308,60 @@ namespace CNC.Core
                         }
                     }
 
-                return Chain(segs, cell);
+                // Marching squares leaves a vertex at nearly every cell edge, so straight runs carry
+                // hundreds of collinear points. Douglas-Peucker at a fifth of a cell keeps everything the
+                // field can even express while cutting the emitted g-code - and the machine's blocks-per-
+                // second load while cutting it - by an order of magnitude.
+                var rings = Chain(segs, cell);
+                for (int i = 0; i < rings.Count; i++)
+                    rings[i] = Simplify(rings[i], cell * 0.2d);
+                return rings;
+            }
+
+            private static List<Point2D> Simplify(List<Point2D> ring, double tol)
+            {
+                if (ring.Count <= 4)
+                    return ring;
+                var keep = new bool[ring.Count];
+                keep[0] = keep[ring.Count - 1] = true;
+                SimplifySpan(ring, 0, ring.Count - 1, tol, keep);
+                var kept = new List<Point2D>();
+                for (int i = 0; i < ring.Count; i++)
+                    if (keep[i])
+                        kept.Add(ring[i]);
+                return kept.Count >= 4 ? kept : ring;
+            }
+
+            // Classic recursive split at the worst offender. The first call's chord is degenerate (a
+            // closed ring starts and ends at the same point), which the zero-length branch turns into
+            // "farthest point from the start" - exactly the split a closed ring wants.
+            private static void SimplifySpan(List<Point2D> pts, int a, int b, double tol, bool[] keep)
+            {
+                if (b - a < 2)
+                    return;
+                double ax = pts[a].X, ay = pts[a].Y, dx = pts[b].X - ax, dy = pts[b].Y - ay;
+                double len2 = dx * dx + dy * dy;
+                int worst = -1;
+                double worstD2 = tol * tol;
+                for (int i = a + 1; i < b; i++)
+                {
+                    double px = pts[i].X - ax, py = pts[i].Y - ay, d2;
+                    if (len2 < 1e-18)
+                        d2 = px * px + py * py;
+                    else
+                    {
+                        double t = (px * dx + py * dy) / len2;
+                        t = t < 0d ? 0d : t > 1d ? 1d : t;
+                        double ex = px - t * dx, ey = py - t * dy;
+                        d2 = ex * ex + ey * ey;
+                    }
+                    if (d2 > worstD2) { worstD2 = d2; worst = i; }
+                }
+                if (worst < 0)
+                    return;
+                keep[worst] = true;
+                SimplifySpan(pts, a, worst, tol, keep);
+                SimplifySpan(pts, worst, b, tol, keep);
             }
 
             private static double Frac(double va, double vb, double level)
@@ -356,7 +442,16 @@ namespace CNC.Core
             /// <summary>One spine of the region: its distance from the boundary, and cells that lie on it.</summary>
             public class Ridge
             {
+                /// <summary>Deepest distance in the group - what the pass plunges to.</summary>
                 public double Dist;
+                /// <summary>Shallowest distance in the group - what the pass's ring level hangs below.
+                /// Real strokes are only NEAR-constant width, so the plateau's cells fluctuate by sampling
+                /// noise; a level below the group's MAXIMUM slices that fluctuation into dozens of tiny
+                /// islands, one per hump, where a level below its MINIMUM stays under every cell of the
+                /// ridge and traces it as one connected ring. The group is at most half a cell tall, so
+                /// what this costs is the pass biting up to that much further into the wall - resolution
+                /// budget - and what it buys is one ring per stroke instead of ninety fragments.</summary>
+                public double MinDist;
                 public List<Point2D> At = new List<Point2D>();
             }
 
@@ -395,15 +490,11 @@ namespace CNC.Core
                 // fine: the group's deepest value wins and the others are within the resolution budget.
                 cand.Sort((a, b) => a.Key.CompareTo(b.Key));
                 var ridges = new List<Ridge>();
-                double groupStart = 0d;
                 Ridge cur = null;
                 foreach (var c in cand)
                 {
-                    if (cur == null || c.Key - groupStart > cell * 0.5d)
-                    {
-                        ridges.Add(cur = new Ridge { Dist = c.Key });
-                        groupStart = c.Key;
-                    }
+                    if (cur == null || c.Key - cur.MinDist > cell * 0.5d)
+                        ridges.Add(cur = new Ridge { Dist = c.Key, MinDist = c.Key });
                     if (c.Key > cur.Dist)
                         cur.Dist = c.Key;
                     cur.At.Add(c.Value);
