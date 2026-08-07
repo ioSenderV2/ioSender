@@ -2349,7 +2349,27 @@ namespace GCode_Sender
             // left at the baseline this run loaded rather than the true prior value - safe (the baseline is
             // itself a trusted reference), just not a perfect restore. Known, accepted gap.
             if (setTloRef)
+            {
+                // Put back the tool length offset this program measured. EmitTloReference applied it, then
+                // pcorner.macro's G49 cancelled it (deliberate - its absolute G53 moves need true machine
+                // coordinates) and NOTHING restored it, so Setup used to finish in G49. The origin written
+                // above lives in the tool-length REFERENCE frame and is ONLY the work origin once a G43 is
+                // active, so leaving G49 behind means work Z0 sits TLO_probe too deep - straight into the
+                // stock. Recomputed from the same #<_tlo_ref> baseline the origin was, hence before the
+                // rollback below rather than after.
+                //
+                // It cut a spoilboard on 2026-08-06. The first run of the day survived only by accident: its
+                // job emitted an M6, and tc.macro re-probed the puck and applied a TLO of its own. The second
+                // run had the same endmill already fitted, so no M6 was emitted, nothing re-applied anything,
+                // and the job rapided to a work Z0 that was 15.432mm inside the material. "Same bit, same
+                // spindle, nothing touched" is exactly when this fires - the offset was never stale, just
+                // discarded. G43.1 sets the offset absolutely, so re-emitting it costs nothing if it somehow
+                // survived.
+                L("(--- restore the tool length offset the probe measured - see BuildProgram ---)");
+                L("G43.1 Z[#<_probe_z> - #<_tlo_ref>]");
+                L("(PRINT, LS_TLO_RESTORED tlo=[#<_probe_z> - #<_tlo_ref>])");
                 L("#<_tlo_ref> = #<_tlo_saved>");
+            }
             L("M2");
 
             return b.ToString();
