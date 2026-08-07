@@ -109,6 +109,15 @@
                         </StackPanel>
                         <local:NumericField x:Uid="fld_wocap" x:Name="fldCapHeight" Label="Cap height:" ColonAt="150" Format="###0.0##" Unit="mm"
                                             ToolTip="Height of a capital letter - the size you actually mean by &quot;10 mm lettering&quot;. Round letters overshoot it very slightly, as they should."/>
+                        <StackPanel x:Name="pnlFontRow" Orientation="Horizontal" Margin="0,2,0,2">
+                            <Label x:Uid="lbl_wofont" Content="Font:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Uid="cbx_wofont" x:Name="cbxFont" MinWidth="180" MaxWidth="240" MinHeight="22" VerticalAlignment="Center"
+                                      ToolTip="Single stroke engraves each letter as one pen line - the best cut for small lettering. Any other font V-CARVES the letter shapes: the bit follows the outline at a depth set by the local stroke width, giving the tapered strokes and sharp corners of carved lettering. Best at larger sizes."/>
+                        </StackPanel>
+                        <StackPanel x:Name="pnlFontStyleRow" Orientation="Horizontal" Margin="154,0,0,4">
+                            <CheckBox x:Uid="chk_wofontbold" x:Name="chkFontBold" Content="Bold" VerticalAlignment="Center"/>
+                            <CheckBox x:Uid="chk_wofontitalic" x:Name="chkFontItalic" Content="Italic" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
                         <local:NumericField x:Uid="fld_wolen" x:Name="fldLength" Label="Length:" ColonAt="150" Format="###0.0##" Unit="mm"/>
                         <local:NumericField x:Uid="fld_woangle" x:Name="fldAngle" Label="Angle:" ColonAt="150" Format="-##0.0#" Unit="deg"
                                             ToolTip="Direction of the line, measured from +X counter-clockwise. 0 runs along X, 90 along Y."/>

@@ -61,6 +61,16 @@ namespace CNC.Controls
             // (free-text, not numeric), so it doesn't get that for free.
             UIUtils.SelectAllOnFocus(txtName);
 
+            // First entry is the built-in stroke font (= FontFamily "", the engraving mode); everything
+            // after it is an installed family and means V-carve. One combo carries both the mode and the
+            // font, because they are not independent choices - see WorkOrderToolpath.FontFamily.
+            cbxFont.Items.Add(StrokeFontLabel);
+            foreach (var family in TrueTypeOutlines.InstalledFamilies())
+                cbxFont.Items.Add(family);
+            cbxFont.SelectionChanged += (s, e) => { UpdateFontStyleEnabled(); CaptureFields(); };
+            chkFontBold.Click += (s, e) => CaptureFields();
+            chkFontItalic.Click += (s, e) => CaptureFields();
+
             foreach (var f in AllFields())
                 System.ComponentModel.DependencyPropertyDescriptor
                     .FromProperty(NumericField.ValueProperty, typeof(NumericField))
@@ -69,6 +79,14 @@ namespace CNC.Controls
             canvasDiagram.MouseLeftButtonDown += (s, e) => { placing = true; PlaceFromMouse(e.GetPosition(canvasDiagram)); canvasDiagram.CaptureMouse(); };
             canvasDiagram.MouseMove += (s, e) => { if (placing) PlaceFromMouse(e.GetPosition(canvasDiagram)); };
             canvasDiagram.MouseLeftButtonUp += (s, e) => { placing = false; canvasDiagram.ReleaseMouseCapture(); };
+        }
+
+        private const string StrokeFontLabel = "(single stroke - engrave)";
+
+        // Bold/italic only mean something for a real font family - the stroke font has one weight.
+        private void UpdateFontStyleEnabled()
+        {
+            pnlFontStyleRow.IsEnabled = cbxFont.SelectedIndex > 0;
         }
 
         private NumericField[] AllFields()
@@ -720,6 +738,15 @@ namespace CNC.Controls
             fldDiameter.Value = tp.Diameter; fldSize.Value = tp.Size;
             fldWidth.Value = tp.Width; fldDepthY.Value = tp.Depth;
             txtEngraveText.Text = tp.Text ?? string.Empty; fldCapHeight.Value = tp.CapHeight;
+            // A family saved on another machine may not be installed here. Adding it to the list rather
+            // than falling back to index 0 keeps the choice intact - silently reverting to the stroke font
+            // would change the MODE of the cut just by opening the file. (WPF itself falls back to Arial
+            // for rendering an unknown family, which is visible and recoverable; a lost field is neither.)
+            if (tp.IsCarved && !cbxFont.Items.Contains(tp.FontFamily))
+                cbxFont.Items.Add(tp.FontFamily);
+            cbxFont.SelectedIndex = tp.IsCarved ? cbxFont.Items.IndexOf(tp.FontFamily) : 0;
+            chkFontBold.IsChecked = tp.FontBold; chkFontItalic.IsChecked = tp.FontItalic;
+            UpdateFontStyleEnabled();
             chkEntireSpoilboard.IsChecked = tp.EntireSpoilboard;
 
             // Only the dimensions this geometry actually has. Indirect has none of its own - it borrows
@@ -738,6 +765,8 @@ namespace CNC.Controls
             Show(fldAngle, isLine || isText);
             Show(pnlTextRow, isText);
             Show(fldCapHeight, isText);
+            Show(pnlFontRow, isText);
+            Show(pnlFontStyleRow, isText);
             Show(fldDiameter, isCircle);
             Show(fldSize, tp.Geometry == WorkOrderGeometryKind.Square);
             Show(fldWidth, isWD && !entireSpoilboard);
@@ -838,7 +867,10 @@ namespace CNC.Controls
             // deep on a 90-degree bit and 0.69 on a 60, and that difference decides whether a shallow
             // engraving goes through a veneer.
             bool isEngrave = op.Kind == WorkOrderOpKind.Engrave;
-            Show(fldEngraveWidth, isEngrave);
+            // A V-carve has no stroke width to ask for - depth follows the glyph's own local width - so
+            // the width field gives way and the note explains where depth comes from instead.
+            bool isCarve = isEngrave && selectedToolpath != null && selectedToolpath.IsCarved;
+            Show(fldEngraveWidth, isEngrave && !isCarve);
             Show(txtEngraveDepth, isEngrave);
             if (isEngrave)
             {
@@ -855,14 +887,25 @@ namespace CNC.Controls
                                   ? "  Pick a V-bit for this operation."
                                   : string.Empty;
 
-                // Say it plainly rather than quietly cutting something narrower than was asked for: past its
-                // own diameter the bit's cone has run out and the shank would be doing the cutting.
-                if (cut.Clamped)
-                    note = string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                        "  Limited to {0:0.###} mm - the widest this bit can cut.", cut.Width) + note;
+                if (isCarve)
+                {
+                    // Mirrors BuildVCarve's own ceiling: past the bit's diameter the cone has run out.
+                    double maxCarve = vtool != null && vtool.DiameterMm > 0d ? (vtool.DiameterMm / 2d) / Math.Tan(half) : 3d;
+                    txtEngraveDepth.Text = string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "Depth follows the letter shapes - up to {0:0.###} mm with the {1:0.#}° bit. Wider strokes bottom out flat and are cleared.{2}",
+                        maxCarve, deg, note);
+                }
+                else
+                {
+                    // Say it plainly rather than quietly cutting something narrower than was asked for: past its
+                    // own diameter the bit's cone has run out and the shank would be doing the cutting.
+                    if (cut.Clamped)
+                        note = string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                            "  Limited to {0:0.###} mm - the widest this bit can cut.", cut.Width) + note;
 
-                txtEngraveDepth.Text = string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                    "{0:0.###} mm deep with the {1:0.#}° bit.{2}", cut.Depth, deg, note);
+                    txtEngraveDepth.Text = string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "{0:0.###} mm deep with the {1:0.#}° bit.{2}", cut.Depth, deg, note);
+                }
             }
             Show(fldCountersinkDiameter, op.Kind == WorkOrderOpKind.Countersink);
             Show(pnlTabs, selectedToolpath != null && WorkOrderRules.SupportsTabs(selectedToolpath, op));
@@ -915,6 +958,8 @@ namespace CNC.Controls
                 {
                     tp.Length = fldLength.Value; tp.Angle = fldAngle.Value;
                     tp.Text = txtEngraveText.Text; tp.CapHeight = fldCapHeight.Value;
+                    tp.FontFamily = cbxFont.SelectedIndex > 0 ? (string)cbxFont.SelectedItem : string.Empty;
+                    tp.FontBold = chkFontBold.IsChecked == true; tp.FontItalic = chkFontItalic.IsChecked == true;
                     tp.Diameter = fldDiameter.Value; tp.Size = fldSize.Value;
                     tp.Width = fldWidth.Value; tp.Depth = fldDepthY.Value;
                     tp.Columns = fldColumns.Value; tp.ColumnSpacing = fldColumnSpacing.Value;
@@ -1624,6 +1669,12 @@ namespace CNC.Controls
         // flip AddLine already makes.
         private void AddTextStrokes(Point center, WorkOrderToolpath tp, double scale, Brush stroke, double thickness)
         {
+            if (tp.IsCarved)
+            {
+                AddCarvedText(center, tp, scale, stroke);
+                return;
+            }
+
             var strokes = CNC.Core.StrokeFont.Render(tp.Text, tp.CapHeight);
             if (strokes.Count == 0)
                 return;
@@ -1651,6 +1702,50 @@ namespace CNC.Controls
                 }
                 canvasDiagram.Children.Add(poly);
             }
+        }
+
+        // Carved text previews FILLED - the cut removes the whole glyph interior, and showing solid
+        // letters is also what tells the operator at a glance they are in carve mode rather than stroke.
+        // Mirrors BuildVCarve's transform (bounding-box centre on the anchor, then rotate about it) the
+        // same way AddTextStrokes mirrors BuildEngrave's.
+        private void AddCarvedText(Point center, WorkOrderToolpath tp, double scale, Brush brush)
+        {
+            var outline = TrueTypeOutlines.Render(tp.Text, tp.FontFamily, tp.CapHeight, tp.FontBold, tp.FontItalic);
+            if (outline.Count == 0)
+                return;
+
+            double minX = double.MaxValue, maxX = double.MinValue, minY = double.MaxValue, maxY = double.MinValue;
+            foreach (var c in outline)
+                foreach (var p in c.Points)
+                {
+                    if (p.X < minX) minX = p.X;
+                    if (p.X > maxX) maxX = p.X;
+                    if (p.Y < minY) minY = p.Y;
+                    if (p.Y > maxY) maxY = p.Y;
+                }
+
+            double ox = -(minX + maxX) / 2d, oy = -(minY + maxY) / 2d;
+            double rad = tp.Angle * Math.PI / 180d;
+            double cos = Math.Cos(rad), sin = Math.Sin(rad);
+
+            // One geometry, even-odd fill: the counters (the hole in an O) punch out exactly as the
+            // carve engine's own inside test treats them.
+            var geo = new PathGeometry { FillRule = FillRule.EvenOdd };
+            foreach (var c in outline)
+            {
+                var fig = new PathFigure { IsClosed = true, IsFilled = true };
+                bool first = true;
+                foreach (var p in c.Points)
+                {
+                    double lx = p.X + ox, ly = p.Y + oy;
+                    var q = new Point(center.X + (lx * cos - ly * sin) * scale,
+                                      center.Y - (lx * sin + ly * cos) * scale);   // screen Y grows downward
+                    if (first) { fig.StartPoint = q; first = false; }
+                    else fig.Segments.Add(new LineSegment(q, true));
+                }
+                geo.Figures.Add(fig);
+            }
+            canvasDiagram.Children.Add(new System.Windows.Shapes.Path { Data = geo, Fill = brush });
         }
 
         private void AddEllipse(Point center, double rx, double ry, Brush stroke, double thickness, Brush fill)

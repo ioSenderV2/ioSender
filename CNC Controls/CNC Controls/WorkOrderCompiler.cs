@@ -511,6 +511,12 @@ namespace CNC.Controls
         // cut free.
         private static List<string> BuildEngrave(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
         {
+            // A Text toolpath carrying a real font family V-carves the glyph outlines instead of tracing
+            // stroke-font pen paths - one op kind, two ways of cutting it, chosen on the GEOMETRY where the
+            // font itself is chosen (see WorkOrderToolpath.FontFamily).
+            if (tp.IsCarved)
+                return BuildVCarve(tp, op, cx, cy);
+
             var lines = new List<string>();
 
             var strokes = CNC.Core.StrokeFont.Render(tp.Text, tp.CapHeight);
@@ -563,6 +569,100 @@ namespace CNC.Controls
                         lines.Add("G0 Z" + F(SafeZ()));
                         lines.Add("G0 X" + F(x) + " Y" + F(y));
                         lines.Add("G1 Z" + F(-depth) + " F" + F(op.PlungeFeed));
+                    }
+                    else
+                        lines.Add("G1 X" + F(x) + " Y" + F(y) + " F" + F(op.Feed));
+                }
+            }
+            lines.Add("G0 Z" + F(SafeZ()));
+
+            return lines;
+        }
+
+        // Grid cell for the carve's distance field. 0.1 mm keeps the field's error an order below anything
+        // a V-bit leaves in wood, and text-sized fields build in well under a second at it.
+        private const double CarveResolution = 0.1d;
+
+        // Depth between successive carve levels. This does NOT scallop the walls - consecutive passes tile
+        // the cone exactly, a deeper pass's flank running through the tip of the one above - it only sets
+        // how much material a single ring removes, and the in-plan faceting of curved boundaries.
+        private const double CarveDepthStep = 0.5d;
+
+        // V-carve text set in a real outline font: the bit follows iso-depth contours of the glyph's
+        // FILLED shape, so strokes taper into their corners the way carved lettering does. Depth is again
+        // a consequence, but of the glyph's own local width rather than a requested stroke width: at every
+        // point the cone sinks until it spans the stroke (see CNC.Core.VCarve for the geometry and its
+        // error budget). The one ceiling is the bit itself - past DiameterMm the cone runs out and the
+        // shank would rub - and where a stroke is wider than that ceiling the bottom flattens off and is
+        // cleared, below.
+        private static List<string> BuildVCarve(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
+        {
+            var lines = new List<string>();
+
+            var outline = TrueTypeOutlines.Render(tp.Text, tp.FontFamily, tp.CapHeight, tp.FontBold, tp.FontItalic);
+            if (outline.Count == 0)
+                return lines;   // blank text or an unresolvable family - emit nothing rather than a bare plunge
+
+            var tool = CustomTools.Find(op.Tool);
+            double halfAngle = tool != null ? tool.HalfAngleRad : Math.PI / 4d;
+            double tanA = Math.Tan(halfAngle);
+            // The same clamp EngraveCutFor applies to a requested stroke width, expressed as a depth.
+            double maxDepth = tool != null && tool.DiameterMm > 0d ? (tool.DiameterMm / 2d) / tanA : 3d;
+
+            // The engine carves in the text's own coordinates (baseline flat, Y up) and the transform to
+            // the stock happens per emitted point - same shape either way, but the field's grid stays
+            // aligned with the glyphs instead of sampling them diagonally.
+            var polys = new List<IList<Point2D>>();
+            double minX = double.MaxValue, maxX = double.MinValue, minY = double.MaxValue, maxY = double.MinValue;
+            foreach (var c in outline)
+            {
+                polys.Add(c.Points);
+                foreach (var p in c.Points)
+                {
+                    if (p.X < minX) minX = p.X;
+                    if (p.X > maxX) maxX = p.X;
+                    if (p.Y < minY) minY = p.Y;
+                    if (p.Y > maxY) maxY = p.Y;
+                }
+            }
+
+            // clearFlats on (the default): where a stroke is wider than the cone can span, the engine
+            // appends the maxDepth clearing generations itself - see VCarve.Build.
+            var passes = CNC.Core.VCarve.Build(polys, halfAngle, maxDepth, CarveResolution, CarveDepthStep);
+            if (passes.Count == 0)
+                return lines;
+
+            // Anchor at the centre of the text's bounding box - the same extents the model reports for
+            // placement - then rotate about that anchor, so the pinned point stays pinned as the angle
+            // changes, exactly as the stroke branch does.
+            double ox = -(minX + maxX) / 2d, oy = -(minY + maxY) / 2d;
+            double rad = tp.Angle * Math.PI / 180d;
+            double cos = Math.Cos(rad), sin = Math.Sin(rad);
+
+            lines.Add(string.Format(CultureInfo.InvariantCulture,
+                "(VCARVE \"{0}\" in {1}{2}{3}, cap {4:0.###} mm, {5} passes to {6:0.###} mm max at {7:0.#} deg included)",
+                // Same sanitising as BuildEngrave: grblHAL ends a comment at the FIRST ')'.
+                (tp.Text ?? string.Empty).Replace('(', '[').Replace(')', ']')
+                                         .Replace((char)13, ' ').Replace((char)10, '|'),
+                tp.FontFamily.Replace('(', '[').Replace(')', ']'),
+                tp.FontBold ? " bold" : string.Empty, tp.FontItalic ? " italic" : string.Empty,
+                tp.CapHeight, passes.Count, maxDepth, halfAngle * 360d / Math.PI));
+
+            foreach (var pass in passes)   // already shallow to deep, outside to inside - the cut order
+            {
+                bool first = true;
+                foreach (var p in pass.Path)
+                {
+                    double lx = p.X + ox, ly = p.Y + oy;
+                    double x = cx + lx * cos - ly * sin;
+                    double y = cy + lx * sin + ly * cos;
+
+                    if (first)
+                    {
+                        first = false;
+                        lines.Add("G0 Z" + F(SafeZ()));
+                        lines.Add("G0 X" + F(x) + " Y" + F(y));
+                        lines.Add("G1 Z" + F(-pass.Depth) + " F" + F(op.PlungeFeed));
                     }
                     else
                         lines.Add("G1 X" + F(x) + " Y" + F(y) + " F" + F(op.Feed));
@@ -1263,10 +1363,11 @@ namespace CNC.Controls
                             // The operator's own text goes into a g-code comment, and grblHAL ends a comment
                             // at the FIRST ')' - so a bracket in it would truncate the block and let the rest
                             // parse as g-code. Sanitised exactly as BuildEngrave sanitises its own.
-                            desc = string.Format("engrave \"{0}\", {1:0.#} mm caps, {2:0.###} mm stroke",
-                                (tp.Text ?? string.Empty).Replace('(', '[').Replace(')', ']')
-                                                         .Replace((char)13, ' ').Replace((char)10, '|'),
-                                tp.CapHeight, op.EngraveWidth);
+                            string shown = (tp.Text ?? string.Empty).Replace('(', '[').Replace(')', ']')
+                                                                    .Replace((char)13, ' ').Replace((char)10, '|');
+                            desc = tp.IsCarved
+                                ? string.Format("v-carve \"{0}\" in {1}, {2:0.#} mm caps", shown, tp.FontFamily, tp.CapHeight)
+                                : string.Format("engrave \"{0}\", {1:0.#} mm caps, {2:0.###} mm stroke", shown, tp.CapHeight, op.EngraveWidth);
                             break;
                         default:
                             // Was "continue", which SKIPPED THE WHOLE OPERATION - BuildOperation never ran,

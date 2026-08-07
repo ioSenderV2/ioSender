@@ -1772,3 +1772,7 @@ CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wocap:System.Windows.F
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woengravewidth:CNC.Controls.NumericField.Label,None,False,True,,Stroke width:
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woengravewidth:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_woengravewidth:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"How wide the engraved line should be. The plunge depth is worked out from this and the V-bit's included angle, because width is what you can measure on the part - the same 0.8 mm line is 0.40 mm deep on a 90 degree bit but 0.69 mm on a 60 degree one."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,lbl_wofont:System.Windows.Controls.ContentControl.Content,Label,True,True,,Font:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,cbx_wofont:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Single stroke engraves each letter as one pen line - the best cut for small lettering. Any other font V-CARVES the letter shapes: the bit follows the outline at a depth set by the local stroke width, giving the tapered strokes and sharp corners of carved lettering. Best at larger sizes."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wofontbold:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Bold
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wofontitalic:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Italic

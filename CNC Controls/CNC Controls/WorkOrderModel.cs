@@ -175,6 +175,19 @@ namespace CNC.Controls
         public string Text = "TEXT";
         public double CapHeight = 10d;
 
+        // Empty = the built-in single-stroke engraving font (a pen path - the cut IS the letter), which is
+        // both the default and what every work order saved before this field existed gets from the
+        // XmlSerializer. Any other value names an installed TrueType family, and the letters are V-CARVED:
+        // the bit follows the glyph's filled outline at depth varying with local width, sharp corners and
+        // tapered strokes, the way carved lettering looks. One field carries the mode choice AND the font,
+        // because "which font" and "stroke vs carve" are not independent - the stroke font IS a font.
+        public string FontFamily = "";
+        public bool FontBold = false;
+        public bool FontItalic = false;
+
+        /// <summary>True when this Text toolpath V-carves a TrueType outline rather than engraving the stroke font.</summary>
+        public bool IsCarved { get { return Geometry == WorkOrderGeometryKind.Text && !string.IsNullOrEmpty(FontFamily); } }
+
         // Pattern: the whole toolpath repeats at each instance position. The X/Y above is instance one, and
         // stays the anchor - a Grid grows from it, a Circular pattern orbits it.
         public WorkOrderPatternKind Pattern = WorkOrderPatternKind.None;
@@ -221,7 +234,9 @@ namespace CNC.Controls
                     // this cap height, so ask the font. Measured on the UNROTATED text deliberately: the
                     // baseline angle rotates the result about the anchor, and taking extents after rotation
                     // would make the anchor drift sideways every time the text was edited.
-                    case WorkOrderGeometryKind.Text: return CNC.Core.StrokeFont.Measure(Text, CapHeight).X / 2d;
+                    case WorkOrderGeometryKind.Text:
+                        return (IsCarved ? TrueTypeOutlines.Measure(Text, FontFamily, CapHeight, FontBold, FontItalic)
+                                         : CNC.Core.StrokeFont.Measure(Text, CapHeight)).X / 2d;
                     default: return 0d;
                 }
             }
@@ -238,7 +253,9 @@ namespace CNC.Controls
                     case WorkOrderGeometryKind.Oval:
                     case WorkOrderGeometryKind.Rect:
                     case WorkOrderGeometryKind.Surface: return Depth / 2d;
-                    case WorkOrderGeometryKind.Text: return CNC.Core.StrokeFont.Measure(Text, CapHeight).Y / 2d;
+                    case WorkOrderGeometryKind.Text:
+                        return (IsCarved ? TrueTypeOutlines.Measure(Text, FontFamily, CapHeight, FontBold, FontItalic)
+                                         : CNC.Core.StrokeFont.Measure(Text, CapHeight)).Y / 2d;
                     default: return 0d;
                 }
             }
@@ -546,7 +563,7 @@ namespace CNC.Controls
                 case WorkOrderGeometryKind.Rect: return "Rectangle (width, depth)";
                 case WorkOrderGeometryKind.Surface: return "Surface (width, depth) - face the whole area";
                 case WorkOrderGeometryKind.Indirect: return "Indirect (repeat another toolpath here)";
-                case WorkOrderGeometryKind.Text: return "Text (engrave with a V-bit)";
+                case WorkOrderGeometryKind.Text: return "Text (engrave or V-carve with a V-bit)";
                 default: return kind.ToString();
             }
         }
@@ -570,7 +587,7 @@ namespace CNC.Controls
         {
             switch (kind)
             {
-                case WorkOrderOpKind.Engrave: return "Engrave (V-bit, single pass along the strokes)";
+                case WorkOrderOpKind.Engrave: return "Engrave (V-bit - stroke font, or V-carve an outline font)";
                 case WorkOrderOpKind.Pocket: return "Pocket (clear the enclosed area)";
                 case WorkOrderOpKind.Contour: return "Contour (follow the outline)";
                 case WorkOrderOpKind.Drill: return "Drill (straight peck)";
@@ -790,6 +807,15 @@ namespace CNC.Controls
                     return string.IsNullOrEmpty(tp.IndirectSource)
                         ? "indirect (no source selected)"
                         : string.Format("indirect -> {0}", tp.IndirectSource);
+                case WorkOrderGeometryKind.Text:
+                    // Was falling to the rect default below, so the tree summarized a Text toolpath as
+                    // "rect 40x25" - the toolpath's unused Width/Depth defaults, nothing to do with text.
+                    string t = (tp.Text ?? string.Empty).Replace((char)13, ' ').Replace((char)10, ' ');
+                    if (t.Length > 15)
+                        t = t.Substring(0, 14) + "…";
+                    return tp.IsCarved
+                        ? string.Format("\"{0}\" {1:0.#} mm caps, {2}", t, tp.CapHeight, tp.FontFamily)
+                        : string.Format("\"{0}\" {1:0.#} mm caps", t, tp.CapHeight);
                 default:
                     return string.Format("rect {0:0.#}x{1:0.#}", tp.Width, tp.Depth);
             }
