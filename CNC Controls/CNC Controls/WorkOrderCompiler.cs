@@ -517,9 +517,15 @@ namespace CNC.Controls
             if (strokes.Count == 0)
                 return lines;   // empty or wholly unrenderable text - emit nothing rather than a bare plunge
 
+            // One shared answer for depth-from-width, INCLUDING the clamp at the bit's own maximum cutting
+            // diameter - see CustomTool.EngraveCutFor. Computing it here as well as in the UI is how the two
+            // would drift apart.
             var tool = CustomTools.Find(op.Tool);
+            var cut = tool != null ? tool.EngraveCutFor(op.EngraveWidth)
+                                   : new EngraveCut { Width = Math.Max(0.01d, op.EngraveWidth), MaxWidth = double.MaxValue,
+                                                      Depth = Math.Max(0.01d, op.EngraveWidth) / 2d };
             double halfAngle = tool != null ? tool.HalfAngleRad : Math.PI / 4d;
-            double depth = Math.Max(0.01d, (Math.Max(0.01d, op.EngraveWidth) / 2d) / Math.Tan(halfAngle));
+            double depth = Math.Max(0.01d, cut.Depth);
 
             // StrokeFont lays the text out with its baseline starting at the origin and running along +X.
             // Move it so the toolpath's anchor lands on (cx,cy), then rotate about that same anchor - so
@@ -537,7 +543,12 @@ namespace CNC.Controls
                 // g-code. Newlines are folded to '|' for the same reason - one comment, one line.
                 (tp.Text ?? string.Empty).Replace('(', '[').Replace(')', ']')
                                          .Replace((char)13, ' ').Replace((char)10, '|'),
-                tp.CapHeight, op.EngraveWidth, depth, halfAngle * 360d / Math.PI));
+                tp.CapHeight, cut.Width, depth, halfAngle * 360d / Math.PI));
+
+            if (cut.Clamped)
+                lines.Add(string.Format(CultureInfo.InvariantCulture,
+                    "(ENGRAVE stroke width limited to {0:0.###} mm - the widest this bit can cut; asked for {1:0.###})",
+                    cut.Width, op.EngraveWidth));
 
             foreach (var stroke in strokes)
             {

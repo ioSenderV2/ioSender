@@ -74,6 +74,50 @@ namespace CNC.Controls
                 return deg * Math.PI / 360d;   // /2 for half-angle, then degrees->radians
             }
         }
+
+        /// <summary>
+        /// What this tool will actually cut when asked for a stroke <paramref name="requestedWidth"/> mm
+        /// wide: how deep to plunge, the width really achieved, and whether the request had to be limited.
+        /// </summary>
+        /// <remarks>
+        /// The limit is real geometry, not a policy choice. A V-bit's quoted diameter is its MAXIMUM
+        /// cutting diameter - the width of the cone where the flutes end and the shank begins - so it is
+        /// also the widest stroke the bit can engrave. Ask for more and the arithmetic happily returns a
+        /// depth as though the cone continued forever, and the machine drives the SHANK into the work.
+        ///
+        ///     max usable depth = (D/2) / tan(halfAngle)
+        ///     1/4" 90 deg -> 3.18 mm deep, 1/4" 60 deg -> 5.50 mm deep; both cap at a 6.35 mm stroke
+        ///
+        /// Note the maximum width is the diameter whatever the angle - the angle only decides how far down
+        /// you travel to reach it.
+        ///
+        /// Lives here, on the tool, so the compiler and the UI readout share one answer. They were already
+        /// computing depth separately from the same formula, which is exactly the arrangement that drifts.
+        /// </remarks>
+        public EngraveCut EngraveCutFor(double requestedWidth)
+        {
+            var cut = new EngraveCut();
+
+            // A tool with no diameter recorded cannot be checked against one - don't invent a limit that
+            // would silently narrow a stroke the operator asked for.
+            cut.MaxWidth = DiameterMm > 0d ? DiameterMm : double.MaxValue;
+
+            double want = Math.Max(0.01d, requestedWidth);
+            cut.Clamped = want > cut.MaxWidth;
+            cut.Width = cut.Clamped ? cut.MaxWidth : want;
+            cut.Depth = (cut.Width / 2d) / Math.Tan(HalfAngleRad);
+
+            return cut;
+        }
+    }
+
+    /// <summary>The result of asking a tool for a given engraved stroke width - see CustomTool.EngraveCutFor.</summary>
+    public struct EngraveCut
+    {
+        public double Depth;      // mm to plunge
+        public double Width;      // the width actually cut - equals what was asked for unless Clamped
+        public double MaxWidth;   // the widest stroke this tool can cut at all
+        public bool Clamped;      // the request exceeded MaxWidth and was limited to it
     }
 
     public class CustomToolList

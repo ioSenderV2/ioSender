@@ -845,12 +845,24 @@ namespace CNC.Controls
                 var vtool = CustomTools.Find(op.Tool);
                 double half = vtool != null ? vtool.HalfAngleRad : Math.PI / 4d;
                 double deg = half * 360d / Math.PI;
+                // Same helper the compiler uses, so what this says is what will be cut - clamp included.
+                var cut = vtool != null ? vtool.EngraveCutFor(op.EngraveWidth)
+                                        : new EngraveCut { Width = Math.Max(0.01d, op.EngraveWidth),
+                                                           Depth = Math.Max(0.01d, op.EngraveWidth) / 2d };
+
+                string note = vtool == null ? "  (no tool selected - assuming 90°)"
+                            : vtool.Kind != CustomToolKind.VBitOrChamfer && vtool.Kind != CustomToolKind.Countersink
+                                  ? "  Pick a V-bit for this operation."
+                                  : string.Empty;
+
+                // Say it plainly rather than quietly cutting something narrower than was asked for: past its
+                // own diameter the bit's cone has run out and the shank would be doing the cutting.
+                if (cut.Clamped)
+                    note = string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "  Limited to {0:0.###} mm - the widest this bit can cut.", cut.Width) + note;
+
                 txtEngraveDepth.Text = string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                    "{0:0.###} mm deep with the {1:0.#}° bit.{2}",
-                    (Math.Max(0.01d, op.EngraveWidth) / 2d) / Math.Tan(half), deg,
-                    vtool == null ? "  (no tool selected - assuming 90°)"
-                                  : vtool.Kind == CustomToolKind.VBitOrChamfer || vtool.Kind == CustomToolKind.Countersink
-                                        ? string.Empty : "  Pick a V-bit for this operation.");
+                    "{0:0.###} mm deep with the {1:0.#}° bit.{2}", cut.Depth, deg, note);
             }
             Show(fldCountersinkDiameter, op.Kind == WorkOrderOpKind.Countersink);
             Show(pnlTabs, selectedToolpath != null && WorkOrderRules.SupportsTabs(selectedToolpath, op));
