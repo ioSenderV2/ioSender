@@ -104,6 +104,10 @@
       <Project>{FA7FEF55-AA80-4B20-B345-E3CA7204DD18}</Project>
       <Name>CNC Controls</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\CNC Contracts\CNC.Contracts.csproj">
+      <Project>{9448A265-0B77-4235-A5F5-BDE212EC75E7}</Project>
+      <Name>CNC.Contracts</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\CNC Core\CNC Core\CNC Core.csproj">
       <Project>{f245ff89-a838-4d6e-aa40-92cfd3d072d3}</Project>
       <Name>CNC Core</Name>

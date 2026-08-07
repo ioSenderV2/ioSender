@@ -67,6 +67,16 @@
          ObsBridge (OBS Studio's protocol, client functionality). Don't add it back here. -->
   </ItemGroup>
   <ItemGroup>
+    <!-- The wire contract (step 6 of the client/server split). The machine-facing enums and the
+         GrblState struct live there now (same namespaces, so no call-site changes); Core builds its
+         working state out of contract types. Reference direction is one-way: everything may reference
+         CNC.Contracts, CNC.Contracts references nothing. -->
+    <ProjectReference Include="..\..\CNC Contracts\CNC.Contracts.csproj">
+      <Project>{9448A265-0B77-4235-A5F5-BDE212EC75E7}</Project>
+      <Name>CNC.Contracts</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="ActionCommand.cs" />
     <Compile Include="GCodeRunTime.cs" />
     <Compile Include="GCodeRunTimeIndex.cs" />

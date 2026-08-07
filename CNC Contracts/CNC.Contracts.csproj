@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CNC.Contracts - the wire contract between the machine server and any client (step 6 of the
+  client/server split).
+
+  THE RULE THAT KEEPS THIS ASSEMBLY HONEST: if it couldn't be JSON, it doesn't belong here.
+  Plain data types only - no behavior, no events, no INotifyPropertyChanged, no references to any
+  other project. A browser client consumes the JSON form of exactly these shapes; anything in here
+  a browser couldn't also have is the pass-C#-objects shortcut sneaking back in.
+
+  Namespaces: types MOVED here from CNC Core keep their original namespace (CNC.Core / CNC.GCode) so
+  the move needed zero call-site churn - same zero-churn discipline as the step-5 forwarders. NEW
+  contract types (the wire messages) use CNC.Contracts.
+
+  This is the LEGACY net462 project the solution builds. CNC.Contracts.net8.csproj (same folder,
+  same sources, NOT in the .sln) is the portability probe, built with dotnet - the same two-project
+  pattern as CNC Core / CNC.Core.net8, and for the same reason: the VS MSBuild on this box (17.6)
+  cannot resolve an SDK-style project targeting net8.0, so SDK-style projects stay out of the .sln.
+-->
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{9448A265-0B77-4235-A5F5-BDE212EC75E7}</ProjectGuid>
+    <OutputType>library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>CNC.Contracts</RootNamespace>
+    <AssemblyName>CNC.Contracts</AssemblyName>
+    <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <WarningLevel>4</WarningLevel>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="MachineEnums.cs" />
+    <Compile Include="GCodeEnums.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

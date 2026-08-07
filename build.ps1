@@ -139,6 +139,10 @@ $solution = Join-Path $root 'ioSender XL\ioSender XL.sln'
 $exeRel = 'ioSender XL\ioSender XL\bin\{0}\ioSender.exe'
 
 function Find-MSBuild {
+    # NOTE (learned 2026-08-07): every project in the .sln must stay legacy-style. Neither MSBuild on
+    # this box can build an SDK-style net8.0 project (Build Tools lacks the Microsoft.DotNet
+    # SdkResolver entirely; Enterprise is 17.6, which caps at .NET SDK 7). SDK-style projects live
+    # OUTSIDE the solution and build with dotnet - the CNC.Core.net8 / CNC.Contracts.net8 probe pattern.
     $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
     if (Test-Path $vswhere) {
         $found = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild `

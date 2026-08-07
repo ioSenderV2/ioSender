@@ -46,4 +46,10 @@
     <PackageReference Include="System.IO.Ports" Version="8.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The machine-facing enums + GrblState moved to CNC.Contracts (step 6). Referencing ITS net8
+         probe here means this build asserts the contracts' portability too. -->
+    <ProjectReference Include="..\..\CNC Contracts\CNC.Contracts.net8.csproj" />
+  </ItemGroup>
+
 </Project>

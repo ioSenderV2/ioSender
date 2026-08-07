@@ -149,20 +149,7 @@ namespace CNC.Core
         BothAxes = 3
     }
 
-    public enum GrblStates
-    {
-        Unknown = 0,
-        Idle,
-        Run,
-        Tool,
-        Hold,
-        Home,
-        Check,
-        Jog,
-        Alarm,
-        Door,
-        Sleep
-    }
+    // GrblStates moved to CNC Contracts (MachineEnums.cs), same namespace - the wire messages carry it.
 
     public enum GrblMode
     {
@@ -305,12 +292,7 @@ namespace CNC.Core
         Error
     }
 
-    public enum HomedState
-    {
-        Unknown = 0,
-        NotHomed,
-        Homed
-    }
+    // HomedState moved to CNC Contracts (MachineEnums.cs), same namespace.
 
     public enum SDState
     {
@@ -320,48 +302,8 @@ namespace CNC.Core
         Detected = 3
     }
 
-    [Flags]
-    public enum Signals : int // Keep in sync with GrblInfo.SignalLetters constant below
-    {
-        Off = 0,
-        LimitX = 1 << 0,
-        LimitY = 1 << 1,
-        LimitZ = 1 << 2,
-        LimitA = 1 << 3,
-        LimitB = 1 << 4,
-        LimitC = 1 << 5,
-        LimitU = 1 << 6,
-        LimitV = 1 << 7,
-        LimitW = 1 << 8,
-        EStop = 1 << 9,
-        Probe  = 1 << 10,
-        Reset = 1 << 11,
-        SafetyDoor = 1 << 12,
-        Hold = 1 << 13,
-        CycleStart = 1 << 14,
-        BlockDelete = 1 << 15,
-        OptionalStop = 1 << 16,
-        ProbeDisconnected = 1 << 17,
-        MotorWarning = 1 << 18,
-        MotorFault = 1 << 19
-    }
-
-    [Flags]
-    public enum THCSignals : int
-    {
-        Off = 0,
-        ArcOk = 1 << 0,
-        THCEnabled = 1 << 1,
-        THCActive = 1 << 2,
-        TorchOn = 1 << 3,
-        OhmicProbe = 1 << 4,
-        VelocityLock = 1 << 5,
-        VoidLock = 1 << 6,
-        Down = 1 << 7,
-        Up = 1 << 8,
-        Breakaway = 1 << 9,
-        FloatSwitch = 1 << 10
-    }
+    // Signals and THCSignals moved to CNC Contracts (MachineEnums.cs), same namespace. Signals must
+    // stay in sync with the GrblInfo.SignalLetters constant below.
 
     [Flags]
     public enum Probes : int
@@ -372,14 +314,8 @@ namespace CNC.Core
         Probe2 = 1 << 2
     }
 
-    public struct GrblState
-    {
-        public GrblStates State;
-        public int Substate;
-        public int LastAlarm;
-        public int Error;
-        public bool MPG;
-    }
+    // The GrblState struct moved to CNC Contracts (MachineEnums.cs), same namespace - it is the wire
+    // shape of the controller's run state and MachineState.GrblState's type.
 
     public class Resources
     {
