@@ -64,6 +64,61 @@ namespace CNC.Controls
             // reach us before the TextBox/keyboard-navigation consumes them - a plain bubbling
             // KeyDown never sees the arrows on a focused single-line TextBox.
             txtInput.AddHandler(Keyboard.PreviewKeyDownEvent, new KeyEventHandler(txtInput_KeyDown), true);
+
+            // The scrollback refreshes on this timer, not per ResponseLog change - see FlushLog.
+            logFlush = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(250) };
+            logFlush.Tick += (s, e) => FlushLog(false);
+            logFlush.Start();
+            DataContextChanged += (s, e) => HookLog();
+            Loaded += (s, e) => HookLog();
+        }
+
+        // ---- Coalesced scrollback refresh ----
+        //
+        // Every response line lands in GrblViewModel.ResponseLog on the UI thread. Rebuilding the text
+        // for each one (which the old binding did - the WHOLE 2000-line join plus a full TextBox.Text
+        // re-set, twice per line once the trim's RemoveAt fired too) costs O(scrollback) per line, and a
+        // dense job's response rate multiplied that into a saturated UI thread: no repaints, starved
+        // input, and minutes of backlog draining after the job itself had finished. Marking a dirty flag
+        // is all the per-line work now; the join happens at most four times a second, and not at all
+        // while the console isn't on screen (it catches up the moment it becomes visible).
+
+        private GrblViewModel logModel;
+        private readonly DispatcherTimer logFlush;
+        private bool logDirty;
+
+        private void HookLog()
+        {
+            var m = DataContext as GrblViewModel;
+            if (ReferenceEquals(m, logModel))
+                return;
+            if (logModel != null)
+                logModel.ResponseLog.CollectionChanged -= ResponseLog_CollectionChanged;
+            logModel = m;
+            if (logModel != null)
+            {
+                logModel.ResponseLog.CollectionChanged += ResponseLog_CollectionChanged;
+                logDirty = true;
+                FlushLog(true);
+            }
+        }
+
+        private void ResponseLog_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            logDirty = true;
+        }
+
+        private void FlushLog(bool force)
+        {
+            if (!logDirty || logModel == null || (!force && !IsVisible))
+                return;
+            logDirty = false;
+
+            var log = logModel.ResponseLog;
+            var sb = new System.Text.StringBuilder(log.Count * 16);
+            foreach (var line in log)
+                sb.AppendLine(line);   // same join the old converter produced, so line-index math holds
+            txtOutput.Text = sb.ToString();
         }
 
         // LogOnly: hide the inline input prompt and show just the scrollback - used by the run-control
@@ -172,7 +227,10 @@ namespace CNC.Controls
         private void ConsoleControl_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (IsVisible)
+            {
+                FlushLog(true);   // catch up on whatever arrived while hidden
                 Dispatcher.BeginInvoke(new System.Action(() => txtInput.Focus()), DispatcherPriority.Input);
+            }
         }
 
         private void btn_Clear(object sender, RoutedEventArgs e)

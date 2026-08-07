@@ -8,7 +8,6 @@
              d:DesignHeight="331" d:DesignWidth="400"
              IsVisibleChanged="ConsoleControl_IsVisibleChanged">
     <UserControl.Resources>
-        <local:StringCollectionToTextConverter x:Key="OcToString" />
         <local:LogicalNotConverter x:Key="BooleanConverter" />
     </UserControl.Resources>
     <!--> <GroupBox Header="Console" HorizontalAlignment="Center" VerticalAlignment="Top" Width="394" Height="328"> <\!-->
@@ -60,7 +59,13 @@
                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                      ToolTip="Enter a command (MDI). Paste multiple lines to send them all on Enter. Up/Down recalls history, Esc clears."/>
         </DockPanel>
-        <TextBox x:Name="txtOutput" x:Uid="txt_consoleOutput" IsReadOnly="True" TextWrapping="NoWrap" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
+        <!-- Text is set from code-behind on a coalescing timer, NOT bound. The old MultiBinding
+             (ResponseLog + ResponseLog.Count through StringCollectionToTextConverter) re-joined the whole
+             2000-line scrollback and re-set the entire TextBox text on EVERY collection change - twice per
+             line once the trim kicked in - which at a dense job's response rate saturated the UI thread:
+             status stopped painting, input starved, and a multi-minute backlog of received-but-unprocessed
+             lines drained long after the machine went quiet. See FlushLog in code-behind. -->
+        <TextBox x:Name="txtOutput" x:Uid="txt_consoleOutput" IsReadOnly="True" IsUndoEnabled="False" TextWrapping="NoWrap" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
                  local:TextBoxUtilities.AlwaysScrollToEnd="True" IsInactiveSelectionHighlightEnabled="True"
                  FontSize="{Binding Source={x:Static local:AppConfig.Settings}, Path=Base.ConsoleFontSize}" FontFamily="Verdana"
                  ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -75,12 +80,6 @@
                     <MenuItem x:Uid="mnu_save" Header="Save..." Click="OutSave_Click"/>
                 </ContextMenu>
             </TextBox.ContextMenu>
-            <TextBox.Text>
-                <MultiBinding Converter="{StaticResource OcToString}">
-                    <Binding Path="ResponseLog" Mode="OneWay"/>
-                    <Binding Path="ResponseLog.Count" Mode="OneWay" />
-                </MultiBinding>
-            </TextBox.Text>
         </TextBox>
     </DockPanel>
     <!--> </GroupBox> </!-->
