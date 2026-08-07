@@ -978,8 +978,13 @@ namespace CNC.Controls
                     var ct = CustomTools.Find(op.Tool);
                     // ct is null only for a stale op.Tool referencing a tool since deleted from the list -
                     // ParameterWarnings flags that at Generate time, this just keeps the comment generic.
+                    // A= was hardcoded to 90, so a 60-degree V-bit declared itself as 90 to the simulator and
+                    // the Fusion post that read this - the cutter shape they drew was simply the wrong cone.
+                    // It reads the tool's own angle now (CustomTool.IncludedAngleDeg, which defaults to 90,
+                    // so nothing changes for a tool whose angle was never set).
                     string type = ct == null ? "FLAT"
-                                : (ct.Kind == CustomToolKind.VBitOrChamfer || ct.Kind == CustomToolKind.Countersink) ? "VBIT A=90"
+                                : (ct.Kind == CustomToolKind.VBitOrChamfer || ct.Kind == CustomToolKind.Countersink)
+                                      ? string.Format(CultureInfo.InvariantCulture, "VBIT A={0:0.#}", ct.IncludedAngleDeg)
                                 : ct.Kind == CustomToolKind.BallEnd ? "BALL"
                                 : "FLAT";
                     string description = ct?.Name ?? ("tool " + op.Tool);
@@ -1254,8 +1259,26 @@ namespace CNC.Controls
                                 ? string.Format("surface - entire spoilboard, {0:0.0} mm deep", TrueDepth(op))
                                 : string.Format("surface {0:0.0}x{1:0.0} mm, {2:0.0} mm deep", tp.Width, tp.Depth, TrueDepth(op));
                             break;
+                        case WorkOrderOpKind.Engrave:
+                            // The operator's own text goes into a g-code comment, and grblHAL ends a comment
+                            // at the FIRST ')' - so a bracket in it would truncate the block and let the rest
+                            // parse as g-code. Sanitised exactly as BuildEngrave sanitises its own.
+                            desc = string.Format("engrave \"{0}\", {1:0.#} mm caps, {2:0.###} mm stroke",
+                                (tp.Text ?? string.Empty).Replace('(', '[').Replace(')', ']')
+                                                         .Replace((char)13, ' ').Replace((char)10, '|'),
+                                tp.CapHeight, op.EngraveWidth);
+                            break;
                         default:
-                            continue;
+                            // Was "continue", which SKIPPED THE WHOLE OPERATION - BuildOperation never ran,
+                            // so an operation the operator had enabled produced no g-code at all while the
+                            // header still counted it and the tool still appeared in the list. That is what
+                            // adding Engrave hit: it engraved nothing and the only clue was a 13-line file.
+                            //
+                            // A description is presentation. Losing one must never lose the CUT, so an
+                            // unrecognised kind now falls back to its own label and is emitted normally.
+                            // Every kind has a case above; this exists so the next one added cannot vanish.
+                            desc = WorkOrderRules.OpLabel(op.Kind);
+                            break;
                     }
 
                     // Whether the NEXT scheduled operation (if any) uses the same tool - if so, AppendToolEnd
