@@ -221,6 +221,14 @@ namespace CNC.Controls
                     op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("chamfer", material);
                     op.Feed = 500d;
                     break;
+                case WorkOrderOpKind.Engrave:
+                    // Same tool class as a chamfer - both cut with the point of a V-bit - so it reuses that
+                    // suggestion rather than inventing a second lookup that would drift from it. Without
+                    // this the operation kept the generic 2-flute end mill, and then the depth readout was
+                    // computed against a tool that has no included angle at all.
+                    op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("chamfer", material);
+                    op.Feed = 500d;
+                    break;
                 case WorkOrderOpKind.Countersink:
                     // op.CountersinkDiameter already holds its own default (12.5mm - see WorkOrderModel) at
                     // this point, so the tool is picked from that instead of a generic "smallest" guess.

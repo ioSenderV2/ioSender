@@ -158,9 +158,14 @@ namespace CNC.Controls
         {
             bool isDrill = kind == WorkOrderOpKind.Drill;
             bool isCountersink = kind == WorkOrderOpKind.Countersink;
-            bool isChamfer = kind == WorkOrderOpKind.Chamfer;
+            // Engrave and Chamfer both cut with the point of a V-shaped bit, so they want the same class of
+            // tool. Grouping them here rather than adding another flag matters because isMill below is a
+            // NEGATION of the special cases - a new operation kind that nobody adds to this list silently
+            // becomes a milling operation, which is how Engrave first shipped offering end mills and hiding
+            // the V-bit, the exact opposite of what it needs.
+            bool isVeeTool = kind == WorkOrderOpKind.Chamfer || kind == WorkOrderOpKind.Engrave;
             bool isSurface = kind == WorkOrderOpKind.Surface;
-            bool isMill = !isDrill && !isCountersink && !isChamfer && !isSurface;
+            bool isMill = !isDrill && !isCountersink && !isVeeTool && !isSurface;
 
             foreach (var item in toolItems)
             {
@@ -169,7 +174,7 @@ namespace CNC.Controls
                 switch (ct.Kind)
                 {
                     case CustomToolKind.Drill: visible = isDrill; break;
-                    case CustomToolKind.VBitOrChamfer: visible = isChamfer; break;
+                    case CustomToolKind.VBitOrChamfer: visible = isVeeTool; break;
                     case CustomToolKind.Countersink: visible = isCountersink; break;
                     // The surfacing bit is otherwise a normal mill-class tool (isMill's own bucket), but a
                     // Surface operation only ever wants IT - a facing pass with an ordinary endmill/ball end
