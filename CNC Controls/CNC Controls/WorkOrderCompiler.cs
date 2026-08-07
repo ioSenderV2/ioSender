@@ -639,6 +639,11 @@ namespace CNC.Controls
             double rad = tp.Angle * Math.PI / 180d;
             double cos = Math.Cos(rad), sin = Math.Sin(rad);
 
+            int cutPasses = 0;
+            foreach (var p in passes)
+                if (p.Depth >= 0.01d)
+                    cutPasses++;
+
             lines.Add(string.Format(CultureInfo.InvariantCulture,
                 "(VCARVE \"{0}\" in {1}{2}{3}, cap {4:0.###} mm, {5} passes to {6:0.###} mm max at {7:0.#} deg included)",
                 // Same sanitising as BuildEngrave: grblHAL ends a comment at the FIRST ')'.
@@ -646,10 +651,24 @@ namespace CNC.Controls
                                          .Replace((char)13, ' ').Replace((char)10, '|'),
                 tp.FontFamily.Replace('(', '[').Replace(')', ']'),
                 tp.FontBold ? " bold" : string.Empty, tp.FontItalic ? " italic" : string.Empty,
-                tp.CapHeight, passes.Count, maxDepth, halfAngle * 360d / Math.PI));
+                tp.CapHeight, cutPasses, maxDepth, halfAngle * 360d / Math.PI));
 
+            // Between rings of the same carve a short hop clears the work - nothing on this operation
+            // sticks up past the stock top - where retracting to full SafeZ 193 times would spend more
+            // of the job travelling in Z than cutting. First approach and final retract still use SafeZ.
+            const double hop = 2d;
+
+            bool approached = false;
             foreach (var pass in passes)   // already shallow to deep, outside to inside - the cut order
             {
+                // The depth-0 boundary rings carve NOTHING - a cone at zero depth has zero width, and the
+                // groove's top edge is formed by the deeper passes' flanks anyway. Emitting them sent the
+                // machine tracing every letter outline while grazing the surface - 800 lines of motion
+                // before the first real plunge, which on the machine looked like the whole job "barely
+                // kissing the stock".
+                if (pass.Depth < 0.01d)
+                    continue;
+
                 bool first = true;
                 foreach (var p in pass.Path)
                 {
@@ -660,7 +679,8 @@ namespace CNC.Controls
                     if (first)
                     {
                         first = false;
-                        lines.Add("G0 Z" + F(SafeZ()));
+                        lines.Add("G0 Z" + F(approached ? hop : SafeZ()));
+                        approached = true;
                         lines.Add("G0 X" + F(x) + " Y" + F(y));
                         lines.Add("G1 Z" + F(-pass.Depth) + " F" + F(op.PlungeFeed));
                     }
