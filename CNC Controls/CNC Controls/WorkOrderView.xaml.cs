@@ -1,4 +1,4 @@
-﻿/*
+/*
  * WorkOrderView.xaml.cs - part of CNC Controls library
  *
  * Odd Jobs "Work Order": the single composer tab that replaced the five fixed job wizards (Surface Stock,

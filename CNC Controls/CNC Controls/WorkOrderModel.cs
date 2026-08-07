@@ -1,4 +1,4 @@
-﻿/*
+/*
  * WorkOrderModel.cs - part of CNC Controls library
  *
  * Odd Jobs "Work Order" data model. The unit of work is a TOOLPATH: a named piece of geometry (one of the
