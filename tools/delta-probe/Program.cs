@@ -154,6 +154,67 @@ static class Probe
         Apply(mirror, d3);
         Check(SameState(mirror, producer.Snapshot().State), "mirror == source after delta 3");
 
+        // ---- MachineStateStream: the in-process channel, driven through the REAL parser ----
+        Console.WriteLine("MachineStateStream via GrblViewModel.DataReceived:");
+
+        var model = new GrblViewModel();
+        using (var stream = new MachineStateStream(model))
+        {
+            var seenA = new System.Collections.Generic.List<MachineDelta>();
+            var mirrorA = new MachineSnapshot();
+            var subA = stream.Subscribe(d => { seenA.Add(d); Apply(mirrorA, d); });
+
+            Check(seenA.Count == 1 && seenA[0].Changed == MachineField.All, "subscribe is snapshot-first");
+
+            // A real status report drives parse -> state mutation -> pump -> delta.
+            model.DataReceived("<Idle|MPos:10.000,20.000,5.000|FS:0,0>");
+            Check(seenA.Count == 2, "status report -> one delta");
+            var sd = seenA[1];
+            Check((sd.Changed & MachineField.GrblState) != 0 && sd.State.GrblState.State == GrblStates.Idle,
+                  "parsed run state crosses (Idle)");
+            Check((sd.Changed & MachineField.MachinePosition) != 0 && sd.State.MachinePosition[0] == 10.0
+                  && sd.State.MachinePosition[1] == 20.0 && sd.State.MachinePosition[2] == 5.0,
+                  "parsed machine position crosses");
+
+            // An identical report changes nothing and must emit nothing.
+            model.DataReceived("<Idle|MPos:10.000,20.000,5.000|FS:0,0>");
+            Check(seenA.Count == 2, "identical report -> no delta");
+
+            // Late joiner with a change PENDING (mutated outside any status report): the newcomer's
+            // snapshot must carry it AND the existing subscriber must still receive it - the
+            // flush-before-snapshot rule.
+            model.State.Tool = "5";
+            var seenB = new System.Collections.Generic.List<MachineDelta>();
+            var mirrorB = new MachineSnapshot();
+            var subB = stream.Subscribe(d => { seenB.Add(d); Apply(mirrorB, d); });
+            Check(seenB.Count == 1 && seenB[0].State.Tool == "5", "late joiner's snapshot has the pending change");
+            Check(seenA.Count == 3 && seenA[2].Changed == MachineField.Tool && seenA[2].State.Tool == "5",
+                  "existing subscriber got the pending change flushed, not swallowed");
+
+            // Both mirrors track through further traffic, and Seq stays gap-free per the contract.
+            model.DataReceived("<Run|MPos:11.000,20.000,5.000|FS:800,12000>");
+            Check(seenA.Count == 4 && seenB.Count == 2, "delta fans out to all subscribers");
+            Check(SameState(mirrorA, mirrorB), "both mirrors agree");
+            bool seqOk = true;
+            for (int i = 2; i < seenA.Count; i++)
+                seqOk &= seenA[i].Seq == seenA[i - 1].Seq + 1;
+            Check(seqOk, "Seq gap-free across the stream");
+
+            // RequestSnapshot resyncs everyone.
+            stream.RequestSnapshot();
+            Check(seenA[seenA.Count - 1].Changed == MachineField.All && seenB[seenB.Count - 1].Changed == MachineField.All,
+                  "RequestSnapshot delivers All to every subscriber");
+            Check(SameState(mirrorA, mirrorB), "mirrors agree after resync");
+
+            // Unsubscribe is honored.
+            subA.Dispose();
+            int countA = seenA.Count;
+            model.DataReceived("<Run|MPos:12.000,20.000,5.000|FS:800,12000>");
+            Check(seenA.Count == countA && seenB[seenB.Count - 1].State.MachinePosition[0] == 12.0,
+                  "disposed subscription stops receiving; live one continues");
+            subB.Dispose();
+        }
+
         Console.WriteLine(failures == 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED");
         return failures == 0 ? 0 : 1;
     }

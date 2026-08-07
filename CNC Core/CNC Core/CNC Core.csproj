@@ -115,6 +115,7 @@
     <Compile Include="GrblViewModel.cs" />
     <Compile Include="MachineState.cs" />
     <Compile Include="MachineDeltaProducer.cs" />
+    <Compile Include="MachineStateStream.cs" />
     <Compile Include="StrokeFont.cs" />
     <Compile Include="VCarve.cs" />
     <Compile Include="JogController.cs" />

@@ -82,6 +82,10 @@ namespace GCode_Sender
 
         private bool saveWinSize = false;
 
+        // The in-process state stream (client/server split, step 6a) - held for the app's lifetime;
+        // see its construction below for why it exists before anything consumes it.
+        private CNC.Core.MachineStateStream stateStream;
+
         public MainWindow()
         {
             CNC.Core.Resources.Path = AppDomain.CurrentDomain.BaseDirectory;
@@ -209,6 +213,13 @@ namespace GCode_Sender
             {
                 CNC.Core.Grbl.GrblViewModel = viewModel;
                 CNC.Controls.GamepadInput.Attach(viewModel);   // one gamepad stack, bound to the main model
+
+                // The state stream (client/server split, step 6a): MachineState -> MachineDelta
+                // messages, pumped per status report. Nothing in the app consumes it yet - the client
+                // mirror will - but constructing it here makes the wire protocol real and observable
+                // now: run with -debuglog=delta and every message appears in the debug log as its
+                // wire JSON.
+                stateStream = new CNC.Core.MachineStateStream(viewModel);
             }
 
             // The run control is now fixed at the main-window bottom (always visible on every tab), so the
