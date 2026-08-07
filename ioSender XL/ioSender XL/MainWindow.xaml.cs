@@ -2421,6 +2421,39 @@ namespace GCode_Sender
         //     older text and reads as "it copied the wrong thing".
         // Hence: leave the clipboard alone when there is nothing to copy, SetDataObject with a short retry,
         // and a visible confirmation ONLY on a call that actually succeeded.
+        // Click on the status line: every status message since launch, timestamped (errors marked "!"),
+        // in a plain scrollable window opened at the end (newest). The status line shows one message at a
+        // time and overwrites freely - this is the "what did it say a minute ago" answer. A snapshot, not
+        // live: click again for a fresh one.
+        private void Message_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            var log = (DataContext as GrblViewModel)?.MessageLog;
+            if (log == null || log.Count == 0)
+                return;
+
+            var text = new TextBox
+            {
+                IsReadOnly = true,
+                IsUndoEnabled = false,
+                TextWrapping = TextWrapping.NoWrap,
+                FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Text = string.Join("\r\n", log)
+            };
+            var win = new Window
+            {
+                Title = "Status messages since launch",
+                Owner = this,
+                Width = 700,
+                Height = 440,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Content = text
+            };
+            win.Loaded += (s2, e2) => { text.CaretIndex = text.Text.Length; text.ScrollToEnd(); };
+            win.Show();
+        }
+
         private void CopyMessage_Click(object sender, RoutedEventArgs e)
         {
             string text = (DataContext as GrblViewModel)?.Message ?? string.Empty;

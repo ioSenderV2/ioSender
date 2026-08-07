@@ -820,6 +820,22 @@ namespace CNC.Core
         // Reset to false on every OTHER Message assignment so a stale error flag can't outlive its message.
         public bool IsMessageError { get; private set; } = false;
 
+        // Every non-empty status message since launch, timestamped, errors marked "!". The status line
+        // shows one message at a time and later ones overwrite freely, so this is where "what did it say
+        // a minute ago" gets answered - click the status line (MainWindow) to see it. Read on demand,
+        // deliberately NOT observable: appends must stay cheap (see ConsoleControl's scrollback history
+        // for what a per-append UI rebuild does to a busy stream).
+        public System.Collections.Generic.List<string> MessageLog { get; } = new System.Collections.Generic.List<string>();
+
+        private void LogMessage(string message, bool isError)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                return;
+            MessageLog.Add(string.Format("{0:HH:mm:ss}  {1}{2}", DateTime.Now, isError ? "! " : string.Empty, message));
+            if (MessageLog.Count > 1200)
+                MessageLog.RemoveRange(0, 200);
+        }
+
         public string Message
         {
             get { return _message == null ? string.Empty : _message; }
@@ -829,6 +845,7 @@ namespace CNC.Core
                 {
                     _message = value;
                     IsMessageError = false;
+                    LogMessage(value, false);
                     if(!Silent)
                         OnPropertyChanged();
                 }
@@ -847,6 +864,7 @@ namespace CNC.Core
             if (_message != message)
             {
                 _message = message;
+                LogMessage(message, true);
                 if (!Silent)
                     OnPropertyChanged(nameof(Message));
             }

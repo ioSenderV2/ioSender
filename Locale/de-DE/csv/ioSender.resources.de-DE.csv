@@ -206,3 +206,4 @@ ioSender.g.en-US.resources:mainwindow.baml,mnu_loadWorkOrder:System.Windows.Fram
 ioSender.g.en-US.resources:mainwindow.baml,txt_runFeedTip:System.Windows.Documents.Run.Text,Text,True,True,,Current feed rate
 ioSender.g.en-US.resources:mainwindow.baml,mnu_tools:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Tools
 ioSender.g.en-US.resources:mainwindow.baml,lbl_copied:System.Windows.Controls.TextBlock.Text,Text,True,True,,Copied
+ioSender.g.en-US.resources:mainwindow.baml,lbl_messageHistoryHint:System.Windows.Controls.TextBlock.Text,Text,True,True,,Click for the full message history since launch.

@@ -135,9 +135,13 @@
                                    Foreground="ForestGreen" FontWeight="SemiBold" VerticalAlignment="Center"
                                    Margin="0,0,6,0"/>
                         <TextBlock x:Uid="lbl_message" x:Name="lblMessage" Text="{Binding Path=Message}" TextWrapping="NoWrap"
-                                   VerticalAlignment="Center" ToolTipService.ShowDuration="60000" ToolTipService.InitialShowDelay="300">
+                                   VerticalAlignment="Center" ToolTipService.ShowDuration="60000" ToolTipService.InitialShowDelay="300"
+                                   Cursor="Hand" MouseLeftButtonUp="Message_Click">
                             <TextBlock.ToolTip>
-                                <TextBlock Text="{Binding Path=Message}" TextWrapping="Wrap" MaxWidth="540"/>
+                                <StackPanel MaxWidth="540">
+                                    <TextBlock Text="{Binding Path=Message}" TextWrapping="Wrap"/>
+                                    <TextBlock x:Uid="lbl_messageHistoryHint" Text="Click for the full message history since launch." Foreground="#FF888888" Margin="0,4,0,0"/>
+                                </StackPanel>
                             </TextBlock.ToolTip>
                         </TextBlock>
                     </StackPanel>
