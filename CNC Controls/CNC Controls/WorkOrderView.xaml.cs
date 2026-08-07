@@ -1760,13 +1760,27 @@ namespace CNC.Controls
                 var st = model.StreamingState;
                 if (st == StreamingState.Send || st == StreamingState.SendMDI)
                     started = true;
+                DebugLog.Write("workorder", string.Format("WatchForRunEnd: saw StreamingState={0}, started={1}{2}",
+                    st, started, !started ? " - NOT ARMED, a terminal state here will be ignored" : string.Empty));
                 if (!started || (st != StreamingState.Idle && st != StreamingState.NoFile))
                     return;
                 model.PropertyChanged -= handler;
+                DebugLog.Write("workorder", "WatchForRunEnd: terminal - popping the borrowed program and switching back");
                 GCode.File.Pop();
                 MacroProcessor.SwitchToTab?.Invoke(ViewType.WorkOrder);
             };
             model.PropertyChanged += handler;
+
+            // The state AT ARM TIME is the number that matters, and it is the one thing the handler above can
+            // never tell us: this watcher only arms (started=true) by OBSERVING a Send/SendMDI transition, so
+            // if the run already passed that point before we subscribed, no terminal state will ever pop the
+            // program and it just sits there as "the job" forever. Reported 2026-08-06 - a work order finished,
+            // parked at G30, and the program stayed loaded. That run had the UI roughly 2.5 minutes behind the
+            // wire (the console reached the final Ln:36623 at 17:29:51; the machine got there at 17:27:17),
+            // which is exactly the condition that makes arriving late plausible.
+            // So record where we came in. "armed while already Send" or "armed while already Idle" identifies
+            // the fault immediately; without it the two are indistinguishable after the fact.
+            DebugLog.Write("workorder", string.Format("WatchForRunEnd: armed with StreamingState={0}", model.StreamingState));
         }
 
         // Shared by Generate and Run: validate + build program text into the

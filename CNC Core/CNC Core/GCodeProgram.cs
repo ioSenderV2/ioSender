@@ -232,13 +232,23 @@ namespace CNC.Core
         public void Push()
         {
             _pushedSnapshots.Push(Program.TakeSnapshot());
+            DebugLog.Write("workorder", string.Format("GCode.File.Push: depth now {0}", _pushedSnapshots.Count));
         }
 
         public void Pop()
         {
+            // An unbalanced Push is invisible from the outside - the generated program simply stays loaded as
+            // "the job" with nothing left to restore it, which is what a work order that fails to evaporate at
+            // the end of a run looks like (2026-08-06). Log both halves so the pairing can be read off the log
+            // instead of inferred, and say so loudly when a Pop arrives with nothing to restore.
             if (_pushedSnapshots.Count == 0)
+            {
+                DebugLog.Write("workorder", "GCode.File.Pop: NOTHING PUSHED - ignored (the loaded program stays as-is)");
                 return;
+            }
             var snapshot = _pushedSnapshots.Pop();
+            DebugLog.Write("workorder", string.Format("GCode.File.Pop: restoring '{0}', depth now {1}",
+                snapshot.FileName ?? "(none)", _pushedSnapshots.Count));
 
             Program.PrepareRestore(snapshot);   // sets filename/BoundingBox/HasSections - no events, blocks untouched yet
             ((BulkObservableCollection<GCodeBlock>)Program.Blocks).ReplaceAll(snapshot.Blocks);
