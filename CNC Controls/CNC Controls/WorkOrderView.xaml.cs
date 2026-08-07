@@ -254,16 +254,17 @@ namespace CNC.Controls
                     break;
                 case WorkOrderOpKind.Surface:
                     op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("facing", material);
-                    // SuggestTool("facing") picks the seeded surfacing bit - seed its real 25mm diameter here
-                    // too, not just the tool choice. Without this, op.BitDiameter sits at WorkOrderOperation's
-                    // generic 6.35mm default until the Feeds and Speeds dialog is confirmed once, and the
-                    // dialog's own tool-switch default gets overwritten right back to that stale 6.35mm by the
-                    // caller's own "restore last-confirmed value" BitDiameter=op.BitDiameter (see
-                    // btnFeedsSpeeds_Click) - badly wrong chip-load lookup (6mm bucket instead of 25mm) until
-                    // the operator happens to notice and fix it by hand.
-                    op.BitDiameter = 25.0d;
                     break;
             }
+
+            // The operation's diameter follows whatever tool was just chosen - the definition is the
+            // source of truth. This used to be special-cased for Surface only (its 25mm bit was the one
+            // whose mismatch against the generic 6.35 default was glaring), leaving every other kind with
+            // the stale default until Feeds and Speeds was confirmed once - and a drill is exempt as ever,
+            // its diameter IS the hole.
+            var chosen = CustomTools.Find(op.Tool);
+            if (op.Kind != WorkOrderOpKind.Drill && chosen != null && chosen.DiameterMm > 0d)
+                op.BitDiameter = chosen.DiameterMm;
 
             // Recall whatever this tool/material was last dialed in to, so a new operation starts from the
             // operator's own proven numbers rather than the chart default (see OddJobsToolMemory).
@@ -1182,7 +1183,15 @@ namespace CNC.Controls
                 // selected tool (CustomTool.Flutes). The old wizards all overrode it with a hardcoded 2,
                 // so the 3-flute roughing bit computed its chip load as if it were 2-flute.
                 // A drill's diameter is the hole itself, so it comes from the geometry, not from a bit field.
-                BitDiameter = isDrill ? op.HoleDiameter : op.BitDiameter,
+                // Everything else seeds from the TOOL DEFINITION, not the operation's stored copy: the
+                // dialog's constructor selects the tool (which sets the right diameter), but an object
+                // initializer runs AFTER the constructor, so seeding op.BitDiameter here stomped that with
+                // the operation's stale 6.35 default - edit the bit to 12.5 mm in its definition and every
+                // dialog still opened saying 6.35, forever, because OK wrote the stale value back. The
+                // field stays editable for a one-off override, but each open follows the definition.
+                BitDiameter = isDrill ? op.HoleDiameter
+                            : CustomTools.Find(op.Tool)?.DiameterMm > 0d ? CustomTools.Find(op.Tool).DiameterMm
+                            : op.BitDiameter,
                 SpindleRPM = op.SpindleRPM, Feed = op.Feed, PlungeFeed = op.PlungeFeed,
                 DepthOfCut = doc,
                 Material = material,
