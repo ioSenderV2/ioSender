@@ -370,7 +370,7 @@ namespace CNC.Controls
                     Name = tp.Name,
                     Geometry = source.Geometry,
                     Enabled = tp.Enabled,
-                    X = tp.X, Y = tp.Y,
+                    X = tp.CenterX, Y = tp.CenterY,
                     Length = source.Length, Angle = source.Angle, Diameter = source.Diameter,
                     Width = source.Width, Depth = source.Depth, Size = source.Size,
                     Pattern = tp.Pattern,

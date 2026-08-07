@@ -1,4 +1,4 @@
-/*
+﻿/*
  * WorkOrderModel.cs - part of CNC Controls library
  *
  * Odd Jobs "Work Order" data model. The unit of work is a TOOLPATH: a named piece of geometry (one of the
@@ -33,6 +33,11 @@ namespace CNC.Controls
     // those two fields, same as Oval/Rect) - it isn't cut relative to any enclosed shape, so it only ever
     // carries the one Surface operation (see WorkOrderRules.AvailableOperations).
     public enum WorkOrderGeometryKind { Line, Circle, Oval, Square, Rect, Surface, Indirect }
+
+    // Which point of a toolpath's own bounding box its X/Y names. Front is -Y and back is +Y, matching the
+    // corner order OddJobsGeometry.RectPoints already walks and the front/back sense pcorner.macro uses for
+    // its corner ids - so "front left" means the same thing here as it does when probing one.
+    public enum WorkOrderAnchor { Center, FrontLeft, FrontRight, BackLeft, BackRight }
 
     // Repeats a whole toolpath - geometry AND every operation on it - at a set of offsets.
     public enum WorkOrderPatternKind { None, Grid, Circular }
@@ -134,8 +139,19 @@ namespace CNC.Controls
         // Enabled flags are left alone so re-checking the toolpath restores exactly what was set before.
         public bool Enabled = true;
 
-        // Position: the shape's center (for Line, its midpoint).
+        // Position: the point X/Y names is chosen by Anchor below - the shape's center by default (and for
+        // Line, its midpoint, which has no corners to name).
         public double X = 0d, Y = 0d;
+
+        // Which point of the shape X/Y actually refers to. Center is the default, so every .workorder saved
+        // before this existed - where the element is simply absent and deserializes to the default - keeps
+        // its exact previous meaning, and nothing needs migrating.
+        //
+        // Changing this RE-INTERPRETS X/Y rather than recomputing it: the shape moves, the numbers you typed
+        // stay put. That is the behaviour asked for, and it is the one that makes the field useful for what
+        // it is for - typing a corner coordinate read off the previous operation so a follow-on pass lines up
+        // against a known edge, instead of doing the half-width arithmetic in your head every time.
+        public WorkOrderAnchor Anchor = WorkOrderAnchor.Center;
 
         // Dimensions - which of these matter depends on Geometry.
         public double Length = 50d;      // Line
@@ -162,6 +178,80 @@ namespace CNC.Controls
         public bool IsClosed { get { return Geometry != WorkOrderGeometryKind.Line; } }
         public bool IsIndirect { get { return Geometry == WorkOrderGeometryKind.Indirect; } }
 
+        // X/Y resolved to the shape's CENTER, whatever Anchor names. Everything downstream - the compiler's
+        // geometry builders, the pattern expansion, the stock-canvas preview - is written in terms of a
+        // center, so the anchor is converted away exactly once, here. Adding a new consumer of the position
+        // that reads X/Y directly would silently ignore the anchor; read these instead.
+        public double CenterX { get { return X + HalfWidth * AnchorSignX; } }
+        public double CenterY { get { return Y + HalfDepth * AnchorSignY; } }
+
+        // Half-extents of the bounding box, per geometry. A Line has none (it is positioned by its midpoint
+        // and has no corners), and Indirect carries no geometry of its own, so both stay put under any
+        // anchor rather than being nudged by a dimension that means nothing to them.
+        private double HalfWidth
+        {
+            get
+            {
+                switch (Geometry)
+                {
+                    case WorkOrderGeometryKind.Circle: return Diameter / 2d;
+                    case WorkOrderGeometryKind.Square: return Size / 2d;
+                    case WorkOrderGeometryKind.Oval:
+                    case WorkOrderGeometryKind.Rect:
+                    case WorkOrderGeometryKind.Surface: return Width / 2d;
+                    default: return 0d;
+                }
+            }
+        }
+
+        private double HalfDepth
+        {
+            get
+            {
+                switch (Geometry)
+                {
+                    case WorkOrderGeometryKind.Circle: return Diameter / 2d;
+                    case WorkOrderGeometryKind.Square: return Size / 2d;
+                    case WorkOrderGeometryKind.Oval:
+                    case WorkOrderGeometryKind.Rect:
+                    case WorkOrderGeometryKind.Surface: return Depth / 2d;
+                    default: return 0d;
+                }
+            }
+        }
+
+        // Which way the center lies FROM the named corner: a front-left anchor has its center up and to the
+        // right (+X, +Y), and so on round. Center yields 0 and so is exactly a no-op.
+        private double AnchorSignX
+        {
+            get
+            {
+                switch (Anchor)
+                {
+                    case WorkOrderAnchor.FrontLeft:
+                    case WorkOrderAnchor.BackLeft: return 1d;
+                    case WorkOrderAnchor.FrontRight:
+                    case WorkOrderAnchor.BackRight: return -1d;
+                    default: return 0d;
+                }
+            }
+        }
+
+        private double AnchorSignY
+        {
+            get
+            {
+                switch (Anchor)
+                {
+                    case WorkOrderAnchor.FrontLeft:
+                    case WorkOrderAnchor.FrontRight: return 1d;
+                    case WorkOrderAnchor.BackLeft:
+                    case WorkOrderAnchor.BackRight: return -1d;
+                    default: return 0d;
+                }
+            }
+        }
+
         // Every position this toolpath's geometry is cut at, instance one first. A None pattern yields exactly
         // the anchor point, so callers never need to special-case the unpatterned toolpath.
         public IEnumerable<double[]> PatternPositions()
@@ -174,7 +264,7 @@ namespace CNC.Controls
                     int rows = Math.Max(1, (int)Math.Round(Rows));
                     for (int r = 0; r < rows; r++)
                         for (int c = 0; c < cols; c++)
-                            yield return new[] { X + c * ColumnSpacing, Y + r * RowSpacing };
+                            yield return new[] { CenterX + c * ColumnSpacing, CenterY + r * RowSpacing };
                     break;
                 }
                 case WorkOrderPatternKind.Circular:
@@ -188,12 +278,12 @@ namespace CNC.Controls
                     for (int i = 0; i < n; i++)
                     {
                         double a = (PatternStartAngle + i * stepDeg) * Math.PI / 180d;
-                        yield return new[] { X + PatternRadius * Math.Cos(a), Y + PatternRadius * Math.Sin(a) };
+                        yield return new[] { CenterX + PatternRadius * Math.Cos(a), CenterY + PatternRadius * Math.Sin(a) };
                     }
                     break;
                 }
                 default:
-                    yield return new[] { X, Y };
+                    yield return new[] { CenterX, CenterY };
                     break;
             }
         }
@@ -341,6 +431,10 @@ namespace CNC.Controls
               WorkOrderGeometryKind.Square, WorkOrderGeometryKind.Rect, WorkOrderGeometryKind.Surface,
               WorkOrderGeometryKind.Indirect };
 
+        public static readonly WorkOrderAnchor[] AllAnchors =
+            { WorkOrderAnchor.Center, WorkOrderAnchor.FrontLeft, WorkOrderAnchor.FrontRight,
+              WorkOrderAnchor.BackLeft, WorkOrderAnchor.BackRight };
+
         #region Standard drill sizes
 
         // The sizes a shop drill index actually holds: metric 1-13 mm in 0.5 mm steps, plus the common
@@ -426,6 +520,21 @@ namespace CNC.Controls
                 case WorkOrderGeometryKind.Surface: return "Surface (width, depth) - face the whole area";
                 case WorkOrderGeometryKind.Indirect: return "Indirect (repeat another toolpath here)";
                 default: return kind.ToString();
+            }
+        }
+
+        // Front is -Y, back is +Y - stated in the label rather than left to be worked out, because "front"
+        // is only obvious once you know which way the machine's Y runs.
+        public static string AnchorLabel(WorkOrderAnchor a)
+        {
+            switch (a)
+            {
+                case WorkOrderAnchor.Center: return "Center";
+                case WorkOrderAnchor.FrontLeft: return "Front left corner (-X, -Y)";
+                case WorkOrderAnchor.FrontRight: return "Front right corner (+X, -Y)";
+                case WorkOrderAnchor.BackLeft: return "Back left corner (-X, +Y)";
+                case WorkOrderAnchor.BackRight: return "Back right corner (+X, +Y)";
+                default: return a.ToString();
             }
         }
 

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * WorkOrderView.xaml.cs - part of CNC Controls library
  *
  * Odd Jobs "Work Order": the single composer tab that replaced the five fixed job wizards (Surface Stock,
@@ -54,6 +54,8 @@ namespace CNC.Controls
                 cbxGeometry.Items.Add(new ComboBoxItem { Content = WorkOrderRules.GeometryLabel(kind), Tag = kind });
             foreach (var kind in WorkOrderRules.AllPatterns)
                 cbxPattern.Items.Add(new ComboBoxItem { Content = WorkOrderRules.PatternLabel(kind), Tag = kind });
+            foreach (var a in WorkOrderRules.AllAnchors)
+                cbxAnchor.Items.Add(new ComboBoxItem { Content = WorkOrderRules.AnchorLabel(a), Tag = a });
 
             // Same select-on-focus behavior every NumericField already has - txtName is a plain TextBox
             // (free-text, not numeric), so it doesn't get that for free.
@@ -277,7 +279,7 @@ namespace CNC.Controls
                 Name = NextDuplicateName(tp.Name),
                 Geometry = tp.Geometry,
                 Enabled = tp.Enabled,
-                X = tp.X, Y = tp.Y,
+                X = tp.X, Y = tp.Y, Anchor = tp.Anchor,
                 Length = tp.Length, Angle = tp.Angle, Diameter = tp.Diameter,
                 Width = tp.Width, Depth = tp.Depth, Size = tp.Size,
                 Pattern = tp.Pattern,
@@ -704,6 +706,7 @@ namespace CNC.Controls
             Show(pnlGeometryRow, !tp.IsIndirect);
             cbxGeometry.SelectedIndex = Array.IndexOf(WorkOrderRules.AllGeometries, tp.Geometry);
 
+            cbxAnchor.SelectedIndex = Array.IndexOf(WorkOrderRules.AllAnchors, tp.Anchor);
             fldX.Value = tp.X; fldY.Value = tp.Y;
             fldLength.Value = tp.Length; fldAngle.Value = tp.Angle;
             fldDiameter.Value = tp.Diameter; fldSize.Value = tp.Size;
@@ -854,6 +857,8 @@ namespace CNC.Controls
             {
                 var tp = selectedToolpath;
                 tp.X = fldX.Value; tp.Y = fldY.Value;
+                if (cbxAnchor.SelectedIndex >= 0)
+                    tp.Anchor = WorkOrderRules.AllAnchors[cbxAnchor.SelectedIndex];
 
                 if (tp.IsIndirect)
                 {
@@ -886,6 +891,16 @@ namespace CNC.Controls
             if (loadingFields || selectedToolpath == null)
                 return;
             selectedToolpath.Name = txtName.Text;
+            OnWorkOrderChanged();
+        }
+
+        // The anchor only reinterprets X/Y - the numbers are left exactly as typed - so all this has to do is
+        // commit the choice and redraw. The shape moving is the point, not a side effect.
+        private void cbxAnchor_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (loadingFields || selectedToolpath == null || cbxAnchor.SelectedIndex < 0)
+                return;
+            selectedToolpath.Anchor = WorkOrderRules.AllAnchors[cbxAnchor.SelectedIndex];
             OnWorkOrderChanged();
         }
 
@@ -1453,7 +1468,7 @@ namespace CNC.Controls
                 // Black at all times: the labels sit over the stock's own material colour (olive for MDF, tan,
                 // grey for metals), and a grey or steel-blue label was unreadable against it. Selection is
                 // carried by weight instead of colour.
-                var anchor = OddJobsStockCanvas.ToPixel(stockTransform, tp.X, tp.Y);
+                var anchor = OddJobsStockCanvas.ToPixel(stockTransform, tp.CenterX, tp.CenterY);
                 var label = new TextBlock
                 {
                     Text = positions.Count > 1 ? string.Format("{0} (x{1})", tp.Name, positions.Count) : tp.Name,
