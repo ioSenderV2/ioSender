@@ -2049,7 +2049,11 @@ namespace CNC.Controls
                 var built = WorkOrderCompiler.BuildProgram(workOrder);
                 sw.Stop();
                 program = string.Join("\r\n", built);
-                model.Message = string.Format("Work order compiled - {0} lines in {1:0.0} s.", built.Count, sw.Elapsed.TotalSeconds);
+                // Kept on MacroProcessor too so the "ready - press Cycle Start" prompt (which lands right
+                // after this and used to overwrite it) can carry the result along - both the Generate
+                // path (PublishGenerated re-sets it) and Run's hand-off to the Job tab read it there.
+                MacroProcessor.ActiveProgramStats = string.Format("{0} lines in {1:0.0} s", built.Count, sw.Elapsed.TotalSeconds);
+                model.Message = string.Format("Work order compiled - {0}.", MacroProcessor.ActiveProgramStats);
             }
             finally
             {
@@ -2071,7 +2075,7 @@ namespace CNC.Controls
             // bigger interruption than the problem this solves.
             if (currentFilePath != null)
                 SaveToDisk();
-            MacroProcessor.PublishGenerated("Work Order", program, EnsureProgramView, () => programView);
+            MacroProcessor.PublishGenerated("Work Order", program, EnsureProgramView, () => programView, MacroProcessor.ActiveProgramStats);
             if (isActiveTab)
                 MacroProcessor.IsProgramGenerated = true;
         }

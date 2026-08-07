@@ -298,7 +298,10 @@ namespace CNC.Controls
             if (model == null)
                 return;
             if (ready)
-                model.Message = string.Format(LibStrings.FindResource("ReadyCycleStart"), MacroProcessor.ActiveProgramName ?? "Program", RunLabels.CycleStart);
+                // The compile stats ride along instead of being wiped: this prompt lands right after
+                // Generate posts its "compiled - N lines in X s" message, and used to overwrite it.
+                model.Message = string.Format(LibStrings.FindResource("ReadyCycleStart"), MacroProcessor.ActiveProgramName ?? "Program", RunLabels.CycleStart)
+                    + (string.IsNullOrEmpty(MacroProcessor.ActiveProgramStats) ? string.Empty : "  (" + MacroProcessor.ActiveProgramStats + ")");
             else
                 // Drop the prompt along with the cue itself - previously only the (invisible) boolean flipped
                 // here, leaving the "<name> ready - press Run to run." TEXT stale on screen through an entire

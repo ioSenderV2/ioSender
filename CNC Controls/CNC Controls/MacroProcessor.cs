@@ -116,6 +116,12 @@ namespace CNC.Controls
         // Start" status prompt. Null when no wizard program is active.
         public static string ActiveProgramName;
 
+        // Optional one-liner about how the active program was built ("4777 lines in 9.6 s"), appended to the
+        // "ready - press Cycle Start" prompt. Exists because that prompt lands right after Generate's own
+        // completion message and OVERWROTE it - the compile result was on screen for a frame. Set by whoever
+        // builds a program (Work Order does), cleared by PublishGenerated when a caller has none to report.
+        public static string ActiveProgramStats;
+
 
         // Set by the shell: switches the main tab strip to the given tab. Used by Work Order's Run - hands
         // its generated program off to the Job tab ("one mental model of running a program" regardless of
@@ -134,8 +140,9 @@ namespace CNC.Controls
         // four times. ensureProgramView/getProgramView are the caller's own lazy-init method/field (each tab
         // owns its ProgramView independently, so there's no shared base to hang a field on) - getProgramView is
         // read AFTER ensureProgramView() runs, so it sees the just-created instance on first call.
-        public static void PublishGenerated(string name, string program, System.Action ensureProgramView, System.Func<ProgramView> getProgramView)
+        public static void PublishGenerated(string name, string program, System.Action ensureProgramView, System.Func<ProgramView> getProgramView, string stats = null)
         {
+            ActiveProgramStats = stats;
             SaveGeneratedCopy(name, program);
             ensureProgramView();
             var view = getProgramView();
