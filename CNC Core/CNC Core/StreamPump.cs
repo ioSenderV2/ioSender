@@ -117,6 +117,12 @@ namespace CNC.Core
         public volatile int PendingLine;    // last acked real line - read by JobControl for the tool-change boundary
         public volatile bool Suspended;     // UI sets this during a tool change so jog/MDI acks aren't consumed as job acks
         public volatile bool IsActive;      // a job is streaming through the pump
+        // Set by JobRunner.OnLineNumberChanged once the controller's reported Ln: has actually matched a
+        // block of THIS program - i.e. proof that execution-driven progress works here. While it is set, the
+        // ack below stops writing "ok" markers, because they would run ahead of the tool by the whole planner
+        // buffer; the line-number handler owns them instead. Never set for a program without N words, or a
+        // controller that does not report Ln:, so those keep the original ack-driven display.
+        public volatile bool ExecutionDrivenProgress;
 
         // ---- coalesced display marshaling (UI thread drains) ----
         private readonly ConcurrentQueue<KeyValuePair<int, string>> sentMarks = new ConcurrentQueue<KeyValuePair<int, string>>();
@@ -167,6 +173,7 @@ namespace CNC.Core
 
             PendingLine = fromBlock;
             Suspended = false;
+            ExecutionDrivenProgress = false;   // re-proved per run, never carried over from the last program
             aborted = false;
             IsActive = true;
 
@@ -387,10 +394,19 @@ namespace CNC.Core
             if (s.Index >= 0)                        // a real program line (not the synthetic M0)
             {
                 PendingLine = s.Index;
-                MarkSent(s.Index, ack);
+                // An "ok" says the controller PARSED and BUFFERED this line, never that it cut it - with a
+                // full planner buffer that is a hundred-odd lines ahead of the tool. On short segments the
+                // whole file reads complete while the spindle is still in the first shape (reported
+                // 2026-08-06 on a 10-square test: every line marked through to the closing M0 during square
+                // one). Once the Ln: reports have proved themselves, they own the markers and the scroll.
+                // Errors are never withheld - an error:N is not progress, it is why the job just stopped.
+                if (!(ExecutionDrivenProgress && ack == "ok"))
+                {
+                    MarkSent(s.Index, ack);
+                    if (s.Index > 5)
+                        latestScroll = s.Index - 5;
+                }
                 latestBlock = s.Index;
-                if (s.Index > 5)
-                    latestScroll = s.Index - 5;
                 ScheduleDrain();
             }
 

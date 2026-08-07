@@ -337,6 +337,9 @@ namespace CNC.Core
         {
             public int CurrBlock, LastExecuting, PendingLine, PgmEndLine, ToolChangeLine, ACKPending, serialUsed;
             public bool Started, Transferred, Complete, IsSDFile, IsChecking, HasError, Stopped, ToolChanged;
+            // Set the first time the controller's reported line number actually matches a block of THIS
+            // program - i.e. proof that execution-driven progress works here. See OnLineNumberChanged.
+            public bool LineNumbersTracking;
             public GCodeBlock CurrentRow, NextRow;
         }
 
@@ -506,6 +509,13 @@ namespace CNC.Core
                     {
                         found = block - 1;
                         Source.Data[block].Sent = "@";
+                        // This report matched a real block, so execution-driven progress demonstrably works
+                        // for this program on this controller - the ack handler can stop marking "ok" ahead
+                        // of the tool from here on. Proved rather than assumed: a program with no N words,
+                        // or a controller not reporting Ln:, never gets here and keeps the old behaviour.
+                        job.LineNumbersTracking = true;
+                        if (pump != null)
+                            pump.ExecutionDrivenProgress = true;   // the pump does the acking on the live path
                         break;
                     }
                 } while (--block > job.LastExecuting);
@@ -513,6 +523,12 @@ namespace CNC.Core
                 {
                     Source.Data[++job.LastExecuting].Sent = "ok";
                 }
+
+                // Follow the TOOL once we own the progress markers. Left to the ack handler this scrolls to
+                // whatever the controller has swallowed, which is the whole planner buffer ahead - so the
+                // green executing line ends up off-screen above a block of unmarked rows.
+                if (job.LineNumbersTracking && job.CurrBlock > 5)
+                    model.ScrollPosition = Math.Max(0, job.LastExecuting - 5);
             }
         }
 
@@ -994,6 +1010,7 @@ namespace CNC.Core
                     model.ScrollPosition = 0;
                     job.ToolChangeLine = -1;
                     job.CurrBlock = job.LastExecuting = job.PendingLine = job.ACKPending = model.BlockExecuting = 0;
+                    job.LineNumbersTracking = false;   // re-proved per job; a program without N words never sets it
                     job.PgmEndLine = Source.Blocks - 1;
 
                     CanRun = true;
@@ -1598,10 +1615,23 @@ namespace CNC.Core
                 {
                     if (!job.HasError)
                     {
-                        Source.Data[job.PendingLine].Sent = response;
+                        // An "ok" means the controller PARSED and BUFFERED this line, not that it cut it.
+                        // With a full planner buffer that runs the marker a hundred-odd lines ahead of the
+                        // tool - on a program of short segments, the whole file shows complete while the
+                        // spindle is still in the first shape (reported 2026-08-06, a 10-square test).
+                        // Once OnLineNumberChanged has proved the controller's Ln: reports match this
+                        // program, IT owns the "ok" markers and the scroll, because it reports what is
+                        // actually EXECUTING. Until then - and forever, for a program with no N words or a
+                        // controller that never reports Ln: - this stays exactly as it was.
+                        // Errors are never suppressed: an error:N is not progress, it is the reason the job
+                        // just stopped, and it must appear on its line the moment it arrives.
+                        if (!(job.LineNumbersTracking && response == "ok"))
+                        {
+                            Source.Data[job.PendingLine].Sent = response;
 
-                        if (job.PendingLine > 5)
-                            model.ScrollPosition = job.PendingLine - 5;
+                            if (job.PendingLine > 5)
+                                model.ScrollPosition = job.PendingLine - 5;
+                        }
                     }
 
                     if(streamingHandler.Call == StreamingAwaitAction)
