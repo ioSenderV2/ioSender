@@ -653,15 +653,24 @@ namespace CNC.Controls
             return lines;
         }
 
-        // A countersink bit plunged straight down a round hole's centerline - the bit's own 90-deg cone does
-        // the chamfering as it descends, so there's no outline to trace at all (unlike Chamfer above).
-        // op.CountersinkDiameter is the FINISHED diameter the operator wants, not a raw depth - converted here
-        // (depth = diameter / 2, same 45-deg-per-side cone math Chamfer's V-bit uses, just specified the other
-        // way around). PlungeFeed (not Feed) since this is a genuine axial plunge, not a corner-breaking trace.
+        // A countersink bit plunged straight down a round hole's centerline - the bit's own cone does the
+        // chamfering as it descends, so there's no outline to trace at all (unlike Chamfer above).
+        // op.CountersinkDiameter is the FINISHED diameter the operator wants, not a raw depth - converted
+        // here from the TOOL'S OWN included angle: half the diameter is the radius the cone must reach, and
+        // it gains radius at tan(halfAngle) per unit of depth.
+        //
+        // This used to be a flat "depth = diameter / 2", which silently assumed every countersink was 90
+        // degrees. It is only right at 90 (tan 45 = 1); on a 60-degree bit the same formula plunges to a
+        // hole 15% too small, and on a 120 it goes nearly twice as deep as asked. See
+        // CustomTool.IncludedAngleDeg - which defaults to 90, so an already-saved tool list reproduces the
+        // old behaviour exactly.
+        // PlungeFeed (not Feed) since this is a genuine axial plunge, not a corner-breaking trace.
         private static List<string> BuildCountersink(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
         {
             var lines = new List<string>();
-            double depth = op.CountersinkDiameter / 2d;
+            var tool = CustomTools.Find(op.Tool);
+            double halfAngle = tool != null ? tool.HalfAngleRad : Math.PI / 4d;   // no tool record: the old 90-deg assumption
+            double depth = (op.CountersinkDiameter / 2d) / Math.Tan(halfAngle);
 
             lines.Add("G0 X" + F(cx) + " Y" + F(cy));
             lines.Add("G0 Z" + F(SafeZ()));

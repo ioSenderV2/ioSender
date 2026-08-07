@@ -10,6 +10,7 @@
  * Persisted as an App.config section via AppConfig.RegisterFolded, same idiom as OddJobsToolMemory.
  */
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -43,6 +44,36 @@ namespace CNC.Controls
         // Not operator-editable via CustomToolEditDialog (retune the RPM field itself instead) - this is
         // just the one-time starting value shown when the tool is first selected.
         public double DefaultRpm = 0d;
+
+        // Full included angle of a V-shaped tool, in degrees - the angle BETWEEN the two flanks, which is
+        // how bits are sold ("60 degree V-bit"), not the half-angle the trigonometry actually wants.
+        // Meaningful only for VBitOrChamfer and Countersink; ignored (and hidden in the edit dialog) for
+        // every other kind, the same way Flutes is for Drill/Countersink.
+        //
+        // It matters because the tool's angle is what converts between depth and width. A V-bit plunged
+        // 1 mm cuts 2 mm wide at 90 degrees but only 1.15 mm at 60 - so engraving and countersinking both
+        // give the wrong size if the angle is assumed. BuildCountersink assumed 90 outright.
+        //
+        // Defaults to 90 rather than 0 deliberately: an existing tool list has no such element, so every
+        // saved tool deserializes to exactly the value that was previously hardcoded, and no installed
+        // work order changes behaviour. 0 would have been a silent divide-into-nonsense.
+        public double IncludedAngleDeg = 90d;
+
+        /// <summary>
+        /// Half the included angle in RADIANS - what the depth/width trigonometry actually takes. Clamped
+        /// well away from 0 and 180 so a nonsense value cannot produce an infinite or negative depth;
+        /// tan() at those limits is where a bad tool definition would otherwise turn into a plunge.
+        /// </summary>
+        public double HalfAngleRad
+        {
+            get
+            {
+                double deg = IncludedAngleDeg;
+                if (double.IsNaN(deg) || deg < 1d || deg > 179d)
+                    deg = 90d;
+                return deg * Math.PI / 360d;   // /2 for half-angle, then degrees->radians
+            }
+        }
     }
 
     public class CustomToolList
