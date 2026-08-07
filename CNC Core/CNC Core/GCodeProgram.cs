@@ -161,23 +161,79 @@ namespace CNC.Core
             if (filename == "" || !Program.Loaded)
             {
                 model.EstimatedRunTime = string.Empty;
+                GCodeRunTimeIndex.Instance.Clear();
                 return;
             }
 
             var snapshot = new List<GCodeToken>(Program.Parser.Tokens);
+
+            // Per-section token lists for the outline breakdown. Each block already knows its own tokens
+            // AND its section (GCodeJob.AddStamped), so the split needs no re-parse and no per-token
+            // bookkeeping - just concatenation in program order. Built HERE, on the UI thread, because
+            // Blocks is a bound ObservableCollection that the next load will refill.
+            var sectionNames = new List<string>();
+            var sectionTokens = new List<List<GCodeToken>>();
+            if (Program.HasSections)
+            {
+                string currentName = null;
+                List<GCodeToken> current = null;
+                foreach (var b in Program.Blocks)
+                {
+                    if (current == null || b.Section != currentName)
+                    {
+                        // Blocks before the first marker have a null Section and form no group in the
+                        // outline either - collect them so their motion still lands in SOME section
+                        // rather than being silently dropped from the sum.
+                        currentName = b.Section;
+                        current = new List<GCodeToken>();
+                        sectionNames.Add(currentName);
+                        sectionTokens.Add(current);
+                    }
+                    if (b.Tokens != null)
+                        current.AddRange(b.Tokens);
+                }
+            }
+
             System.Threading.Tasks.Task.Run(() =>
             {
                 string text;
+                Dictionary<string, string> bySection = null;
                 try
                 {
                     text = GCodeRunTime.Format(GCodeRunTime.Estimate(snapshot));
+
+                    if (sectionTokens.Count > 0)
+                    {
+                        var times = GCodeRunTime.EstimateSections(sectionTokens);
+
+                        // Sum unformatted first: a section name can repeat (the same operation posted
+                        // twice), and the outline groups those rows together, so their estimates have to
+                        // add up rather than the second overwriting the first. Summing the DISPLAY
+                        // strings would compound their rounding.
+                        var totals = new Dictionary<string, TimeSpan>();
+                        for (int i = 0; i < times.Count && i < sectionNames.Count; i++)
+                        {
+                            string name = sectionNames[i];
+                            if (string.IsNullOrEmpty(name))
+                                continue;   // the pre-marker preamble is no group in the outline
+                            TimeSpan running;
+                            totals[name] = totals.TryGetValue(name, out running) ? running + times[i] : times[i];
+                        }
+
+                        bySection = new Dictionary<string, string>();
+                        foreach (var kv in totals)
+                            bySection[kv.Key] = GCodeRunTime.Format(kv.Value);
+                    }
                 }
                 catch
                 {
                     text = string.Empty;   // an estimate is a nicety; it must never surface as a failure
                 }
                 if (System.Threading.Volatile.Read(ref estimateGeneration) == generation)
+                {
                     model.EstimatedRunTime = text;
+                    GCodeRunTimeIndex.Instance.Publish(bySection);
+                }
             });
         }
 

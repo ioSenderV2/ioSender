@@ -114,6 +114,26 @@ namespace CNC.Controls
             });
     }
 
+    // Program-outline group header -> that section's estimated run time, e.g. "~4 min".
+    //
+    // Two inputs on purpose: the section NAME (what to look up) and GCodeRunTimeIndex.Version (WHEN to
+    // look). The estimate is computed off the UI thread after the load, so it does not exist when these
+    // headers are first built; bumping Version is what brings the visible ones back to re-read it. The
+    // second value is deliberately unused beyond that.
+    public class SectionRunTimeConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            string section = values != null && values.Length > 0 ? values[0] as string : null;
+            return GCodeRunTimeIndex.Instance.Lookup(section);
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     // Adapted from: https://stackoverflow.com/questions/4353186/binding-observablecollection-to-a-textbox/8847910#8847910
     public class StringCollectionToTextConverter : IMultiValueConverter
     {

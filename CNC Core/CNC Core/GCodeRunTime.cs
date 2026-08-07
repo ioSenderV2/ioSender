@@ -54,14 +54,6 @@ namespace CNC.Core
             if (tokens == null || tokens.Count == 0)
                 return TimeSpan.Zero;
 
-            var rapid = new double[3];
-            for (int i = 0; i < 3; i++)
-            {
-                double r = 0d;
-                try { r = GrblSettings.GetDouble(GrblSetting.MaxFeedRateBase + i); } catch { }
-                rapid[i] = r > 0d ? r : DefaultRapidMmMin;
-            }
-
             double minutes = 0d;
             var emu = new GCodeEmulator();
 
@@ -70,7 +62,7 @@ namespace CNC.Core
             // it - whatever was summed before a refusal is still the best answer available.
             try
             {
-                Walk(emu, tokens, rapid, ref minutes);
+                minutes = Walk(emu, tokens, RapidRates(), false);
             }
             catch
             {
@@ -79,9 +71,66 @@ namespace CNC.Core
             return TimeSpan.FromMinutes(minutes);
         }
 
-        private static void Walk(GCodeEmulator emu, List<GCodeToken> tokens, double[] rapid, ref double minutes)
+        /// <summary>
+        /// Per-section estimates for a program split into named sections (the loaded outline). Sections are
+        /// walked in order through ONE emulator that is never reset between them, so modal state - feed
+        /// rate, position, plane - carries across a boundary as it does on the machine. Estimating each
+        /// section standalone would restore a default feed and origin the program never re-states, making
+        /// every section after the first wrong.
+        /// </summary>
+        /// <returns>One TimeSpan per entry of <paramref name="sections"/>, in the same order.</returns>
+        public static List<TimeSpan> EstimateSections(List<List<GCodeToken>> sections)
         {
-            foreach (var a in emu.Execute(tokens))
+            var result = new List<TimeSpan>();
+            if (sections == null)
+                return result;
+
+            var rapid = RapidRates();
+            var emu = new GCodeEmulator();
+
+            // Reset ONCE, up front. Execute() does this per call, which is exactly what must not happen
+            // between sections - but a never-reset emulator has no coordinate system at all and throws on
+            // its first token, silently zeroing every section.
+            emu.Reset();
+
+            foreach (var section in sections)
+            {
+                double minutes = 0d;
+                try
+                {
+                    minutes = Walk(emu, section, rapid, true);
+                }
+                catch
+                {
+                    // This section's estimate is lost; the emulator's state may now be mid-program, so the
+                    // sections after it are suspect too - but a wrong-ish estimate beats none, and the
+                    // whole-program figure shown beside the file name is computed independently.
+                }
+                result.Add(TimeSpan.FromMinutes(minutes));
+            }
+
+            return result;
+        }
+
+        private static double[] RapidRates()
+        {
+            var rapid = new double[3];
+            for (int i = 0; i < 3; i++)
+            {
+                double r = 0d;
+                try { r = GrblSettings.GetDouble(GrblSetting.MaxFeedRateBase + i); } catch { }
+                rapid[i] = r > 0d ? r : DefaultRapidMmMin;
+            }
+            return rapid;
+        }
+
+        private static double Walk(GCodeEmulator emu, List<GCodeToken> tokens, double[] rapid, bool continueState)
+        {
+            double minutes = 0d;
+            if (tokens == null || tokens.Count == 0)
+                return minutes;
+
+            foreach (var a in continueState ? emu.ExecuteContinue(tokens) : emu.Execute(tokens))
             {
                 switch (a.Token.Command)
                 {
@@ -121,6 +170,8 @@ namespace CNC.Core
                         break;
                 }
             }
+
+            return minutes;
         }
 
         /// <summary>"~45 s", "~14 min", "~1 h 20 min" - deliberately coarse; see the header on why "~".</summary>

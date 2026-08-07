@@ -117,6 +117,17 @@ namespace CNC.Core
             return run(Tokens);
         }
 
+        /// <summary>
+        /// Continue from the current state instead of resetting - for walking a program one section at a
+        /// time while modal state (feed rate, position, plane, distance mode) carries across the boundary
+        /// exactly as it does on the machine. Resetting between sections would restore a default feed and
+        /// origin that the program never re-states, so every section after the first would be wrong.
+        /// </summary>
+        public IEnumerable<RunAction> ExecuteContinue(List<GCodeToken> Tokens)
+        {
+            return run(Tokens);
+        }
+
         private IEnumerable<RunAction> run(List<GCodeToken> Tokens)
         {
             if (Tokens == null)   // program-free render (e.g. work-envelope-only scene) - nothing to emulate

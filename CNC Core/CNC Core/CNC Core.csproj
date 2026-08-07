@@ -69,6 +69,7 @@
   <ItemGroup>
     <Compile Include="ActionCommand.cs" />
     <Compile Include="GCodeRunTime.cs" />
+    <Compile Include="GCodeRunTimeIndex.cs" />
     <Compile Include="JogGate.cs" />
     <Compile Include="ConsoleLog.cs" />
     <Compile Include="DebugLog.cs" />
