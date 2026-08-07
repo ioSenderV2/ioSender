@@ -663,7 +663,7 @@ namespace CNC.Core
         public int LineNumber { get { return _line; } private set { _line = value; OnPropertyChanged(); } }
 
         public double THCVoltage { get { return State.THCVoltage; } private set { State.THCVoltage = value; OnPropertyChanged(); } }
-        public EnumFlags<THCSignals> THCSignals { get; private set; } = new EnumFlags<THCSignals>(Core.THCSignals.Off);
+        public EnumFlags<THCSignals> THCSignals { get { return State.THCSignals; } }
 
         #region Spindle
 
@@ -681,7 +681,7 @@ namespace CNC.Core
                 }
             }
         }
-        public EnumFlags<SpindleState> SpindleState { get; private set; } = new EnumFlags<SpindleState>(GCode.SpindleState.Off);
+        public EnumFlags<SpindleState> SpindleState { get { return State.SpindleState; } }
 
         public bool IsSpindleVariable { get { return Spindles.Count > 0 ? Spindles[_spindle_num].Variable : GrblInfo.HasVariableSpindle; } }
         public bool IsSpindleReversible { get { return Spindles.Count > 0 ? Spindles[_spindle_num].Direction : GrblInfo.HasReversableSpindle; } }

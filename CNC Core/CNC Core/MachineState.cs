@@ -98,6 +98,13 @@ namespace CNC.Core
         // Axes currently under a scaling factor (G51).
         public EnumFlags<AxisFlags> AxisScaled { get; private set; } = new EnumFlags<AxisFlags>(AxisFlags.None);
 
+        // Spindle run state (off/CW/CCW), as parsed from the "A" report element. The 5a slice moved the
+        // other four EnumFlags; these two were left behind then and caught up with 5d.
+        public EnumFlags<SpindleState> SpindleState { get; private set; } = new EnumFlags<SpindleState>(GCode.SpindleState.Off);
+
+        // Torch height controller signals (plasma).
+        public EnumFlags<THCSignals> THCSignals { get; private set; } = new EnumFlags<THCSignals>(Core.THCSignals.Off);
+
         // ---- Machine-truth scalars (slice 5c). Storage only, and deliberately without notification: the
         // notifying setters stay on GrblViewModel, per the seam rule that has carried this split -
         // MachineState holds the storage, GrblViewModel holds the notification. Defaults mirror the
