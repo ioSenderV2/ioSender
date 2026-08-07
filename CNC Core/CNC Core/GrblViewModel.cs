@@ -548,9 +548,15 @@ namespace CNC.Core
         public int GrblError { get { return _grblState.Error; } set { _grblState.Error = value; OnPropertyChanged(); } }
         public StreamingState StreamingState { get { return _streamingState; } set { if (_streamingState != value) { _streamingState = value; OnPropertyChanged(); } } }
         public string WorkCoordinateSystem { get { return _wcs; } private set { _wcs = value; OnPropertyChanged(); } }
-        public Position MachinePosition { get; private set; } = new Position();
-        public Position WorkPosition { get; private set; } = new Position();
-        public Position Position { get; private set; } = new Position();
+        // The machine's own state, owned separately from this view model's display concerns - step 5 of
+        // the client/server split. These properties forward to it and return the SAME instances they always
+        // did, so every binding in the app is unaffected; see MachineState's header for why composition
+        // rather than the inheritance the two earlier splits used.
+        public MachineState State { get; private set; } = new MachineState();
+
+        public Position MachinePosition { get { return State.MachinePosition; } }
+        public Position WorkPosition { get { return State.WorkPosition; } }
+        public Position Position { get { return State.Position; } }
         public bool IsMachinePosition { get { return _isMPos; } private set { _isMPos = value; OnPropertyChanged(); } }
         public bool IsMachinePositionKnown { get { return MachinePosition.IsSet(GrblInfo.AxisFlags); } }
         public bool SuspendPositionNotifications
@@ -559,17 +565,17 @@ namespace CNC.Core
             set { Position.SuspendNotifications = MachinePosition.SuspendNotifications = value; }
         }
 
-        public AxisLetter AxisLetter { get; private set; } = new AxisLetter();
-        public EnumFlags<AxisFlags> AxisHomed { get; private set; } = new EnumFlags<AxisFlags>(AxisFlags.None);
-        public Position HomePosition { get; private set; } = new Position();
+        public AxisLetter AxisLetter { get { return State.AxisLetter; } }
+        public EnumFlags<AxisFlags> AxisHomed { get { return State.AxisHomed; } }
+        public Position HomePosition { get { return State.HomePosition; } }
 
-        public Position WorkPositionOffset { get; private set; } = new Position();
-        public Position ToolOffset { get; private set; } = new Position();
-        public Position ProbePosition { get; private set; } = new Position();
+        public Position WorkPositionOffset { get { return State.WorkPositionOffset; } }
+        public Position ToolOffset { get { return State.ToolOffset; } }
+        public Position ProbePosition { get { return State.ProbePosition; } }
         public bool IsProbeSuccess { get { return _isProbeSuccess; } private set { _isProbeSuccess = value; OnPropertyChanged(); } }
-        public EnumFlags<Signals> Signals { get; private set; } = new EnumFlags<Signals>(Core.Signals.Off);
-        public EnumFlags<Signals> OptionalSignals { get; set; } = new EnumFlags<Signals>(Core.Signals.Off);
-        public EnumFlags<AxisFlags> AxisScaled { get; private set; } = new EnumFlags<AxisFlags>(AxisFlags.None);
+        public EnumFlags<Signals> Signals { get { return State.Signals; } }
+        public EnumFlags<Signals> OptionalSignals { get { return State.OptionalSignals; } set { State.OptionalSignals = value; } }
+        public EnumFlags<AxisFlags> AxisScaled { get { return State.AxisScaled; } }
         public string FileName { get { return _fileName; } set { _fileName = value; SDRewind = false; OnPropertyChanged(); OnPropertyChanged(nameof(IsFileLoaded)); OnPropertyChanged(nameof(IsPhysicalFileLoaded)); } }
         // Full source path for display tooltips: the file path for a loaded file, or the tool/wizard name for
         // a generated program (no on-disk path). Set in GCode.

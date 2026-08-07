@@ -101,6 +101,7 @@
     <Compile Include="Geometry.cs" />
     <Compile Include="Threading.cs" />
     <Compile Include="GrblViewModel.cs" />
+    <Compile Include="MachineState.cs" />
     <Compile Include="JogController.cs" />
     <Compile Include="LibStrings.cs" />
     <Compile Include="MacroRunner.cs" />
