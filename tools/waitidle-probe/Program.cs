@@ -150,13 +150,15 @@ static class Probe
         // PumpLog: SEND/armed/clear with HH:mm:ss.fff stamps; statusTimeline: our own Run/Idle log.
         var log = File.ReadAllLines(PumpLog.FilePath);
         DateTime? armed = null, cleared = null, tailSent = null;
+        int clearedLine = -1, tailLine = -1;   // log ORDER, not stamps: clear->tail can land in the same ms
         var sendsWhileArmed = new List<string>();
-        foreach (var line in log)
+        for (int li = 0; li < log.Length; li++)
         {
+            string line = log[li];
             DateTime ts = ParseStamp(line, t0);
             if (line.Contains("WAITIDLE armed")) armed = ts;
-            else if (line.Contains("WAITIDLE clear")) cleared = ts;
-            else if (line.Contains("SEND idx=" + tailRow + " ")) tailSent = ts;
+            else if (line.Contains("WAITIDLE clear")) { cleared = ts; clearedLine = li; }
+            else if (line.Contains("SEND idx=" + tailRow + " ")) { tailSent = ts; tailLine = li; }
             else if (armed != null && cleared == null && line.Contains("SEND idx=")) sendsWhileArmed.Add(line);
         }
 
@@ -184,8 +186,8 @@ static class Probe
             Check(cleared > armed, "clear follows arm", string.Format("held {0:0}ms", (cleared.Value - armed.Value).TotalMilliseconds));
             Check(cleared > lastRun, "barrier released only AFTER the last Run report",
                   string.Format("lastRun={0:HH:mm:ss.fff} clear={1:HH:mm:ss.fff}", lastRun, cleared));
-            Check(tailSent > cleared, "tail hit the wire only after the release",
-                  string.Format("clear={0:HH:mm:ss.fff} tail={1:HH:mm:ss.fff}", cleared, tailSent));
+            Check(tailLine > clearedLine, "tail hit the wire only after the release",
+                  string.Format("clear@line{0} tail@line{1}", clearedLine, tailLine));
             // Two consecutive idle reports at a ~200ms poll = at least ~200ms between the last Run
             // report and release; a release inside that window would mean the streak logic is broken.
             Check((cleared.Value - lastRun).TotalMilliseconds >= 150, "release waited out the two-report idle streak",
@@ -204,6 +206,86 @@ static class Probe
         Check(unmetConn.Count == 0, "PREREQ connected passes on a live link", string.Join("; ", unmetConn));
         var unmetBoth = MacroRunner.EvaluatePrereqLines(model, new[] { "(PREREQ homed, connected)" });
         Check(unmetBoth.Count == 1, "combined PREREQ reports only the genuinely unmet condition", string.Join("; ", unmetBoth));
+
+        // ---- (MBOX) barrier, OK path (unified streaming Step 4a) ----------------------------------
+        Console.WriteLine();
+        string promptMsg = null;
+        DateTime promptAt = DateTime.MinValue;
+        MacroRunner.HoldPrompt = (t, m, cancellable, yesNo) =>
+        {
+            promptMsg = m; promptAt = DateTime.Now;
+            Thread.Sleep(700);           // operator "reading" - dispatch must stay held this whole time
+            return true;
+        };
+
+        var prog2 = new GCodeProgram(model);
+        prog2.AddBlock("mbox-ok", CNC.Core.Action.New);
+        prog2.AddBlock("G21 G91");
+        prog2.AddBlock("G1 Z-1 F120");
+        prog2.AddBlock("(MBOX, OKCANCEL, install the probe now)");
+        prog2.AddBlock("G4 P0.5");
+        prog2.AddBlock("M2");
+        prog2.AddBlock("", CNC.Core.Action.End);
+        int mboxTail = -1;
+        for (int i = 0; i < prog2.Data.Count; i++) if (prog2.Data[i].Data.StartsWith("G4")) mboxTail = i;
+
+        PumpLog.Clear();
+        var fin2 = new ManualResetEventSlim();
+        string err2 = null;
+        var pump2 = new StreamPump(model, null, null);
+        pump2.Start(prog2, 0, prog2.Blocks - 1, 512, true, true, false,
+                    () => fin2.Set(), e => { err2 = e; fin2.Set(); });
+        bool done2 = fin2.Wait(TimeSpan.FromSeconds(20));
+        Check(done2 && err2 == null, "MBOX-OK job finished cleanly", err2 ?? "");
+        Check(promptMsg == "install the probe now", "prompt shown with the parsed message", promptMsg ?? "(never shown)");
+
+        var log2 = File.ReadAllLines(PumpLog.FilePath);
+        DateTime? mArmed = null, mOk = null, mTail = null;
+        foreach (var line in log2)
+        {
+            DateTime ts = ParseStamp(line, t0);
+            if (line.Contains("MBOX armed")) mArmed = ts;
+            else if (line.Contains("MBOX OK")) mOk = ts;
+            else if (line.Contains("SEND idx=" + mboxTail + " ")) mTail = ts;
+        }
+        Check(mArmed != null && mOk != null && mTail != null, "armed/answered/tail all logged",
+              string.Format("armed={0} ok={1} tail={2}", mArmed != null, mOk != null, mTail != null));
+        if (mOk != null && mTail != null && promptAt != DateTime.MinValue)
+        {
+            Check((mOk.Value - promptAt).TotalMilliseconds >= 600, "dispatch held while the operator was answering",
+                  string.Format("{0:0}ms prompt-to-answer", (mOk.Value - promptAt).TotalMilliseconds));
+            Check(mTail >= mOk, "tail only after the answer",
+                  string.Format("ok={0:HH:mm:ss.fff} tail={1:HH:mm:ss.fff}", mOk, mTail));
+        }
+
+        // ---- (MBOX) barrier, Cancel path: host Stop callback, tail never sent ----------------------
+        MacroRunner.HoldPrompt = (t, m, cancellable, yesNo) => false;   // instant Cancel
+        var cancelFired = new ManualResetEventSlim();
+
+        var prog3 = new GCodeProgram(model);
+        prog3.AddBlock("mbox-cancel", CNC.Core.Action.New);
+        prog3.AddBlock("G21 G91");
+        prog3.AddBlock("(MBOX, OKCANCEL, about to cut - continue?)");
+        prog3.AddBlock("G1 Z-1 F120");
+        prog3.AddBlock("M2");
+        prog3.AddBlock("", CNC.Core.Action.End);
+        int cancelTail = -1;
+        for (int i = 0; i < prog3.Data.Count; i++) if (prog3.Data[i].Data.StartsWith("G1")) cancelTail = i;
+
+        PumpLog.Clear();
+        var fin3 = new ManualResetEventSlim();
+        var pump3 = new StreamPump(model, null, null);
+        pump3.Start(prog3, 0, prog3.Blocks - 1, 512, true, true, false,
+                    () => fin3.Set(), e => fin3.Set(),
+                    onOperatorCancel: () => cancelFired.Set());
+        bool cancelled = cancelFired.Wait(TimeSpan.FromSeconds(10));
+        Check(cancelled, "Cancel routed to the host's Stop callback");
+        Thread.Sleep(500);              // anything wrongly queued would go out in this window
+        pump3.Abort();                  // play JobRunner.Stop's AbortPump role for the headless harness
+        bool finishedAnyway = fin3.Wait(TimeSpan.FromMilliseconds(300));
+        Check(!finishedAnyway, "cancelled job did NOT report finished");
+        var log3 = File.ReadAllLines(PumpLog.FilePath);
+        Check(!log3.Any(l => l.Contains("SEND idx=" + cancelTail + " ")), "post-MBOX line never hit the wire on Cancel");
 
         Console.WriteLine(failures == 0 ? "\nALL CHECKS PASSED" : string.Format("\n{0} CHECK(S) FAILED", failures));
         return failures == 0 ? 0 : 1;

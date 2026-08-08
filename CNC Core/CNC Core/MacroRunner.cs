@@ -943,6 +943,15 @@ namespace CNC.Core
             return axis >= 0 && axis < letters.Length ? letters.Substring(axis, 1) : ("axis " + axis);
         }
 
+        // Public face of RunMBox for the unified streaming engine (Step 4a): StreamPump consumes an
+        // (MBOX ...) row and shows the SAME prompt through the SAME HoldPrompt seam this class's own
+        // Run() loop uses - one parser, one dialog, no drift. Null host (headless/unattended) proceeds,
+        // same as always.
+        public static bool ShowMBox(string name, string line)
+        {
+            return RunMBox(name, line);
+        }
+
         // Show the message box for an (MBOX...) line; returns false if the user cancelled (Cancel/No).
         private static bool RunMBox(string name, string line)
         {

@@ -121,6 +121,19 @@ namespace CNC.Core
         private volatile bool waitIdleBarrier;
         private int idleStreak;
 
+        // (MBOX ...) dispatch barrier (unified streaming engine Step 4a). Armed when SendNext consumes
+        // a Directive=="MBOX" row; the prompt is shown (host UI thread, via controlMarshal) only once
+        // everything before it is ACKED - faithful to MacroRunner's Flush(wait:true)-then-prompt
+        // ordering. Deliberately NOT motion-idle: macros that need motion done first already chain
+        // (WAITIDLE) before (MBOX), and both tc.macro and pcorner.macro do exactly that. OK releases
+        // through the ack-channel sentinel; Cancel routes to the HOST's own Stop path (onOperatorCancel,
+        // wired to JobRunner.Stop) because prior moves may still be physically executing - user-confirmed
+        // design decision over a soft-finish, 2026-08-08.
+        private volatile bool mboxBarrier;
+        private bool mboxPromptPending;         // pump thread only: prompt not yet dispatched to the host
+        private string mboxLine;                // the raw (MBOX ...) row text, parsed by MacroRunner.ShowMBox
+        private System.Action onOperatorCancel; // host's Stop path; null (headless, no host) falls back to onError
+
         private Thread thread;
         private BlockingCollection<string> acks;
         private CancellationTokenSource cts;
@@ -163,7 +176,7 @@ namespace CNC.Core
 
         public void Start(IProgramSource source, int fromBlock, int pgmEndLine, int serialSize, bool useBuffering,
                           bool sendComments, bool startSimulator, System.Action onJobFinished, System.Action<string> onError,
-                          bool continueOnError = false, System.Action onCheckError = null)
+                          bool continueOnError = false, System.Action onCheckError = null, System.Action onOperatorCancel = null)
         {
             this.source = source;
             this.serialSize = serialSize;
@@ -174,6 +187,7 @@ namespace CNC.Core
             this.onError = onError;
             this.continueOnError = continueOnError;
             this.onCheckError = onCheckError;
+            this.onOperatorCancel = onOperatorCancel;
 
             sendIdx = fromBlock;
             this.pgmEndLine = pgmEndLine;
@@ -181,6 +195,9 @@ namespace CNC.Core
             started = probePending = jobHasProbe = false;
             waitIdleBarrier = false;
             idleStreak = 0;
+            mboxBarrier = false;
+            mboxPromptPending = false;
+            mboxLine = null;
             inflight.Clear();
             while (sentMarks.TryDequeue(out _)) { }
             latestBlock = latestScroll = -1;
@@ -278,6 +295,12 @@ namespace CNC.Core
         private const string StatusIdleTick = "\0status-idle";
         private const string StatusBusyTick = "\0status-busy";
 
+        // (MBOX) answer sentinels: pushed into the ack channel from the HOST's UI thread when the
+        // operator answers the prompt, handled on the pump thread like everything else that touches
+        // dispatch accounting. BlockingCollection.Add is thread-safe, so this needs no extra locking.
+        private const string MboxOkTick = "\0mbox-ok";
+        private const string MboxCancelTick = "\0mbox-cancel";
+
         // Called from the UI thread when the controller is confirmed idle while the pump still believes a job is
         // streaming - i.e. the pump stalled (it thinks the controller's buffer is full, but an idle controller has
         // drained it, so some acks must have been missed; or all lines were sent but a tail ack never arrived).
@@ -306,6 +329,11 @@ namespace CNC.Core
                     if (ack == StatusIdleTick || ack == StatusBusyTick)
                     {
                         OnBarrierStatus(ack == StatusIdleTick);
+                        continue;
+                    }
+                    if (ack == MboxOkTick || ack == MboxCancelTick)
+                    {
+                        OnMboxAnswer(ack == MboxOkTick);
                         continue;
                     }
                     if (preambleAcks > 0 && ack != IdleKick)
@@ -339,9 +367,9 @@ namespace CNC.Core
         {
             while (sendIdx >= 0 && !aborted)
             {
-                if (probePending || waitIdleBarrier)   // hold everything: streamed probe in flight, or a (WAITIDLE) waiting out real motion
+                if (probePending || waitIdleBarrier || mboxBarrier)   // hold everything: probe in flight, (WAITIDLE) waiting out motion, or (MBOX) awaiting the operator
                 {
-                    PumpLog.W(string.Format("HOLD barrier  sendIdx={0} inflight={1} used={2} waitIdle={3}", sendIdx, inflight.Count, serialUsed, waitIdleBarrier));
+                    PumpLog.W(string.Format("HOLD barrier  sendIdx={0} inflight={1} used={2} waitIdle={3} mbox={4}", sendIdx, inflight.Count, serialUsed, waitIdleBarrier, mboxBarrier));
                     break;
                 }
 
@@ -366,6 +394,27 @@ namespace CNC.Core
                     if (DebugLog.Enabled)   // PumpLog is off for ordinary jobs - arm/clear are rare, log both ways
                         DebugLog.Write("pump", string.Format("WAITIDLE armed @idx={0} inflight={1} last={2}", sendIdx, inflight.Count, wLast));
                     sendIdx = wLast ? -1 : sendIdx + 1;
+                    break;
+                }
+
+                // (MBOX ...) - consumed by the SENDER (see the mboxBarrier field comment for the full
+                // design). Prompt deferred to MaybeShowMbox: it must not appear until everything before
+                // this row is acked. Skipped in check mode, same reasoning as WAITIDLE - a syntax check
+                // has no operator steps to hold for.
+                if (block.Directive == "MBOX" && !continueOnError)
+                {
+                    bool mLast = pgmEndLine == sendIdx;
+                    MarkSent(sendIdx, "hold");
+                    latestBlock = sendIdx;
+                    ScheduleDrain();
+                    mboxBarrier = true;
+                    mboxPromptPending = true;
+                    mboxLine = block.Data;
+                    PumpLog.W(string.Format("MBOX armed @idx={0} inflight={1} last={2}", sendIdx, inflight.Count, mLast));
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("pump", string.Format("MBOX armed @idx={0} inflight={1} last={2}", sendIdx, inflight.Count, mLast));
+                    sendIdx = mLast ? -1 : sendIdx + 1;
+                    MaybeShowMbox();   // nothing outstanding? prompt right away
                     break;
                 }
 
@@ -478,6 +527,8 @@ namespace CNC.Core
                 PumpLog.W("BARRIER clear");
             }
 
+            MaybeShowMbox();   // an armed (MBOX) prompts once the lines before it are all acked
+
             if (s.Index >= 0)                        // a real program line (not the synthetic M0)
             {
                 PendingLine = s.Index;
@@ -522,6 +573,58 @@ namespace CNC.Core
             }
 
             SendNext();
+        }
+
+        // Pump thread only. An armed (MBOX) shows its prompt once nothing is outstanding - the prompt
+        // itself runs on the HOST's UI thread (controlMarshal; ShowHoldPrompt blocks there in a nested
+        // DispatcherFrame, so the UI keeps pumping and the operator can jog). The answer comes back via
+        // the ack-channel sentinels; the pump thread never blocks on the operator.
+        private void MaybeShowMbox()
+        {
+            if (!mboxBarrier || !mboxPromptPending || inflight.Count != 0 || aborted)
+                return;
+            mboxPromptPending = false;
+            string line = mboxLine;
+            PumpLog.W("MBOX prompting");
+            PostControl(() =>
+            {
+                bool ok = MacroRunner.ShowMBox(string.Empty, line);
+                try { acks.Add(ok ? MboxOkTick : MboxCancelTick); } catch { }
+            });
+        }
+
+        // The operator answered the (MBOX) prompt (pump thread, via the sentinel). OK: release and
+        // resume, mirroring OnBarrierStatus's completion handling for a barrier-as-last-row program.
+        // Cancel: the HOST's Stop path (JobRunner.Stop - feed hold, teardown, operator-stopped state),
+        // because lines before the MBOX may still be physically executing; the pump does NOT tear
+        // itself down - Stop's AbortPump does that properly. Null host (headless): onError fallback.
+        private void OnMboxAnswer(bool ok)
+        {
+            if (!mboxBarrier || aborted)
+                return;
+
+            mboxBarrier = false;
+            PumpLog.W(string.Format("MBOX {0}  sendIdx={1}", ok ? "OK" : "CANCELLED", sendIdx));
+            if (DebugLog.Enabled)
+                DebugLog.Write("pump", string.Format("MBOX {0}  sendIdx={1}", ok ? "OK" : "CANCELLED", sendIdx));
+
+            if (!ok)
+            {
+                if (onOperatorCancel != null)
+                    PostControl(onOperatorCancel);
+                else
+                    PostControl(() => onError("cancelled at operator prompt"));
+                return;
+            }
+
+            if (sendIdx >= 0)
+                SendNext();
+            if (sendIdx < 0 && inflight.Count == 0)
+            {
+                PumpLog.W("JOB FINISHED (mbox was tail)");
+                aborted = true;
+                PostControl(onJobFinished);
+            }
         }
 
         // A status report arrived while the (WAITIDLE) barrier is armed (read thread enqueued a sentinel;

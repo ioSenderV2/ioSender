@@ -864,7 +864,11 @@ namespace CNC.Core
                     pump.Start(Source, job.CurrBlock, job.PgmEndLine, serialSize, useBuffering,
                                SendComments, StartSimulator,
                                OnPumpJobFinished, OnPumpError,
-                               continueOnError: job.IsChecking, onCheckError: OnPumpCheckError);
+                               continueOnError: job.IsChecking, onCheckError: OnPumpCheckError,
+                               // (MBOX) Cancel = the operator declining to continue = the operator's own
+                               // Stop, exactly (feed hold, teardown, operator-stopped state) - lines
+                               // before the MBOX may still be physically executing when they answer.
+                               onOperatorCancel: Stop);
                 }
             }
         }
