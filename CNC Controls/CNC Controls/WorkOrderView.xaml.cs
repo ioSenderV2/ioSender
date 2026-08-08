@@ -1997,6 +1997,14 @@ namespace CNC.Controls
         // mid-inspection.
         private void WatchForRunEnd()
         {
+            WatchForRunEnd(model);
+        }
+
+        // Static since the compile cache's boot-time auto-restore (2026-08-08): that path arms this
+        // watcher before any WorkOrderView instance exists, and the body only ever needed the view
+        // model + statics anyway. Behavior unchanged for the Generate path, which forwards above.
+        private static void WatchForRunEnd(GrblViewModel model)
+        {
             bool started = false;
             System.ComponentModel.PropertyChangedEventHandler handler = null;
             handler = (s, e) =>
@@ -2158,9 +2166,18 @@ namespace CNC.Controls
                 cachedFp = fp;          // warm the in-session memo too - Generate after this is instant
                 cachedProgram = text;
                 cachedStats = stats;
+                // Same run-end contract as Generate (found missing on the first hardware test of this
+                // feature: the restored run finished and did NOT pop/switch back to the Work Order tab):
+                // push the (empty, at boot) slot and arm the same terminal watcher, so a finished or
+                // stopped run evaporates the program and lands the operator on the Work Order tab,
+                // exactly like a Generate-initiated run.
+                GCode.File.Push();
                 GCode.File.LoadText("Work Order", text);
                 if (model != null)
+                {
                     model.Message = string.Format("Restored the last Work Order program from cache ({0}) - press Cycle Start when ready.", stats);
+                    WatchForRunEnd(model);
+                }
                 DebugLog.Write("workorder", string.Format("auto-restored cached program at boot (fp {0}, {1})", fp.Substring(0, 8), stats));
                 return true;
             }
