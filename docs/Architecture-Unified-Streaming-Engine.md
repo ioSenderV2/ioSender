@@ -229,8 +229,13 @@ separately.
    too); `JobRunner.Run`'s loaded-program branch gates on `Directive=="PREREQ"` rows. Evaluator
    sim-verified live (waitidle-probe 19/19, incl. the $# round-trip); the JobRunner refusal path
    itself needs a real Cycle Start to observe — on the hardware-confirm list with WAITIDLE.
-6. **Point Work Order's Generate button at the new path** — write into `GCode.File` directly, one
-   Cycle Start. Retire the overlay.
+6. ✅ **Work Order is ONE press — HARDWARE-VERIFIED (`d18f8a7`, 2026-08-08 10:53).** Generate =
+   compile + `Push`/`LoadText` + land on the Job tab; the ordinary Cycle Start runs the
+   directive-bearing program through the unified engine. Log-confirmed across two real runs
+   including mid-run FeedHolds; clean terminal → pop → switch back. The deferred-CycleStart race
+   (audit Finding #2, the original "press Start twice") is gone **by construction** — no deferred
+   start exists to race. `WatchForRunEnd` arms on `Send` only now (a jog between Generate and Start
+   must not pop the program) and self-disarms if a different file gets loaded in between.
 7. **Delete the now-dead code** in one cleanup commit, separate from the functional slices above.
 
 ## Open questions — ✅ all three answered 2026-08-08
