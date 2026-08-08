@@ -33,13 +33,29 @@ namespace CNC.Controls
         {
             UserPrompt.Handler = (message, caption, buttons, icon, defaultResult, id) =>
             {
-                var owner = OwnerWindow();
-                return ToPromptResult(owner != null
-                    ? Show(owner, message, caption, ToMessageBoxButton(buttons), ToMessageBoxImage(icon),
-                           ToMessageBoxResult(defaultResult), id)
-                    : Show(message, caption, ToMessageBoxButton(buttons), ToMessageBoxImage(icon),
-                           ToMessageBoxResult(defaultResult), id));
+                // A Core prompt can be raised from a WORKER thread - e.g. GCodeJob.ParseFileLines's
+                // per-line load-error dialog, which runs inside BackgroundLoad's Task.Run since the
+                // background-load refactor. OwnerWindow()/the custom message box touch UI-owned
+                // objects, so that used to throw "the calling thread cannot access this object"
+                // INSIDE the error dialog (found 2026-08-08 loading a #-expression file). Marshal the
+                // whole thing synchronously: the caller blocks for the answer either way - that's the
+                // prompt's contract - so Invoke preserves the semantics exactly.
+                var dispatcher = Application.Current?.Dispatcher;
+                if (dispatcher != null && !dispatcher.CheckAccess())
+                    return dispatcher.Invoke(() => ShowCorePrompt(message, caption, buttons, icon, defaultResult, id));
+                return ShowCorePrompt(message, caption, buttons, icon, defaultResult, id);
             };
+        }
+
+        private static PromptResult ShowCorePrompt(string message, string caption, PromptButtons buttons,
+            PromptIcon icon, PromptResult defaultResult, string id)
+        {
+            var owner = OwnerWindow();
+            return ToPromptResult(owner != null
+                ? Show(owner, message, caption, ToMessageBoxButton(buttons), ToMessageBoxImage(icon),
+                       ToMessageBoxResult(defaultResult), id)
+                : Show(message, caption, ToMessageBoxButton(buttons), ToMessageBoxImage(icon),
+                       ToMessageBoxResult(defaultResult), id));
         }
 
         /// <summary>

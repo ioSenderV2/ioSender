@@ -352,6 +352,30 @@ static class Probe
         Check(checkpointMsg == "Ready to continue?", "checkpoint prompted with the canned confirmation", checkpointMsg ?? "(never shown)");
         Check(File.ReadAllLines(PumpLog.FilePath).Any(l => l.Contains("PROMPT checkpoint armed")), "checkpoint went through the barrier");
 
+        // ---- Load File path with #-expressions (the 2026-08-08 crash) ------------------------------
+        // ParseFileLines never had AddBlock's passthrough, so a FILE with a #<...> line threw out of
+        // the parser and the per-line error dialog then blew up cross-thread. Exercise the REAL file
+        // loader on a temp file shaped exactly like the failing prompt-test.nc.
+        if (GrblInfo.ExpressionsSupported)
+        {
+            Console.WriteLine();
+            string ncPath = Path.Combine(Path.GetTempPath(), "waitidle-probe-load.nc");
+            File.WriteAllText(ncPath, "(load test)\n(PROMPT depth, 2, Cut depth)\nG21 G91\nG1 Z-#<_depth> F120\nM2\n");
+            var loadJob = new GCodeJob();
+            var loaded = new List<GCodeBlock>();
+            loadJob.BlockConsumer = b => loaded.Add(b);
+            bool loadOk = false;
+            string loadErr = null;
+            try { loadOk = loadJob.ParseFileLines(ncPath); }
+            catch (Exception ex) { loadErr = ex.GetType().Name + ": " + ex.Message; }
+            loadJob.BlockConsumer = null;
+            Check(loadOk && loadErr == null, "file with #-expression loads without throwing", loadErr ?? "");
+            Check(loaded.Any(b => b.Data.Contains("#<_depth>")), "#-line kept verbatim (passthrough)",
+                  string.Join(" | ", loaded.Select(b => b.Data)));
+            Check(loaded.Any(b => b.Directive == "PROMPT"), "PROMPT row flagged through the file loader");
+            try { File.Delete(ncPath); } catch { }
+        }
+
         Console.WriteLine(failures == 0 ? "\nALL CHECKS PASSED" : string.Format("\n{0} CHECK(S) FAILED", failures));
         return failures == 0 ? 0 : 1;
     }

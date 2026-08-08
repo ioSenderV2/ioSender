@@ -360,13 +360,26 @@ namespace CNC.Core
                         tSanitize += System.Diagnostics.Stopwatch.GetTimestamp() - t0;
                     }
 
+                    // O-word / #-expression / $-command passthrough, ported from AddBlock (which had it
+                    // all along for GENERATED programs - Load File never did, so a FILE with a #-line
+                    // was unloadable: ParseBlock THROWS on expression syntax, and the per-line error
+                    // dialog below then blew up cross-thread from the background loader. Found loading
+                    // the unified engine's own prompt-test file, 2026-08-08. Same rules as AddBlock:
+                    // verbatim only when the controller evaluates expressions; $-commands always.
+                    string ts_ = block.TrimStart();
+                    bool isOword = ts_.Length > 1 && (ts_[0] == 'o' || ts_[0] == 'O') && ts_[1] == '<';
+                    bool isSystemCommand = ts_.Length > 0 && ts_[0] == '$';
+                    bool passThrough = isSystemCommand || (GrblInfo.ExpressionsSupported && (isOword || block.IndexOf('#') >= 0));
+
                     int tokenStart = Parser.Tokens.Count;
                     t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-                    bool parsed = Parser.ParseBlock(ref block, false, out ln, out isComment);
+                    bool parsed;
+                    try { parsed = Parser.ParseBlock(ref block, false, out ln, out isComment); }
+                    catch { if (!passThrough) throw; parsed = false; ln = 0; isComment = false; }
                     tParse += System.Diagnostics.Stopwatch.GetTimestamp() - t0;
 
                     t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-                    if (parsed)
+                    if (parsed || passThrough)
                     {
                         // Captured BEFORE the addLineNumber branch below can prepend "N123" onto block -
                         // that would break the leading-"(" check a directive is recognized by. DRAFT, see
@@ -378,7 +391,7 @@ namespace CNC.Core
                             LineNumber = ln;
                             addLineNumber = false;
                         }
-                        else if (addLineNumber)
+                        else if (addLineNumber && parsed)   // never number a passthrough line (breaks O-word routing / #-assignments - see AddBlock)
                         {
                             LineNumber += 10;
                             block = "N" + LineNumber.ToString() + block;
@@ -395,7 +408,9 @@ namespace CNC.Core
                                 BeginSection(sm.Groups[1].Value);
                         }
 
-                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd) { HasSpindleOrCoolantOn = CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = CurrentLineHasToolChange(tokenStart), Directive = directiveKeyword, Tokens = Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) });
+                        // parsed guards the token-derived flags, same as AddBlock: a failed parse leaves
+                        // Parser.Tokens stale from the last successful line - never trust it here.
+                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = parsed && CurrentLineHasToolChange(tokenStart), Directive = directiveKeyword, Tokens = parsed ? Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) : new List<GCodeToken>() });
                         while (commands.Count > 0)
                         {
                             block = commands.Dequeue();
