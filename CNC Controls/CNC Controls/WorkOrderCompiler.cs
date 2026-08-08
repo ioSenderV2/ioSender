@@ -627,6 +627,42 @@ namespace CNC.Controls
         // how much material a single ring removes, and the in-plan faceting of curved boundaries.
         private const double CarveDepthStep = 0.5d;
 
+        // The distance-field build inside VCarve.Build is by far the most expensive thing Generate does -
+        // minutes for board-sized lettering at CarveResolution - and it depends on NOTHING but the glyph
+        // outlines (text/font/style/size) and the cone (half angle, max depth). Position, alignment, WCS,
+        // the skip-first-tool-change option, feeds - none of them touch it; they act on the emitted
+        // coordinates afterwards. So the passes are memoized on exactly those inputs: clicking Generate
+        // again for another identical board - or after toggling "first tool already loaded", or after
+        // nudging X/Y - reuses the carve and takes seconds, while any edit to the text, font, size or
+        // V-bit changes the key and recomputes. Stale-by-construction is impossible: the key IS the full
+        // input set (the resolution/step consts are compile-time fixed). Pass objects are read-only
+        // downstream (grouping reorders references, emission reads points), so sharing them is safe.
+        private static readonly Dictionary<string, List<CNC.Core.VCarvePass>> carvePassCache = new Dictionary<string, List<CNC.Core.VCarvePass>>();
+        private const int CarveCacheMax = 8;   // a work order rarely has more distinct carves than this
+
+        private static List<CNC.Core.VCarvePass> CachedCarvePasses(WorkOrderToolpath tp, double capHeight,
+                                                                   double halfAngle, double maxDepth, List<IList<Point2D>> polys)
+        {
+            // U+0001-separated: an unambiguous key even though Text is free-form - a bare concat (or a
+            // separator that can appear in the values, like a digit) would let field combinations collide.
+            string key = string.Join("\u0001", tp.Text, tp.FontFamily,
+                tp.FontBold ? "b" : "", tp.FontItalic ? "i" : "",
+                capHeight.ToString("R", CultureInfo.InvariantCulture),
+                halfAngle.ToString("R", CultureInfo.InvariantCulture),
+                maxDepth.ToString("R", CultureInfo.InvariantCulture));
+
+            List<CNC.Core.VCarvePass> passes;
+            if (carvePassCache.TryGetValue(key, out passes))
+                return passes;
+
+            passes = CNC.Core.VCarve.Build(polys, halfAngle, maxDepth, CarveResolution, CarveDepthStep);
+
+            if (carvePassCache.Count >= CarveCacheMax)
+                carvePassCache.Clear();
+            carvePassCache[key] = passes;
+            return passes;
+        }
+
         // V-carve text set in a real outline font: the bit follows iso-depth contours of the glyph's
         // FILLED shape, so strokes taper into their corners the way carved lettering does. Depth is again
         // a consequence, but of the glyph's own local width rather than a requested stroke width: at every
@@ -670,7 +706,7 @@ namespace CNC.Controls
 
             // clearFlats on (the default): where a stroke is wider than the cone can span, the engine
             // appends the maxDepth clearing generations itself - see VCarve.Build.
-            var passes = CNC.Core.VCarve.Build(polys, halfAngle, maxDepth, CarveResolution, CarveDepthStep);
+            var passes = CachedCarvePasses(tp, capHeight, halfAngle, maxDepth, polys);
             if (passes.Count == 0)
                 return lines;
 
