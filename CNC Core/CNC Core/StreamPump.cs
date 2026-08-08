@@ -110,6 +110,17 @@ namespace CNC.Core
         private bool probePending, jobHasProbe;
         private readonly Queue<Sent> inflight = new Queue<Sent>();
 
+        // (WAITIDLE) dispatch barrier - the first directive the pump acts on itself (unified streaming
+        // engine Step 3, docs/Architecture-Unified-Streaming-Engine.md). Armed when SendNext consumes a
+        // Directive=="WAITIDLE" row (sender-side, nothing written to the wire); released on the pump
+        // thread once everything outstanding is acked AND two consecutive <Idle| status reports arrive -
+        // the same success condition MacroRunner.WaitForIdle proved on hardware, just event-driven.
+        // volatile: the pump thread owns arming/clearing, but the comms READ thread reads it to decide
+        // whether to forward status sentinels into the ack channel (below), so the flag itself is the
+        // one cross-thread toggle. idleStreak stays pump-thread-only.
+        private volatile bool waitIdleBarrier;
+        private int idleStreak;
+
         private Thread thread;
         private BlockingCollection<string> acks;
         private CancellationTokenSource cts;
@@ -168,6 +179,8 @@ namespace CNC.Core
             this.pgmEndLine = pgmEndLine;
             serialUsed = 0;
             started = probePending = jobHasProbe = false;
+            waitIdleBarrier = false;
+            idleStreak = 0;
             inflight.Clear();
             while (sentMarks.TryDequeue(out _)) { }
             latestBlock = latestScroll = -1;
@@ -238,17 +251,32 @@ namespace CNC.Core
                 return;
             if (cls == Comms.ReplyClass.Ack || cls == Comms.ReplyClass.Nak)
                 acks.Add(reply);
-            else if (cls == Comms.ReplyClass.Status && DebugLog.Enabled)
-                // DebugLog, not PumpLog: PumpLog writes to a DIFFERENT file (%TEMP%\iosender-startjob.log)
-                // and is disabled by default - the wrong choice for "confirm this signal reaches the pump
-                // on real hardware", which is the whole point right now. DebugLog is what -debuglog/
-                // latest_debug.log already show for [jobrunner]/[jog] this session.
-                DebugLog.Write("pump", "STATUS " + reply);
+            else if (cls == Comms.ReplyClass.Status)
+            {
+                if (DebugLog.Enabled)
+                    // DebugLog, not PumpLog: PumpLog writes to a DIFFERENT file (%TEMP%\iosender-startjob.log)
+                    // and is disabled by default - the wrong choice for "confirm this signal reaches the pump
+                    // on real hardware", which is the whole point right now. DebugLog is what -debuglog/
+                    // latest_debug.log already show for [jobrunner]/[jog] this session.
+                    DebugLog.Write("pump", "STATUS " + reply);
+                // (WAITIDLE) barrier feed: classify idle-or-not HERE (a string prefix check, cheap and
+                // non-blocking) and let the pump thread do everything else. Gated on the armed flag so
+                // ordinary jobs never carry status traffic in their ack channel.
+                if (waitIdleBarrier)
+                    acks.Add(reply.StartsWith("<Idle") ? StatusIdleTick : StatusBusyTick);
+            }
         }
 
         // Sentinel pushed through the ack channel by KickIdle so the nudge is handled on the pump thread (the
         // owner of serialUsed/inflight/sendIdx) - never touch that accounting from the UI thread.
         private const string IdleKick = "\0idlekick";
+
+        // Status-report sentinels for the (WAITIDLE) barrier, same ack-channel trick as IdleKick: the
+        // read thread classifies the report (idle or not) and enqueues one of these; the pump thread -
+        // the owner of inflight/idleStreak - does all the actual deciding. Only enqueued while the
+        // barrier is armed, so normal jobs never pay for the ~5/s status traffic in their ack channel.
+        private const string StatusIdleTick = "\0status-idle";
+        private const string StatusBusyTick = "\0status-busy";
 
         // Called from the UI thread when the controller is confirmed idle while the pump still believes a job is
         // streaming - i.e. the pump stalled (it thinks the controller's buffer is full, but an idle controller has
@@ -273,6 +301,13 @@ namespace CNC.Core
                     catch (OperationCanceledException) { break; }
                     if (aborted)
                         break;
+                    // Barrier status sentinels are not acks - route them out BEFORE the preamble swallow
+                    // or a WAITIDLE early in a program with a modal-reset prolog would eat them as acks.
+                    if (ack == StatusIdleTick || ack == StatusBusyTick)
+                    {
+                        OnBarrierStatus(ack == StatusIdleTick);
+                        continue;
+                    }
                     if (preambleAcks > 0 && ack != IdleKick)
                     {
                         preambleAcks--;     // swallow a modal-reset prolog ack - not a job line
@@ -304,13 +339,36 @@ namespace CNC.Core
         {
             while (sendIdx >= 0 && !aborted)
             {
-                if (probePending)               // hold everything while a streamed probe is in flight
+                if (probePending || waitIdleBarrier)   // hold everything: streamed probe in flight, or a (WAITIDLE) waiting out real motion
                 {
-                    PumpLog.W(string.Format("HOLD barrier  sendIdx={0} inflight={1} used={2}", sendIdx, inflight.Count, serialUsed));
+                    PumpLog.W(string.Format("HOLD barrier  sendIdx={0} inflight={1} used={2} waitIdle={3}", sendIdx, inflight.Count, serialUsed, waitIdleBarrier));
                     break;
                 }
 
                 GCodeBlock block = source.Data[sendIdx];
+
+                // (WAITIDLE) - consumed by the SENDER, never written to the wire (unified streaming
+                // engine Step 3; MacroRunner.Run did exactly this in its own loop). Arm the barrier and
+                // stop dispatching; OnBarrierStatus releases it once everything outstanding is acked and
+                // two consecutive <Idle| reports prove the physical motion is done - an ack only proves
+                // the controller BUFFERED a move, which is the race WAITIDLE exists to close. Skipped in
+                // check mode ($C, continueOnError): the controller reports <Check|, never <Idle|, so an
+                // armed barrier could never release - and a syntax check has no motion to wait out anyway.
+                if (block.Directive == "WAITIDLE" && !continueOnError)
+                {
+                    bool wLast = pgmEndLine == sendIdx;
+                    MarkSent(sendIdx, "wait");
+                    latestBlock = sendIdx;
+                    ScheduleDrain();
+                    waitIdleBarrier = true;
+                    idleStreak = 0;
+                    PumpLog.W(string.Format("WAITIDLE armed @idx={0} inflight={1} last={2}", sendIdx, inflight.Count, wLast));
+                    if (DebugLog.Enabled)   // PumpLog is off for ordinary jobs - arm/clear are rare, log both ways
+                        DebugLog.Write("pump", string.Format("WAITIDLE armed @idx={0} inflight={1} last={2}", sendIdx, inflight.Count, wLast));
+                    sendIdx = wLast ? -1 : sendIdx + 1;
+                    break;
+                }
+
                 string line = block.Data;
                 int len = block.Length;
 
@@ -464,6 +522,42 @@ namespace CNC.Core
             }
 
             SendNext();
+        }
+
+        // A status report arrived while the (WAITIDLE) barrier is armed (read thread enqueued a sentinel;
+        // this runs on the pump thread, which owns all the accounting). Release needs BOTH: everything
+        // outstanding acked (inflight empty - lines before the WAITIDLE may still be awaiting their ok)
+        // AND two consecutive idle reports - one report can catch the planner momentarily drained mid-job,
+        // and can also land in the sub-report-interval window between the last ack and motion visibly
+        // starting; two reports ~200ms apart span both (MacroRunner.WaitForIdle's own proven condition).
+        private void OnBarrierStatus(bool idle)
+        {
+            if (!waitIdleBarrier || aborted)
+                return;
+
+            if (idle && inflight.Count == 0)
+            {
+                if (++idleStreak >= 2)
+                {
+                    waitIdleBarrier = false;
+                    idleStreak = 0;
+                    PumpLog.W(string.Format("WAITIDLE clear  sendIdx={0}", sendIdx));
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("pump", string.Format("WAITIDLE clear  sendIdx={0}", sendIdx));
+                    // Mirror OnIdleKick's completion logic: the barrier row may have been the last line,
+                    // in which case no further ack will ever run OnAck's finished check - do it here.
+                    if (sendIdx >= 0)
+                        SendNext();
+                    if (sendIdx < 0 && inflight.Count == 0)
+                    {
+                        PumpLog.W("JOB FINISHED (waitidle was tail)");
+                        aborted = true;
+                        PostControl(onJobFinished);
+                    }
+                }
+            }
+            else
+                idleStreak = 0;   // moving (or acks still outstanding) - any partial streak is stale
         }
 
         // The controller is confirmed idle but we still think a job is in flight (see KickIdle). An idle
