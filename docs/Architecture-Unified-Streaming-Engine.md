@@ -198,9 +198,17 @@ separately.
    still physically moving, **held 10,685ms across 40 Run reports**, released 611ms after the last Run,
    tail on the wire only after release; prose comments mentioning WAITIDLE stream untouched. Sim
    gotchas encoded in the probe (boots with `Pn:XYZ` limit pins asserted → `$21=0` in its own EEPROM
-   copy; RX buffer 1023 not 16k; `Action.New`'s arg is a name, not a block). **Hardware confirmation
-   on the real controller still pending** — the earlier hardware attempt was degenerate (G4 acks late
-   and reports Idle, so a dwell can't exercise the hold).
+   copy; RX buffer 1023 not 16k; `Action.New`'s arg is a name, not a block). **✅ HARDWARE-VERIFIED
+   2026-08-08 09:45** — the user ran the real-motion test file on the real controller: barrier armed
+   at ack-drain with Z physically descending, **wire silent 10,250ms** through both 5s moves, tail
+   out 1ms after clear, `M2`, zero alarms (log lines 33655-33885 of the 05-34-08 debug log). The
+   earlier dwell attempt was degenerate (G4 acks late and reports Idle) — real G1 motion is the only
+   valid test shape.
+
+   **Same log review also produced the 32-bit OOM's smoking gun** (crash 04:56, unrelated build):
+   stack pinned at `MacroRunner.StreamProgram`'s unsleeping `DoEvents` wait loop allocating
+   dispatcher operations to the 3GB ceiling. Step 7's deletion of that loop is now a crash fix, not
+   just cleanup.
 4. **`MBOX` barrier + `PROMPT` up-front dialog/substitution.**
 5. ✅ **`PREREQ` up-front gate** (`56b1dc8`, 2026-08-08) — done out of order (before MBOX/PROMPT)
    because it is the safest slice: pure pre-flight, refusal before any motion, no streaming
