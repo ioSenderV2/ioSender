@@ -504,6 +504,12 @@ namespace CNC.Controls
 
         private void JogCommand(string cmd, JogKind kind)
         {
+            // Diagnostic only, 2026-08-08: entry-point trace, before ANYTHING else in this method - the
+            // 80s-silent repro left zero [jog]/[jobrunner] lines, meaning the click never reached even
+            // JogGate.TryBegin(). This answers whether JogCommand itself is being entered at all.
+            if (DebugLog.Enabled)
+                DebugLog.Write("jog", string.Format("JogCommand ENTERED cmd=\"{0}\" kind={1}", cmd, kind));
+
             GrblViewModel model = DataContext as GrblViewModel;
 
             if (cmd == "stop") {
