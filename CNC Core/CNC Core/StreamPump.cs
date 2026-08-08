@@ -14,8 +14,10 @@ drains, and motion stutters.
 
 StreamPump moves ONLY the latency-critical send/ack flow control onto a dedicated background thread:
 
-  - Acks are tapped straight off the comms read thread via Comms.com.AckSink (no UI dispatcher), fed
-    into a BlockingCollection the pump thread consumes.
+  - Acks are tapped straight off the comms read thread via Comms.com.ReplyClassified (no UI dispatcher;
+    replaced the old single-purpose AckSink 2026-08-08 - see docs/Architecture-Unified-Streaming-Engine.md),
+    fed into a BlockingCollection the pump thread consumes. Status reports arrive on the same event now
+    too (logged only for now - not yet consumed by real dispatch logic).
   - The pump does standard grbl character-counting flow control (keep <= serialSize bytes in flight)
     and writes job lines directly via Comms (BlockingWrites = synchronous, so back-to-back lines can't
     overlap; blocks only this thread - desired backpressure - never the UI).
@@ -186,9 +188,15 @@ namespace CNC.Core
                 fromBlock, pgmEndLine, source?.Blocks, serialSize, useBuffering, sendComments));
 
             Comms.com.BlockingWrites = true;
-            // Tap acks straight off the read thread. Dropped while Suspended (tool change) so jog/MDI acks
-            // are not mistaken for job-line acks - they fall through to the UI path, which ignores them.
-            Comms.com.AckSink = ack => { if (!Suspended) acks.Add(ack); };
+            // Tap classified replies straight off the read thread. -= before += : ReplyClassified is a
+            // real multicast event (2026-08-08, replaced the old single-purpose AckSink property), and
+            // JobRunner REUSES this same pump instance across jobs rather than recreating it - a
+            // property assignment always safely replaced the old handler, but += accumulates, so a
+            // Start() that ever ran before Abort()/Run()'s finally unsubscribed the previous one would
+            // silently double-process every ack. -= on a not-currently-subscribed handler is a no-op, so
+            // this is always safe regardless of what state the previous run left it in.
+            Comms.com.ReplyClassified -= OnReplyClassified;
+            Comms.com.ReplyClassified += OnReplyClassified;
 
             // Re-establish modal state for a mid-program start (units / plane / distance mode): "Start from this
             // toolpath" queues a G90 G94 / G17 / G21 prolog on source.Commands. The legacy streamer drained that
@@ -213,8 +221,25 @@ namespace CNC.Core
         {
             aborted = true;
             if (Comms.com != null)
-                Comms.com.AckSink = null;   // stop routing acks to a dying pump
+                Comms.com.ReplyClassified -= OnReplyClassified;   // stop routing replies to a dying pump
             cts?.Cancel();                  // unblock the ack Take
+        }
+
+        // The classified-reply handler installed on Comms.com for the pump's lifetime (see Start/Abort/
+        // Run's finally). Runs ON THE COMMS READ THREAD - must not block (see the interface doc-comment).
+        // Ack/Nak: EXACTLY the old AckSink closure's behavior, unchanged - dropped while Suspended (tool
+        // change) so jog/MDI acks are not mistaken for job-line acks; they fall through to the UI path,
+        // which ignores them. Status: new 2026-08-08 - logged only for now, so the signal's presence can
+        // be confirmed on real hardware; nothing consumes it yet. The WAITIDLE dispatch barrier that will
+        // actually use it is separate, not-yet-built work - see docs/Architecture-Unified-Streaming-Engine.md.
+        private void OnReplyClassified(Comms.ReplyClass cls, string reply)
+        {
+            if (Suspended)
+                return;
+            if (cls == Comms.ReplyClass.Ack || cls == Comms.ReplyClass.Nak)
+                acks.Add(reply);
+            else if (cls == Comms.ReplyClass.Status)
+                PumpLog.W("STATUS " + reply);
         }
 
         // Sentinel pushed through the ack channel by KickIdle so the nudge is handled on the pump thread (the
@@ -263,7 +288,7 @@ namespace CNC.Core
             {
                 if (Comms.com != null)
                 {
-                    Comms.com.AckSink = null;
+                    Comms.com.ReplyClassified -= OnReplyClassified;
                     Comms.com.BlockingWrites = false;
                 }
                 IsActive = false;

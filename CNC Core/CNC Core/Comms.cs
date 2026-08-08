@@ -96,6 +96,19 @@ namespace CNC.Core
             NAK
         }
 
+        // The classification a reply gets for ReplyClassified below - a superset of State (which stays
+        // as-is, used for the unrelated CommandState/AwaitAck bookkeeping many other call sites depend
+        // on). Other = a reply that arrived and was assembled but isn't an ack or a status report (an
+        // alarm line, a $$ /$# response, ...) - raised so a subscriber only interested in one class can
+        // still tell "definitely something else" from silence, rather than never being called at all.
+        public enum ReplyClass
+        {
+            Ack,
+            Nak,
+            Status,
+            Other
+        }
+
         public enum ResetMode
         {
             None,
@@ -125,12 +138,18 @@ namespace CNC.Core
         bool EventMode { get; set; }
         Action<int> ByteReceived { get; set; }
 
-        // Optional tap for ok/error acks, invoked ON THE READ THREAD the instant a reply is assembled -
-        // before (and in addition to) the DataReceived marshal to the UI thread. The streamer thread
-        // installs this so job flow control never waits on a busy UI dispatcher. Null (the default) =
-        // exactly today's behaviour. Implementations must call it only for "ok"/"error" replies and must
-        // not block (the handler does a non-blocking enqueue).
-        Action<string> AckSink { get; set; }
+        // Classified-reply tap, raised ON THE READ THREAD the instant a reply is assembled - before (and
+        // in addition to) the DataReceived marshal to the UI thread. Replaces the old single-purpose
+        // AckSink (2026-08-08, docs/Architecture-Unified-Streaming-Engine.md): StreamPump had zero
+        // visibility into status reports because AckSink only ever fired for ok/error, which made a
+        // WAITIDLE-style "wait for genuine Idle" barrier impossible to build safely. A real event, not a
+        // property, so more than one subscriber can attach if a future consumer needs the same
+        // comms-thread-speed delivery. Implementations must raise this for EVERY reply (all four
+        // classes, including Other) so a subscriber can tell "checked and it's not what I want" from
+        // "never got called". Handlers MUST NOT block - non-blocking enqueue only, the same discipline
+        // AckSink always had; this still runs on the comms read thread and a stall here stalls every
+        // subsequent reply behind it.
+        event Action<Comms.ReplyClass, string> ReplyClassified;
 
         // When true, multi-byte writes (WriteBytes/WriteString) are SYNCHRONOUS so back-to-back job lines
         // from the streamer thread can't overlap (a fire-and-forget async write would throw "a write is

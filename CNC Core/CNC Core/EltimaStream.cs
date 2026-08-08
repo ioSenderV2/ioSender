@@ -77,7 +77,7 @@ namespace CNC.Core
 
         public event DataReceivedHandler DataReceived;
 
-        public Action<string> AckSink { get; set; }
+        public event Action<Comms.ReplyClass, string> ReplyClassified;
         public bool BlockingWrites { get; set; }   // Eltima writes are already synchronous; no-op here
 
 #if RESPONSELOG
@@ -357,9 +357,14 @@ namespace CNC.Core
 
                         state = Reply == "ok" ? Comms.State.ACK : (Reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
 
-                        // Tap ok/error acks straight to the streamer (when installed), bypassing the UI dispatcher.
-                        if (AckSink != null && (state == Comms.State.ACK || state == Comms.State.NAK))
-                            AckSink(Reply);
+                        // Classified-reply tap straight to any subscriber, bypassing the UI dispatcher.
+                        // Raised for every reply, not just ack/nak - see the interface doc-comment.
+                        ReplyClassified?.Invoke(
+                            state == Comms.State.ACK ? Comms.ReplyClass.Ack :
+                            state == Comms.State.NAK ? Comms.ReplyClass.Nak :
+                            Reply.Length > 0 && Reply[0] == '<' ? Comms.ReplyClass.Status :
+                            Comms.ReplyClass.Other,
+                            Reply);
                     }
                 }
                 else

@@ -348,7 +348,7 @@ static class Probe
         public Comms.State CommandState { get; set; }
         public bool EventMode { get; set; }
         public System.Action<int> ByteReceived { get; set; }
-        public System.Action<string> AckSink { get; set; }
+        public event System.Action<Comms.ReplyClass, string> ReplyClassified;
         public bool BlockingWrites { get; set; }
         public bool IsReconnecting => false;
 

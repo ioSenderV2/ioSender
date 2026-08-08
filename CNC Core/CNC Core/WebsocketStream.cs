@@ -83,7 +83,7 @@ namespace CNC.Core
 
         public event DataReceivedHandler DataReceived;
 
-        public Action<string> AckSink { get; set; }
+        public event Action<Comms.ReplyClass, string> ReplyClassified;
         public bool BlockingWrites { get; set; }   // websocket Send is already synchronous; no-op here
 
         public WebsocketStream(string host, SynchronizationContext syncContext)
@@ -393,9 +393,14 @@ namespace CNC.Core
             {
                 Reply = reply;
                 state = reply == "ok" ? Comms.State.ACK : (reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
-                // Tap ok/error acks straight to the streamer (when installed), bypassing the UI dispatcher.
-                if (AckSink != null && (state == Comms.State.ACK || state == Comms.State.NAK))
-                    AckSink(reply);
+                // Classified-reply tap straight to any subscriber, bypassing the UI dispatcher. Raised
+                // for every reply, not just ack/nak - see the interface doc-comment.
+                ReplyClassified?.Invoke(
+                    state == Comms.State.ACK ? Comms.ReplyClass.Ack :
+                    state == Comms.State.NAK ? Comms.ReplyClass.Nak :
+                    reply.Length > 0 && reply[0] == '<' ? Comms.ReplyClass.Status :
+                    Comms.ReplyClass.Other,
+                    reply);
                 // Async marshal (BeginInvoke, not Invoke): a synchronous Invoke blocks this read thread on a
                 // busy UI, stalling reads and acks. BeginInvoke keeps reads flowing; the per-call reply value
                 // is captured (strings are immutable) so order/content are preserved (see TelnetStream).

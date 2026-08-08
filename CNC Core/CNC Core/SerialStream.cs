@@ -63,7 +63,7 @@ namespace CNC.Core
 
         public event DataReceivedHandler DataReceived;
 
-        public Action<string> AckSink { get; set; }
+        public event Action<Comms.ReplyClass, string> ReplyClassified;
         public bool BlockingWrites { get; set; }
 
         // Raw serial log, enabled at runtime by the -debugfile <path> launch arg (Resources.DebugFile).
@@ -523,10 +523,15 @@ namespace CNC.Core
 
                         state = Reply == "ok" ? Comms.State.ACK : (Reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
 
-                        // Tap ok/error acks straight to the streamer (when installed), bypassing the UI
-                        // dispatcher so flow control never waits on a busy UI. Non-blocking enqueue.
-                        if (AckSink != null && (state == Comms.State.ACK || state == Comms.State.NAK))
-                            AckSink(Reply);
+                        // Classified-reply tap straight to any subscriber (StreamPump), bypassing the UI
+                        // dispatcher so flow control never waits on a busy UI. Non-blocking enqueue only -
+                        // see the interface doc-comment. Raised for every reply, not just ack/nak.
+                        ReplyClassified?.Invoke(
+                            state == Comms.State.ACK ? Comms.ReplyClass.Ack :
+                            state == Comms.State.NAK ? Comms.ReplyClass.Nak :
+                            Reply.Length > 0 && Reply[0] == '<' ? Comms.ReplyClass.Status :
+                            Comms.ReplyClass.Other,
+                            Reply);
                     }
                 }
                 else

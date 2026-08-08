@@ -34,7 +34,7 @@ namespace WebsocketProbe
 
             var stream = new WebsocketStream(string.Format("ws://localhost:{0}/", Port), null);
             stream.DataReceived += data => { lock (replies) replies.Add(data); };
-            stream.AckSink = a => { lock (acks) acks.Add(a); };
+            stream.ReplyClassified += (cls, r) => { if (cls == Comms.ReplyClass.Ack || cls == Comms.ReplyClass.Nak) lock (acks) acks.Add(r); };
             stream.ConnectionLost += () => Interlocked.Increment(ref lost);
             stream.Reconnected += () => Interlocked.Increment(ref reconnected);
 
@@ -52,7 +52,7 @@ namespace WebsocketProbe
             Check("reply content", Count(replies) == 1 && replies[0] == "ok", Dump(replies));
             Check("state is ACK after 'ok'", stream.CommandState == Comms.State.ACK,
                   stream.CommandState.ToString());
-            Check("ack tapped to AckSink", Count(acks) == 1 && acks[0] == "ok", Dump(acks));
+            Check("ack tapped via ReplyClassified", Count(acks) == 1 && acks[0] == "ok", Dump(acks));
 
             // The port's real behavioural risk: websocket-sharp delivered whole messages, ClientWebSocket
             // can hand back a partial one. Split a reply across two frames and it must still rejoin.

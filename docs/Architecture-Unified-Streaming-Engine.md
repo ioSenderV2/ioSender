@@ -116,6 +116,32 @@ scoped so it only matters while a `WAITIDLE` barrier is actually set (no cost/ri
 blind, and it changes Step 3 from "mirror an existing mechanism" to "design a new cross-thread signal,
 then mirror the barrier shape." Answer this BEFORE Step 3 code, not during it.
 
+**✅ Signal built 2026-08-08.** The gap above is closed at the transport level, not by adding a
+narrow second `StatusSink` alongside `AckSink` — `AckSink` (a single-purpose `Action<string>`
+*property*, one subscriber at a time) is **replaced** by `Comms.ReplyClassified`, a real multicast
+event (`event Action<Comms.ReplyClass, string>`) raised from the SAME classification point in all
+four stream classes (`Serial`/`Telnet`/`Websocket`/`Eltima`Stream) for **every** reply, not just
+ack/nak — `ReplyClass` is `{ Ack, Nak, Status, Other }`, status recognized by `reply[0] == '<'`.
+`StreamPump` migrated from assigning `AckSink` to subscribing `OnReplyClassified`; Ack/Nak handling
+is bit-for-bit the same as the old closure (`if (!Suspended) acks.Add(reply)`), and Status is now
+logged (`PumpLog.W("STATUS " + reply)`) so its presence is confirmable on real hardware — **nothing
+consumes it yet**, the WAITIDLE barrier itself is still not built. One non-obvious risk caught and
+guarded before it shipped: `JobRunner` REUSES the same `StreamPump` instance across jobs rather than
+recreating it, and a real event *accumulates* subscribers with `+=` where the old property always
+just replaced the previous value — so `Start()` now does `-=` before `+=` (a safe no-op if nothing
+was subscribed) to guarantee exactly one active subscription regardless of what state a previous
+run's cleanup left behind; without that guard, a `Start()` racing ahead of a previous `Abort()`
+would silently double-process every ack.
+
+Verified two ways before trusting it: `.\build.ps1 -Scratch` (compiles clean) AND
+`dotnet run --project tools/websocket-probe` — a REAL loopback test against the actual production
+`WebsocketStream` (not a mock) — all 22 checks passed, including "ack tapped via ReplyClassified"
+confirming ack delivery through the new event is unchanged. Still needs a real hardware jog/job test
+before the barrier logic itself gets built on top of it.
+
+**Remaining for Step 3 proper (not done):** the actual `WAITIDLE` dispatch barrier that consumes
+`Status` — recognizing two consecutive `<Idle|...>` reports, clearing the barrier, resuming dispatch.
+
 ### `(MBOX, ...)` — a dispatch barrier + a prompt
 Same barrier pattern as `WAITIDLE`: hold dispatch, show the existing non-modal `HoldPrompt` (already
 built not to steal focus, so the operator can jog while it's up — keep that property), resume dispatch
@@ -155,9 +181,11 @@ separately.
    like an ordinary comment today, so nothing should change until the next step reads the flag.
    **Drafted 2026-08-08 (`d330305`), compile-checked via -Scratch only, NOT hardware-verified — a
    carve was running, no `-Launch` was possible. Verify inert on a real launch before trusting it.**
-3. **Design the status-report-reaches-the-pump-thread signal** (see the gap above — this wasn't in the
-   original plan; found while starting this step), THEN **`WAITIDLE` barrier** using it — smallest
-   functional slice, hardware-verify on a macro that uses only `WAITIDLE`.
+3. ✅⏳ **The status-report-reaches-the-pump-thread signal is built** (`Comms.ReplyClassified`,
+   2026-08-08 — see the gap note above) — compile-checked + verified via the real `websocket-probe`
+   loopback test, NOT yet hardware-verified on a real controller. **Still to do:** the `WAITIDLE`
+   barrier itself that consumes it — smallest functional slice, hardware-verify on a macro that uses
+   only `WAITIDLE`.
 4. **`MBOX` barrier + `PROMPT` up-front dialog/substitution.**
 5. **`PREREQ` up-front gate.**
 6. **Point Work Order's Generate button at the new path** — write into `GCode.File` directly, one
