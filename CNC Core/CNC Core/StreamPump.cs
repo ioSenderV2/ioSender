@@ -238,8 +238,12 @@ namespace CNC.Core
                 return;
             if (cls == Comms.ReplyClass.Ack || cls == Comms.ReplyClass.Nak)
                 acks.Add(reply);
-            else if (cls == Comms.ReplyClass.Status)
-                PumpLog.W("STATUS " + reply);
+            else if (cls == Comms.ReplyClass.Status && DebugLog.Enabled)
+                // DebugLog, not PumpLog: PumpLog writes to a DIFFERENT file (%TEMP%\iosender-startjob.log)
+                // and is disabled by default - the wrong choice for "confirm this signal reaches the pump
+                // on real hardware", which is the whole point right now. DebugLog is what -debuglog/
+                // latest_debug.log already show for [jobrunner]/[jog] this session.
+                DebugLog.Write("pump", "STATUS " + reply);
         }
 
         // Sentinel pushed through the ack channel by KickIdle so the nudge is handled on the pump thread (the

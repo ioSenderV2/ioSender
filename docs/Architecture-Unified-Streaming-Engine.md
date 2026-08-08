@@ -124,7 +124,9 @@ four stream classes (`Serial`/`Telnet`/`Websocket`/`Eltima`Stream) for **every**
 ack/nak — `ReplyClass` is `{ Ack, Nak, Status, Other }`, status recognized by `reply[0] == '<'`.
 `StreamPump` migrated from assigning `AckSink` to subscribing `OnReplyClassified`; Ack/Nak handling
 is bit-for-bit the same as the old closure (`if (!Suspended) acks.Add(reply)`), and Status is now
-logged (`PumpLog.W("STATUS " + reply)`) so its presence is confirmable on real hardware — **nothing
+logged (`DebugLog.Write("pump", "STATUS " + reply)` — corrected from an initial `PumpLog.W` mistake:
+`PumpLog` writes to a different file and is disabled by default, the wrong choice for "confirm this
+reaches hardware") so its presence is confirmable on real hardware — **nothing
 consumes it yet**, the WAITIDLE barrier itself is still not built. One non-obvious risk caught and
 guarded before it shipped: `JobRunner` REUSES the same `StreamPump` instance across jobs rather than
 recreating it, and a real event *accumulates* subscribers with `+=` where the old property always
