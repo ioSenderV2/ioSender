@@ -123,6 +123,13 @@ namespace CNC.Controls
         public static string ActiveProgramStats;
 
 
+        // Step 7 seam (unified streaming engine): start the just-loaded job as a macro run - the shell
+        // (ioSender XL) points this at its run bar's JobControl.RunMacro, since the JobControl INSTANCE
+        // lives in that assembly. Same idiom as SwitchToTab below. The bool is 'unattended'. Null means
+        // no streamer is wired (headless/degenerate host) - Run() refuses rather than sending motion
+        // without flow control, exactly as the retired MacroRunner.Flush did.
+        public static System.Action<bool> StartLoadedJob;
+
         // Set by the shell: switches the main tab strip to the given tab. Used by Work Order's Run - hands
         // its generated program off to the Job tab ("one mental model of running a program" regardless of
         // source), then switches BACK to Work Order once the Job tab's borrowed program is done with (a
@@ -333,20 +340,151 @@ namespace CNC.Controls
             return result;
         }
 
-        // --- Engine forwarders -------------------------------------------------------------------------
-        // The engine is CNC.Core.MacroRunner; these keep every existing call site working unchanged.
+        // --- The unified-engine entry (Step 7) ---------------------------------------------------------
+        // Run used to forward to CNC.Core.MacroRunner.Run - a second engine that interpreted directives
+        // itself and streamed transient bursts through RunStreamedJobInPlace, holding the caller in
+        // DoEvents wait loops (the proven 32-bit OOM allocator). Now a macro IS a job: push the loaded
+        // program aside, load the directive-bearing text as the job, and start it through the ordinary
+        // streaming path. The pump handles (WAITIDLE)/(MBOX)/bare-(PROMPT) inline and JobRunner.Run gates
+        // (PREREQ)/(PROMPT ...) up front - the same hardware-verified path Work Order runs on since Step 6.
+        // Deliberately silent presentation (user decision 2026-08-08): no tab switch, no floating run
+        // view - the operator stays where they are; the run bar drives Feed Hold/Stop from any tab and
+        // the docked Job list shows progress if they look. The previous job pops back at the terminal.
 
-        /// <summary>Run a macro. Returns false if it was aborted (prerequisite unmet or user cancelled).</summary>
+        /// <summary>Run a macro through the unified streaming engine. Returns false if it was refused up
+        /// front (busy, prerequisite unmet, or user cancelled); true once the run has started (the run
+        /// itself is asynchronous - pass onDone to sequence work after it).</summary>
         /// <param name="unattended">Skip every routine confirmation this macro would otherwise pop (the
         /// confirm-before-run prompt, bare mid-body (PROMPT) run-confirmations, and (MBOX) holds - all
         /// auto-answered OK/Yes) and take an unanswered (PROMPT param, default, ...) input's own default
         /// rather than asking. For a "Generate and Run" action that a tab offers explicitly (see
-        /// SupportsGenerateAndRun) - NOT a general silencing knob. PREREQ failures and alarm-abort checks
-        /// still apply and still stop the run; this only skips prompts that exist purely to ask "are you
-        /// sure" / "ready?", not safety gates.</param>
-        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false, bool unattended = false, bool preferJobView = false)
+        /// SupportsGenerateAndRun) - NOT a general silencing knob. PREREQ failures still apply and still
+        /// stop the run; this only skips prompts that exist purely to ask "are you sure" / "ready?".</param>
+        /// <param name="onDone">Invoked on the UI thread at the run's true terminal, after the previous
+        /// job is restored. The argument is true only for a genuine program end (JobFinished) - false for
+        /// a Stop/alarm recovery. Not invoked when Run returns false (nothing started).</param>
+        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false, bool unattended = false, System.Action<bool> onDone = null)
         {
-            return MacroRunner.Run(model, name, code, confirm, unattended, preferJobView);
+            if (model == null || string.IsNullOrEmpty(code))
+                return true;
+
+            if (string.IsNullOrEmpty(name))
+                name = "Macro";
+
+            if (StartLoadedJob == null)
+            {
+                // No streamer wired - refuse rather than flood (Feed Hold / Stop would not work).
+                UserPrompt.Show("Cannot run this program safely: the job streamer is not available, so motion would be sent without flow control and Feed Hold / Stop would be unresponsive.",
+                    "ioSender", PromptButtons.OK, PromptIcon.Error);
+                return false;
+            }
+
+            // Busy guard: a macro run means "load this as the job and press Cycle Start" - doing that
+            // while a job is streaming would collide with it, and doing it while held/jogging/tool-
+            // changing would make the programmatic Cycle Start a RESUME of that state instead of a
+            // start. The retired engine's deferred Background-priority start merely broke quietly in
+            // these states; the unified immediate start must refuse them explicitly.
+            var grblState = model.GrblState.State;
+            if (model.IsJobRunning || JobTimer.IsRunning || grblState == GrblStates.Run || grblState == GrblStates.Hold ||
+                grblState == GrblStates.Jog || grblState == GrblStates.Tool || grblState == GrblStates.Door)
+            {
+                UserPrompt.Show(string.Format("Cannot run macro \"{0}\": the machine is busy (a job is running, held or jogging). Let it finish or stop it first.", name),
+                    "ioSender", PromptButtons.OK, PromptIcon.Warning);
+                return false;
+            }
+
+            // A macro whose body is a single "@<path>" line is a reference to an external file - load and
+            // run that file's current contents (re-read every run, so the macro can be developed by
+            // editing the file - no copy/paste back into ioSender).
+            if (!MacroRunner.ResolveFileReference(ref code, name))
+                return false;
+
+            MacroRunner.SaveGeneratedCopy(name, code);
+
+            var lines = code.Replace("\r", string.Empty).Split('\n');
+
+            // O-word/#-expression lines can only be streamed verbatim when the controller evaluates
+            // expressions itself; there is no safe fallback (MDI is reserved for typed text), so refuse
+            // outright rather than send it unfiltered. Same rule the retired Flush applied per burst.
+            if (!GrblInfo.ExpressionsSupported)
+            {
+                foreach (var l in lines)
+                    if (l.IndexOf("O<", StringComparison.OrdinalIgnoreCase) >= 0 || l.IndexOf('#') >= 0)
+                    {
+                        UserPrompt.Show("This macro uses O-word/parameter (#) syntax, which needs the controller to support NGC expressions (EXPR). This controller does not report that support, so ioSender cannot run it.",
+                            "ioSender", PromptButtons.OK, PromptIcon.Error);
+                        return false;
+                    }
+            }
+
+            // Confirm-before-run - but an input prompt's OK/Cancel is itself the run confirmation, so
+            // when the macro has (PROMPT param, ...) fields the field dialog (shown by JobRunner.Run's
+            // up-front gate) does the confirming and a separate box here would be redundant. Same rule
+            // the retired engine applied.
+            if (confirm && !unattended && MacroRunner.CollectPromptFields(lines).Count == 0 &&
+                UserPrompt.Show(string.Format("Run {0} macro?", name), "ioSender",
+                    PromptButtons.YesNo, PromptIcon.Question) != PromptResult.Yes)
+                return false;
+
+            // Make the macro the loaded job, previous job pushed aside. Program_FileChanged clears
+            // IsDryRunMode by design on every load - re-arm it (Work Order's Generate idiom): the
+            // retired engine kept an armed dry run active across macro runs (per-line neutralisation
+            // only - the pump still applies exactly that; the Z-shift preamble is skipped for macro
+            // runs, see JobRunner.ArmMacroRun).
+            bool dryRunArmed = model.IsDryRunMode;
+            GCode.File.Push();
+            GCode.File.LoadText(name, code);
+            model.IsDryRunMode = dryRunArmed;
+
+            // Watch the run to its TRUE terminal (Idle/NoFile after a genuine Send) and pop the borrowed
+            // job back - WorkOrderView.WatchForRunEnd's proven pattern, armed BEFORE the start below so
+            // even a run that finishes inside the start call's own event pumping cannot be missed.
+            // Left in place through an Error/Halted (alarm) on purpose: the pop then happens on the
+            // Idle that follows the operator's reset/unlock, so they can see what failed first.
+            bool started = false, jobFinished = false;
+            System.ComponentModel.PropertyChangedEventHandler handler = null;
+            handler = (s, e) =>
+            {
+                if (e.PropertyName != nameof(GrblViewModel.StreamingState))
+                    return;
+                var st = model.StreamingState;
+                if (st == StreamingState.Send)
+                    started = true;
+                if (st == StreamingState.JobFinished)
+                    jobFinished = true;
+                if (!started || (st != StreamingState.Idle && st != StreamingState.NoFile))
+                    return;
+                model.PropertyChanged -= handler;
+                // Self-disarm without popping if the loaded job is no longer ours (a different file got
+                // loaded before the terminal was seen) - popping would yank that file out from under the
+                // operator. Same guard as WatchForRunEnd.
+                if (model.FileName != name)
+                    DebugLog.Write("macro", string.Format("Run watcher: terminal but loaded job is '{0}', not '{1}' - disarming without pop", model.FileName, name));
+                else
+                {
+                    DebugLog.Write("macro", string.Format("Run watcher: '{0}' terminal (jobFinished={1}) - popping the borrowed program", name, jobFinished));
+                    GCode.File.Pop();
+                }
+                onDone?.Invoke(jobFinished);
+            };
+            model.PropertyChanged += handler;
+
+            StartLoadedJob(unattended);
+
+            // JobRunner.Run's own up-front gates (PREREQ unmet, the field dialog's Cancel) return without
+            // starting anything - no terminal will ever fire the watcher, so detect it here: no Send seen
+            // means nothing started. Undo the push and report the refusal. (A macro so short it already
+            // FINISHED inside the start call still set 'started' on its way through Send - the watcher
+            // has then popped and completed normally, and this is not taken.)
+            if (!started)
+            {
+                model.PropertyChanged -= handler;
+                GCode.File.Pop();
+                DebugLog.Write("macro", string.Format("Run: '{0}' did not start (gate refused/cancelled) - popped the borrowed program", name));
+                return false;
+            }
+
+            return true;
         }
 
         public static void SaveGeneratedCopy(string name, string code)

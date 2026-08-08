@@ -960,6 +960,17 @@ namespace CNC.Controls
             runner.Run(fromBlock, honorActiveProgram);
         }
 
+        // Step 7 (unified streaming engine): start the just-pushed/loaded macro program through the
+        // ordinary streaming path, flagged as a macro run (skips the dry-run Z-shift preamble; unattended
+        // additionally auto-answers prompts/holds - see JobRunner.ArmMacroRun). honorActiveProgram: false,
+        // same as every internal starter with a Source already primed - a wizard tab is typically the
+        // caller here, and re-entering its ActiveRun would recurse.
+        public void RunMacro(bool unattended)
+        {
+            runner.ArmMacroRun(unattended);
+            runner.Run(0, false);
+        }
+
         public bool CallHandler(StreamingState state, bool always)
         {
             return runner.CallHandler(state, always);

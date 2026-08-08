@@ -508,8 +508,10 @@ namespace CNC.Core
 
         // If 'code' is a single "@<path>" reference, replace it with the referenced file's current
         // contents (re-read on every run). Relative paths resolve against the config folder.
-        // Returns false (after a message) if the file cannot be read.
-        private static bool ResolveFileReference(ref string code, string name)
+        // Returns false (after a message) if the file cannot be read. Public since Step 7:
+        // MacroProcessor.Run (the unified-engine entry) resolves the reference before loading the
+        // text as the job, exactly as the retired Run() loop here did before streaming it.
+        public static bool ResolveFileReference(ref string code, string name)
         {
             // Extensionless @<path> defaults to ".macro" - normally already baked into the stored text
             // by MacroCreateDialog, this is a safety net for references normalized before that existed.

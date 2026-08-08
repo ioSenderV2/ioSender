@@ -139,6 +139,13 @@ namespace CNC.Core
         // same principle as dry-run's local line rewrites). Null/empty = no prompts, zero cost.
         private List<MacroRunner.PromptField> promptFields;
 
+        // Unattended run (Step 7): a "Generate and Run" macro run auto-answers every (MBOX)/bare-(PROMPT)
+        // hold OK/Yes instead of prompting - the same thing MacroRunner.Run's own 'unattended' flag did in
+        // the retired directive loop. The barrier still ARMS and still waits for ack-drain first, so the
+        // strict ordering (everything before the hold is acked before anything after it is sent) is
+        // preserved; only the operator dialog is skipped. Never set for an ordinary loaded-job run.
+        private bool unattended;
+
         private Thread thread;
         private BlockingCollection<string> acks;
         private CancellationTokenSource cts;
@@ -182,9 +189,10 @@ namespace CNC.Core
         public void Start(IProgramSource source, int fromBlock, int pgmEndLine, int serialSize, bool useBuffering,
                           bool sendComments, bool startSimulator, System.Action onJobFinished, System.Action<string> onError,
                           bool continueOnError = false, System.Action onCheckError = null, System.Action onOperatorCancel = null,
-                          List<MacroRunner.PromptField> promptFields = null)
+                          List<MacroRunner.PromptField> promptFields = null, bool unattended = false)
         {
             this.promptFields = (promptFields != null && promptFields.Count > 0) ? promptFields : null;
+            this.unattended = unattended;
             this.source = source;
             this.serialSize = serialSize;
             this.useBuffering = useBuffering;
@@ -644,6 +652,16 @@ namespace CNC.Core
             if (!mboxBarrier || !mboxPromptPending || inflight.Count != 0 || aborted)
                 return;
             mboxPromptPending = false;
+            // Unattended (Step 7): auto-answer OK without ever showing the dialog - through the same
+            // sentinel path as a real answer, so release ordering is identical to an attended run.
+            if (unattended)
+            {
+                PumpLog.W("MBOX auto-OK (unattended)");
+                if (DebugLog.Enabled)
+                    DebugLog.Write("pump", "MBOX auto-OK (unattended)");
+                try { acks.Add(MboxOkTick); } catch { }
+                return;
+            }
             string line = mboxLine;
             PumpLog.W("MBOX prompting");
             PostControl(() =>

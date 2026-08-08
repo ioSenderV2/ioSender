@@ -109,6 +109,23 @@ namespace CNC.Core
         /// </summary>
         public bool SimulateActive { get; set; }
 
+        // Step 7 (unified streaming engine): the NEXT Run() is a macro run started programmatically by
+        // MacroProcessor.Run - the macro was just pushed/loaded as the job and Run(0, false) follows
+        // immediately. One-shot, consumed (and cleared) at the top of Run() itself so no early-return
+        // path can leave it armed for a later, unrelated Cycle Start. Effects while consumed:
+        //   - macro: the dry-run G92 Z-clearance preamble is skipped. Per-line spindle/coolant/M6
+        //     suppression still applies in the pump (gated on IsDryRunMode alone) - that pair is exactly
+        //     the protection macro runs had under the retired MacroRunner engine, where dry run
+        //     neutralised lines but never shifted Z (a Z shift corrupts a probing macro's positioning).
+        //   - unattended: the (PROMPT) field dialog takes each field's declared default, and the pump
+        //     auto-answers (MBOX)/bare-(PROMPT) holds OK - MacroRunner.Run's own 'unattended' contract.
+        private bool macroRunPending, unattendedRunPending;
+        public void ArmMacroRun(bool unattended)
+        {
+            macroRunPending = true;
+            unattendedRunPending = unattended;
+        }
+
         // --- Host policy: is a tool tab's program the thing Run would run? ------------------------------
         // Both are pure client bookkeeping (which tab is focused, whether it has generated), so the engine
         // asks rather than reads. Unset = no tool tab in play, which is what a headless host wants.
@@ -647,6 +664,11 @@ namespace CNC.Core
 
         public void Run(int fromBlock, bool honorActiveProgram = true)
         {
+            // One-shot macro-run intent (Step 7): consumed HERE, before any early return can strand it
+            // armed for the next unrelated Cycle Start. See ArmMacroRun.
+            bool macroRun = macroRunPending, unattendedRun = unattendedRunPending;
+            macroRunPending = unattendedRunPending = false;
+
             // Host work first - switching the connection to the simulator when "Simulate" was armed. That
             // whole step is client business (it launches the simulator and repaints the run button), so it
             // lives in RegisterActiveProgramPolicy below; false means it could not prepare and the run is off.
@@ -771,7 +793,9 @@ namespace CNC.Core
                             Source.Data.Where(b => b.Directive == "PROMPT").Select(b => (string)b.Data));
                         if (promptFields.Count > 0)
                         {
-                            if (!CheckModeArmed && model.GrblState.State != GrblStates.Check &&
+                            // Unattended macro run: no operator to ask - each field keeps its declared
+                            // default (PromptField.Value is seeded with it), same as check mode below.
+                            if (!CheckModeArmed && model.GrblState.State != GrblStates.Check && !unattendedRun &&
                                 !MacroRunner.ShowFieldPrompt(model.FileName ?? "Program", promptFields))
                                 return;   // cancelled - not an error, just not running
                             if (GrblInfo.ExpressionsSupported)
@@ -802,14 +826,17 @@ namespace CNC.Core
                     // (GCodeBlock.HasSpindleOrCoolantOn) only neutralises commands IN the program, not
                     // whatever state the machine is already in when dry run starts.
                     //
-                    // Also gated on !(Source is a transient macro/tool run): dry-run is a loaded-job-only
-                    // toggle the operator arms from the Run dropdown on the Job tab - it must never leak
-                    // into a probing/wizard macro (Start Job, Load Stock, ...) streamed via RunStreamedJobInPlace,
-                    // which shares this same Run. A stray G92 Z offset there corrupts the macro's own
-                    // positioning (e.g. a spoilboard probe search starting ~10mm+ too high and timing out) even
-                    // though the macro never armed dry run itself - it was simply still checked from an earlier,
-                    // unrelated loaded-job test.
+                    // Also gated on !(Source is a transient macro/tool run) and !macroRun (Step 7): dry-run
+                    // is a loaded-job-only toggle the operator arms from the Run dropdown on the Job tab -
+                    // its Z-clearance G92 must never leak into a probing/wizard macro. A stray G92 Z offset
+                    // there corrupts the macro's own positioning (e.g. a spoilboard probe search starting
+                    // ~10mm+ too high and timing out) even though the macro never armed dry run itself - it
+                    // was simply still checked from an earlier, unrelated loaded-job test. Macro runs used
+                    // to arrive as transient sources (RunStreamedJobInPlace); under the unified engine they
+                    // arrive as the pushed loaded job, so the macroRun one-shot carries the same exemption.
+                    // Per-line spindle/coolant/M6 suppression still applies to them in the pump.
                     if ((dryRunActive = model.IsDryRunMode && model.GrblState.State != GrblStates.Check
+                                          && !macroRun
                                           && !((Source as GCodeProgram)?.IsTransient ?? false)))
                     {
                         // DeclaredStock (NOT the .Stock property) - .Stock falls back to the machine's FULL
@@ -898,7 +925,7 @@ namespace CNC.Core
                                // 5mm move after Cancel. Abort() is what btnStop_Click actually calls;
                                // it leaves job.Stopped false and the CMD_STOP goes out.
                                onOperatorCancel: Abort,
-                               promptFields: promptFields);
+                               promptFields: promptFields, unattended: unattendedRun);
                 }
             }
         }

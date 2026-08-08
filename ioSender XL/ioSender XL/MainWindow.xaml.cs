@@ -259,6 +259,9 @@ namespace GCode_Sender
             // Every streamed macro/wizard run goes here: stream the generated program through the flow-controlled
             // streamer, in its own ProgramView, without leaving the current tab or touching the loaded job.
             CNC.Core.MacroRunner.RunStreamedJobInPlace = (m, name, code, isFinalBurst, preferJobView, onDone) => RunStreamedJobInPlace(m, name, code, isFinalBurst, preferJobView, onDone);
+            // Step 7 (unified streaming engine): MacroProcessor.Run loads the macro as the job and starts
+            // it here - the run bar's JobControl instance lives in this assembly, hence the seam.
+            CNC.Controls.MacroProcessor.StartLoadedJob = unattended => RunControl.RunMacro(unattended);
             CNC.Controls.MacroProcessor.RegisterPrompts();   // point the engine's (PROMPT)/(MBOX) seams at this assembly's dialogs
 
             // Matches App.xaml.cs's skip of the single-instance CHECK for a -testserver launch: this
