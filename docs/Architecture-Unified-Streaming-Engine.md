@@ -189,11 +189,18 @@ separately.
    like an ordinary comment today, so nothing should change until the next step reads the flag.
    **Drafted 2026-08-08 (`d330305`), compile-checked via -Scratch only, NOT hardware-verified — a
    carve was running, no `-Launch` was possible. Verify inert on a real launch before trusting it.**
-3. ✅⏳ **The status-report-reaches-the-pump-thread signal is built** (`Comms.ReplyClassified`,
-   2026-08-08 — see the gap note above) — compile-checked + verified via the real `websocket-probe`
-   loopback test, NOT yet hardware-verified on a real controller. **Still to do:** the `WAITIDLE`
-   barrier itself that consumes it — smallest functional slice, hardware-verify on a macro that uses
-   only `WAITIDLE`.
+3. ✅ **DONE and verified two ways (2026-08-08).** The signal: `Comms.ReplyClassified` — verified via
+   `websocket-probe` (22/22) AND a full real-hardware carve (4,263 `[pump] STATUS` lines). The
+   barrier itself (`b62051e` + recognizer fix `a66857f`): consumed sender-side in `SendNext`, held via
+   `waitIdleBarrier`, released on the pump thread by ack-drain + two consecutive `<Idle|` sentinels
+   through the same ack-channel trick as `IdleKick`. **Verified by `tools/waitidle-probe`** — the real
+   pump over the real `TelnetStream` against the real simulator: armed while everything was ack'd but
+   still physically moving, **held 10,685ms across 40 Run reports**, released 611ms after the last Run,
+   tail on the wire only after release; prose comments mentioning WAITIDLE stream untouched. Sim
+   gotchas encoded in the probe (boots with `Pn:XYZ` limit pins asserted → `$21=0` in its own EEPROM
+   copy; RX buffer 1023 not 16k; `Action.New`'s arg is a name, not a block). **Hardware confirmation
+   on the real controller still pending** — the earlier hardware attempt was degenerate (G4 acks late
+   and reports Idle, so a dwell can't exercise the hold).
 4. **`MBOX` barrier + `PROMPT` up-front dialog/substitution.**
 5. **`PREREQ` up-front gate.**
 6. **Point Work Order's Generate button at the new path** — write into `GCode.File` directly, one
