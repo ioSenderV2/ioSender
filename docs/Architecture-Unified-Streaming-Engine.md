@@ -209,12 +209,15 @@ separately.
    stack pinned at `MacroRunner.StreamProgram`'s unsleeping `DoEvents` wait loop allocating
    dispatcher operations to the 3GB ceiling. Step 7's deletion of that loop is now a crash fix, not
    just cleanup.
-4. ⏳ **`MBOX` barrier done (`eb09825`, sim-verified 27/27 both paths — hardware test pending);
-   `PROMPT` up-front dialog/substitution still to build.** MBOX design as confirmed with the user:
-   prompt at ack-drain (not motion-idle — macros chain `(WAITIDLE)(MBOX)` when they need that, as
-   tc/pcorner do); OK releases via sentinel; **Cancel = `JobRunner.Stop()` exactly** (new
-   `onOperatorCancel` Start parameter) because prior moves may still be physically executing.
-   Hardware test: OK path, and Cancel while a prior move is mid-motion → must behave like Stop.
+4. ✅ **`MBOX` barrier HARDWARE-VERIFIED both paths (`eb09825`+`1a536e8`, 2026-08-08 10:06);
+   `PROMPT` up-front dialog/substitution still to build.** Design as confirmed: prompt at ack-drain
+   (not motion-idle — macros chain `(WAITIDLE)(MBOX)` when they need that); OK releases via sentinel;
+   Cancel = the Stop button's routine. **The hardware pass caught what the sim probe could not:**
+   Cancel was first wired to `Stop()`, which sets `job.Stopped=true` — the exact flag that SUPPRESSES
+   `CMD_STOP` in `StreamingIdle` — so Z ran its move to completion after Cancel, zero stop bytes on
+   the wire. The Stop BUTTON actually calls **`Abort()`**; rewired, retested: `0x19` out 6ms after
+   Cancel, `[MSG:Stop]`, Z frozen mid-move at −7.884. Lesson recorded: `Stop()` vs `Abort()` naming
+   is inverted from what it reads as — `Stop()` means "already stopped, don't send the byte."
 5. ✅ **`PREREQ` up-front gate** (`56b1dc8`, 2026-08-08) — done out of order (before MBOX/PROMPT)
    because it is the safest slice: pure pre-flight, refusal before any motion, no streaming
    interaction. `MacroRunner.EvaluatePrereqLines` is THE one evaluator (Run() refactored through it
