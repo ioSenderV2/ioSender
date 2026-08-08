@@ -270,6 +270,7 @@ namespace GCode_Sender
                 new PipeServer(App.Current?.Dispatcher ?? Dispatcher);
                 PipeServer.FileTransfer += Pipe_FileTransfer;
                 PipeServer.ActivateRequested += BringToForeground;
+                PipeServer.ShutdownRequested += Pipe_ShutdownRequested;
             }
             AttachBasePropertyChangedHandler();
             WireBarOverlays();
@@ -2560,6 +2561,51 @@ namespace GCode_Sender
         {
             if(!JobRunning)
                 GCode.File.Load(filename);
+        }
+
+        // A watcher armed by a pending #SHUTDOWN# request (see Pipe_ShutdownRequested) - null when none
+        // is pending. A fresh request always replaces it (Stop the old one first), so re-asking simply
+        // resets the window rather than stacking watchers.
+        private DispatcherTimer shutdownWatcher;
+
+        // build.ps1 (or any other tooling) asking, over the single-instance pipe, to close gracefully
+        // within timeoutSeconds - added 2026-08-08 so a rebuild never kills a live job out from under the
+        // operator (see docs/Architecture-Unified-Streaming-Engine.md's own false-crash-alarm lesson from
+        // the same session this was built in). Idle: close now - Close() goes through Window_Closing the
+        // same as the operator clicking X, but that guard only matters while a job IS running, which we
+        // have already ruled out here. Busy: watch for JobRunning to clear and close the moment it does;
+        // if the window expires first, just stop watching and keep running - NEVER force-close past the
+        // timeout, that would recreate exactly the hazard this exists to prevent. The caller polls the
+        // PROCESS itself for up to its own timeout to learn whether this actually happened; nothing is
+        // written back over the one-way pipe.
+        private void Pipe_ShutdownRequested(int timeoutSeconds)
+        {
+            shutdownWatcher?.Stop();
+            shutdownWatcher = null;
+
+            if (!JobRunning)
+            {
+                Close();
+                return;
+            }
+
+            var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+            shutdownWatcher = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            shutdownWatcher.Tick += (s, e) =>
+            {
+                if (!JobRunning)
+                {
+                    shutdownWatcher.Stop();
+                    shutdownWatcher = null;
+                    Close();
+                }
+                else if (DateTime.UtcNow >= deadline)
+                {
+                    shutdownWatcher.Stop();
+                    shutdownWatcher = null;   // gave up - still busy, stay running, caller's own poll times out
+                }
+            };
+            shutdownWatcher.Start();
         }
 
         // Another launch was intercepted by the single-instance gate: surface this (the running) window.

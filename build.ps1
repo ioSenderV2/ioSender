@@ -234,11 +234,61 @@ if ($DefaultConfig) {
 if (-not (Test-Path $solution)) { throw "Solution not found: $solution" }
 $msbuild = Find-MSBuild
 
+# Ask a running instance to close itself over the single-instance pipe (PipeServer.ShutdownRequested,
+# added 2026-08-08) before ever force-killing it - a blind Stop-Process is exactly how a rebuild killed
+# a live job out from under the operator mid-jog-test the same session this was added in. Idle: closes
+# in well under a second. Busy: the app itself watches for the job to finish and closes then, up to
+# TimeoutSeconds - it NEVER force-closes past that on its own, so if it's still running when our own
+# poll gives up, that is a real "still busy" answer, not a fluke, and this function must not paper over
+# it by falling through to a kill.
+#
+# Falls back to the OLD blind kill ONLY when the pipe can't be reached at all - no instance running, or
+# a running instance from a build that predates this feature and was never asked (its window still owns
+# the pipe name, so Connect succeeds, but it never wired ShutdownRequested and won't act on the line -
+# request will simply produce no response). That's a real, if narrow, gap: an unresponsive OLD binary
+# would silently swallow the request and then get killed by the fallback below exactly like today,
+# instead of being recognized as "didn't understand, don't know if it's safe". A rebuild replaces the
+# binary going forward, so this only bites once per machine/first upgrade.
+function Request-IoSenderShutdown {
+    param([int]$TimeoutSeconds = 60)
+
+    if (-not (Get-Process ioSender -ErrorAction SilentlyContinue)) { return $true }   # nothing to ask
+
+    $asked = $false
+    try {
+        $pipe = New-Object System.IO.Pipes.NamedPipeClientStream('.', 'ioSender', [System.IO.Pipes.PipeDirection]::InOut)
+        $pipe.Connect(250)
+        $writer = New-Object System.IO.StreamWriter($pipe)
+        $writer.WriteLine("#SHUTDOWN:$TimeoutSeconds#")
+        $writer.Flush()
+        $writer.Dispose()
+        $pipe.Dispose()
+        $asked = $true
+    } catch { }
+
+    if (-not $asked) { return $false }   # couldn't even reach the pipe - caller falls back to a kill
+
+    # Small buffer past the app's own window: it closes the instant JobRunning clears, this is just
+    # polling for that externally, not a second independent timeout.
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds + 5)
+    while ((Get-Date) -lt $deadline) {
+        if (-not (Get-Process ioSender -ErrorAction SilentlyContinue)) { return $true }
+        Start-Sleep -Milliseconds 500
+    }
+    return $false   # asked, and it's STILL busy - do not proceed to a kill
+}
+
 # A scratch build never touches bin\<Config>\ at all, so there's normally nothing to kill - but
 # -Clean deletes the LIVE bin\ tree too (not just scratch's side folder), so a running instance's
 # locked DLLs must go first regardless of -Scratch, or the delete below fails with Access to the
 # path ... is denied (confirmed 2026-07-31).
 if (-not $NoKill -and (-not $Scratch -or $Clean)) {
+    if (-not (Request-IoSenderShutdown -TimeoutSeconds 60)) {
+        if (Get-Process ioSender -ErrorAction SilentlyContinue) {
+            throw "ioSender asked to close gracefully (a job may be running) and is still up after 60s - refusing to force-kill it. Let the job finish or close it yourself, then re-run."
+        }
+        # else: pipe unreachable (no instance, or a pre-shutdown-feature build) - fall through to the kill below.
+    }
     Get-Process ioSender -ErrorAction SilentlyContinue | Stop-Process -Force
 }
 

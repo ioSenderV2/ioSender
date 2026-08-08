@@ -43,6 +43,7 @@ using System;
 using System.IO;
 using System.IO.Pipes;
 using System.Security.Principal;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace CNC.Controls
@@ -59,6 +60,41 @@ namespace CNC.Controls
         // Raised (on the UI thread) each time another launch connects, so the running instance can
         // bring itself to the foreground - a second launch should surface the existing window.
         public static event Action ActivateRequested;
+
+        // A graceful-shutdown request over the SAME single-instance pipe - added 2026-08-08 so tooling
+        // (build.ps1) can ask a running instance to close itself instead of Stop-Process'ing it blind,
+        // which is exactly how a live job/carve gets killed out from under the operator. The int is the
+        // requester's own timeout in seconds: if a job is running when this arrives, the app watches for
+        // it to finish and exits then: NEVER force-closes past the timeout - it just keeps running and
+        // the timeout expires on the CALLER's side, which is what tells build.ps1 not to proceed.
+        // Raised on the UI thread, same as ActivateRequested/FileTransfer.
+        public static event Action<int> ShutdownRequested;
+
+        // "#SHUTDOWN:60#" - a line the filename-forwarding protocol would never produce (no real path
+        // starts with '#'), so recognizing it first is unambiguous and doesn't need a separate pipe.
+        private static readonly Regex ShutdownCommand = new Regex(@"^#SHUTDOWN:(\d+)#$");
+
+        // Client-side: ask a running instance to shut down gracefully within timeoutSeconds. Returns
+        // true if an instance was there to ask (NOT whether it actually closed - the caller must poll
+        // for the process exiting itself, since this pipe is one-way and closing may be delayed behind
+        // a running job). False = no instance running at all, same meaning as TryForwardToRunningInstance.
+        public static bool RequestShutdown(int timeoutSeconds)
+        {
+            try
+            {
+                using (var pipeClient = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut, PipeOptions.None, TokenImpersonationLevel.Impersonation))
+                {
+                    pipeClient.Connect(250);
+                    using (var pipe = new StreamWriter(pipeClient))
+                        pipe.WriteLine(string.Format("#SHUTDOWN:{0}#", timeoutSeconds));
+                    return true;
+                }
+            }
+            catch
+            {
+                return false; // timeout / no server: nothing to ask
+            }
+        }
 
         public PipeServer(System.Windows.Threading.Dispatcher dispatcher)
         {
@@ -114,8 +150,14 @@ namespace CNC.Controls
                                     break; // client closed (EOF): no more data on this connection
                                 if (c >= ' ')
                                     filename += (char)c;
-                                else if (c == 10 && FileTransfer != null && File.Exists(filename))
-                                    dispatcher.Invoke(FileTransfer, filename);
+                                else if (c == 10)
+                                {
+                                    var shutdown = ShutdownCommand.Match(filename);
+                                    if (shutdown.Success)
+                                        dispatcher.Invoke(() => ShutdownRequested?.Invoke(int.Parse(shutdown.Groups[1].Value)));
+                                    else if (FileTransfer != null && File.Exists(filename))
+                                        dispatcher.Invoke(FileTransfer, filename);
+                                }
                             }
                             pipeServer.Disconnect();
                         }
