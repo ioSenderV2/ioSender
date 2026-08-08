@@ -49,9 +49,20 @@ Finding #4) is a **third**, older copy that re-parses each line instead of readi
 already dead weight whenever `preferJobView` is true (Work Order already skips it, per its own
 comment). **Three implementations of one rule, not two.**
 
-**Open question, blocks Step below:** which of `StreamPump`/`JobRunner.SendNextLine` is actually the
-live path today (config-dependent on `useBuffering`?), and is the other vestigial. Don't know yet —
-verify before adding directive support to either, so it isn't built twice again.
+**✅ Q1 answered (2026-08-08), by tracing the code, not guessing:** `StreamPump` is the ONE live
+per-line dispatch loop. `JobRunner.Run` unconditionally creates and starts a `StreamPump` for every
+real job (`JobRunner.cs:839-844`) — the comment right there says it outright: *"The send/ack flow
+control ALWAYS runs on the dedicated background thread (StreamPump)... including Check mode ($C),
+which USED TO fall back to the legacy UI-thread streamer... Check mode no longer needs a separate
+streamer."* The moment the pump is active, `streamingHandler.Count` is explicitly set `false` "to
+stop legacy line accounting so a late/trailing response can't re-enter it" (`OnPumpJobFinished`/
+`OnPumpError`, `JobRunner.cs:899,907`) — i.e. `SendNextLine`'s own switch-driven re-entry is
+deliberately neutered while the pump owns the run. `SendNextLine` isn't fully dead code, though: it's
+still called directly from a couple of narrow resumption points (tool-change-line resume,
+`JobRunner.cs:714`; a `StreamingState.Send` case explicitly commented "Only entered in legacy mode",
+`JobRunner.cs:1255-1269`) that Step 2/3 below need to check are actually reachable before deciding
+whether directive recognition needs adding there too, or whether they're dead in practice and safe to
+delete alongside the rest of the legacy path. **Directive support goes into `StreamPump.SendNext`.**
 
 ## The directive model
 
@@ -130,17 +141,24 @@ separately.
    Cycle Start. Retire the overlay.
 7. **Delete the now-dead code** in one cleanup commit, separate from the functional slices above.
 
-## Open questions (need an answer before Step 1, not before Step 6)
+## Open questions — ✅ all three answered 2026-08-08
 
-- **Q1:** Which of `StreamPump`/`JobRunner.SendNextLine` is the live dispatch path today — is the other
-  dead, or does `useBuffering`/some config still route through both? Needs verifying in code, not
-  guessed.
-- **Q2:** Where should the up-front `PREREQ`/`PROMPT` scan + dialog live — inside `JobRunner.Run`
-  itself, or a caller-side step in `JobControl` before Cycle Start is requested? Affects whether
-  `JobRunner` needs its own UI-prompt seam or keeps taking an already-resolved program.
-- **Q3:** `MBOX`'s Cancel/No today aborts just the macro (`return false`). In the unified engine that
-  becomes "abort the job" — should it be exactly the existing Stop path, or does aborting mid-directive
-  need softer handling (no rewind, leave the machine where it is)?
+- **Q1 — which dispatch loop is live:** `StreamPump`. See the note under "Today's actual shape" above.
+- **Q2 — where the up-front PREREQ/PROMPT dialog lives:** inside `JobRunner.Run` itself, via the SAME
+  static seams `MacroRunner` already established (`CNC.Core.UserPrompt`/`FieldPrompt`/`HoldPrompt`) —
+  not a new caller-side step in `JobControl`. `MacroRunner` and `JobRunner` are both already in
+  `CNC.Core` and both need to stay WPF-free (the client/server split's own rule: "what talks to the
+  machine stays [in Core]; what talks to the operator goes [through a seam, never direct UI]" —
+  [[iosender-client-server-split-project]]). Reusing the existing delegates means no new seam to
+  design or wire up — `JobRunner.Run` just calls the same statics `MacroRunner.Run` already calls.
+- **Q3 — MBOX Cancel/No semantics:** the existing Stop path, not a new softer "abort mid-directive"
+  state. By the time an MBOX prompt is showing, the dispatch barrier (same mechanism as `WAITIDLE`)
+  has already halted line-sending — there's no in-flight motion to distinguish from a normal Stop, so
+  a second abort concept would be pure duplication for no behavioral gain. Reusing Stop also means any
+  future improvement to Stop's own handling applies here for free. Flagged for a quick hardware sanity
+  check during Step 4 (does Stop behave sensibly when called with nothing actually in flight? almost
+  certainly yes — Feed Hold/Stop already have to tolerate an idle controller — but confirm, don't
+  assume, before shipping it).
 
 Related: [[iosender-unified-streaming-engine-design]] (memory), [Architecture-Streaming-Paths.md](Architecture-Streaming-Paths.md),
 [[iosender-jobcontrol-run-blocker]] (JobRunner's own extraction history/discipline to mirror).
