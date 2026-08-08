@@ -316,12 +316,10 @@ namespace CNC.Controls
         // pvisecorner.macro is a DEDICATED macro, not pcorner.macro - pcorner needs its reference OUTSIDE both
         // faces (over open spoilboard), the opposite of this dialog's "jog over the jaw" convention; forcing
         // pcorner to work from an inside reference sent the probe the wrong direction on real hardware.
-        // pvisecorner.macro contains an O-word CALL, so MacroProcessor.Flush must stream it through the
-        // flow-controlled job streamer (RunStreamedJobInPlace) - which is ASYNCHRONOUS (Cycle Start is
-        // deferred to a background dispatcher cycle, see MainWindow.RunStreamedJobInPlace) - so Run() returns
-        // long before the probe actually happens. The result can't be read back the instant Run() returns;
-        // instead watch StreamingState the same way MainWindow.RestoreSourceOnEnd does (arm on Send/SendMDI,
-        // fire on the next Idle/NoFile) and read the machine's position back only once the run has genuinely
+        // MacroProcessor.Run streams through the flow-controlled unified engine and is ASYNCHRONOUS - it
+        // returns once the run has STARTED, long before the probe actually happens. The result can't be
+        // read back the instant Run() returns; instead watch StreamingState (arm on start, fire on the
+        // next Idle/NoFile) and read the machine's position back only once the run has genuinely
         // finished - by which point the final G53 move below has physically parked it at the resolved corner.
         private void RunViseCornerProbe(Fixture fx, string joggedCoords)
         {
@@ -402,11 +400,10 @@ namespace CNC.Controls
         private class RunStarted { public bool Value; }
 
         // Watches a just-started macro run (MacroProcessor.Run, called by the caller right after this) to its
-        // TRUE completion and invokes onDone then - necessary whenever the code contains an O-word CALL or a
-        // G1/G2/G3 feed move, since MacroProcessor.Flush routes those through the async flow-controlled job
-        // streamer (RunStreamedJobInPlace): Cycle Start is deferred to a background dispatcher tick, so Run()
-        // returns as soon as the stream is KICKED OFF - well before the probe motion (and its result) actually
-        // happens. Reading GrblState/machine position immediately after Run() returns sees STALE values.
+        // TRUE completion and invokes onDone then - necessary because Run() is asynchronous (the unified
+        // engine streams the macro as a job): it returns as soon as the run has STARTED - well before the
+        // probe motion (and its result) actually happens. Reading GrblState/machine position immediately
+        // after Run() returns sees STALE values.
         // Confirmed on real hardware twice: RunViseCornerProbe's first attempt used a stale jogged position for
         // exactly this reason (fixed via confirm:false above), and - found while investigating that - Test
         // position's own snippet has the same bug (its G91 G1 retract lines force the same streamed path; its

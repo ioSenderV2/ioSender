@@ -1983,17 +1983,10 @@ namespace CNC.Controls
         // was loaded before (or that nothing was); WatchForRunEnd's Pop() restores it once this run reaches
         // its true terminal.
         //
-        // The actual STREAMING still goes through MacroProcessor.Run's own transient program
-        // (RunStreamedJobInPlace), never GCode.File directly - but Run() is called here with preferJobView:
-        // true (2026-08-01), so that transient program's live per-line status ("ok"/"*") is written straight
-        // into jobProgramView instead of a separate floating run view (every OTHER MacroProcessor.Run caller
-        // - Setup, calibration, fixture tools - leaves that false and keeps the "never touch the Job tab"
-        // default). jobProgramView temporarily shows the transient collection rather than GCode.File.Data;
-        // GCode.File.Pop()'s own FileChanged handler rebinds it back once the run ends, so this is a
-        // self-reverting redirect, not a permanent takeover - see RunStreamedJobInPlace's own comment.
-        // (The two-press Run() that interpreted directives via MacroProcessor.Run/RunStreamedJobInPlace
-        // was retired by Step 6 - Generate() above IS the whole handoff now, and the ordinary Cycle
-        // Start runs the program through the unified engine.)
+        // (The two-press Run() that interpreted directives via the retired second engine was replaced by
+        // Step 6 - Generate() above IS the whole handoff now, and the ordinary Cycle Start streams the
+        // loaded program - GCode.File itself - through the unified engine, live per-line status landing
+        // directly in the docked list. Step 7 then moved every OTHER macro caller onto the same path.)
 
         // Pop the loaded job back to whatever was there before, once this run reaches its TRUE terminal state
         // (Idle/NoFile - a clean finish or a Stop) - mirrors MainWindow.RestoreSourceOnEnd's own arm-on-

@@ -14,8 +14,9 @@
  * pumped with its own DispatcherFrame, and it forwards jog keys to the KeypressHandler so the operator can
  * jog to a corner while it is up. That is WPF by design, not by accident.
  *
- * Run / EmitGotoG30 / CoordinateSystemDefined / SaveGeneratedCopy stay here as forwarders so none of the
- * ~50 call sites across the app had to move.
+ * Run is the unified-engine ENTRY since Step 7 (load the macro as the job, start it, pop-restore at the
+ * terminal); EmitGotoG30 / CoordinateSystemDefined / SaveGeneratedCopy stay here as forwarders so none
+ * of the ~50 call sites across the app had to move.
  */
 
 using System;
@@ -484,6 +485,13 @@ namespace CNC.Controls
                     DebugLog.Write("macro", string.Format("Run watcher: '{0}' terminal (jobFinished={1}) - popping the borrowed program", name, jobFinished));
                     GCode.File.Pop();
                 }
+                // A Generate-first tool tab's run just finished cleanly: drop the in-memory program and
+                // revert the Run bar to "Generate" - the operator re-generates for the next job rather
+                // than re-running a stale program. RestoreSourceOnEnd's clean-finish behavior, preserved
+                // with its exact condition: NOT on error/halt or a Feed Hold + Stop (jobFinished false),
+                // so the operator can still inspect/resume the SAME generated program.
+                if (jobFinished && SupportsGenerateMode)
+                    DiscardGenerated?.Invoke();
                 onDone?.Invoke(jobFinished);
             };
             model.PropertyChanged += handler;

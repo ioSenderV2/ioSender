@@ -256,9 +256,6 @@ namespace GCode_Sender
             // aligned) instead of stretching full height, so the popup itself shrinks - not just the grid.
             CNC.Controls.ProgramView.CompactChanged += ApplyOverlayCompact;
 
-            // Every streamed macro/wizard run goes here: stream the generated program through the flow-controlled
-            // streamer, in its own ProgramView, without leaving the current tab or touching the loaded job.
-            CNC.Core.MacroRunner.RunStreamedJobInPlace = (m, name, code, isFinalBurst, preferJobView, onDone) => RunStreamedJobInPlace(m, name, code, isFinalBurst, preferJobView, onDone);
             // Step 7 (unified streaming engine): MacroProcessor.Run loads the macro as the job and starts
             // it here - the run bar's JobControl instance lives in this assembly, hence the seam.
             CNC.Controls.MacroProcessor.StartLoadedJob = unattended => RunControl.RunMacro(unattended);
@@ -640,24 +637,6 @@ namespace GCode_Sender
         // collection, the mint source highlight and toolpath outline grouping; AutoShow is off so a load
         // doesn't pop the overlay open.
         private CNC.Controls.ProgramView jobProgramView;
-
-        // A plain streamed macro (not a tool that owns its own view) runs in this dedicated view, so it shows in
-        // its own overlay with live markers and never overwrites the loaded job. Reused across macro runs.
-        private CNC.Controls.ProgramView _macroRunView;
-        private System.Windows.Threading.DispatcherTimer _macroRunViewTimer;
-        private void EnsureMacroRunView()
-        {
-            if (_macroRunView == null)
-                _macroRunView = new CNC.Controls.ProgramView();
-            if (_macroRunViewTimer == null)
-            {
-                // The run view has no tab to close it and holds nothing useful once the run is done, so auto-
-                // dismiss it 20 s after it stops streaming (a new run/burst re-uses it and cancels the timer).
-                // On fire, disconnect it - the overlay reverts to the view beneath (the loaded job, or none).
-                _macroRunViewTimer = new System.Windows.Threading.DispatcherTimer { Interval = System.TimeSpan.FromSeconds(20) };
-                _macroRunViewTimer.Tick += (s, e) => { _macroRunViewTimer.Stop(); _macroRunView.Disconnect(); };
-            }
-        }
 
         private void OnJobFileChanged(string fileName)
         {
@@ -1084,182 +1063,6 @@ namespace GCode_Sender
             timer.Start();
         }
 
-        // Stream a tool's generated program through the flow-controlled streamer WITHOUT leaving the current tab
-        // (the bottom run bar drives Feed Hold/Stop on any tab) and WITHOUT touching the loaded job: the program
-        // is built as a standalone transient IProgramSource and the streamer is pointed at it for the run, then
-        // reset to the job (GCode.File) when it finishes. So e.g. Load Stock's probe program never disturbs the job.
-        private void RunStreamedJobInPlace(GrblViewModel m, string name, string[] code, bool isFinalBurst, bool preferJobView, System.Action onDone)
-        {
-            if (code == null || code.Length == 0)
-            {
-                onDone?.Invoke();
-                return;
-            }
-
-            // preferJobView (Work Order, which already made itself the loaded job via GCode.File.Push/LoadText
-            // before streaming) opts OUT of the "never touch the Job tab" rule below and builds this burst
-            // straight into GCode.File itself instead of a disconnected transient copy. The Job tab's actual
-            // docked list (ProgramPanel's own GCodeListControl, in ProgramPanel.xaml) is permanently bound to
-            // GCode.File.Data (its own Loaded handler falls back to it and nothing ever redirects it away) -
-            // an EARLIER attempt at this fix routed the live burst into jobProgramView instead (a SEPARATE
-            // ProgramView instance, not the one ProgramPanel actually displays) and the docked status column
-            // never updated, confirmed on real hardware 2026-08-01. Rebuilding directly into GCode.File means
-            // the same collection ProgramPanel is already watching receives the live "ok"/"*"/"@" writes.
-            // Single-burst assumption: Work Order's compiled program has no (MBOX)/(WAITIDLE), so
-            // MacroProcessor.Run always flushes it as ONE burst - Action.New here replaces GCode.File's
-            // content wholesale, which would be wrong for a hypothetical FUTURE multi-burst preferJobView
-            // caller (each burst would wipe the previous one's). Fine for Work Order today; revisit if
-            // preferJobView ever gets a second caller that streams more than one burst.
-            var prog = preferJobView ? GCode.File : new CNC.Controls.GCode(m);   // else: transient, does not mutate the job/Model
-            prog.AddBlock(name, CNC.Core.Action.New);
-            for (int i = 0; i < code.Length - 1; i++)
-                prog.AddBlock(code[i], CNC.Core.Action.Add);
-            prog.AddBlock(code[code.Length - 1], CNC.Core.Action.End);
-
-            RunControl.Source = prog;          // stream this program instead of the loaded job
-            // Mark the ACTUAL streamed program in a ProgramView so the live per-line markers ("@"/"ok") and scroll
-            // track the run. A tool that owns its view (a wizard) marks its own; a plain macro - no tool view, or
-            // only the loaded-job view is active - gets a dedicated run view, so a run never overwrites the job.
-            // preferJobView needs none of this - prog IS GCode.File, already shown by the docked view.
-            if (!preferJobView)
-            {
-                var connected = CNC.Controls.ProgramView.Active;
-                if (connected != null && connected != jobProgramView)
-                    connected.SetProgram(prog.Data);
-                else
-                {
-                    EnsureMacroRunView();
-                    _macroRunViewTimer.Stop();     // a run is (re)using the view - cancel any pending auto-dismiss
-                    _macroRunView.Title = string.IsNullOrEmpty(name) ? "Program" : name;
-                    _macroRunView.SetProgram(prog.Data);
-                    _macroRunView.Connect();
-                }
-            }
-            RestoreSourceOnEnd(m, prog, isFinalBurst, onDone);   // revert to the job source when THIS burst ends, then signal completion
-
-            // Defer CycleStart to a clean dispatcher cycle. Starting it synchronously
-            // from inside MacroProcessor.Run's streaming flush re-enters the dispatcher (CycleStart pumps events
-            // in a DoEvents wait), which corrupts the run's state machine so it never reaches its terminal state -
-            // the UI then stays "job running" (unresponsive) until Stop. Deferring runs it after Run() unwinds.
-            //
-            // Background is the lowest priority above idle, so on a macro that streams several short bursts back
-            // to back (e.g. Start Job's park move, or Stepper Calibration's per-corner probes) this can be starved
-            // behind a stream of Normal-priority work (status-report handling, THIS burst's own onDone dispatch)
-            // long enough that it doesn't run until AFTER the burst it belongs to has already finished and
-            // RestoreSourceOnEnd already cleared RunControl.Source. Firing CycleStart at that point still starts
-            // real motion (StreamingState -> Send, GrblState -> Run) but with no RestoreSourceOnEnd handler left
-            // subscribed to catch it (it already unsubscribed at the real terminal state) - MacroProcessor's very
-            // next (WAITIDLE) then walks straight into that untracked stream and aborts ("controller did not
-            // return to idle"), even though the real burst completed cleanly. Confirmed via DebugLog("macro")
-            // tracing 2026-07-21: StreamProgram's wait loop exited with StreamingState already back to Send/Run,
-            // with no corresponding RestoreSourceOnEnd trace for that transition - i.e. nobody's handler was even
-            // watching it. Guard: only actually start if this burst's transient is still the active source: if
-            // RestoreSourceOnEnd already reverted it, this CycleStart is stale and must be skipped.
-            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
-                new System.Action(() =>
-                {
-                    if (RunControl.Source == prog)
-                        RunControl.Run(0, false);   // stream from the bottom run bar - no tab change, don't re-enter ActiveRun
-                    else
-                        CNC.Core.DebugLog.Write("macro", "RunStreamedJobInPlace: skipped stale deferred CycleStart - burst already finished");
-                }));
-        }
-
-        // When the current run finishes, revert the streamer to the loaded-job source. Mirrors RestoreTabOnJobEnd:
-        // arm on the first running state, fire on the next terminal one, then unsubscribe. onDone (may be null)
-        // is MacroProcessor's completion signal for THIS burst - see Flush's 'wait' parameter.
-        private void RestoreSourceOnEnd(GrblViewModel m, CNC.Controls.GCode prog, bool isFinalBurst, System.Action onDone)
-        {
-            bool started = false;
-            bool jobFinished = false;
-            System.ComponentModel.PropertyChangedEventHandler handler = null;
-            handler = (s, e) =>
-            {
-                if (e.PropertyName != nameof(GrblViewModel.StreamingState))
-                    return;
-                var st = m.StreamingState;
-                CNC.Core.DebugLog.Write("macro", string.Format("RestoreSourceOnEnd: StreamingState -> {0} (started={1}, GrblState={2})",
-                    st, started, m.GrblState.State));
-                if (st == StreamingState.Send || st == StreamingState.SendMDI)
-                    started = true;
-                // JobFinished is only ever raised on a genuine program end (M30/M2, see JobControl's
-                // StreamingHandler.Call(StreamingState.JobFinished, ...) call sites) - a Feed Hold + Stop
-                // instead routes through StreamingState.Stop on its way back to Idle. Both eventually land on
-                // the SAME terminal Idle/NoFile state below, so without this distinction a Feed Hold + Stop
-                // was indistinguishable from a clean finish and wrongly discarded the generated program
-                // (Run bar reverted to "Generate" mid-job with no way to resume) - confirmed on real
-                // hardware 2026-07-27 on the Odd Jobs Pocket tool.
-                if (st == StreamingState.JobFinished)
-                    jobFinished = true;
-                // Wait for the TRUE terminal state (Idle/NoFile = streamer fully finalized), not JobFinished: the
-                // streamer parks in AwaitIdle after the last ack until the controller reports Idle, and that final
-                // transition is delivered by GrblStateChanged only while a program is active. Tearing down (which
-                // clears ActiveRun) at JobFinished would close that gate mid-finalization and hang the run. Error/
-                // Halted are ALSO terminal here (a failed burst - e.g. a probe miss - stays in Error until the
-                // operator clicks Stop/Reset): MacroProcessor.Flush can block on onDone (see its 'wait' param), so
-                // this must fire on a failure too, or a mid-macro error would hang Run() until manual intervention.
-                //
-                // NOTE: deliberately fires on the FIRST Idle/NoFile report, not a debounced Nth one - a
-                // debounce here was tried (2026-07-21) and reverted: it requires a SECOND PropertyChanged
-                // notification for StreamingState, but that property only raises PropertyChanged when its
-                // VALUE actually changes - once it settles at Idle, no further report retriggers it, so a
-                // per-report debounce here gets permanently stuck (Flush hangs forever, no message, no
-                // timeout). The real "trailing motion after Idle" race this was trying to catch is instead
-                // handled at the WaitForIdle end (see its comment) using report-driven polling, which DOES
-                // correctly observe every incoming status report regardless of whether a property value
-                // technically changed.
-                if (!started || (st != StreamingState.Idle && st != StreamingState.NoFile && st != StreamingState.Error && st != StreamingState.Halted))
-                    return;
-
-                m.PropertyChanged -= handler;
-                Dispatcher.BeginInvoke(new System.Action(() =>
-                {
-                    // Revert the streamer to the loaded job, but ONLY if this burst's transient is still the
-                    // source. A stay-put run (Load Stock) streams several bursts back-to-back (the park move,
-                    // then each O<...> CALL); each reverts its own source at its idle, and the guard stops a
-                    // finishing burst from clobbering the source a later burst already set. The tool's own
-                    // ProgramView stays connected across ALL bursts (so each is marked in it and the Job view
-                    // is never touched); the full teardown - disconnect the view, clear the active program -
-                    // happens when the tool's tab is left (Activate(false)), not at a mid-run burst boundary.
-                    if (RunControl.Source == prog)
-                        RunControl.Source = null;
-
-                    // The macro's whole run just finished (isFinalBurst) with no error: hide the program view
-                    // completely rather than leaving it sitting in its Compact 3-line state showing wherever
-                    // the last executed line happened to land - there's nothing actionable left to look at.
-                    // Works uniformly for a tool's own preview pane (Start Job, Stepper Calibration, ...) and
-                    // the shared _macroRunView alike, since both go through the same ProgramView.Active/
-                    // Disconnect mechanism. On error (Halted/Error) the view is left up on purpose - see the
-                    // fallback branch below - so the operator can see where/what failed.
-                    if (isFinalBurst && (st == StreamingState.Idle || st == StreamingState.NoFile))
-                    {
-                        _macroRunViewTimer?.Stop();
-                        CNC.Controls.ProgramView.Active?.Disconnect();
-
-                        // A Generate-first tool tab's run just finished cleanly: drop the in-memory program and
-                        // revert the Run bar back to "Generate" (see MacroProcessor's Generate-mode plumbing) -
-                        // the operator re-generates for the next job rather than re-running a stale program.
-                        // Left alone on error/halt (same condition as the program-view dismiss above), AND on
-                        // a Feed Hold + Stop (jobFinished false - see its own comment above) so the operator
-                        // can still inspect/RESUME the SAME generated program, without redoing Generate.
-                        if (CNC.Controls.MacroProcessor.SupportsGenerateMode && jobFinished)
-                            CNC.Controls.MacroProcessor.DiscardGenerated?.Invoke();
-                    }
-                    // A plain macro's run view auto-dismisses 20 s after it stops streaming (a re-use resets
-                    // it); a tool's own view is left alone - it closes on tab-leave.
-                    else if (_macroRunViewTimer != null && CNC.Controls.ProgramView.Active == _macroRunView)
-                    {
-                        _macroRunViewTimer.Stop();
-                        _macroRunViewTimer.Start();
-                    }
-                    CNC.Core.DebugLog.Write("macro", string.Format("RestoreSourceOnEnd: about to invoke onDone, StreamingState={0} GrblState={1}",
-                        m.StreamingState, m.GrblState.State));
-                    onDone?.Invoke();
-                }));
-            };
-            m.PropertyChanged += handler;
-        }
-
         /// <summary>
         /// Bring Machine Setup up wherever the layout puts it - the tab when it is on the bar, its own window
         /// when it is a File-menu entry (the default since 2026-08-03) - and hand back the view so the caller
@@ -1412,11 +1215,13 @@ namespace GCode_Sender
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            // MacroRunner.IsRunning: the menu-disabled check alone has a hole - a macro at an
-            // (MBOX)/(PROMPT) hold has IsJobRunning FALSE between its bursts, menu enabled, so an X-click
-            // (or a tooling shutdown request, which found this the hard way 2026-08-08) sailed through and
-            // abandoned the run mid-hold. Same predicate as Pipe_ShutdownRequested's ShutdownBlocked.
-            if (CNC.Core.MacroRunner.IsRunning || (!CNC.Core.Grbl.GrblViewModel.IsSDCardJob && !menuMain.IsEnabled))
+            // A macro at an (MBOX)/(PROMPT) hold used to have IsJobRunning FALSE between its bursts (menu
+            // enabled), so an X-click (or a tooling shutdown request, which found this the hard way
+            // 2026-08-08) sailed through and abandoned the run mid-hold - MacroRunner.IsRunning was added
+            // to plug that. Step 7 closed the hole BY CONSTRUCTION: a macro is one continuous stream and a
+            // hold is a mid-stream barrier, so IsJobRunning stays true (menu disabled) for the whole run.
+            // Same predicate as Pipe_ShutdownRequested's ShutdownBlocked.
+            if (!CNC.Core.Grbl.GrblViewModel.IsSDCardJob && !menuMain.IsEnabled)
             {
                 // JobRunning (menuMain disabled) blocks exit while a job is running/paused (e.g. HOLD) -
                 // used to just silently refuse the close with no explanation.
@@ -2586,13 +2391,14 @@ namespace GCode_Sender
         // PROCESS itself for up to its own timeout to learn whether this actually happened; nothing is
         // written back over the one-way pipe.
         // The one "is anything the operator cares about in flight" predicate for shutdown decisions.
-        // JobRunning alone is NOT enough: a macro (Setup, wizards) streams in BURSTS, and between them -
-        // at an (MBOX)/(PROMPT) hold, exactly when the operator is standing at the machine following its
-        // instructions - IsJobRunning is false. The first live test of this feature closed ioSender in
-        // the middle of the Setup macro's "install probe" MBOX hold that way (2026-08-08), abandoning
-        // the run: the precise harm this feature exists to prevent, caused by this feature. Hence
-        // MacroRunner.IsRunning, added for this - true across the whole Run() including its holds.
-        private bool ShutdownBlocked { get { return JobRunning || CNC.Core.MacroRunner.IsRunning; } }
+        // Under the retired two-engine design JobRunning alone was NOT enough: a macro streamed in BURSTS,
+        // and between them - at an (MBOX)/(PROMPT) hold, exactly when the operator is standing at the
+        // machine following its instructions - IsJobRunning was false. The first live test of this feature
+        // closed ioSender in the middle of the Setup macro's "install probe" MBOX hold that way
+        // (2026-08-08), abandoning the run; MacroRunner.IsRunning was the stopgap. Step 7 retired it BY
+        // CONSTRUCTION: a macro is one continuous stream and a hold is a mid-stream barrier, so
+        // IsJobRunning stays true across the whole run including its holds.
+        private bool ShutdownBlocked { get { return JobRunning; } }
 
         private void Pipe_ShutdownRequested(int timeoutSeconds)
         {
