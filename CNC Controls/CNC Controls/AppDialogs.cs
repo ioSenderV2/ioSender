@@ -148,6 +148,41 @@ namespace CNC.Controls
             MessageBoxButton buttons, MessageBoxImage icon, MessageBoxResult defaultResult, string yesText, string noText);
         public static CustomMessageBoxDelegate CustomMessageBox;
 
+        // WPF refuses resource/component loads once Application shutdown has begun - constructing ANY
+        // dialog then throws InvalidOperationException ("The Application object is being shut down").
+        // Surfaced as a full crash report 2026-08-08 13:16: a slow startup's "no controller response"
+        // prompt raced the operator closing the hung-looking window, and the app crash-exited (0xFA11)
+        // instead of just closing. A dialog nobody can answer has exactly one sensible behavior: take
+        // the caller's default (or the least-destructive button), log it, and let shutdown proceed.
+        // Application.IsShuttingDown is the flag WPF itself consults before refusing; it is internal,
+        // so it is read via reflection with the public signals as fallback if that ever breaks.
+        private static readonly System.Reflection.PropertyInfo isShuttingDownProp =
+            typeof(Application).GetProperty("IsShuttingDown",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+        private static bool ApplicationShuttingDown
+        {
+            get
+            {
+                try
+                {
+                    if (isShuttingDownProp != null && (bool)isShuttingDownProp.GetValue(null, null))
+                        return true;
+                }
+                catch { /* reflection failed - fall through to the public signals */ }
+                var app = Application.Current;
+                return app == null || app.Dispatcher.HasShutdownStarted;
+            }
+        }
+
+        private static MessageBoxResult ShutdownAnswer(string message, MessageBoxButton buttons, MessageBoxResult defaultResult)
+        {
+            var result = defaultResult == MessageBoxResult.None ? SafeDefault(buttons) : defaultResult;
+            CNC.Core.DebugLog.Write("app", string.Format(
+                "AppDialogs.Show suppressed - app is shutting down, answering {0} to: {1}", result, message));
+            return result;
+        }
+
         public static MessageBoxResult Show(string message, string caption = "",
             MessageBoxButton buttons = MessageBoxButton.OK, MessageBoxImage icon = MessageBoxImage.None,
             MessageBoxResult defaultResult = MessageBoxResult.None, string id = null, string yesText = null, string noText = null)
@@ -155,9 +190,22 @@ namespace CNC.Controls
             string answer = Ask(id ?? caption, caption, message, buttons, defaultResult);
             if (answer != null)
                 return ParseResult(answer, buttons);
-            return CustomMessageBox != null
-                ? CustomMessageBox(null, message, caption, buttons, icon, DefaultOrNone(defaultResult), yesText, noText)
-                : MessageBox.Show(message, caption, buttons, icon, DefaultOrNone(defaultResult));
+            if (ApplicationShuttingDown)
+                return ShutdownAnswer(message, buttons, defaultResult);
+            try
+            {
+                return CustomMessageBox != null
+                    ? CustomMessageBox(null, message, caption, buttons, icon, DefaultOrNone(defaultResult), yesText, noText)
+                    : MessageBox.Show(message, caption, buttons, icon, DefaultOrNone(defaultResult));
+            }
+            // Belt and braces for the race the pre-check can lose (shutdown starting between the check
+            // and the construction). Filtered on the shutdown flag ON PURPOSE: an unfiltered catch here
+            // would also swallow genuine dialog bugs (e.g. a cross-thread "calling thread must be STA"
+            // is the same exception type) that must keep failing loudly.
+            catch (InvalidOperationException) when (ApplicationShuttingDown)
+            {
+                return ShutdownAnswer(message, buttons, defaultResult);
+            }
         }
 
         public static MessageBoxResult Show(Window owner, string message, string caption = "",
@@ -167,11 +215,20 @@ namespace CNC.Controls
             string answer = Ask(id ?? caption, caption, message, buttons, defaultResult);
             if (answer != null)
                 return ParseResult(answer, buttons);
-            if (CustomMessageBox != null)
-                return CustomMessageBox(owner, message, caption, buttons, icon, DefaultOrNone(defaultResult), yesText, noText);
-            return owner != null
-                ? MessageBox.Show(owner, message, caption, buttons, icon, DefaultOrNone(defaultResult))
-                : MessageBox.Show(message, caption, buttons, icon, DefaultOrNone(defaultResult));
+            if (ApplicationShuttingDown)
+                return ShutdownAnswer(message, buttons, defaultResult);
+            try
+            {
+                if (CustomMessageBox != null)
+                    return CustomMessageBox(owner, message, caption, buttons, icon, DefaultOrNone(defaultResult), yesText, noText);
+                return owner != null
+                    ? MessageBox.Show(owner, message, caption, buttons, icon, DefaultOrNone(defaultResult))
+                    : MessageBox.Show(message, caption, buttons, icon, DefaultOrNone(defaultResult));
+            }
+            catch (InvalidOperationException) when (ApplicationShuttingDown)   // see the parameterless overload
+            {
+                return ShutdownAnswer(message, buttons, defaultResult);
+            }
         }
 
         // Offer the prompt to the harness; null => not intercepted (caller shows the real MessageBox).
