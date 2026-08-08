@@ -934,6 +934,20 @@ namespace CNC.Core
             return HoldPromptOrDefault(name, body, cancellable, yesNo);
         }
 
+        // DRAFT/UNVERIFIED 2026-08-08 - not yet built or hardware-tested, see
+        // docs/Architecture-Unified-Streaming-Engine.md Step 2. General-purpose counterpart to the
+        // keyword-specific IsDirective below: used by GCodeJob (GCodeBlock.Directive) to flag a directive
+        // line at LOAD time, before there's any reason to ask "is it specifically a PREREQ" - a plain
+        // Load File needs this too, not just this class's own Run() loop. Returns the canonical uppercase
+        // keyword, or null if the line isn't one of the four directives at all.
+        public static string RecognizeDirective(string line)
+        {
+            foreach (var keyword in new[] { "PREREQ", "PROMPT", "MBOX", "WAITIDLE" })
+                if (IsDirective(line, keyword))
+                    return keyword;
+            return null;
+        }
+
         // True if the trimmed line is the named directive, e.g. "(MBOX ...)" / "(PREREQ ...)".
         private static bool IsDirective(string line, string keyword)
         {

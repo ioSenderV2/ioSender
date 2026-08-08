@@ -140,6 +140,17 @@ namespace CNC.Core
         // reset) before this fix.
         public bool HasToolChange { get; set; }
 
+        // DRAFT/UNVERIFIED 2026-08-08 - not yet built or hardware-tested, see
+        // docs/Architecture-Unified-Streaming-Engine.md Step 2. Set at load time (GCodeJob.ParseFileLines/
+        // AddBlock, same call sites as HasSpindleOrCoolantOn/HasToolChange above) from a plain text check
+        // (MacroRunner.RecognizeDirective) - NOT the token parser, since a directive is sender-only
+        // metadata inside an ordinary "(...)" comment, never real G-code. Canonical uppercase keyword
+        // ("PREREQ"/"PROMPT"/"MBOX"/"WAITIDLE") or null. Purely additive for now: nothing reads this yet,
+        // so setting it changes no behavior - the unified streamer's dispatch loop (StreamPump.SendNext)
+        // is what will branch on it in a later step.
+        public string Directive { get; set; }
+        public bool IsDirective { get { return Directive != null; } }
+
         // Outline grouping: set when the Fusion add-in's own section-marker comments are recognized in a
         // loaded file (see rxSectionMarker below). Null for a file with no section markers (the Program list
         // then renders flat, ungrouped).
@@ -357,6 +368,11 @@ namespace CNC.Core
                     t0 = System.Diagnostics.Stopwatch.GetTimestamp();
                     if (parsed)
                     {
+                        // Captured BEFORE the addLineNumber branch below can prepend "N123" onto block -
+                        // that would break the leading-"(" check a directive is recognized by. DRAFT, see
+                        // GCodeBlock.Directive's own comment.
+                        string directiveKeyword = isComment ? MacroRunner.RecognizeDirective(block) : null;
+
                         if (ln > 0)
                         {
                             LineNumber = ln;
@@ -379,7 +395,7 @@ namespace CNC.Core
                                 BeginSection(sm.Groups[1].Value);
                         }
 
-                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd) { HasSpindleOrCoolantOn = CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = CurrentLineHasToolChange(tokenStart), Tokens = Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) });
+                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd) { HasSpindleOrCoolantOn = CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = CurrentLineHasToolChange(tokenStart), Directive = directiveKeyword, Tokens = Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) });
                         while (commands.Count > 0)
                         {
                             block = commands.Dequeue();
@@ -467,6 +483,10 @@ namespace CNC.Core
 
                 if (parsed || passThrough)
                 {
+                    // Captured BEFORE the AddLineNumbers branch below can prepend "N123" onto block - see
+                    // the ParseFileLines call site's identical comment. DRAFT, see GCodeBlock.Directive.
+                    string directiveKeyword = isComment ? MacroRunner.RecognizeDirective(block) : null;
+
                     // Don't add a line number to a block that already carries one (e.g. a generated program that
                     // numbered its own lines) - two N-words make a malformed block (the controller rejects it
                     // with error:25). Also never number an O-word, #-parameter, or $-command line (see above -
@@ -483,7 +503,7 @@ namespace CNC.Core
                     // parsed guards Tokens here too: a failed parse (O-word/#-expression passthrough, see
                     // `passThrough` above) leaves Parser.Tokens stale from whatever line last parsed
                     // successfully - only trust it right after ParseBlock itself returned true.
-                    AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = parsed && CurrentLineHasToolChange(tokenStart), Tokens = parsed ? Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) : new List<GCodeToken>() });
+                    AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = parsed && CurrentLineHasToolChange(tokenStart), Directive = directiveKeyword, Tokens = parsed ? Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) : new List<GCodeToken>() });
                     while (commands.Count > 0)
                     {
                         block = commands.Dequeue();
