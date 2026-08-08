@@ -461,7 +461,7 @@ namespace CNC.Controls
             // even a run that finishes inside the start call's own event pumping cannot be missed.
             // Left in place through an Error/Halted (alarm) on purpose: the pop then happens on the
             // Idle that follows the operator's reset/unlock, so they can see what failed first.
-            bool started = false, jobFinished = false;
+            bool started = false, jobFinished = false, sawError = false;
             System.ComponentModel.PropertyChangedEventHandler handler = null;
             handler = (s, e) =>
             {
@@ -472,6 +472,11 @@ namespace CNC.Controls
                     started = true;
                 if (st == StreamingState.JobFinished)
                     jobFinished = true;
+                // Latch a failed run: this watcher only completes at the Idle/NoFile that follows the
+                // operator's reset/unlock, so without the latch an alarmed run would be treated exactly
+                // like a clean one by the view-dismissal below.
+                if (st == StreamingState.Error || st == StreamingState.Halted)
+                    sawError = true;
                 if (!started || (st != StreamingState.Idle && st != StreamingState.NoFile))
                     return;
                 model.PropertyChanged -= handler;
@@ -485,6 +490,16 @@ namespace CNC.Controls
                     DebugLog.Write("macro", string.Format("Run watcher: '{0}' terminal (jobFinished={1}) - popping the borrowed program", name, jobFinished));
                     GCode.File.Pop();
                 }
+                // The run is over and there is nothing actionable left to look at: dismiss the expanded
+                // program view rather than leaving it sitting open showing wherever the last executed
+                // line happened to land - RestoreSourceOnEnd's old clean-finish behavior, found missing
+                // on the first Step 7 hardware test (Setup ran fine, its preview overlay stayed up).
+                // Works uniformly for a tool's own preview pane (Setup, Stepper Calibration, ...) - all
+                // go through the same ProgramView.Active/Disconnect mechanism. On a failed run (see the
+                // sawError latch above) the view is left up on purpose, so the operator can see
+                // where/what failed - same polarity as the old code's Error/Halted branch.
+                if (!sawError)
+                    ProgramView.Active?.Disconnect();
                 // A Generate-first tool tab's run just finished cleanly: drop the in-memory program and
                 // revert the Run bar to "Generate" - the operator re-generates for the next job rather
                 // than re-running a stale program. RestoreSourceOnEnd's clean-finish behavior, preserved
