@@ -1900,19 +1900,17 @@ namespace CNC.Controls
             isActiveTab = activate;
             if (activate)
             {
+                // Step 6: this tab's run-bar button is ALWAYS "Generate" - IsProgramGenerated is never
+                // set, so the Generate->Run label flip (and the preview overlay it re-showed here) is
+                // gone. Generate hands the program to the Job tab as the loaded job; the run half of
+                // the bar belongs there now. ActiveRun stays null for the same reason - there is no
+                // second engine to route a run through.
                 MacroProcessor.SupportsGenerateMode = true;
                 MacroProcessor.AllowRunModesWhenGenerated = true;
                 MacroProcessor.ActiveGenerate = Generate;
                 MacroProcessor.DiscardGenerated = DiscardProgram;
-                MacroProcessor.IsProgramGenerated = !string.IsNullOrEmpty(program);
+                MacroProcessor.IsProgramGenerated = false;
                 UpdateValidation();
-                if (!string.IsNullOrEmpty(program))
-                {
-                    EnsureProgramView();
-                    programView.SetProgramText(program);
-                    programView.Connect();
-                }
-                MacroProcessor.ActiveRun = Run;
             }
             else
             {
@@ -1993,46 +1991,9 @@ namespace CNC.Controls
         // default). jobProgramView temporarily shows the transient collection rather than GCode.File.Data;
         // GCode.File.Pop()'s own FileChanged handler rebinds it back once the run ends, so this is a
         // self-reverting redirect, not a permanent takeover - see RunStreamedJobInPlace's own comment.
-        private void Run()
-        {
-            if (model == null)
-                return;
-
-            // Captured as the very first thing, before Generate()/SwitchToTab/anything else in this method
-            // runs - GCode.File.LoadText below fires GCode.Program_FileChanged, which UNCONDITIONALLY clears
-            // model.IsDryRunMode (by design - see that method's own comment: dry-run is a per-run toggle that
-            // must never leak onto a DIFFERENT program the operator loads next), and MacroProcessor.Run
-            // further down reads model.IsDryRunMode itself - confirmed via temporary logging that this really
-            // was getting cleared and needed the restore below. checkModeArmed doesn't need the same
-            // treatment - it's consumed (the actual $C sent to the controller) in JobControl.Run() before
-            // MacroProcessor.ActiveRun (this method) is ever reached, so Check mode is already in effect at
-            // the controller level regardless of anything this method does.
-            bool dryRunArmed = model.IsDryRunMode;
-
-            if (string.IsNullOrWhiteSpace(program))
-                Generate();
-            if (string.IsNullOrWhiteSpace(program))
-                return;
-
-            string toRun = program;
-            MacroProcessor.SwitchToTab?.Invoke(ViewType.GRBL);   // the Job tab
-
-            GCode.File.Push();
-            GCode.File.LoadText("Work Order", toRun);
-            model.IsDryRunMode = dryRunArmed;
-
-            // Declined at the confirm (or any other pre-flight rejection - PREREQ, MBOX Cancel, ...) - nothing
-            // is actually going to stream, so pop back to whatever was loaded before immediately rather than
-            // leaving the generated program sitting there as "the job" with nothing to ever restore it, and
-            // switch back to this tab - the borrowed slot on the Job tab is done with, hand it back.
-            if (!MacroProcessor.Run(model, "Work Order", toRun, true, false, true))
-            {
-                GCode.File.Pop();
-                MacroProcessor.SwitchToTab?.Invoke(ViewType.WorkOrder);
-            }
-            else
-                WatchForRunEnd();
-        }
+        // (The two-press Run() that interpreted directives via MacroProcessor.Run/RunStreamedJobInPlace
+        // was retired by Step 6 - Generate() above IS the whole handoff now, and the ordinary Cycle
+        // Start runs the program through the unified engine.)
 
         // Pop the loaded job back to whatever was there before, once this run reaches its TRUE terminal state
         // (Idle/NoFile - a clean finish or a Stop) - mirrors MainWindow.RestoreSourceOnEnd's own arm-on-
@@ -2049,13 +2010,25 @@ namespace CNC.Controls
                 if (e.PropertyName != nameof(GrblViewModel.StreamingState))
                     return;
                 var st = model.StreamingState;
-                if (st == StreamingState.Send || st == StreamingState.SendMDI)
+                // Send ONLY - not SendMDI. Step 6 arms this watcher at GENERATE time, and Cycle Start
+                // may be minutes away: a single jog in between reaches SendMDI then Idle, which under
+                // the old SendMDI-arming would have popped the program before it ever ran.
+                if (st == StreamingState.Send)
                     started = true;
                 DebugLog.Write("workorder", string.Format("WatchForRunEnd: saw StreamingState={0}, started={1}{2}",
                     st, started, !started ? " - NOT ARMED, a terminal state here will be ignored" : string.Empty));
                 if (!started || (st != StreamingState.Idle && st != StreamingState.NoFile))
                     return;
                 model.PropertyChanged -= handler;
+                // Self-disarm without popping when the loaded job is no longer OURS - the operator
+                // generated, then loaded a different file instead of running: popping now would yank
+                // THEIR file out from under THEIR run. (The pushed stack entry is left unconsumed in
+                // that path - accepted, the alternative is worse.)
+                if (model.FileName != "Work Order")
+                {
+                    DebugLog.Write("workorder", string.Format("WatchForRunEnd: terminal but loaded job is '{0}', not ours - disarming without pop", model.FileName));
+                    return;
+                }
                 DebugLog.Write("workorder", "WatchForRunEnd: terminal - popping the borrowed program and switching back");
                 GCode.File.Pop();
                 MacroProcessor.SwitchToTab?.Invoke(ViewType.WorkOrder);
@@ -2149,6 +2122,15 @@ namespace CNC.Controls
             return true;
         }
 
+        // ONE press (unified streaming engine Step 6, 2026-08-08): Generate compiles and makes the
+        // directive-bearing program THE loaded job - no preview overlay, no second engine, no second
+        // press. The ordinary Cycle Start on the Job tab then runs it through the unified pump: the
+        // PREREQ gate and PROMPT dialog fire up front in JobRunner.Run, and WAITIDLE/MBOX hold
+        // dispatch inline. MacroProcessor.Run / RunStreamedJobInPlace are no longer in Work Order's
+        // path at all (the other wizard tabs still use them until Step 7 retires the old engine).
+        // The mechanics preserved from the retired two-press Run(): capture the program to a local
+        // BEFORE the tab switch (Activate(false) clears the field synchronously), and re-arm dry-run
+        // around LoadText (Program_FileChanged clears it by design on every load).
         private void Generate()
         {
             if (!BuildProgram())
@@ -2162,9 +2144,22 @@ namespace CNC.Controls
             // bigger interruption than the problem this solves.
             if (currentFilePath != null)
                 SaveToDisk();
-            MacroProcessor.PublishGenerated("Work Order", program, EnsureProgramView, () => programView, MacroProcessor.ActiveProgramStats);
-            if (isActiveTab)
-                MacroProcessor.IsProgramGenerated = true;
+
+            bool dryRunArmed = model != null && model.IsDryRunMode;
+            string toLoad = program;
+            string stats = MacroProcessor.ActiveProgramStats;
+
+            MacroProcessor.SwitchToTab?.Invoke(ViewType.GRBL);   // the Job tab
+
+            GCode.File.Push();
+            GCode.File.LoadText("Work Order", toLoad);
+            if (model != null)
+            {
+                model.IsDryRunMode = dryRunArmed;
+                model.Message = string.Format("Work order loaded ({0}) - press Cycle Start when ready.", stats);
+            }
+
+            WatchForRunEnd();
         }
 
         public static WorkOrder SectionConfig;
