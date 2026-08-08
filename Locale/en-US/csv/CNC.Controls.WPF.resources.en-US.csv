@@ -1540,3 +1540,7 @@ CNC.Controls.WPF.g.en-US.resources:workorderview.baml,lbl_wofont:System.Windows.
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,cbx_wofont:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Single stroke engraves each letter as one pen line - the best cut for small lettering. Any other font V-CARVES the letter shapes: the bit follows the outline at a depth set by the local stroke width, giving the tapered strokes and sharp corners of carved lettering. Best at larger sizes."
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wofontbold:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Bold
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wofontitalic:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Italic
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wohastext:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Text
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wohastext:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Engrave text fitted inside this shape. The shape itself still cuts exactly as before - ticking this adds a V-bit Engrave operation that cuts the text. Leave Cap height 0 to size the text to the largest that fits.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,lbl_wotexthalign:System.Windows.Controls.ContentControl.Content,Label,True,True,,Horizontal align:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,lbl_wotextvalign:System.Windows.Controls.ContentControl.Content,Label,True,True,,Vertical align:

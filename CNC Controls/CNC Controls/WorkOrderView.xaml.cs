@@ -72,6 +72,19 @@ namespace CNC.Controls
             chkFontBold.Click += (s, e) => CaptureFields();
             chkFontItalic.Click += (s, e) => CaptureFields();
 
+            // Typed text used to reach the model only when some OTHER field's change ran CaptureFields -
+            // type into the box and Generate straight away, and the previous text was what got cut. Same
+            // commit-on-change the name box has (CaptureFields itself no-ops while fields are loading).
+            txtEngraveText.TextChanged += (s, e) => CaptureFields();
+
+            // Order matches the enums - the selected index IS the value.
+            foreach (var label in new[] { "Left", "Center", "Right" })
+                cbxTextHAlign.Items.Add(label);
+            foreach (var label in new[] { "Top", "Center", "Bottom" })
+                cbxTextVAlign.Items.Add(label);
+            cbxTextHAlign.SelectionChanged += (s, e) => CaptureFields();
+            cbxTextVAlign.SelectionChanged += (s, e) => CaptureFields();
+
             foreach (var f in AllFields())
                 System.ComponentModel.DependencyPropertyDescriptor
                     .FromProperty(NumericField.ValueProperty, typeof(NumericField))
@@ -310,6 +323,11 @@ namespace CNC.Controls
                 X = tp.X, Y = tp.Y, Anchor = tp.Anchor,
                 Length = tp.Length, Angle = tp.Angle, Diameter = tp.Diameter,
                 Width = tp.Width, Depth = tp.Depth, Size = tp.Size,
+                // The text block was missing here entirely - duplicating a Text toolpath used to come up
+                // with the "TEXT" defaults, silently.
+                Text = tp.Text, CapHeight = tp.CapHeight,
+                FontFamily = tp.FontFamily, FontBold = tp.FontBold, FontItalic = tp.FontItalic,
+                HasText = tp.HasText, TextHAlign = tp.TextHAlign, TextVAlign = tp.TextVAlign,
                 Pattern = tp.Pattern,
                 Columns = tp.Columns, RowSpacing = tp.RowSpacing, ColumnSpacing = tp.ColumnSpacing, Rows = tp.Rows,
                 PatternCount = tp.PatternCount, PatternRadius = tp.PatternRadius,
@@ -762,13 +780,27 @@ namespace CNC.Controls
             Show(fldX, !entireSpoilboard);
             Show(fldY, !entireSpoilboard);
             bool isText = tp.Geometry == WorkOrderGeometryKind.Text;
+            // Shape text: the same text fields serve the Text kind and a shape with its Text box ticked
+            // (see the XAML comment). Alignment is shape-text-only - the Text kind places by anchor.
+            bool canShapeText = WorkOrderRules.SupportsShapeText(tp.Geometry);
+            bool showText = isText || (canShapeText && tp.HasText);
             Show(fldLength, isLine);
             // The baseline angle is the same field a Line uses - degrees from +X - so Text just shows it too.
             Show(fldAngle, isLine || isText);
-            Show(pnlTextRow, isText);
-            Show(fldCapHeight, isText);
-            Show(pnlFontRow, isText);
-            Show(pnlFontStyleRow, isText);
+            Show(pnlHasTextRow, canShapeText);
+            chkHasText.IsChecked = tp.HasText;
+            Show(pnlTextRow, showText);
+            Show(fldCapHeight, showText);
+            Show(pnlFontRow, showText);
+            Show(pnlFontStyleRow, showText);
+            Show(pnlTextHAlignRow, showText && !isText);
+            Show(pnlTextVAlignRow, showText && !isText);
+            // Sliding a rectangle around inside a curve voids the inscribed-fit guarantee - see
+            // WorkOrderTextFit - so circles and ovals stay centered.
+            bool centerOnly = tp.Geometry == WorkOrderGeometryKind.Circle || tp.Geometry == WorkOrderGeometryKind.Oval;
+            cbxTextHAlign.IsEnabled = cbxTextVAlign.IsEnabled = !centerOnly;
+            cbxTextHAlign.SelectedIndex = centerOnly ? (int)WorkOrderTextHAlign.Center : (int)tp.TextHAlign;
+            cbxTextVAlign.SelectedIndex = centerOnly ? (int)WorkOrderTextVAlign.Center : (int)tp.TextVAlign;
             Show(fldDiameter, isCircle);
             Show(fldSize, tp.Geometry == WorkOrderGeometryKind.Square);
             Show(fldWidth, isWD && !entireSpoilboard);
@@ -962,6 +994,13 @@ namespace CNC.Controls
                     tp.Text = txtEngraveText.Text; tp.CapHeight = fldCapHeight.Value;
                     tp.FontFamily = cbxFont.SelectedIndex > 0 ? (string)cbxFont.SelectedItem : string.Empty;
                     tp.FontBold = chkFontBold.IsChecked == true; tp.FontItalic = chkFontItalic.IsChecked == true;
+                    // HasText itself is toggled in chkHasText_Click (it adds/removes the Engrave op);
+                    // only the alignment choices are captured here, and only where they're editable.
+                    if (WorkOrderRules.SupportsShapeText(tp.Geometry) && cbxTextHAlign.IsEnabled)
+                    {
+                        if (cbxTextHAlign.SelectedIndex >= 0) tp.TextHAlign = (WorkOrderTextHAlign)cbxTextHAlign.SelectedIndex;
+                        if (cbxTextVAlign.SelectedIndex >= 0) tp.TextVAlign = (WorkOrderTextVAlign)cbxTextVAlign.SelectedIndex;
+                    }
                     tp.Diameter = fldDiameter.Value; tp.Size = fldSize.Value;
                     tp.Width = fldWidth.Value; tp.Depth = fldDepthY.Value;
                     tp.Columns = fldColumns.Value; tp.ColumnSpacing = fldColumnSpacing.Value;
@@ -986,6 +1025,26 @@ namespace CNC.Controls
             if (loadingFields || selectedToolpath == null)
                 return;
             selectedToolpath.Name = txtName.Text;
+            OnWorkOrderChanged();
+        }
+
+        // Shape text on/off. Ticking adds the Engrave operation that will cut the text (with the V-bit
+        // suggestion NewOperation already applies); unticking removes it - leaving it would leave an
+        // Engrave op that no longer has anything to engrave, flagged by Validate but better not created.
+        private void chkHasText_Click(object sender, RoutedEventArgs e)
+        {
+            var tp = selectedToolpath;
+            if (loadingFields || tp == null || !WorkOrderRules.SupportsShapeText(tp.Geometry))
+                return;
+
+            tp.HasText = chkHasText.IsChecked == true;
+            if (tp.HasText && !tp.Operations.Any(o => o.Kind == WorkOrderOpKind.Engrave))
+                tp.Operations.Add(NewOperation(WorkOrderOpKind.Engrave, tp));
+            else if (!tp.HasText)
+                tp.Operations.RemoveAll(o => o.Kind == WorkOrderOpKind.Engrave);
+
+            // The op list changed shape, and the text fields' visibility follows the checkbox.
+            RebuildTree(tp);
             OnWorkOrderChanged();
         }
 

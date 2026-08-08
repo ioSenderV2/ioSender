@@ -101,6 +101,23 @@
                         </StackPanel>
                         <local:NumericField x:Uid="fld_wox" x:Name="fldX" Label="X offset:" ColonAt="150" Format="-####0.0##" Unit="mm"/>
                         <local:NumericField x:Uid="fld_woy" x:Name="fldY" Label="Y offset:" ColonAt="150" Format="-####0.0##" Unit="mm"/>
+                        <local:NumericField x:Uid="fld_wolen" x:Name="fldLength" Label="Length:" ColonAt="150" Format="###0.0##" Unit="mm"/>
+                        <local:NumericField x:Uid="fld_woangle" x:Name="fldAngle" Label="Angle:" ColonAt="150" Format="-##0.0#" Unit="deg"
+                                            ToolTip="Direction of the line, measured from +X counter-clockwise. 0 runs along X, 90 along Y."/>
+                        <local:NumericField x:Uid="fld_wodia" x:Name="fldDiameter" Label="Diameter:" ColonAt="150" Format="###0.0##" Unit="mm"/>
+                        <local:NumericField x:Uid="fld_wosize" x:Name="fldSize" Label="Size:" ColonAt="150" Format="###0.0##" Unit="mm"/>
+                        <local:NumericField x:Uid="fld_wow" x:Name="fldWidth" Label="Width (X):" ColonAt="150" Format="###0.0##" Unit="mm"/>
+                        <local:NumericField x:Uid="fld_wod" x:Name="fldDepthY" Label="Depth (Y):" ColonAt="150" Format="###0.0##" Unit="mm"/>
+
+                        <!-- Text fields serve two masters: the Text GEOMETRY (always shown there), and shape
+                             text - the checkbox below on Line/Circle/Oval/Square/Rect, which engraves text
+                             fitted INSIDE the shape (WorkOrderTextFit). They sit after the dimensions because
+                             for a shape the text is an addition to it; the Text kind hides the dimensions, so
+                             its layout reads the same as ever. -->
+                        <StackPanel x:Name="pnlHasTextRow" Orientation="Horizontal" Margin="154,2,0,2">
+                            <CheckBox x:Uid="chk_wohastext" x:Name="chkHasText" Content="Text" VerticalAlignment="Center" Click="chkHasText_Click"
+                                      ToolTip="Engrave text fitted inside this shape. The shape itself still cuts exactly as before - ticking this adds a V-bit Engrave operation that cuts the text. Leave Cap height 0 to size the text to the largest that fits."/>
+                        </StackPanel>
                         <StackPanel x:Name="pnlTextRow" Orientation="Horizontal" Margin="0,2,0,2">
                             <Label x:Uid="lbl_wotext" Content="Text:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Top"/>
                             <TextBox x:Uid="txt_wotext" x:Name="txtEngraveText" MinWidth="180" MinHeight="46" MaxWidth="240"
@@ -108,7 +125,7 @@
                                      ToolTip="What to engrave. Press Enter for a second line. Uppercase, digits and common punctuation are supported; lowercase is engraved as uppercase, and anything the font cannot draw is skipped rather than cut as a gap."/>
                         </StackPanel>
                         <local:NumericField x:Uid="fld_wocap" x:Name="fldCapHeight" Label="Cap height:" ColonAt="150" Format="###0.0##" Unit="mm"
-                                            ToolTip="Height of a capital letter - the size you actually mean by &quot;10 mm lettering&quot;. Round letters overshoot it very slightly, as they should."/>
+                                            ToolTip="Height of a capital letter - the size you actually mean by &quot;10 mm lettering&quot;. Round letters overshoot it very slightly, as they should. For text fitted in a shape, 0 sizes it to the largest that fits - a size that can't fit is refused at Generate."/>
                         <StackPanel x:Name="pnlFontRow" Orientation="Horizontal" Margin="0,2,0,2">
                             <Label x:Uid="lbl_wofont" Content="Font:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
                             <ComboBox x:Uid="cbx_wofont" x:Name="cbxFont" MinWidth="180" MaxWidth="240" MinHeight="22" VerticalAlignment="Center"
@@ -118,13 +135,16 @@
                             <CheckBox x:Uid="chk_wofontbold" x:Name="chkFontBold" Content="Bold" VerticalAlignment="Center"/>
                             <CheckBox x:Uid="chk_wofontitalic" x:Name="chkFontItalic" Content="Italic" Margin="12,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
-                        <local:NumericField x:Uid="fld_wolen" x:Name="fldLength" Label="Length:" ColonAt="150" Format="###0.0##" Unit="mm"/>
-                        <local:NumericField x:Uid="fld_woangle" x:Name="fldAngle" Label="Angle:" ColonAt="150" Format="-##0.0#" Unit="deg"
-                                            ToolTip="Direction of the line, measured from +X counter-clockwise. 0 runs along X, 90 along Y."/>
-                        <local:NumericField x:Uid="fld_wodia" x:Name="fldDiameter" Label="Diameter:" ColonAt="150" Format="###0.0##" Unit="mm"/>
-                        <local:NumericField x:Uid="fld_wosize" x:Name="fldSize" Label="Size:" ColonAt="150" Format="###0.0##" Unit="mm"/>
-                        <local:NumericField x:Uid="fld_wow" x:Name="fldWidth" Label="Width (X):" ColonAt="150" Format="###0.0##" Unit="mm"/>
-                        <local:NumericField x:Uid="fld_wod" x:Name="fldDepthY" Label="Depth (Y):" ColonAt="150" Format="###0.0##" Unit="mm"/>
+                        <StackPanel x:Name="pnlTextHAlignRow" Orientation="Horizontal" Margin="0,2,0,2">
+                            <Label x:Uid="lbl_wotexthalign" Content="Horizontal align:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="cbxTextHAlign" MinWidth="180" MinHeight="22" VerticalAlignment="Center"
+                                      ToolTip="Where the text sits when it is smaller than the room available. On a Line it distributes along the length. Text in a circle or oval is center-only."/>
+                        </StackPanel>
+                        <StackPanel x:Name="pnlTextVAlignRow" Orientation="Horizontal" Margin="0,2,0,2">
+                            <Label x:Uid="lbl_wotextvalign" Content="Vertical align:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="cbxTextVAlign" MinWidth="180" MinHeight="22" VerticalAlignment="Center"
+                                      ToolTip="Vertical placement in the leftover room. On a Line: Top sets the text on the line, Bottom hangs it below, Center straddles it."/>
+                        </StackPanel>
 
                         <!-- Surface only - see WorkOrderToolpath.EntireSpoilboard's own comment. -->
                         <StackPanel x:Name="pnlEntireSpoilboard" Orientation="Horizontal" Margin="0,0,0,6">
