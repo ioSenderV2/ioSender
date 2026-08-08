@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Harness for StreamPump's (WAITIDLE) dispatch barrier - unified streaming engine Step 3
+    (docs/Architecture-Unified-Streaming-Engine.md). Drives the REAL StreamPump over the REAL
+    TelnetStream against the REAL grblHAL simulator on loopback - no UI, no test server, no real
+    hardware - and asserts the property the first (dwell-based) hardware test never exercised:
+    the barrier must HOLD while the controller reports Run, and release only after two consecutive
+    Idle reports, before the tail of the program is allowed onto the wire.
+
+    Why a dwell couldn't test this: grblHAL acks G4 only after the dwell completes and reports Idle
+    throughout, so the barrier armed against an already-idle controller and released trivially.
+    Real G1 motion acks immediately (planner-buffered) and reports Run for the whole move - exactly
+    the ack-vs-physical-motion gap WAITIDLE exists to close.
+
+    The simulator binary and its EEPROM/littlefs state are copied from %AppData%\ioSender\Simulator
+    to a temp work dir per run, so the user's own simulator state is never dirtied.
+
+    Run with:  dotnet run (from tools/waitidle-probe)
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <AssemblyName>waitidle-probe</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CNC Core\CNC Core\CNC.Core.net8.csproj" />
+  </ItemGroup>
+
+</Project>
