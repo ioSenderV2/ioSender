@@ -865,10 +865,14 @@ namespace CNC.Core
                                SendComments, StartSimulator,
                                OnPumpJobFinished, OnPumpError,
                                continueOnError: job.IsChecking, onCheckError: OnPumpCheckError,
-                               // (MBOX) Cancel = the operator declining to continue = the operator's own
-                               // Stop, exactly (feed hold, teardown, operator-stopped state) - lines
-                               // before the MBOX may still be physically executing when they answer.
-                               onOperatorCancel: Stop);
+                               // (MBOX) Cancel = the operator declining to continue = the STOP BUTTON's
+                               // routine, which is Abort() - NOT Stop(). Found on real hardware
+                               // 2026-08-08: Stop() sets job.Stopped=true first, and StreamingIdle's
+                               // Stop case sends CMD_STOP only when !job.Stopped - so wiring Stop()
+                               // here suppressed the stop byte and Z kept moving to the end of its
+                               // 5mm move after Cancel. Abort() is what btnStop_Click actually calls;
+                               // it leaves job.Stopped false and the CMD_STOP goes out.
+                               onOperatorCancel: Abort);
                 }
             }
         }
