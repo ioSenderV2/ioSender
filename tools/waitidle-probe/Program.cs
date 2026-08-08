@@ -287,6 +287,71 @@ static class Probe
         var log3 = File.ReadAllLines(PumpLog.FilePath);
         Check(!log3.Any(l => l.Contains("SEND idx=" + cancelTail + " ")), "post-MBOX line never hit the wire on Cancel");
 
+        // ---- (PROMPT) slice (Step 4b) --------------------------------------------------------------
+        // Field substitution needs the #<...> passthrough load path, which is gated on the controller
+        // reporting EXPR - ask via $I (the model is wired, so NEWOPT parsing is the real one).
+        Console.WriteLine();
+        GrblInfo.Get(model);   // the REAL $I handshake - populates GrblInfo (incl. ExpressionsSupported) from NEWOPT
+        Check(GrblInfo.ExpressionsSupported, "sim reports EXPR (needed for #<...> passthrough load)");
+
+        if (GrblInfo.ExpressionsSupported)
+        {
+            var prog4 = new GCodeProgram(model);
+            prog4.AddBlock("prompt-fields", CNC.Core.Action.New);
+            prog4.AddBlock("(PROMPT depth, 3, Cut depth)");
+            prog4.AddBlock("G21 G91");
+            prog4.AddBlock("G1 Z-#<_depth> F120");
+            prog4.AddBlock("G1 Z#<_depth> F120");
+            prog4.AddBlock("M2");
+            prog4.AddBlock("", CNC.Core.Action.End);
+
+            // JobRunner's half (collect + dialog) played by the harness: collect via the REAL collector,
+            // then stand in for the operator changing the default from 3 to 2.
+            var fields = MacroRunner.CollectPromptFields(
+                prog4.Data.Where(b => b.Directive == "PROMPT").Select(b => (string)b.Data).ToList());
+            Check(fields.Count == 1 && fields[0].Inner == "_depth" && fields[0].Value == "3",
+                  "field collected with declared default", fields.Count > 0 ? fields[0].Inner + "=" + fields[0].Value : "(none)");
+            if (fields.Count == 1) fields[0].Value = "2";
+
+            PumpLog.Clear();
+            var fin4 = new ManualResetEventSlim();
+            string err4 = null;
+            var pump4 = new StreamPump(model, null, null);
+            pump4.Start(prog4, 0, prog4.Blocks - 1, 512, true, true, false,
+                        () => fin4.Set(), e => { err4 = e; fin4.Set(); }, promptFields: fields);
+            bool done4 = fin4.Wait(TimeSpan.FromSeconds(20));
+            Check(done4 && err4 == null, "prompt-fields job finished cleanly", err4 ?? "");
+
+            var log4 = File.ReadAllLines(PumpLog.FilePath);
+            var sent4 = log4.Where(l => l.Contains("SEND idx=")).ToArray();
+            Check(sent4.Any(l => l.Contains("Z-2")) && !sent4.Any(l => l.Contains("#<")),
+                  "wire got the substituted value, never the raw reference",
+                  string.Join(" | ", sent4.Where(l => l.Contains("Z"))));
+            Check(!sent4.Any(l => l.Contains("PROMPT")), "field row consumed sender-side, never streamed");
+        }
+
+        // Bare (PROMPT) = mid-stream checkpoint through the MBOX machinery.
+        string checkpointMsg = null;
+        MacroRunner.HoldPrompt = (t, m, c, y) => { checkpointMsg = m; return true; };
+        var prog5 = new GCodeProgram(model);
+        prog5.AddBlock("prompt-bare", CNC.Core.Action.New);
+        prog5.AddBlock("G21 G91");
+        prog5.AddBlock("(PROMPT)");
+        prog5.AddBlock("G4 P0.2");
+        prog5.AddBlock("M2");
+        prog5.AddBlock("", CNC.Core.Action.End);
+
+        PumpLog.Clear();
+        var fin5 = new ManualResetEventSlim();
+        string err5 = null;
+        var pump5 = new StreamPump(model, null, null);
+        pump5.Start(prog5, 0, prog5.Blocks - 1, 512, true, true, false,
+                    () => fin5.Set(), e => { err5 = e; fin5.Set(); });
+        bool done5 = fin5.Wait(TimeSpan.FromSeconds(15));
+        Check(done5 && err5 == null, "bare-PROMPT job finished cleanly", err5 ?? "");
+        Check(checkpointMsg == "Ready to continue?", "checkpoint prompted with the canned confirmation", checkpointMsg ?? "(never shown)");
+        Check(File.ReadAllLines(PumpLog.FilePath).Any(l => l.Contains("PROMPT checkpoint armed")), "checkpoint went through the barrier");
+
         Console.WriteLine(failures == 0 ? "\nALL CHECKS PASSED" : string.Format("\n{0} CHECK(S) FAILED", failures));
         return failures == 0 ? 0 : 1;
     }

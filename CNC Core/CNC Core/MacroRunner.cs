@@ -162,15 +162,7 @@ namespace CNC.Core
             //      - assign the globals on the controller (so $F=<file> jobs can read them), and
             //      - substitute the references in the streamed body (so inline use works on any
             //        controller and ioSender's own parser stays consistent).
-            var fields = new List<PromptField>();
-            foreach (var raw in lines)
-            {
-                if (!IsDirective(raw, "PROMPT"))
-                    continue;
-                var field = ParsePromptField(raw);
-                if (field != null && !fields.Any(f => f.Inner.Equals(field.Inner, StringComparison.OrdinalIgnoreCase)))
-                    fields.Add(field);
-            }
+            var fields = CollectPromptFields(lines);
             // An input prompt's OK/Cancel is itself the run confirmation, so a separate "Prompt to
             // run" box would be redundant - only show that when there are no input prompts to gate on.
             if (fields.Count > 0)
@@ -561,6 +553,39 @@ namespace CNC.Core
             public string Param { get { return "#<" + Inner + ">"; } }
         }
 
+        // The one field collector (unified streaming engine Step 4b): every (PROMPT param, default
+        // [, label]) in the lines, deduped by parameter name - bare (PROMPT) rows contribute nothing
+        // here (they are mid-stream checkpoints, not inputs). Public so JobRunner's up-front pass on a
+        // LOADED program uses exactly this; Run() above goes through it too.
+        public static List<PromptField> CollectPromptFields(IEnumerable<string> lines)
+        {
+            var fields = new List<PromptField>();
+            foreach (var raw in lines)
+            {
+                if (!IsDirective(raw, "PROMPT"))
+                    continue;
+                var field = ParsePromptField(raw);
+                if (field != null && !fields.Any(f => f.Inner.Equals(field.Inner, StringComparison.OrdinalIgnoreCase)))
+                    fields.Add(field);
+            }
+            return fields;
+        }
+
+        // Public face of the FieldPrompt seam for JobRunner's up-front pass - same dialog, same
+        // no-host default (proceed with declared defaults). Returns false only on operator Cancel.
+        public static bool ShowFieldPrompt(string title, List<PromptField> fields)
+        {
+            return PromptForFields(title, fields);
+        }
+
+        // True when this row is a PROMPT directive with NO field body - the mid-stream run-confirmation
+        // form. The pump treats these as an operator checkpoint (MBOX machinery); field-form rows are
+        // consumed silently there because their work happened up front.
+        public static bool IsBarePrompt(string line)
+        {
+            return IsDirective(line, "PROMPT") && Body(line, "PROMPT").Trim().Length == 0;
+        }
+
         // Parse "(PROMPT param, default [, label])" into a field. Returns null for a bare (PROMPT).
         private static PromptField ParsePromptField(string raw)
         {
@@ -599,8 +624,9 @@ namespace CNC.Core
             return s;
         }
 
-        // Replace every #<_name> reference in the line with the value the user entered.
-        private static string ApplySubstitutions(string line, List<PromptField> fields)
+        // Replace every #<_name> reference in the line with the value the user entered. Public for
+        // StreamPump's send-time substitution (Step 4b) - the stored program rows stay untouched.
+        public static string ApplySubstitutions(string line, List<PromptField> fields)
         {
             foreach (var field in fields)
                 line = Regex.Replace(line, @"#<\s*" + Regex.Escape(field.Inner) + @"\s*>", field.Value, RegexOptions.IgnoreCase);

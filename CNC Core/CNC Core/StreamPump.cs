@@ -134,6 +134,11 @@ namespace CNC.Core
         private string mboxLine;                // the raw (MBOX ...) row text, parsed by MacroRunner.ShowMBox
         private System.Action onOperatorCancel; // host's Stop path; null (headless, no host) falls back to onError
 
+        // (PROMPT ...) field values collected by the host up front (Step 4b) - substituted into each
+        // line at SEND time so the stored program rows stay untouched (inspection/re-run stability,
+        // same principle as dry-run's local line rewrites). Null/empty = no prompts, zero cost.
+        private List<MacroRunner.PromptField> promptFields;
+
         private Thread thread;
         private BlockingCollection<string> acks;
         private CancellationTokenSource cts;
@@ -176,8 +181,10 @@ namespace CNC.Core
 
         public void Start(IProgramSource source, int fromBlock, int pgmEndLine, int serialSize, bool useBuffering,
                           bool sendComments, bool startSimulator, System.Action onJobFinished, System.Action<string> onError,
-                          bool continueOnError = false, System.Action onCheckError = null, System.Action onOperatorCancel = null)
+                          bool continueOnError = false, System.Action onCheckError = null, System.Action onOperatorCancel = null,
+                          List<MacroRunner.PromptField> promptFields = null)
         {
+            this.promptFields = (promptFields != null && promptFields.Count > 0) ? promptFields : null;
             this.source = source;
             this.serialSize = serialSize;
             this.useBuffering = useBuffering;
@@ -418,8 +425,61 @@ namespace CNC.Core
                     break;
                 }
 
+                // (PROMPT ...) rows (Step 4b): the FIELD form's work happened up front in JobRunner
+                // (dialog + preamble assignments), so its row is consumed as a no-op. The BARE form is
+                // a mid-stream operator checkpoint - reuse the MBOX barrier wholesale with a canned
+                // confirmation; Cancel takes the same proven Abort() route.
+                if (block.Directive == "PROMPT" && !continueOnError)
+                {
+                    if (!MacroRunner.IsBarePrompt(block.Data))
+                    {
+                        MarkSent(sendIdx, "ok");
+                        latestBlock = sendIdx;
+                        ScheduleDrain();
+                        bool pLast = pgmEndLine == sendIdx;
+                        sendIdx = pLast ? -1 : sendIdx + 1;
+                        if (pLast)
+                        {
+                            // Degenerate but real: a field row as the program's LAST line leaves no
+                            // later ack to run the finished check - do it here (barrier-tail pattern).
+                            if (inflight.Count == 0)
+                            {
+                                PumpLog.W("JOB FINISHED (prompt row was tail)");
+                                aborted = true;
+                                PostControl(onJobFinished);
+                            }
+                            break;
+                        }
+                        continue;       // a consumed input row must not stall dispatch
+                    }
+
+                    bool bLast = pgmEndLine == sendIdx;
+                    MarkSent(sendIdx, "hold");
+                    latestBlock = sendIdx;
+                    ScheduleDrain();
+                    mboxBarrier = true;
+                    mboxPromptPending = true;
+                    mboxLine = "(MBOX, OKCANCEL, Ready to continue?)";
+                    PumpLog.W(string.Format("PROMPT checkpoint armed @idx={0} inflight={1} last={2}", sendIdx, inflight.Count, bLast));
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("pump", string.Format("PROMPT checkpoint armed @idx={0}", sendIdx));
+                    sendIdx = bLast ? -1 : sendIdx + 1;
+                    MaybeShowMbox();
+                    break;
+                }
+
                 string line = block.Data;
                 int len = block.Length;
+
+                // (PROMPT) field substitution at SEND time (Step 4b): the wire gets the operator's
+                // values, the stored row keeps its #<_name> references. len must track the ACTUAL
+                // bytes written - the substituted line's length differs from block.Length, and the
+                // grbl character-count flow control lives or dies on that number.
+                if (promptFields != null && line.IndexOf("#<", StringComparison.Ordinal) >= 0)
+                {
+                    line = MacroRunner.ApplySubstitutions(line, promptFields);
+                    len = line.Length + 1;
+                }
 
                 // Comments are sent as an empty comment when "Send comments" is off - except to the simulator,
                 // which parses (TOOL ...) comments. Use a local length; never mutate the shared block.

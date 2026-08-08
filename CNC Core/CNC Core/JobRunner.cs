@@ -38,6 +38,7 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
@@ -755,6 +756,30 @@ namespace CNC.Core
                         }
                     }
 
+                    // (PROMPT ...) field collection for a loaded program (Step 4b) - one combined dialog
+                    // before any motion, exactly as MacroRunner.Run does for macros, through the same
+                    // collector and FieldPrompt seam. Cancel = a silent refusal (the operator changed
+                    // their mind - not an error). Check mode runs unattended: declared defaults, no
+                    // dialog - a syntax check has no operator to ask. The values land two ways, same
+                    // hybrid as always: #<_name>=value assignments ride the existing Source.Commands
+                    // preamble (only when the controller reports EXPR - MacroRunner's own refusal rule
+                    // for #-syntax on the wire), and StreamPump substitutes references at send time.
+                    List<MacroRunner.PromptField> promptFields = null;
+                    if (Source.Data.Any(b => b.Directive == "PROMPT"))
+                    {
+                        promptFields = MacroRunner.CollectPromptFields(
+                            Source.Data.Where(b => b.Directive == "PROMPT").Select(b => (string)b.Data));
+                        if (promptFields.Count > 0)
+                        {
+                            if (!CheckModeArmed && model.GrblState.State != GrblStates.Check &&
+                                !MacroRunner.ShowFieldPrompt(model.FileName ?? "Program", promptFields))
+                                return;   // cancelled - not an error, just not running
+                            if (GrblInfo.ExpressionsSupported)
+                                foreach (var field in promptFields)
+                                    Source.Commands.Enqueue(field.Param + "=" + field.Value);
+                        }
+                    }
+
                     job.ToolChangeLine = -1;
                     model.BlockExecuting = fromBlock;
                     job.CurrBlock = job.ACKPending = job.PendingLine = fromBlock;
@@ -872,7 +897,8 @@ namespace CNC.Core
                                // here suppressed the stop byte and Z kept moving to the end of its
                                // 5mm move after Cancel. Abort() is what btnStop_Click actually calls;
                                // it leaves job.Stopped false and the CMD_STOP goes out.
-                               onOperatorCancel: Abort);
+                               onOperatorCancel: Abort,
+                               promptFields: promptFields);
                 }
             }
         }
