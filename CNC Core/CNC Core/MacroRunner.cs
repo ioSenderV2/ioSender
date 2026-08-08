@@ -528,12 +528,13 @@ namespace CNC.Core
         public static string RecognizeDirective(string line)
         {
             // WAITIDLE takes no arguments, so require the EXACT form "(WAITIDLE)" here. The loose
-            // keyword+non-letter rule IsDirective uses (kept for the argument-taking directives, and
-            // unchanged inside Run() itself for macro back-compat) recognized a loaded file's ordinary
-            // comment "(WAITIDLE barrier test ...)" as a live directive on the very first hardware test
-            // of the pump's WAITIDLE barrier, 2026-08-08 - at load time this runs against ARBITRARY
-            // g-code files, not just hand-written macros, so prose comments are a real input.
-            string t = line.Trim();
+            // keyword+non-letter rule IsDirective uses (kept for the argument-taking directives)
+            // recognized a loaded file's ordinary comment "(WAITIDLE barrier test ...)" as a live
+            // directive on the very first hardware test of the pump's WAITIDLE barrier, 2026-08-08 -
+            // at load time this runs against ARBITRARY g-code files, not just hand-written macros, so
+            // prose comments are a real input. N-word stripped first (StripLineNumber): a file that
+            // arrives ALREADY numbered on disk must flag its directives too.
+            string t = StripLineNumber(line).Trim();
             if (t.Length > 1 && t[0] == '(' && t[t.Length - 1] == ')' &&
                 t.Substring(1, t.Length - 2).Trim().Equals("WAITIDLE", StringComparison.OrdinalIgnoreCase))
                 return "WAITIDLE";
@@ -544,10 +545,33 @@ namespace CNC.Core
             return null;
         }
 
-        // True if the trimmed line is the named directive, e.g. "(MBOX ...)" / "(PREREQ ...)".
-        private static bool IsDirective(string line, string keyword)
+        // Strip a leading N-word ("N20 (PREREQ...)" -> "(PREREQ...)"). Line numbering is prepended at
+        // LOAD time (GCodeJob), AFTER the Directive flag is captured but onto the STORED Data text -
+        // and every evaluator that re-reads that text lands here. Found on real hardware 2026-08-08
+        // 15:04: a rebooted (unhomed, TLO-less) machine ran a work order that declared
+        // "(PREREQ, connected, homed, noalarm, tlo, ...)" - the gate entered on the Directive flag,
+        // but EvaluatePrereqLines re-parsed the numbered rows, matched nothing, collected ZERO
+        // conditions and passed vacuously. The run then died on the wire (error:2 reading the wiped
+        // #<_tlo_ref>) instead of being refused up front. Same hole covered PROMPT field collection,
+        // IsBarePrompt, and RunMBox's body parsing in any numbered program.
+        private static string StripLineNumber(string line)
         {
             string t = line.TrimStart();
+            if (t.Length > 1 && (t[0] == 'N' || t[0] == 'n') && char.IsDigit(t[1]))
+            {
+                int i = 2;
+                while (i < t.Length && char.IsDigit(t[i]))
+                    i++;
+                t = t.Substring(i).TrimStart();
+            }
+            return t;
+        }
+
+        // True if the trimmed line is the named directive, e.g. "(MBOX ...)" / "(PREREQ ...)" -
+        // tolerating a load-time-prepended N-word (see StripLineNumber).
+        private static bool IsDirective(string line, string keyword)
+        {
+            string t = StripLineNumber(line);
             if (!t.StartsWith("("))
                 return false;
             t = t.Substring(1).TrimStart();
@@ -556,10 +580,10 @@ namespace CNC.Core
         }
 
         // The text inside the parentheses after the keyword (and the following comma/space), e.g.
-        // "(MBOX, OKCANCEL, hi)" -> "OKCANCEL, hi".
+        // "(MBOX, OKCANCEL, hi)" -> "OKCANCEL, hi". N-word tolerated, same as IsDirective.
         private static string Body(string line, string keyword)
         {
-            string t = line.Trim();
+            string t = StripLineNumber(line).Trim();
             int close = t.LastIndexOf(')');
             string inner = (close >= 1 ? t.Substring(1, close - 1) : t.Substring(1)).TrimStart();
             inner = inner.Substring(Math.Min(keyword.Length, inner.Length));   // drop the keyword
