@@ -627,6 +627,8 @@ namespace CNC.Core
         {
             AbortPump();
             JobTimer.Stop();
+            mdiOutstanding = null;   // a controller reset answers nothing outstanding - don't let a stale
+                                     // $J record trigger a bogus flush-release later
             streamingHandler.Call(StreamingState.Stop, true);
             ResetJobData();
         }
@@ -1046,8 +1048,72 @@ namespace CNC.Core
                 Comms.com.WriteByte((byte)b);
         }
 
+        // The last MDI command actually written to the wire by the SendMDI pacing below, and when - the
+        // release check needs to know WHAT is outstanding, not just that something is. Written/cleared
+        // only on the UI thread (SendCommand and ResponseReceived both run there).
+        private string mdiOutstanding;
+        private DateTime mdiWrittenAtUtc;
+
+        // How long an unanswered $J= must sit, with the controller REPORTING Idle, before it is declared
+        // flushed. A real jog ack lands in ~18ms (wire-measured 2026-08-06); a real jog in progress
+        // reports <Jog|, not Idle - so 750ms of Idle silence is far past any legitimate case.
+        private const int MdiJogFlushMs = 750;
+
+        // grblHAL FLUSHES a $J= whose 0x85 jog-cancel lands before it is parsed: no ok, no error, nothing,
+        // machine stays Idle - proven on the wire 2026-08-08 12:01 ($J= out, 0x85 3ms behind it, zero
+        // replies ever). The SendMDI pacing waits for exactly that reply, so without this release the
+        // state machine wedges permanently and every later command queues forever (observed live: queue
+        // depth 1..5, jogging dead until an app restart). JogGate learned this firmware contract long ago
+        // (its Alive()/Clear()); this is the same cure for JobRunner's parallel pacing.
+        //
+        // Called when a NEW command arrives. If the outstanding write is a $J, unanswered well past any
+        // real ack time, with the controller reporting Idle: declare it flushed. Queued $J rows are
+        // DISCARDED, not replayed - a jog the operator asked for seconds ago is not one they still want
+        // (JogGate's own freshness rule), and replaying a stale continuous jog whose cancel byte went out
+        // long ago is genuinely dangerous (this incident had $J=G91G21Z152 queued with nothing left armed
+        // to cancel it). Non-jog rows are kept in order and resume draining through the normal pacing.
+        // Scoped strictly to $J: a generic reply timeout here would mask real link faults, which are
+        // LinkMonitor's job to call.
+        private void ReleaseFlushedJogMdi()
+        {
+            if (streamingState != StreamingState.SendMDI || mdiOutstanding == null
+                 || !mdiOutstanding.StartsWith("$J", StringComparison.OrdinalIgnoreCase)
+                 || grblState.State != GrblStates.Idle
+                 || (DateTime.UtcNow - mdiWrittenAtUtc).TotalMilliseconds < MdiJogFlushMs)
+                return;
+
+            int purged = 0;
+            var kept = new Queue<string>();
+            while (Source.Commands.Count > 0)
+            {
+                string queued = Source.Commands.Dequeue();
+                if (queued.StartsWith("$J", StringComparison.OrdinalIgnoreCase))
+                    purged++;
+                else
+                    kept.Enqueue(queued);
+            }
+            while (kept.Count > 0)
+                Source.Commands.Enqueue(kept.Dequeue());
+
+            if (DebugLog.Enabled)
+                DebugLog.Write("jobrunner", string.Format(
+                    "SendMDI RELEASED - outstanding \"{0}\" unanswered for {1:F0}ms with the controller Idle (jog-cancel flush); purged {2} stale queued $J, kept {3}",
+                    mdiOutstanding, (DateTime.UtcNow - mdiWrittenAtUtc).TotalMilliseconds, purged, Source.Commands.Count));
+
+            mdiOutstanding = null;
+            if (Source.Commands.Count > 0)
+                ResponseReceived("go");   // resume draining the kept non-jog rows through the normal pacing
+            else
+                streamingState = StreamingState.Idle;   // nothing left - the arriving command kicks afresh
+        }
+
         public void SendCommand(string command)
         {
+            // A wedged SendMDI (see ReleaseFlushedJogMdi) is only ever noticed when the operator sends
+            // the NEXT command - release it here so that command goes out instead of queueing forever.
+            if (command.Length > 1)
+                ReleaseFlushedJogMdi();
+
             if (command.Length == 1)
                 SendRTCommand(command);
             else if (streamingState == StreamingState.Idle ||
@@ -1811,12 +1877,18 @@ namespace CNC.Core
                         string sent = Source.Commands.Dequeue();
                         if (DebugLog.Enabled)
                             DebugLog.Write("jobrunner", string.Format("SendMDI DEQUEUED+WROTE \"{0}\" - {1} left queued", sent, Source.Commands.Count));
+                        // Record what is now outstanding - ReleaseFlushedJogMdi's evidence for declaring
+                        // a cancel-flushed $J dead. Overwriting the previous value is the settle: this
+                        // case only runs when a reply (or the initial "go" kick) arrived for it.
+                        mdiOutstanding = sent;
+                        mdiWrittenAtUtc = DateTime.UtcNow;
                         Comms.com.WriteCommand(sent);
                     }
                     else
                     {
                         if (DebugLog.Enabled)
                             DebugLog.Write("jobrunner", "SendMDI queue empty on this ack - streamingState -> Idle");
+                        mdiOutstanding = null;
                         streamingState = StreamingState.Idle;
                     }
                     break;
