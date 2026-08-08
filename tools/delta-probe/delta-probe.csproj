@@ -19,6 +19,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\CNC Core\CNC Core\CNC.Core.net8.csproj" />
+    <!-- MachineMirror (CNC.Client) - the harness drives it two ways: a fake IMachineStateStream for
+         precise gap/selective-apply checks, and the real MachineStateStream for one end-to-end pass. -->
+    <ProjectReference Include="..\..\CNC Client\CNC Client\CNC.Client.net8.csproj" />
   </ItemGroup>
 
 </Project>

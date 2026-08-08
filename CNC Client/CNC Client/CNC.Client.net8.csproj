@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    PORTABILITY PROBE for CNC.Client - not part of ioSender XL.sln and never shipped, same pattern
+    as CNC Core / CNC Contracts and for the same reason: the VS MSBuild that builds the solution
+    cannot resolve an SDK-style project targeting net8.0.
+
+    Build it alone with:  dotnet build "CNC Client/CNC Client/CNC.Client.net8.csproj"
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>CNC.Client</AssemblyName>
+    <RootNamespace>CNC.Client</RootNamespace>
+    <LangVersion>7.3</LangVersion>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <BaseOutputPath>bin\net8probe\</BaseOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="*.cs" Exclude="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CNC Contracts\CNC.Contracts.net8.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -4,8 +4,11 @@
  */
 
 using System;
+using System.Collections.Generic;
+using System.ComponentModel;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using CNC.Client;
 using CNC.Contracts;
 using CNC.Core;
 
@@ -223,7 +226,130 @@ static class Probe
             subB.Dispose();
         }
 
+        // ---- CNC.Client.MachineMirror: precise gap/selective-apply checks against a fake stream ----
+        Console.WriteLine("MachineMirror vs a fake IMachineStateStream (precise control over Seq):");
+        {
+            var fake = new FakeStateStream();
+            var notified = new List<string>();
+            var clientMirror = new MachineMirror(fake);
+            Check(!clientMirror.HasData, "clientMirror starts with no data before any message");
+
+            fake.Push(Snapshot(seq: 0, tool: "1", state: GrblStates.Idle));
+            Check(clientMirror.HasData && clientMirror.Tool == "1" && clientMirror.GrblState.State == GrblStates.Idle,
+                  "first snapshot populates the clientMirror");
+
+            clientMirror.PropertyChanged += (s, e) => notified.Add(e.PropertyName);
+            fake.Push(Delta(seq: 1, changed: MachineField.Tool, tool: "2"));
+            Check(clientMirror.Tool == "2", "delta updates the flagged field");
+            Check(notified.Count == 1 && notified[0] == nameof(MachineMirror.Tool),
+                  "notification fires ONLY for the flagged field (got [" + string.Join(",", notified) + "])");
+
+            // Seq gap: deltas 2 and 3 both claim to change WorkCoordinateSystem, but only 3 is delivered -
+            // the clientMirror must detect the missing 2, refuse to apply 3 blindly, and self-heal via
+            // RequestSnapshot instead. FakeStateStream's RequestSnapshot delivers NextSnapshot().
+            notified.Clear();
+            fake.NextSnapshot = () => Snapshot(seq: 5, tool: "9", state: GrblStates.Run);
+            fake.Push(Delta(seq: 3, changed: MachineField.WorkCoordinateSystem, wcs: "G55"));
+            // The load-bearing check: WorkCoordinateSystem lands at null (the resync snapshot's own
+            // value), NOT "G55" from the dropped delta - proving the gap delta's payload never took
+            // effect, only the resync's did.
+            Check(clientMirror.Tool == "9" && clientMirror.WorkCoordinateSystem == null,
+                  "a Seq gap is NOT applied on top of stale state - the resync snapshot wins instead");
+            Check(fake.SnapshotRequests == 1, "exactly one resync requested for the gap");
+            // A full resync (Changed=All) correctly notifies EVERY field, not just the ones that
+            // differ from before - it's the conservative-correct reading of "trust everything here",
+            // and resyncs are rare enough that over-notifying costs nothing.
+            Check(notified.Contains(nameof(MachineMirror.Tool)) && notified.Contains(nameof(MachineMirror.WorkCoordinateSystem)),
+                  "a full resync notifies every field, including ones already at their resync value");
+
+            // Back in sync: seq 6 following the resync's seq 5 applies normally, no further resync.
+            fake.Push(Delta(seq: 6, changed: MachineField.FeedRate, feedRate: 42d));
+            Check(clientMirror.FeedRate == 42d && fake.SnapshotRequests == 1, "normal delta after resync applies with no extra resync");
+
+            clientMirror.Dispose();
+        }
+
+        // ---- MachineMirror end-to-end: the real MachineStateStream, driven by the real parser ----
+        Console.WriteLine("MachineMirror via the REAL MachineStateStream + parser:");
+        {
+            var model2 = new GrblViewModel();
+            using var stream2 = new MachineStateStream(model2);
+            using var mirror2 = new MachineMirror(stream2);
+
+            Check(mirror2.HasData, "mirror has data immediately after construction (synchronous snapshot)");
+
+            model2.DataReceived("<Idle|MPos:1.000,2.000,3.000|FS:0,0>");
+            Check(mirror2.GrblState.State == GrblStates.Idle && mirror2.MachinePosition[0] == 1.0,
+                  "mirror reflects a real parsed status report end to end");
+
+            model2.DataReceived("<Run|MPos:4.000,2.000,3.000|FS:800,12000>");
+            Check(mirror2.GrblState.State == GrblStates.Run && mirror2.MachinePosition[0] == 4.0
+                  && mirror2.FeedRate == 800d,
+                  "mirror tracks a second real report (state + position + feed)");
+        }
+
         Console.WriteLine(failures == 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED");
         return failures == 0 ? 0 : 1;
+    }
+
+    // ---- Test helpers for the MachineMirror section ----
+
+    static MachineDelta Snapshot(long seq, string tool = null, GrblStates state = GrblStates.Unknown)
+    {
+        return new MachineDelta
+        {
+            Seq = seq,
+            Changed = MachineField.All,
+            State = new MachineSnapshot { Tool = tool, GrblState = new GrblState { State = state } }
+        };
+    }
+
+    static MachineDelta Delta(long seq, MachineField changed, string tool = null, string wcs = null, double feedRate = 0d)
+    {
+        return new MachineDelta
+        {
+            Seq = seq,
+            Changed = changed,
+            State = new MachineSnapshot { Tool = tool, WorkCoordinateSystem = wcs, FeedRate = feedRate }
+        };
+    }
+
+    // Minimal IMachineStateStream double: fans a pushed delta out to subscribers, and answers
+    // RequestSnapshot with whatever NextSnapshot() currently returns. Deliberately does NOT
+    // auto-deliver a snapshot on Subscribe (unlike the real contract) - test code pushes the first
+    // message itself, which gives precise control over the Seq sequence under test.
+    sealed class FakeStateStream : IMachineStateStream
+    {
+        // CNC.Core.Action (an enum, GCode.cs) shadows System.Action inside a `using CNC.Core;` scope -
+        // qualify explicitly rather than fight the using list (same gotcha b9456f9 hit in Core itself).
+        private readonly List<System.Action<MachineDelta>> subscribers = new List<System.Action<MachineDelta>>();
+        public Func<MachineDelta> NextSnapshot;
+        public int SnapshotRequests;
+
+        public IDisposable Subscribe(System.Action<MachineDelta> handler)
+        {
+            subscribers.Add(handler);
+            return new Unsub(() => subscribers.Remove(handler));
+        }
+
+        public void Push(MachineDelta delta)
+        {
+            foreach (var h in subscribers.ToArray())
+                h(delta);
+        }
+
+        public void RequestSnapshot()
+        {
+            SnapshotRequests++;
+            if (NextSnapshot != null)
+                Push(NextSnapshot());
+        }
+
+        private sealed class Unsub : IDisposable
+        {
+            private System.Action dispose;
+            public Unsub(System.Action dispose) { this.dispose = dispose; }
+            public void Dispose() { dispose?.Invoke(); dispose = null; }
+        }
     }
 }
