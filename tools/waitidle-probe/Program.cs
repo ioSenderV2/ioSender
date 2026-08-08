@@ -106,6 +106,8 @@ static class Probe
 
         // ---- build the program through the REAL load-time path (GCodeJob.AddBlock sets Directive) --
         var model = new GrblViewModel();
+        stream.DataReceived += model.DataReceived;   // headless model wiring (net8-smoke's pattern) -
+                                                     // feeds GrblState/homed state for the PREREQ checks below
         var prog = new GCodeProgram(model);      // transient ctor - never touches shared state
         prog.AddBlock("waitidle-probe", CNC.Core.Action.New);   // New's arg is a NAME, not a block
         prog.AddBlock("(header comment that mentions WAITIDLE mid-prose - must NOT arm)");
@@ -189,6 +191,19 @@ static class Probe
             Check((cleared.Value - lastRun).TotalMilliseconds >= 150, "release waited out the two-report idle streak",
                   string.Format("{0:0}ms after last Run", (cleared.Value - lastRun).TotalMilliseconds));
         }
+
+        // ---- PREREQ evaluator against the live sim (unified streaming Step 5's shared evaluator) ----
+        // The sim is unhomed (homing disabled in our EEPROM copy), so 'homed' must fail; the link is
+        // up and the controller idle, so 'connected' must pass - and a combined line must report only
+        // the one genuinely unmet condition.
+        Console.WriteLine();
+        var unmetHomed = MacroRunner.EvaluatePrereqLines(model, new[] { "(PREREQ homed)" });
+        Check(unmetHomed.Count == 1 && unmetHomed[0].Contains("not homed"), "PREREQ homed correctly unmet on the unhomed sim",
+              string.Join("; ", unmetHomed));
+        var unmetConn = MacroRunner.EvaluatePrereqLines(model, new[] { "(PREREQ connected)" });
+        Check(unmetConn.Count == 0, "PREREQ connected passes on a live link", string.Join("; ", unmetConn));
+        var unmetBoth = MacroRunner.EvaluatePrereqLines(model, new[] { "(PREREQ homed, connected)" });
+        Check(unmetBoth.Count == 1, "combined PREREQ reports only the genuinely unmet condition", string.Join("; ", unmetBoth));
 
         Console.WriteLine(failures == 0 ? "\nALL CHECKS PASSED" : string.Format("\n{0} CHECK(S) FAILED", failures));
         return failures == 0 ? 0 : 1;

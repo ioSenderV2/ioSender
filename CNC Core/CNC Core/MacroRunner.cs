@@ -146,33 +146,10 @@ namespace CNC.Core
             string[] lines = code.Replace("\r", string.Empty).Split('\n');
             var buffer = new StringBuilder();
 
-            // 1) Prerequisites - evaluated up front, before anything is streamed.
-            var conditions = new List<string>();
-            foreach (var raw in lines)
-            {
-                if (!IsDirective(raw, "PREREQ"))
-                    continue;
-                foreach (var arg in Body(raw, "PREREQ").Split(','))
-                {
-                    string cond = arg.Trim();   // original case kept - build options match case-sensitively
-                    if (cond.Length > 0)
-                        conditions.Add(cond);
-                }
-            }
-
-            // The homed state and stored positions / work coordinate systems all come from the $#
-            // report - fetch it once up front if any such prerequisite is present so they are read
-            // fresh from the controller (the status-report H: field is change-based and goes stale).
-            if (conditions.Any(c => c.Equals("homed", StringComparison.OrdinalIgnoreCase) || CoordinateSystemCodes.Contains(c.ToUpperInvariant())))
-                GrblWorkParameters.Get(model);
-
-            var unmet = new List<string>();
-            foreach (var cond in conditions)
-            {
-                string fail = EvalPrereq(model, cond);
-                if (fail != null)
-                    unmet.Add(fail);
-            }
+            // 1) Prerequisites - evaluated up front, before anything is streamed. Shared with
+            //    JobRunner's loaded-program gate (unified streaming engine Step 5) - ONE evaluator,
+            //    per the streaming-paths audit's "the same rule written twice can drift" finding.
+            var unmet = EvaluatePrereqLines(model, lines);
             if (unmet.Count > 0)
             {
                 UserPrompt.Show(string.Format("Cannot run macro \"{0}\":\r\n\r\n• {1}", name, string.Join("\r\n• ", unmet)),
@@ -767,6 +744,39 @@ namespace CNC.Core
                 EventUtils.DoEvents();
 
             return res == true;
+        }
+
+        // The one PREREQ evaluator (unified streaming engine Step 5): collect every (PREREQ ...)
+        // condition from the given lines, fetch a fresh $# when any condition needs it (homed state /
+        // stored positions go stale in the change-based status report), and return the unmet failure
+        // texts - empty means run. Public so JobRunner's pre-Cycle-Start gate on a LOADED program uses
+        // exactly this, not a re-implementation; Run() above goes through it too.
+        public static List<string> EvaluatePrereqLines(GrblViewModel model, IEnumerable<string> lines)
+        {
+            var conditions = new List<string>();
+            foreach (var raw in lines)
+            {
+                if (!IsDirective(raw, "PREREQ"))
+                    continue;
+                foreach (var arg in Body(raw, "PREREQ").Split(','))
+                {
+                    string cond = arg.Trim();   // original case kept - build options match case-sensitively
+                    if (cond.Length > 0)
+                        conditions.Add(cond);
+                }
+            }
+
+            if (conditions.Any(c => c.Equals("homed", StringComparison.OrdinalIgnoreCase) || CoordinateSystemCodes.Contains(c.ToUpperInvariant())))
+                GrblWorkParameters.Get(model);
+
+            var unmet = new List<string>();
+            foreach (var cond in conditions)
+            {
+                string fail = EvalPrereq(model, cond);
+                if (fail != null)
+                    unmet.Add(fail);
+            }
+            return unmet;
         }
 
         private static string EvalPrereq(GrblViewModel model, string cond)

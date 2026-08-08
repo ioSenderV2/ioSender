@@ -38,6 +38,7 @@
  */
 
 using System;
+using System.Linq;
 using System.Threading;
 
 namespace CNC.Core
@@ -732,6 +733,28 @@ namespace CNC.Core
                 }
                 else
                 {
+                    // (PREREQ ...) gate for a LOADED program (unified streaming engine Step 5): a
+                    // directive-bearing program - Work Order's generated text, or a .macro opened via
+                    // plain Load File - declares its own preconditions, and they are checked HERE,
+                    // before any motion, exactly as MacroRunner.Run has always done for macros. One
+                    // shared evaluator (EvaluatePrereqLines) so the two paths cannot drift. Evaluated
+                    // on every Cycle Start including a mid-program "start from this toolpath" run -
+                    // prerequisites are program-level facts (homed, G30 set, build options), not
+                    // positional ones. Programs without PREREQ rows skip all of this at the cost of
+                    // one flag scan. Not applied to SD-card jobs above: the sender never sees their
+                    // lines, so there is nothing to scan - the same visibility rule as dry run.
+                    if (Source.Data.Any(b => b.Directive == "PREREQ"))
+                    {
+                        var unmet = MacroRunner.EvaluatePrereqLines(model,
+                            Source.Data.Where(b => b.Directive == "PREREQ").Select(b => (string)b.Data));
+                        if (unmet.Count > 0)
+                        {
+                            UserPrompt.Show(string.Format("Cannot start this program:\r\n\r\n• {0}", string.Join("\r\n• ", unmet)),
+                                "ioSender", PromptButtons.OK, PromptIcon.Warning);
+                            return;
+                        }
+                    }
+
                     job.ToolChangeLine = -1;
                     model.BlockExecuting = fromBlock;
                     job.CurrBlock = job.ACKPending = job.PendingLine = fromBlock;
