@@ -990,6 +990,16 @@ namespace CNC.Core
                 {
                 }
             }
+            // Diagnostic only, 2026-08-08: this branch used to not exist - a command (jog or MDI) arriving
+            // while streamingState is outside the allowed list above was, and still is, silently dropped.
+            // No behavior change here (still a no-op), but a real incident on real hardware looked exactly
+            // like a hung controller with zero trace anywhere - repeated jog clicks got logged to the
+            // console (GrblViewModel.ExecuteCommand accepted them) but never reached the wire, and nothing
+            // recorded WHY. This makes the drop itself observable: enable with -debuglog=jobrunner (or a
+            // bare -debuglog) and a repro will show the exact command and the streamingState that ate it,
+            // which is the fact needed to fix this correctly rather than guess at it.
+            else if (DebugLog.Enabled)
+                DebugLog.Write("jobrunner", string.Format("SendCommand DROPPED \"{0}\" - streamingState={1} is not in the allowed set", command, streamingState));
         }
 
         public void RewindFile()
