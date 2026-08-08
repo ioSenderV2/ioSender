@@ -2585,9 +2585,16 @@ namespace GCode_Sender
 
             if (!JobRunning)
             {
-                Close();
+                ShowShutdownNoticeAndClose();
                 return;
             }
+
+            // Operator visibility while the watcher waits (user feedback 2026-08-08: the idle path's
+            // instant close looked exactly like a crash - "I never saw a notification"). Message is the
+            // established status-bar text every wizard/macro already uses.
+            var model = DataContext as GrblViewModel;
+            if (model != null)
+                model.Message = "Shutdown requested - closing when the job finishes";
 
             var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
             shutdownWatcher = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -2597,15 +2604,53 @@ namespace GCode_Sender
                 {
                     shutdownWatcher.Stop();
                     shutdownWatcher = null;
-                    Close();
+                    ShowShutdownNoticeAndClose();
                 }
                 else if (DateTime.UtcNow >= deadline)
                 {
                     shutdownWatcher.Stop();
                     shutdownWatcher = null;   // gave up - still busy, stay running, caller's own poll times out
+                    if (model != null)
+                        model.Message = "Shutdown request timed out - still running";
                 }
             };
             shutdownWatcher.Start();
+        }
+
+        // The ~2s "why is this window about to disappear" notice, shown before EVERY shutdown-request
+        // close (idle-path immediate and busy-path job-finished alike). Chosen by the user over
+        // close-instantly and notice-with-Cancel: a vanishing window must always have a visible cause -
+        // the silent version was indistinguishable from a crash from the operator's seat, the exact
+        // confusion this whole feature exists to kill. Code-built on purpose (no XAML/x:Uid: LocBaml
+        // localization can't reach code-built UI, and a 2-second transient doesn't warrant a dialog
+        // class); costs every scripted rebuild ~2s, which build.ps1's poll window (timeout+5s) absorbs.
+        private void ShowShutdownNoticeAndClose()
+        {
+            var notice = new Window
+            {
+                WindowStyle = WindowStyle.None,
+                ResizeMode = ResizeMode.NoResize,
+                ShowInTaskbar = false,
+                Topmost = true,
+                SizeToContent = SizeToContent.WidthAndHeight,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                Content = new System.Windows.Controls.TextBlock
+                {
+                    Text = "Shutdown requested - closing...",
+                    FontSize = 16,
+                    Margin = new Thickness(28, 18, 28, 18)
+                }
+            };
+            notice.Show();
+            var t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            t.Tick += (s, e) =>
+            {
+                t.Stop();
+                notice.Close();
+                Close();
+            };
+            t.Start();
         }
 
         // Another launch was intercepted by the single-instance gate: surface this (the running) window.
