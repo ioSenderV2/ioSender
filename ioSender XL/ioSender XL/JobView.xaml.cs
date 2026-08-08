@@ -706,6 +706,15 @@ namespace GCode_Sender
 
             if (GrblInfo.NumAxes > 3)
                 GCode.File.AddTransformer(typeof(GCodeWrapViewModel), "Wrap to rotary (WIP)", MainWindow.UIViewModel.TransformMenuItems);
+
+            // Work Order compile cache, restore half (a 4-minute script-font compile per restart was the
+            // motivating case): now that the controller is booted and its settings are loaded (the cache
+            // fingerprint folds them in - this is the earliest moment it CAN be computed), reload the
+            // cached compiled program as the job if it still matches the persisted work order. OnBooted
+            // runs once per session (isBooted gate at the call site), never over an already-loaded job
+            // (a file-open argument wins), and never in an automation instance.
+            if (App.TestServerPort < 0)
+                CNC.Controls.WorkOrderView.TryAutoRestoreCachedProgram(model);
         }
 
         private bool InitSystem()

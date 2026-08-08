@@ -17,6 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -2040,6 +2041,135 @@ namespace CNC.Controls
             DebugLog.Write("workorder", string.Format("WatchForRunEnd: armed with StreamingState={0}", model.StreamingState));
         }
 
+        // ---- Compiled-program cache (user request 2026-08-08: a script-font engraving compiles for
+        // ~4 MINUTES, and since Step 6/7 the program pops off the Job tab after every run, so repeat
+        // runs and restarts each paid that again). Generate is MEMOIZED: a fingerprint of everything
+        // that shapes the output - the work order content plus the ambient state WorkOrderCompiler
+        // reads (TLO baseline baked into #<_tlo_ref>, spindle capability, soft-limit travel/pulloff/
+        // homing direction) plus the app version (the compiler evolves) - keys both an in-memory copy
+        // and the stamped Generated\work_order.macro file (which doubles as the debugging copy, whose
+        // refresh Step 6 had silently dropped). Any content or machine change misses and recompiles;
+        // a fingerprint that CANNOT be computed (settings not loaded) fails closed to a recompile.
+        // Known accepted blind spot: the hash covers the work order, not the font FILES - a system TTF
+        // changing on disk would not invalidate (vanishingly rare for installed fonts).
+        // Static: one Work Order tab, and the memo must survive view recreation.
+        private static string cachedFp, cachedProgram, cachedStats;
+
+        private const string CacheStampPrefix = "(WOCACHE ";
+
+        // Everything the compiled text depends on, hashed. Null = can't know (controller settings not
+        // loaded yet) - callers must treat that as a miss, never as a match.
+        internal static string ComputeFingerprint(WorkOrder wo)
+        {
+            if (wo == null)
+                return null;
+            // The compiler reads these live (see WorkOrderCompiler: MaxTravel/pulloff/homing for the
+            // envelope math, TloRefBaseline for #<_tlo_ref>, SpindleDirectionCapability) - if the
+            // settings aren't in yet the output can't be predicted, so no fingerprint.
+            if (string.IsNullOrEmpty(GrblSettings.GetString(GrblSetting.MaxTravelBase)))
+                return null;
+
+            var sb = new StringBuilder();
+            using (var sw = new System.IO.StringWriter(sb))
+                new System.Xml.Serialization.XmlSerializer(typeof(WorkOrder)).Serialize(sw, wo);
+            sb.Append("|v=").Append(System.Reflection.Assembly.GetExecutingAssembly().GetName().Version);
+            sb.Append("|tlo=").Append(AppConfig.Settings.Base.TloRefBaseline.ToInvariantString());
+            sb.Append("|spin=").Append(AppConfig.Settings.Base.SpindleDirectionCapability);
+            sb.Append("|fso=").Append(GrblInfo.ForceSetOrigin);
+            sb.Append("|hd=").Append(GrblInfo.HomingDirection);
+            sb.Append("|po=").Append(GrblSettings.GetString(GrblSetting.HomingPulloff));
+            for (int i = 0; i < GrblInfo.NumAxes; i++)
+                sb.Append("|t").Append(i).Append('=').Append(GrblSettings.GetString(GrblSetting.MaxTravelBase + i));
+
+            using (var sha = System.Security.Cryptography.SHA1.Create())
+            {
+                var hash = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(sb.ToString()));
+                var hex = new StringBuilder(hash.Length * 2);
+                foreach (byte b in hash)
+                    hex.Append(b.ToString("x2"));
+                return hex.ToString();
+            }
+        }
+
+        // Read Generated\work_order.macro back IF its stamp matches this fingerprint. The stamp is the
+        // file's first line - "(WOCACHE <sha1> stats=<line>)" - an ordinary g-code comment, so a stamped
+        // file is still a valid, runnable/inspectable program. A file from before stamping existed (or a
+        // hand-edited one) simply misses.
+        private static bool TryReadCachedProgram(string fp, out string text, out string stats)
+        {
+            text = stats = null;
+            try
+            {
+                string path = MacroRunner.GeneratedCopyPath("Work Order");
+                if (fp == null || !System.IO.File.Exists(path))
+                    return false;
+                string all = System.IO.File.ReadAllText(path);
+                int nl = all.IndexOf('\n');
+                if (nl < 0)
+                    return false;
+                string stamp = all.Substring(0, nl).TrimEnd('\r').Trim();
+                if (!stamp.StartsWith(CacheStampPrefix, StringComparison.Ordinal) || !stamp.EndsWith(")", StringComparison.Ordinal))
+                    return false;
+                string body = stamp.Substring(CacheStampPrefix.Length, stamp.Length - CacheStampPrefix.Length - 1);
+                int sp = body.IndexOf(' ');
+                string stampFp = sp < 0 ? body : body.Substring(0, sp);
+                if (stampFp != fp)
+                    return false;
+                int st = body.IndexOf("stats=", StringComparison.Ordinal);
+                stats = st >= 0 ? body.Substring(st + 6).Trim() : string.Empty;
+                text = all.Substring(nl + 1);
+                return text.Length > 0;
+            }
+            catch
+            {
+                text = stats = null;
+                return false;   // unreadable cache = miss, never an error - Generate just recompiles
+            }
+        }
+
+        // Write-through after a real compile: memo + the stamped file (which is ALSO the Generated-folder
+        // debugging copy - one write serves both). No fingerprint (settings unavailable) still writes the
+        // plain unstamped copy - the debugging aid must not vanish just because the cache can't key it.
+        private static void StoreCachedProgram(string fp, string text, string stats)
+        {
+            cachedFp = fp;
+            cachedProgram = text;
+            cachedStats = stats;
+            MacroRunner.SaveGeneratedCopy("Work Order", fp == null ? text
+                : string.Format("(WOCACHE {0} stats={1})\r\n{2}", fp, stats ?? string.Empty, text));
+        }
+
+        // Startup auto-restore (user-chosen "both" 2026-08-08): once the controller is booted and its
+        // settings are in (the fingerprint needs them - fp==null before that fails closed), reload the
+        // cached program as the job if it still matches the persisted work order, so a restart lands
+        // ready for Cycle Start without repaying a multi-minute compile. The section holder is static
+        // and populated at config load, so this works without the tab ever having been opened. Never
+        // fires over an already-loaded job (a file-open argument wins).
+        public static bool TryAutoRestoreCachedProgram(GrblViewModel model)
+        {
+            try
+            {
+                var wo = SectionConfig;
+                if (wo == null || wo.Toolpaths.Count == 0 || GCode.File.IsLoaded)
+                    return false;
+                string fp = ComputeFingerprint(wo);
+                if (!TryReadCachedProgram(fp, out string text, out string stats))
+                    return false;
+                cachedFp = fp;          // warm the in-session memo too - Generate after this is instant
+                cachedProgram = text;
+                cachedStats = stats;
+                GCode.File.LoadText("Work Order", text);
+                if (model != null)
+                    model.Message = string.Format("Restored the last Work Order program from cache ({0}) - press Cycle Start when ready.", stats);
+                DebugLog.Write("workorder", string.Format("auto-restored cached program at boot (fp {0}, {1})", fp.Substring(0, 8), stats));
+                return true;
+            }
+            catch
+            {
+                return false;   // restore is a convenience - any failure means "press Generate", never a fault
+            }
+        }
+
         // Shared by Generate and Run: validate + build program text into the
         // `program` field. False (nothing built, `program` untouched) on any validation failure or a "no" to
         // the WCS/tool-length confirm.
@@ -2085,6 +2215,38 @@ namespace CNC.Controls
                     "Work Order", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) != MessageBoxResult.Yes)
                 return false;
 
+            // Memoized Generate (see the cache block above BuildProgram): same fingerprint = same
+            // output, so reuse the last compile - the in-session memo first, then the stamped
+            // Generated copy (the restart case). Placed AFTER the validation + WCS/TLO confirm above
+            // on purpose: those gates are about the MACHINE'S current trustworthiness, not the text,
+            // and must keep firing even when the text is reused.
+            string fp = ComputeFingerprint(workOrder);
+            if (fp != null)
+            {
+                string hitText = null, hitStats = null;
+                if (fp == cachedFp && cachedProgram != null)
+                {
+                    hitText = cachedProgram;
+                    hitStats = cachedStats;
+                }
+                else if (TryReadCachedProgram(fp, out string fileText, out string fileStats))
+                {
+                    hitText = fileText;
+                    hitStats = fileStats;
+                    cachedFp = fp;
+                    cachedProgram = fileText;
+                    cachedStats = fileStats;
+                }
+                if (hitText != null)
+                {
+                    program = hitText;
+                    MacroProcessor.ActiveProgramStats = string.IsNullOrEmpty(hitStats) ? "cached" : hitStats + " (cached)";
+                    model.Message = string.Format("Work order program reused from cache - {0}.", MacroProcessor.ActiveProgramStats);
+                    DebugLog.Write("workorder", string.Format("Generate: cache hit (fp {0})", fp.Substring(0, 8)));
+                    return true;
+                }
+            }
+
             // The compile is synchronous on the UI thread and noticeably long for a V-carve, so say so -
             // and the render flush is not optional: without it the "Compiling..." message and the wait
             // cursor would only ever paint AFTER the work they announce is already done.
@@ -2112,6 +2274,11 @@ namespace CNC.Controls
             {
                 Mouse.OverrideCursor = null;
             }
+
+            // Write-through: warm the memo and write the stamped Generated copy in one go (the stamp
+            // is what lets a restart reuse this compile; the file is also the debugging copy, whose
+            // refresh Step 6 had dropped when it took PublishGenerated out of this path).
+            StoreCachedProgram(fp, program, MacroProcessor.ActiveProgramStats);
             return true;
         }
 

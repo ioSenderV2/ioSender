@@ -87,11 +87,18 @@ namespace CNC.Core
         {
             try
             {
-                var fileName = new string(name.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '_').ToArray()) + ".macro";
                 System.IO.Directory.CreateDirectory(Resources.GeneratedFolder);
-                System.IO.File.WriteAllText(System.IO.Path.Combine(Resources.GeneratedFolder, fileName), code);
+                System.IO.File.WriteAllText(GeneratedCopyPath(name), code);
             }
             catch { /* best-effort - never let a diagnostic write block the actual run */ }
+        }
+
+        // The one filename rule for a generated copy, shared with readers (Work Order's compile cache
+        // reads back the copy it wrote) so writer and reader cannot drift on the sanitization.
+        public static string GeneratedCopyPath(string name)
+        {
+            var fileName = new string(name.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '_').ToArray()) + ".macro";
+            return System.IO.Path.Combine(Resources.GeneratedFolder, fileName);
         }
 
         // Shared by every generator that parks at G30 (StartJobView, StepperCalibrationProbeWizard, ...):
