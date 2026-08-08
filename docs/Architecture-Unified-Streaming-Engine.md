@@ -210,7 +210,9 @@ separately.
    dispatcher operations to the 3GB ceiling. Step 7's deletion of that loop is now a crash fix, not
    just cleanup.
 4. ✅ **`MBOX` barrier HARDWARE-VERIFIED both paths (`eb09825`+`1a536e8`, 2026-08-08 10:06);
-   `PROMPT` up-front dialog/substitution still to build.** Design as confirmed: prompt at ack-drain
+   `PROMPT` done too (`5674410`, sim-verified 34/34: wire got the operator's substituted value via the
+   real EXPR passthrough + `GrblInfo.Get` handshake; bare `(PROMPT)` = checkpoint through the MBOX
+   machinery; hardware test pending).** MBOX design as confirmed: prompt at ack-drain
    (not motion-idle — macros chain `(WAITIDLE)(MBOX)` when they need that); OK releases via sentinel;
    Cancel = the Stop button's routine. **The hardware pass caught what the sim probe could not:**
    Cancel was first wired to `Stop()`, which sets `job.Stopped=true` — the exact flag that SUPPRESSES
