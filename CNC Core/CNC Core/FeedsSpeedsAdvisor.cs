@@ -195,6 +195,26 @@ namespace CNC.Core
                     Drill = woodDrill,
                     DrillHss = hssDrill,
                 },
+                // Bamboo: added 2026-08-07 for laminated cutting boards. Hard-maple-class density, but
+                // two things push the numbers below Hardwood rather than at it: silica content that
+                // dulls edges faster than any true hardwood (carbide only, and treat the bit as a
+                // consumable), and a char-instead-of-dust failure mode when a dulling bit dwells.
+                // ~15-20% under Hardwood's chip loads as the starting point - UNTUNED (no real-cut data
+                // yet, same disclaimer as Brass/Steel), refine from actual boards.
+                ["Bamboo"] = new MaterialRef
+                {
+                    RpmRange = (14000, 18000, 22000),
+                    ChipLoad = new Dictionary<double, double> { { 1.5, 0.020 }, { 3.0, 0.04 }, { 6.0, 0.085 }, { 9.5, 0.125 }, { 12.7, 0.17 }, { 25.0, 0.21 }, { 50.0, 0.24 } },
+                    MaxAxialFrac = 1.0,
+                    MaxRadialFrac = 0.4,
+                    Notes = "Bamboo (laminated boards) is hard-maple dense with abrasive silica - sharp CARBIDE " +
+                            "only, and expect faster edge wear than any hardwood. Long fibers fuzz when the edge " +
+                            "dulls or feed climbs; it chars rather than dusts if the bit dwells, so keep the feed " +
+                            "up instead of slowing down to be safe. Slight hardness jumps at each glue line. " +
+                            "UNTUNED starting point - refine from real boards.",
+                    Drill = woodDrill,
+                    DrillHss = hssDrill,
+                },
                 ["Aluminum"] = new MaterialRef
                 {
                     // Surface-speed driven: RPM computed from surface speed + tool diameter, clamped to the
