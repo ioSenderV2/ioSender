@@ -962,7 +962,18 @@ namespace CNC.Core
         // keyword, or null if the line isn't one of the four directives at all.
         public static string RecognizeDirective(string line)
         {
-            foreach (var keyword in new[] { "PREREQ", "PROMPT", "MBOX", "WAITIDLE" })
+            // WAITIDLE takes no arguments, so require the EXACT form "(WAITIDLE)" here. The loose
+            // keyword+non-letter rule IsDirective uses (kept for the argument-taking directives, and
+            // unchanged inside Run() itself for macro back-compat) recognized a loaded file's ordinary
+            // comment "(WAITIDLE barrier test ...)" as a live directive on the very first hardware test
+            // of the pump's WAITIDLE barrier, 2026-08-08 - at load time this runs against ARBITRARY
+            // g-code files, not just hand-written macros, so prose comments are a real input.
+            string t = line.Trim();
+            if (t.Length > 1 && t[0] == '(' && t[t.Length - 1] == ')' &&
+                t.Substring(1, t.Length - 2).Trim().Equals("WAITIDLE", StringComparison.OrdinalIgnoreCase))
+                return "WAITIDLE";
+
+            foreach (var keyword in new[] { "PREREQ", "PROMPT", "MBOX" })
                 if (IsDirective(line, keyword))
                     return keyword;
             return null;
