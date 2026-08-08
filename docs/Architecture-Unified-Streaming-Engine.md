@@ -97,6 +97,25 @@ event stream that already re-invokes dispatch (status reports / acks) once `ACKP
 0 AND two consecutive Idle reports have been observed — mirroring `WaitForIdle`'s own success
 condition, just event-driven instead of polled-and-blocking.
 
+**⚠️ Gap found 2026-08-08, changes Step 3's real shape — not just "extend probePending":**
+`probePending`'s release condition (`inflight.Count == 0`, `StreamPump.cs:388`) is pure ack-bookkeeping
+— it never looks at `GrblState` at all. Checked directly: `StreamPump` taps `Comms.com.AckSink` and
+**nothing else** — it has zero visibility into status reports, by design (the pump thread's own
+threading contract is "every accounting field touched ONLY by the pump thread," deliberately decoupled
+from the UI-thread `GrblViewModel`/`GrblState` machinery). "Two consecutive Idle reports" is a signal
+that **does not reach the pump thread today** — there is no existing path to extend, unlike probe
+completion. A `WAITIDLE` barrier gated on ack-draining alone (the signal that IS already there) would
+be actively unsafe: acks for a controller-buffered move can land before the physical motion finishes,
+which is exactly the race `WAITIDLE`/`MacroRunner.WaitForIdle` exists to close.
+
+**What Step 3 actually needs, not yet designed:** a new, thread-safe way for a status report (observed
+on the UI thread, same as everywhere else `GrblState` is read) to reach the pump thread and clear the
+barrier — something in the shape of `Comms.com.AckSink`'s own callback wiring, but for status reports,
+scoped so it only matters while a `WAITIDLE` barrier is actually set (no cost/risk to every other job).
+**Left undesigned rather than guessed** — this is exactly the kind of decision that shouldn't be made
+blind, and it changes Step 3 from "mirror an existing mechanism" to "design a new cross-thread signal,
+then mirror the barrier shape." Answer this BEFORE Step 3 code, not during it.
+
 ### `(MBOX, ...)` — a dispatch barrier + a prompt
 Same barrier pattern as `WAITIDLE`: hold dispatch, show the existing non-modal `HoldPrompt` (already
 built not to steal focus, so the operator can jog while it's up — keep that property), resume dispatch
@@ -129,12 +148,16 @@ separately.
 
 ## Staged plan (same discipline as JobRunner's own 4-step extraction — small, hardware-verified, machine free)
 
-1. **Settle the `StreamPump` vs. `JobRunner.SendNextLine` duplication** — investigation only, no
-   behavior change. Prerequisite: don't add directive support to a dead path.
-2. **Add `IsDirective` at load time**, no dispatch behavior yet. Verify inert — a directive line looks
+1. ✅ **Settle the `StreamPump` vs. `JobRunner.SendNextLine` duplication** — investigation only, no
+   behavior change. Prerequisite: don't add directive support to a dead path. **Done 2026-08-08:
+   `StreamPump` is live, see "Today's actual shape" above.**
+2. ✅ **Add `IsDirective` at load time**, no dispatch behavior yet. Verify inert — a directive line looks
    like an ordinary comment today, so nothing should change until the next step reads the flag.
-3. **`WAITIDLE` barrier only** — smallest slice, mechanically closest to the existing `probePending`
-   pattern. Hardware-verify on a macro that uses only `WAITIDLE`.
+   **Drafted 2026-08-08 (`d330305`), compile-checked via -Scratch only, NOT hardware-verified — a
+   carve was running, no `-Launch` was possible. Verify inert on a real launch before trusting it.**
+3. **Design the status-report-reaches-the-pump-thread signal** (see the gap above — this wasn't in the
+   original plan; found while starting this step), THEN **`WAITIDLE` barrier** using it — smallest
+   functional slice, hardware-verify on a macro that uses only `WAITIDLE`.
 4. **`MBOX` barrier + `PROMPT` up-front dialog/substitution.**
 5. **`PREREQ` up-front gate.**
 6. **Point Work Order's Generate button at the new path** — write into `GCode.File` directly, one
