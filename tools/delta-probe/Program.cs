@@ -288,8 +288,87 @@ static class Probe
                   "mirror tracks a second real report (state + position + feed)");
         }
 
+        // ---- Command channel: MachineRealtimeChannel + MachineCommandChannel ----
+        Console.WriteLine("Command channel (realtime byte mapping + queued Jog via the real JogController):");
+        {
+            var fakeComms = new FakeStreamComms();
+            Comms.com = fakeComms;
+
+            var rt = new MachineRealtimeChannel();
+            rt.Send(RealtimeCommand.FeedHold);
+            Check(fakeComms.LastByte == GrblConstants.CMD_FEED_HOLD, "FeedHold writes CMD_FEED_HOLD");
+            rt.Send(RealtimeCommand.CycleStart);
+            Check(fakeComms.LastByte == GrblConstants.CMD_CYCLE_START, "CycleStart writes CMD_CYCLE_START");
+            rt.Send(RealtimeCommand.JogCancel);
+            Check(fakeComms.LastByte == GrblConstants.CMD_JOG_CANCEL, "JogCancel writes CMD_JOG_CANCEL");
+            rt.Send(RealtimeCommand.SpindleOverrideFineMinus);
+            Check(fakeComms.LastByte == GrblConstants.CMD_SPINDLE_OVR_FINE_MINUS, "an override maps correctly too (spot check, not just the common 3)");
+            Check(fakeComms.WriteCount == 4, "realtime writes are single bytes, one per Send - no batching, no extra traffic");
+
+            // Queued: Jog goes through the REAL JogController (model.Keyboard), the same engine the
+            // jog pad/keyboard/gamepad already use - this channel is a new door, not a new lock.
+            var model3 = new GrblViewModel();
+            // JogController starts with every axis template empty until Configure() runs - in the real
+            // app this happens via LatheModeEnabled's setter / MainWindow startup; a bare model needs
+            // it done explicitly, same as GrblInfo.NumAxes/AxisLetters would be set from a real $I reply.
+            model3.Keyboard.Configure(3, "XYZ", false);
+            var commands = new MachineCommandChannel(model3);
+
+            var empty = new JogCommand(3); // all-zero directions: nothing to do
+            var r1 = commands.Jog(empty).Result;
+            Check(!r1.Success && r1.Id == 1, "an empty jog command is refused, not silently accepted");
+
+            var move = new JogCommand(3) { Distance = 5d, Feedrate = 200d, Mode = JogMode.Step };
+            move.Directions[0] = 1d;
+            var r2 = commands.Jog(move).Result;
+            Check(r2.Success && r2.Id == 2, "a real jog command succeeds");
+            Check(fakeComms.LastWrite != null && fakeComms.LastWrite.StartsWith("$J="),
+                  "the jog actually rendered and sent a $J= command (got \"" + fakeComms.LastWrite + "\")");
+
+            Comms.com = null;
+        }
+
         Console.WriteLine(failures == 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED");
         return failures == 0 ? 0 : 1;
+    }
+
+    // Minimal StreamComms double: records the last realtime byte and the last multi-byte write (what
+    // JogController.Send ultimately calls) without opening any real transport. Every other member is
+    // a harmless default - this harness never exercises them.
+    sealed class FakeStreamComms : StreamComms
+    {
+        public byte LastByte;
+        public int WriteCount;
+        public string LastWrite;
+
+        public bool IsOpen => true;
+        public int OutCount => 0;
+        public string Reply => string.Empty;
+        public Comms.StreamType StreamType => Comms.StreamType.Serial;
+        public Comms.State CommandState { get; set; }
+        public bool EventMode { get; set; }
+        public System.Action<int> ByteReceived { get; set; }
+        public System.Action<string> AckSink { get; set; }
+        public bool BlockingWrites { get; set; }
+        public bool IsReconnecting => false;
+
+        public void NotifyLinkLost() { }
+        public void Close() { }
+        public int ReadByte() { return -1; }
+        public void WriteByte(byte data) { LastByte = data; WriteCount++; }
+        public void WriteBytes(byte[] bytes, int len) { LastWrite = System.Text.Encoding.ASCII.GetString(bytes, 0, len); }
+        public void WriteString(string data) { LastWrite = data; }
+        public void WriteCommand(string command) { LastWrite = command; }
+        public string GetReply(string command) { return string.Empty; }
+        public void AwaitAck() { }
+        public void AwaitAck(string command) { }
+        public void AwaitResponse(string command) { }
+        public void AwaitResponse() { }
+        public void PurgeQueue() { }
+
+        public event DataReceivedHandler DataReceived { add { } remove { } }
+        public event System.Action ConnectionLost { add { } remove { } }
+        public event System.Action Reconnected { add { } remove { } }
     }
 
     // ---- Test helpers for the MachineMirror section ----
