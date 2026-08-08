@@ -287,7 +287,14 @@ namespace CNC.Core
             if ((ok = !(GrblState.State == GrblStates.Tool && !(ucmd.StartsWith("$J=") || ucmd == "$TPW" || ucmd.Contains("G10L20")))))
                 MDI = command;
             else
+            {
                 Message = LibStrings.FindResource("JoggingOnly");
+                // Diagnostic only, 2026-08-08: the one refusal ApplyCommand itself can make - GrblState is
+                // Tool (mid tool-change) and this isn't one of the few commands allowed through anyway.
+                // Logged so a repro can rule this specific gate in or out alongside JobRunner's.
+                if (DebugLog.Enabled)
+                    DebugLog.Write("jobrunner", string.Format("ApplyCommand REFUSED \"{0}\" - GrblState is Tool", command));
+            }
 
             return ok;
         }

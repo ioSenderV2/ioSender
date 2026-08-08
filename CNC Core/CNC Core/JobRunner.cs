@@ -985,9 +985,22 @@ namespace CNC.Core
                         streamingState = StreamingState.SendMDI;
                         ResponseReceived("go");
                     }
+                    // Diagnostic only, 2026-08-08: state was ALREADY SendMDI, so no fresh "go" kick ran -
+                    // this command was enqueued and now sits waiting for ResponseReceived to be called
+                    // again by a REAL "ok" from the controller. That is the exact mechanism suspected of
+                    // eating jog commands: grblHAL documented (JogGate.cs) to never ack a $J= sent while
+                    // already in Jog state, so if THIS enqueue is itself a jog and the previous one is
+                    // still outstanding for that reason, nothing will ever drain this queue. Logs the
+                    // queue depth so a repro shows it growing instead of draining.
+                    else if (DebugLog.Enabled)
+                        DebugLog.Write("jobrunner", string.Format("SendCommand QUEUED \"{0}\" behind an outstanding SendMDI (still waiting on its ack) - queue depth now {1}", command, Source.Commands.Count));
                 }
-                catch
+                catch (Exception ex)
                 {
+                    // Diagnostic only, 2026-08-08: this catch used to swallow everything silently - a
+                    // parse or enqueue failure here dropped the command with zero trace anywhere.
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("jobrunner", string.Format("SendCommand THREW on \"{0}\" (streamingState={1}): {2}", command, streamingState, ex));
                 }
             }
             // Diagnostic only, 2026-08-08: this branch used to not exist - a command (jog or MDI) arriving
@@ -1702,10 +1715,26 @@ namespace CNC.Core
                     // confirmed via a comms-tx trace: 14 lines / ~670 bytes in 6ms, before a single real ok
                     // came back. The controller then couldn't keep its NGC expression parser in sync with the
                     // flood and threw a string of "error:71 - Unknown operation" it should never have seen.
+                    // Diagnostic only, 2026-08-08: this is the ONLY place a queued SendCommand actually
+                    // reaches the wire, and it only runs when ResponseReceived is called - once
+                    // synchronously by SendCommand's own "go" kick, and after that only by a REAL ack
+                    // from the controller. If that ack never arrives (the grblHAL Jog-state quirk
+                    // JogGate.cs documents), this case never runs again and the queue just grows - see
+                    // the QUEUED trace above. Logging every dequeue makes the alternative (this case
+                    // firing normally) equally visible, so a repro's log shows exactly which happened.
                     if (Source.Commands.Count > 0)
-                        Comms.com.WriteCommand(Source.Commands.Dequeue());
+                    {
+                        string sent = Source.Commands.Dequeue();
+                        if (DebugLog.Enabled)
+                            DebugLog.Write("jobrunner", string.Format("SendMDI DEQUEUED+WROTE \"{0}\" - {1} left queued", sent, Source.Commands.Count));
+                        Comms.com.WriteCommand(sent);
+                    }
                     else
+                    {
+                        if (DebugLog.Enabled)
+                            DebugLog.Write("jobrunner", "SendMDI queue empty on this ack - streamingState -> Idle");
                         streamingState = StreamingState.Idle;
+                    }
                     break;
 
                 case StreamingState.Reset:

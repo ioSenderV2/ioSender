@@ -224,6 +224,14 @@ namespace CNC.Core
         /// (e.g. ControllerMapper's gamepad jogging).</summary>
         public void Send(string command, bool cancelFirst)
         {
+            // Diagnostic only, 2026-08-08: this path (keyboard jog, and gamepad analog jog - see this
+            // method's own doc comment) writes straight to Comms.com, completely bypassing JobRunner's
+            // SendMDI queue - a different mechanism from the on-screen panel/gamepad-D-pad path
+            // (GrblViewModel.ExecuteCommand), covered separately in JobRunner.cs. Logged here too so a
+            // repro's trace shows which path was actually used, not just that "a jog" was attempted.
+            if (DebugLog.Enabled)
+                DebugLog.Write("jog", string.Format("JogController.Send \"{0}\" cancelFirst={1} IsJogging={2}", command, cancelFirst, IsJogging));
+
             if (IsJogging)
             {
                 while (Comms.com.OutCount != 0) ;
