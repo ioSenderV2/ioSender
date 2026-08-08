@@ -236,7 +236,32 @@ separately.
    (audit Finding #2, the original "press Start twice") is gone **by construction** — no deferred
    start exists to race. `WatchForRunEnd` arms on `Send` only now (a jog between Generate and Start
    must not pop the program) and self-disarms if a different file gets loaded in between.
-7. **Delete the now-dead code** in one cleanup commit, separate from the functional slices above.
+7. **BUILT 2026-08-08 (`168a19f`+`64e43af`+`4311c7d`), hardware verification pending.** Landed as
+   three slices:
+   - **7a — the seam:** `MacroProcessor.Run` IS the unified entry now (all ~13 call sites funnel
+     through it; none moved). It pushes the loaded job aside (`GCode.File.Push`+`LoadText`), starts
+     the run programmatically (`StartLoadedJob` seam → `JobControl.RunMacro` →
+     `JobRunner.Run(0, honorActiveProgram:false)`), and pop-restores at the true terminal via
+     WatchForRunEnd's proven watcher pattern. Silent presentation (user decision): no tab switch, no
+     floating run view. `JobRunner.ArmMacroRun` one-shot: macro runs skip the dry-run G92 Z-shift
+     preamble (per-line pump suppression is exactly the old `DryRunNeutralize` protection);
+     unattended skips the field dialog and the pump auto-answers (MBOX)/bare-(PROMPT) through the
+     sentinel path (ordering preserved). Run gained `onDone(bool jobFinished)`; busy guard refuses
+     Hold/Jog/Tool/Door/Run states where a programmatic Cycle Start would have been a RESUME.
+   - **7b — caller sweep:** Set G28 re-enters Generate from onDone (its `$#` re-read only ever worked
+     because the old deferred start let it slip out first); height map + AutoSquare `ReuseZ0` moved
+     off "started" onto genuine `jobFinished`; `SanitizeComment` parity restored at load time
+     (directive rows skipped). FixtureEditDialog/MachineSetupWizard watchers verified engine-agnostic.
+   - **7c — the deletion (736 lines):** `StreamProgram`'s unsleeping `DoEvents` loop — **the proven
+     32-bit OOM allocator — no longer exists**; ditto `Run/RunInner`, `Flush`, `DryRunNeutralize`
+     (third dry-run copy), `WaitForIdle`/`PumpForReport`, `RunStreamedJobInPlace` +
+     `RestoreSourceOnEnd` + the floating macro run view, and the `MacroRunner.IsRunning` shutdown
+     stopgap — the between-bursts `IsJobRunning=false` gap is closed by construction (a hold is a
+     mid-stream barrier now). `RestoreSourceOnEnd`'s one live behavior (DiscardGenerated on a clean
+     Generate-first finish) moved into the new terminal watcher.
+   - **Known accepted edge:** a hand-written macro doing `$F=<file>` + `(WAITIDLE)` could release the
+     barrier early (2 Idle sentinels ≈ 400ms vs the old 2000ms SD allowance); no generator emits
+     `$F=`.
 
 ## Open questions — ✅ all three answered 2026-08-08
 
