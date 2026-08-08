@@ -202,7 +202,12 @@ separately.
    on the real controller still pending** — the earlier hardware attempt was degenerate (G4 acks late
    and reports Idle, so a dwell can't exercise the hold).
 4. **`MBOX` barrier + `PROMPT` up-front dialog/substitution.**
-5. **`PREREQ` up-front gate.**
+5. ✅ **`PREREQ` up-front gate** (`56b1dc8`, 2026-08-08) — done out of order (before MBOX/PROMPT)
+   because it is the safest slice: pure pre-flight, refusal before any motion, no streaming
+   interaction. `MacroRunner.EvaluatePrereqLines` is THE one evaluator (Run() refactored through it
+   too); `JobRunner.Run`'s loaded-program branch gates on `Directive=="PREREQ"` rows. Evaluator
+   sim-verified live (waitidle-probe 19/19, incl. the $# round-trip); the JobRunner refusal path
+   itself needs a real Cycle Start to observe — on the hardware-confirm list with WAITIDLE.
 6. **Point Work Order's Generate button at the new path** — write into `GCode.File` directly, one
    Cycle Start. Retire the overlay.
 7. **Delete the now-dead code** in one cleanup commit, separate from the functional slices above.
