@@ -1624,6 +1624,11 @@ namespace CNC.Controls
                             break;
                     }
 
+                    // Shape text draws INSIDE the outline just drawn, at the fit's own size and
+                    // placement - so the preview answers "does it fit, and where" as you type.
+                    if (geom.HasText && geom.Geometry != WorkOrderGeometryKind.Text && WorkOrderRules.SupportsShapeText(geom.Geometry))
+                        AddTextStrokes(center, geom, scale, stroke, 1d);
+
                     var dot = new Ellipse { Width = 5, Height = 5, Fill = stroke };
                     Canvas.SetLeft(dot, center.X - 2.5); Canvas.SetTop(dot, center.Y - 2.5);
                     canvasDiagram.Children.Add(dot);
@@ -1738,19 +1743,34 @@ namespace CNC.Controls
         // flip AddLine already makes.
         private void AddTextStrokes(Point center, WorkOrderToolpath tp, double scale, Brush stroke, double thickness)
         {
+            // Same resolution BuildEngrave does: the Text KIND draws at its own size/angle/anchor
+            // convention, shape text at whatever the fit resolver says - the preview shows the CUT,
+            // not the fields. A fit that fails draws nothing; Validate is already saying why.
+            double capHeight = tp.CapHeight, angleDeg = tp.Angle, dx = 0d, dy = 0d;
+            bool shapeText = tp.HasText && tp.Geometry != WorkOrderGeometryKind.Text
+                          && WorkOrderRules.SupportsShapeText(tp.Geometry);
+            if (shapeText)
+            {
+                var fit = WorkOrderTextFit.Resolve(tp);
+                if (!fit.Fits)
+                    return;
+                capHeight = fit.CapHeight; angleDeg = fit.Angle; dx = fit.OffsetX; dy = fit.OffsetY;
+            }
+
             if (tp.IsCarved)
             {
-                AddCarvedText(center, tp, scale, stroke);
+                AddCarvedText(center, tp, scale, stroke, capHeight, angleDeg, dx, dy);
                 return;
             }
 
-            var strokes = CNC.Core.StrokeFont.Render(tp.Text, tp.CapHeight);
+            var strokes = CNC.Core.StrokeFont.Render(tp.Text, capHeight);
             if (strokes.Count == 0)
                 return;
 
-            var size = CNC.Core.StrokeFont.Measure(tp.Text, tp.CapHeight);
-            double ox = -size.X / 2d, oy = -size.Y / 2d + tp.CapHeight / 2d;
-            double rad = tp.Angle * Math.PI / 180d;
+            var size = CNC.Core.StrokeFont.Measure(tp.Text, capHeight);
+            double ox = -size.X / 2d + dx;
+            double oy = shapeText ? -size.Y / 2d + dy : -size.Y / 2d + capHeight / 2d;
+            double rad = angleDeg * Math.PI / 180d;
             double cos = Math.Cos(rad), sin = Math.Sin(rad);
 
             foreach (var st in strokes)
@@ -1777,9 +1797,12 @@ namespace CNC.Controls
         // letters is also what tells the operator at a glance they are in carve mode rather than stroke.
         // Mirrors BuildVCarve's transform (bounding-box centre on the anchor, then rotate about it) the
         // same way AddTextStrokes mirrors BuildEngrave's.
-        private void AddCarvedText(Point center, WorkOrderToolpath tp, double scale, Brush brush)
+        // capHeight/angleDeg/dx/dy arrive resolved from AddTextStrokes, exactly as BuildVCarve's do
+        // from BuildEngrave.
+        private void AddCarvedText(Point center, WorkOrderToolpath tp, double scale, Brush brush,
+                                   double capHeight, double angleDeg, double dx, double dy)
         {
-            var outline = TrueTypeOutlines.Render(tp.Text, tp.FontFamily, tp.CapHeight, tp.FontBold, tp.FontItalic);
+            var outline = TrueTypeOutlines.Render(tp.Text, tp.FontFamily, capHeight, tp.FontBold, tp.FontItalic);
             if (outline.Count == 0)
                 return;
 
@@ -1793,8 +1816,8 @@ namespace CNC.Controls
                     if (p.Y > maxY) maxY = p.Y;
                 }
 
-            double ox = -(minX + maxX) / 2d, oy = -(minY + maxY) / 2d;
-            double rad = tp.Angle * Math.PI / 180d;
+            double ox = -(minX + maxX) / 2d + dx, oy = -(minY + maxY) / 2d + dy;
+            double rad = angleDeg * Math.PI / 180d;
             double cos = Math.Cos(rad), sin = Math.Sin(rad);
 
             // One geometry, even-odd fill: the counters (the hole in an O) punch out exactly as the
