@@ -1409,12 +1409,16 @@ namespace GCode_Sender
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            if (!CNC.Core.Grbl.GrblViewModel.IsSDCardJob && !menuMain.IsEnabled)
+            // MacroRunner.IsRunning: the menu-disabled check alone has a hole - a macro at an
+            // (MBOX)/(PROMPT) hold has IsJobRunning FALSE between its bursts, menu enabled, so an X-click
+            // (or a tooling shutdown request, which found this the hard way 2026-08-08) sailed through and
+            // abandoned the run mid-hold. Same predicate as Pipe_ShutdownRequested's ShutdownBlocked.
+            if (CNC.Core.MacroRunner.IsRunning || (!CNC.Core.Grbl.GrblViewModel.IsSDCardJob && !menuMain.IsEnabled))
             {
                 // JobRunning (menuMain disabled) blocks exit while a job is running/paused (e.g. HOLD) -
                 // used to just silently refuse the close with no explanation.
                 e.Cancel = true;
-                AppDialogs.Show("Cannot exit while a job is running or paused (e.g. in Hold).\n\nStop or finish the job first, then close ioSender.",
+                AppDialogs.Show("Cannot exit while a job or macro is running or paused (e.g. in Hold, or waiting at a macro prompt).\n\nStop or finish it first, then close ioSender.",
                     "Exit blocked", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -2578,40 +2582,57 @@ namespace GCode_Sender
         // timeout, that would recreate exactly the hazard this exists to prevent. The caller polls the
         // PROCESS itself for up to its own timeout to learn whether this actually happened; nothing is
         // written back over the one-way pipe.
+        // The one "is anything the operator cares about in flight" predicate for shutdown decisions.
+        // JobRunning alone is NOT enough: a macro (Setup, wizards) streams in BURSTS, and between them -
+        // at an (MBOX)/(PROMPT) hold, exactly when the operator is standing at the machine following its
+        // instructions - IsJobRunning is false. The first live test of this feature closed ioSender in
+        // the middle of the Setup macro's "install probe" MBOX hold that way (2026-08-08), abandoning
+        // the run: the precise harm this feature exists to prevent, caused by this feature. Hence
+        // MacroRunner.IsRunning, added for this - true across the whole Run() including its holds.
+        private bool ShutdownBlocked { get { return JobRunning || CNC.Core.MacroRunner.IsRunning; } }
+
         private void Pipe_ShutdownRequested(int timeoutSeconds)
         {
             shutdownWatcher?.Stop();
             shutdownWatcher = null;
 
-            if (!JobRunning)
-            {
-                ShowShutdownNoticeAndClose();
-                return;
-            }
-
             // Operator visibility while the watcher waits (user feedback 2026-08-08: the idle path's
             // instant close looked exactly like a crash - "I never saw a notification"). Message is the
             // established status-bar text every wizard/macro already uses.
             var model = DataContext as GrblViewModel;
-            if (model != null)
+            if (model != null && ShutdownBlocked)
                 model.Message = "Shutdown requested - closing when the job finishes";
 
+            // EVERYTHING goes through the watcher - no instant-close special case - and it requires the
+            // predicate clear on TWO consecutive ticks before acting. That second tick is load-bearing:
+            // a macro's final burst is handed to the streamer with a DEFERRED Cycle Start (the audit's
+            // Finding #2 race), so there is a real window where Run() has returned but IsJobRunning is
+            // not yet true - a single instantaneous check can land inside it and read a busy system as
+            // idle. Two ticks a second apart is far wider than that handoff ever is.
+            int clearTicks = 0;
             var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
             shutdownWatcher = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             shutdownWatcher.Tick += (s, e) =>
             {
-                if (!JobRunning)
+                if (!ShutdownBlocked)
                 {
-                    shutdownWatcher.Stop();
-                    shutdownWatcher = null;
-                    ShowShutdownNoticeAndClose();
+                    if (++clearTicks >= 2)
+                    {
+                        shutdownWatcher.Stop();
+                        shutdownWatcher = null;
+                        ShowShutdownNoticeAndClose();
+                    }
                 }
-                else if (DateTime.UtcNow >= deadline)
+                else
                 {
-                    shutdownWatcher.Stop();
-                    shutdownWatcher = null;   // gave up - still busy, stay running, caller's own poll times out
-                    if (model != null)
-                        model.Message = "Shutdown request timed out - still running";
+                    clearTicks = 0;
+                    if (DateTime.UtcNow >= deadline)
+                    {
+                        shutdownWatcher.Stop();
+                        shutdownWatcher = null;   // gave up - still busy, stay running, caller's own poll times out
+                        if (model != null)
+                            model.Message = "Shutdown request timed out - still running";
+                    }
                 }
             };
             shutdownWatcher.Start();

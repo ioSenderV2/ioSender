@@ -164,6 +164,12 @@ pattern exactly.
 new up-front scan + per-line dispatch lives.
 
 **Retires once this lands:**
+- `MacroRunner.IsRunning` (added 2026-08-08) — a stopgap for the two-engine era's biggest state lie:
+  between macro bursts, at an (MBOX)/(PROMPT) hold, `IsJobRunning` is false, so the whole app reads an
+  active Setup run as idle. A tooling shutdown request closed ioSender mid-"install probe" hold exactly
+  this way (the incident that forced the stopgap). In the unified engine a hold is a dispatch barrier
+  INSIDE the streamer — the run never stops being a running job between bursts, the state is truthful
+  by construction, and no side-channel flag is needed. (User's own observation, same day.)
 - `MacroProcessor`'s overlay `ProgramView` + the two-press Generate/Run flow.
 - `RunStreamedJobInPlace` and its deferred-Cycle-Start dispatcher hop (Finding #2 — the whole class of
   bug disappears, it isn't fixed, because there's no longer a second `Run()` call to race).

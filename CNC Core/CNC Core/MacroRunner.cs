@@ -97,6 +97,17 @@ namespace CNC.Core
         // Name given to the in-memory program when a flush is streamed (set per run).
         private static string _streamName = "Macro";
 
+        // True while a Run() is in flight - INCLUDING its (MBOX)/(PROMPT) holds and WaitForIdle waits,
+        // which is the whole point: between streamed bursts model.IsJobRunning is FALSE while a hold
+        // prompt sits waiting for the operator, so anything using IsJobRunning alone reads an active
+        // macro as "idle". That exact gap let a tooling shutdown request close ioSender in the middle
+        // of a Setup macro's "install probe" (MBOX) hold on 2026-08-08, abandoning the run - nothing
+        // marked the run as in progress. Counter + try/finally in Run() covers every early return.
+        // NOT covered: the final fire-and-forget burst (Flush wait:false) still streaming after Run()
+        // returns - IsJobRunning is true for that window, so callers should check both.
+        private static int runDepth = 0;
+        public static bool IsRunning { get { return System.Threading.Interlocked.CompareExchange(ref runDepth, 0, 0) > 0; } }
+
         /// <summary>Run a macro. Returns false if it was aborted (prerequisite unmet or user cancelled).</summary>
         /// <param name="unattended">Skip every routine confirmation this macro would otherwise pop (the
         /// confirm-before-run prompt, bare mid-body (PROMPT) run-confirmations, and (MBOX) holds - all
@@ -110,6 +121,15 @@ namespace CNC.Core
             if (model == null || string.IsNullOrEmpty(code))
                 return true;
 
+            // IsRunning bracket - see runDepth above. try/finally (not manual pairing) so every one of
+            // RunInner's early returns and any thrown exception still clears the flag.
+            System.Threading.Interlocked.Increment(ref runDepth);
+            try { return RunInner(model, name, code, confirm, unattended, preferJobView); }
+            finally { System.Threading.Interlocked.Decrement(ref runDepth); }
+        }
+
+        private static bool RunInner(GrblViewModel model, string name, string code, bool confirm, bool unattended, bool preferJobView)
+        {
             if (string.IsNullOrEmpty(name))
                 name = "Macro";
 
