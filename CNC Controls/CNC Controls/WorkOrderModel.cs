@@ -44,6 +44,11 @@ namespace CNC.Controls
 
     public enum WorkOrderOpKind { Pocket, Contour, Drill, Bore, SideFinish, BottomFinish, Chamfer, Countersink, Surface, Engrave }
 
+    // Where fitted text sits inside its shape when it is smaller than the space available (see
+    // WorkOrderTextFit). Vertical is +Y ("Top" = the back of the machine as drawn, the top on screen).
+    public enum WorkOrderTextHAlign { Left, Center, Right }
+    public enum WorkOrderTextVAlign { Top, Center, Bottom }
+
     // Conventional cuts against the cutter's rotation (chip thins to nothing at the end of the cut) - more
     // forgiving of a machine with backlash/flex, since the cutter is always being pushed away from new
     // material rather than pulled into it. Climb cuts with the rotation (chip starts thick, thins to zero) -
@@ -185,8 +190,23 @@ namespace CNC.Controls
         public bool FontBold = false;
         public bool FontItalic = false;
 
-        /// <summary>True when this Text toolpath V-carves a TrueType outline rather than engraving the stroke font.</summary>
-        public bool IsCarved { get { return Geometry == WorkOrderGeometryKind.Text && !string.IsNullOrEmpty(FontFamily); } }
+        // Shape text (Line/Circle/Oval/Square/Rect): engrave Text INSIDE the geometry, fitted to it.
+        // The shape still cuts exactly as before - this adds an Engrave operation on top (see
+        // WorkOrderRules.AvailableOperations). CapHeight here goes dual-purpose: 0 = auto-size to the
+        // largest that fits (WorkOrderTextFit), a value = that size, refused at Generate if it can't
+        // fit. On a Line the line is the baseline (text runs along it at its angle); closed shapes fit
+        // the text's measured block inside their interior. Alignment applies when the block is smaller
+        // than the room it has; Circle/Oval are center-only (sliding a rectangle inside a curve stops
+        // being a fit guarantee).
+        public bool HasText = false;
+        public WorkOrderTextHAlign TextHAlign = WorkOrderTextHAlign.Center;
+        public WorkOrderTextVAlign TextVAlign = WorkOrderTextVAlign.Center;
+
+        /// <summary>True when this toolpath's text is drawable at all (its own Text kind, or shape text).</summary>
+        public bool UsesText { get { return Geometry == WorkOrderGeometryKind.Text || (HasText && WorkOrderRules.SupportsShapeText(Geometry)); } }
+
+        /// <summary>True when this toolpath's text V-carves a TrueType outline rather than engraving the stroke font.</summary>
+        public bool IsCarved { get { return UsesText && !string.IsNullOrEmpty(FontFamily); } }
 
         // Pattern: the whole toolpath repeats at each instance position. The X/Y above is instance one, and
         // stays the anchor - a Grid grows from it, a Circular pattern orbits it.
@@ -468,6 +488,125 @@ namespace CNC.Controls
         }
     }
 
+    // Resolves shape text (WorkOrderToolpath.HasText) to a concrete cap height, placement and baseline
+    // angle - or an error that WorkOrderRules.Validate surfaces to BLOCK Generate. One resolver used by
+    // both validation and the compiler, so what Generate refuses and what the g-code does can't drift.
+    //
+    // Measurement scales linearly with cap height (both fonts lay out as cap-height multiples), so
+    // everything reduces to unit extents: measure once at a reference size, divide, and the fit answer
+    // is arithmetic rather than search.
+    public class WorkOrderTextFit
+    {
+        public bool Fits;
+        public string Error;
+        public double CapHeight;          // resolved size; == tp.CapHeight when explicit and it fits
+        public double OffsetX, OffsetY;   // block-center offset from the shape center, in the TEXT frame (pre-rotation)
+        public double Angle;              // baseline angle: the Line's angle; 0 inside closed shapes
+
+        // Clear space kept between the text block and the shape's edge, per side. A cut edge right
+        // against a letter reads as a mistake; 1 mm reads as intent. A Line has no edge to stand off.
+        public const double Margin = 1.0d;
+
+        public static WorkOrderTextFit Resolve(WorkOrderToolpath tp)
+        {
+            var fit = new WorkOrderTextFit();
+
+            // Unit extents: mm of text width/height per mm of cap height.
+            const double refCap = 10d;
+            var size = tp.IsCarved ? TrueTypeOutlines.Measure(tp.Text, tp.FontFamily, refCap, tp.FontBold, tp.FontItalic)
+                                   : CNC.Core.StrokeFont.Measure(tp.Text, refCap);
+            double uw = size.X / refCap, uh = size.Y / refCap;
+            if (uw <= 0d || uh <= 0d)
+                return fit.Fail("the text has nothing drawable in it");
+
+            // The room the shape offers, and the largest cap height that fills it.
+            double boxW, boxH, capMax;
+            switch (tp.Geometry)
+            {
+                case WorkOrderGeometryKind.Line:
+                    // The line is the baseline: only its length constrains, and the text runs at its angle.
+                    boxW = tp.Length; boxH = double.PositiveInfinity;
+                    capMax = boxW / uw;
+                    fit.Angle = tp.Angle;
+                    break;
+                case WorkOrderGeometryKind.Square:
+                    boxW = boxH = tp.Size - 2d * Margin;
+                    capMax = Math.Min(boxW / uw, boxH / uh);
+                    break;
+                case WorkOrderGeometryKind.Rect:
+                    boxW = tp.Width - 2d * Margin; boxH = tp.Depth - 2d * Margin;
+                    capMax = Math.Min(boxW / uw, boxH / uh);
+                    break;
+                case WorkOrderGeometryKind.Circle:
+                {
+                    // Inscribed: the block's corners stay inside the circle, not inside its bounding
+                    // square - (w/2)^2 + (h/2)^2 <= r^2 for the fitted radius.
+                    double r = tp.Diameter / 2d - Margin;
+                    boxW = boxH = 2d * r;   // reported room; the corner test below is the real gate
+                    capMax = r <= 0d ? 0d : r / Math.Sqrt(uw * uw + uh * uh) * 2d;
+                    break;
+                }
+                case WorkOrderGeometryKind.Oval:
+                {
+                    // Same idea against the ellipse: (w/2a)^2 + (h/2b)^2 <= 1.
+                    double a = tp.Width / 2d - Margin, b = tp.Depth / 2d - Margin;
+                    boxW = 2d * a; boxH = 2d * b;
+                    double q = a <= 0d || b <= 0d ? 0d
+                             : Math.Sqrt(uw * uw / (4d * a * a) + uh * uh / (4d * b * b));
+                    capMax = q <= 0d ? 0d : 1d / q;
+                    break;
+                }
+                default:
+                    return fit.Fail("this geometry cannot carry text");
+            }
+
+            if (capMax <= 0.05d)
+                return fit.Fail("the shape is too small to hold any text (after the 1 mm margin)");
+
+            const double eps = 1e-6;
+            if (tp.CapHeight <= 0d)
+                fit.CapHeight = capMax;                      // auto: the largest that fits
+            else if (tp.CapHeight <= capMax + eps)
+                fit.CapHeight = tp.CapHeight;                // explicit, and it fits
+            else
+                return fit.Fail(string.Format(CultureInfo.InvariantCulture,
+                    "{0:0.0##} mm lettering does not fit this shape - {1:0.0##} mm is the largest that does (or leave the size 0 to fit automatically)",
+                    tp.CapHeight, capMax));
+
+            // Alignment: only meaningful room left over gets distributed. Circle/Oval are center-only
+            // (validated in Validate; sliding the block off-center voids the inscribed-corner guarantee).
+            double w = uw * fit.CapHeight, h = uh * fit.CapHeight;
+            if (tp.Geometry == WorkOrderGeometryKind.Square || tp.Geometry == WorkOrderGeometryKind.Rect)
+            {
+                double freeX = Math.Max(0d, boxW - w), freeY = Math.Max(0d, boxH - h);
+                fit.OffsetX = tp.TextHAlign == WorkOrderTextHAlign.Left ? -freeX / 2d
+                            : tp.TextHAlign == WorkOrderTextHAlign.Right ? freeX / 2d : 0d;
+                fit.OffsetY = tp.TextVAlign == WorkOrderTextVAlign.Top ? freeY / 2d
+                            : tp.TextVAlign == WorkOrderTextVAlign.Bottom ? -freeY / 2d : 0d;
+            }
+            else if (tp.Geometry == WorkOrderGeometryKind.Line)
+            {
+                // Along the line: H distributes the leftover length; V sets the block against the
+                // baseline - Top sits the block on the line, Bottom hangs it below, Center straddles.
+                double freeX = Math.Max(0d, boxW - w);
+                fit.OffsetX = tp.TextHAlign == WorkOrderTextHAlign.Left ? -freeX / 2d
+                            : tp.TextHAlign == WorkOrderTextHAlign.Right ? freeX / 2d : 0d;
+                fit.OffsetY = tp.TextVAlign == WorkOrderTextVAlign.Top ? h / 2d
+                            : tp.TextVAlign == WorkOrderTextVAlign.Bottom ? -h / 2d : 0d;
+            }
+
+            fit.Fits = true;
+            return fit;
+        }
+
+        private WorkOrderTextFit Fail(string why)
+        {
+            Fits = false;
+            Error = why;
+            return this;
+        }
+    }
+
     public static class WorkOrderRules
     {
         public static readonly WorkOrderGeometryKind[] AllGeometries =
@@ -685,6 +824,19 @@ namespace CNC.Controls
             if (tp.IsClosed)
                 yield return WorkOrderOpKind.BottomFinish;
             yield return WorkOrderOpKind.Chamfer;
+
+            // Shape text: the checkbox on the geometry is what makes Engrave meaningful here - the
+            // engraved thing is the fitted text, cut by this op's own V-bit and stroke width.
+            if (tp.HasText && SupportsShapeText(tp.Geometry))
+                yield return WorkOrderOpKind.Engrave;
+        }
+
+        /// <summary>The geometries that can carry fitted text (see WorkOrderToolpath.HasText).</summary>
+        public static bool SupportsShapeText(WorkOrderGeometryKind kind)
+        {
+            return kind == WorkOrderGeometryKind.Line || kind == WorkOrderGeometryKind.Circle
+                || kind == WorkOrderGeometryKind.Oval || kind == WorkOrderGeometryKind.Square
+                || kind == WorkOrderGeometryKind.Rect;
         }
 
         // What the picker offers for an existing toolpath: everything its geometry allows, minus the
@@ -778,6 +930,22 @@ namespace CNC.Controls
                 // program. Safe only as the work order's one and only enabled operation.
                 if (tp.EntireSpoilboard && wo.EnabledOperations(tp).Any() && wo.EnabledOperationCount > 1)
                     warnings.Add(label + "Entire spoilboard resets the work origin - it must be the only enabled operation in this work order.");
+
+                // Shape text: the fit is resolved here with the SAME resolver the compiler uses, so a
+                // size that can't fit is refused at Generate rather than engraving clipped or lying.
+                if (tp.HasText && SupportsShapeText(tp.Geometry))
+                {
+                    if (!tp.Operations.Any(o => o.Kind == WorkOrderOpKind.Engrave))
+                        warnings.Add(label + "text is enabled but there is no Engrave operation to cut it - add one (or untick Text).");
+
+                    var fit = WorkOrderTextFit.Resolve(tp);
+                    if (!fit.Fits)
+                        warnings.Add(label + "text: " + fit.Error + ".");
+
+                    if ((tp.Geometry == WorkOrderGeometryKind.Circle || tp.Geometry == WorkOrderGeometryKind.Oval)
+                        && (tp.TextHAlign != WorkOrderTextHAlign.Center || tp.TextVAlign != WorkOrderTextVAlign.Center))
+                        warnings.Add(label + "text in a circle or oval is center-aligned only.");
+                }
             }
 
             // Everything above deliberately checks what's AUTHORED, not what's enabled: holding an operation
@@ -791,16 +959,26 @@ namespace CNC.Controls
 
         public static string DescribeGeometry(WorkOrderToolpath tp)
         {
+            // Shape text rides along in the summary so the tree says what the cut will actually be.
+            string withText = "";
+            if (tp.HasText && SupportsShapeText(tp.Geometry))
+            {
+                string txt = (tp.Text ?? string.Empty).Replace((char)13, ' ').Replace((char)10, ' ');
+                if (txt.Length > 12)
+                    txt = txt.Substring(0, 11) + "…";
+                withText = string.Format(" + \"{0}\"", txt);
+            }
+
             switch (tp.Geometry)
             {
                 case WorkOrderGeometryKind.Line:
-                    return string.Format("line {0:0.#} mm @ {1:0}°", tp.Length, tp.Angle);
+                    return string.Format("line {0:0.#} mm @ {1:0}°{2}", tp.Length, tp.Angle, withText);
                 case WorkOrderGeometryKind.Circle:
-                    return string.Format("circle Ø{0:0.###}", tp.Diameter);
+                    return string.Format("circle Ø{0:0.###}{1}", tp.Diameter, withText);
                 case WorkOrderGeometryKind.Oval:
-                    return string.Format("oval {0:0.#}x{1:0.#}", tp.Width, tp.Depth);
+                    return string.Format("oval {0:0.#}x{1:0.#}{2}", tp.Width, tp.Depth, withText);
                 case WorkOrderGeometryKind.Square:
-                    return string.Format("square {0:0.#}", tp.Size);
+                    return string.Format("square {0:0.#}{1}", tp.Size, withText);
                 case WorkOrderGeometryKind.Surface:
                     return string.Format("surface {0:0.#}x{1:0.#}", tp.Width, tp.Depth);
                 case WorkOrderGeometryKind.Indirect:
@@ -817,7 +995,7 @@ namespace CNC.Controls
                         ? string.Format("\"{0}\" {1:0.#} mm caps, {2}", t, tp.CapHeight, tp.FontFamily)
                         : string.Format("\"{0}\" {1:0.#} mm caps", t, tp.CapHeight);
                 default:
-                    return string.Format("rect {0:0.#}x{1:0.#}", tp.Width, tp.Depth);
+                    return string.Format("rect {0:0.#}x{1:0.#}{2}", tp.Width, tp.Depth, withText);
             }
         }
 

@@ -511,15 +511,31 @@ namespace CNC.Controls
         // cut free.
         private static List<string> BuildEngrave(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
         {
-            // A Text toolpath carrying a real font family V-carves the glyph outlines instead of tracing
+            // Shape text (HasText on a Line/Circle/Oval/Square/Rect): size, placement and baseline angle
+            // come from the fit resolver - the SAME one WorkOrderRules.Validate ran to gate Generate, so
+            // by the time we are here it fits; the refusal below is defense against a caller that skipped
+            // validation, not a second opinion.
+            double capHeight = tp.CapHeight, angleDeg = tp.Angle, fitDx = 0d, fitDy = 0d;
+            bool shapeText = tp.HasText && tp.Geometry != WorkOrderGeometryKind.Text
+                          && WorkOrderRules.SupportsShapeText(tp.Geometry);
+            if (shapeText)
+            {
+                var fit = WorkOrderTextFit.Resolve(tp);
+                if (!fit.Fits)
+                    return new List<string> { "(ENGRAVE skipped - text does not fit: "
+                        + (fit.Error ?? "").Replace('(', '[').Replace(')', ']') + ")" };
+                capHeight = fit.CapHeight; angleDeg = fit.Angle; fitDx = fit.OffsetX; fitDy = fit.OffsetY;
+            }
+
+            // A toolpath carrying a real font family V-carves the glyph outlines instead of tracing
             // stroke-font pen paths - one op kind, two ways of cutting it, chosen on the GEOMETRY where the
             // font itself is chosen (see WorkOrderToolpath.FontFamily).
             if (tp.IsCarved)
-                return BuildVCarve(tp, op, cx, cy);
+                return BuildVCarve(tp, op, cx, cy, capHeight, angleDeg, fitDx, fitDy);
 
             var lines = new List<string>();
 
-            var strokes = CNC.Core.StrokeFont.Render(tp.Text, tp.CapHeight);
+            var strokes = CNC.Core.StrokeFont.Render(tp.Text, capHeight);
             if (strokes.Count == 0)
                 return lines;   // empty or wholly unrenderable text - emit nothing rather than a bare plunge
 
@@ -537,9 +553,15 @@ namespace CNC.Controls
             // Move it so the toolpath's anchor lands on (cx,cy), then rotate about that same anchor - so
             // the point the operator pinned stays pinned as the angle changes. Anything else makes lining
             // text up against an edge an exercise in trial and error.
-            var size = CNC.Core.StrokeFont.Measure(tp.Text, tp.CapHeight);
-            double originX = -size.X / 2d, originY = -size.Y / 2d + tp.CapHeight / 2d;
-            double rad = tp.Angle * Math.PI / 180d;
+            //
+            // Two centering conventions on purpose: the Text KIND centers the cap-height band on the
+            // anchor (what "put 10 mm lettering at X,Y" means); shape text centers the MEASURED BLOCK,
+            // because the block is what the fit resolver proved fits, then shifts by the alignment
+            // offsets - which are in the text frame, so they rotate with a Line's baseline.
+            var size = CNC.Core.StrokeFont.Measure(tp.Text, capHeight);
+            double originX = -size.X / 2d + fitDx;
+            double originY = shapeText ? -size.Y / 2d + fitDy : -size.Y / 2d + capHeight / 2d;
+            double rad = angleDeg * Math.PI / 180d;
             double cos = Math.Cos(rad), sin = Math.Sin(rad);
 
             lines.Add(string.Format(CultureInfo.InvariantCulture,
@@ -549,7 +571,7 @@ namespace CNC.Controls
                 // g-code. Newlines are folded to '|' for the same reason - one comment, one line.
                 (tp.Text ?? string.Empty).Replace('(', '[').Replace(')', ']')
                                          .Replace((char)13, ' ').Replace((char)10, '|'),
-                tp.CapHeight, cut.Width, depth, halfAngle * 360d / Math.PI));
+                capHeight, cut.Width, depth, halfAngle * 360d / Math.PI));
 
             if (cut.Clamped)
                 lines.Add(string.Format(CultureInfo.InvariantCulture,
@@ -612,11 +634,14 @@ namespace CNC.Controls
         // error budget). The one ceiling is the bit itself - past DiameterMm the cone runs out and the
         // shank would rub - and where a stroke is wider than that ceiling the bottom flattens off and is
         // cleared, below.
-        private static List<string> BuildVCarve(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
+        // capHeight/angleDeg/fitDx/fitDy arrive resolved from BuildEngrave: the toolpath's own values for
+        // the Text kind, the fit resolver's for shape text (see there).
+        private static List<string> BuildVCarve(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy,
+                                                double capHeight, double angleDeg, double fitDx, double fitDy)
         {
             var lines = new List<string>();
 
-            var outline = TrueTypeOutlines.Render(tp.Text, tp.FontFamily, tp.CapHeight, tp.FontBold, tp.FontItalic);
+            var outline = TrueTypeOutlines.Render(tp.Text, tp.FontFamily, capHeight, tp.FontBold, tp.FontItalic);
             if (outline.Count == 0)
                 return lines;   // blank text or an unresolvable family - emit nothing rather than a bare plunge
 
@@ -651,9 +676,10 @@ namespace CNC.Controls
 
             // Anchor at the centre of the text's bounding box - the same extents the model reports for
             // placement - then rotate about that anchor, so the pinned point stays pinned as the angle
-            // changes, exactly as the stroke branch does.
-            double ox = -(minX + maxX) / 2d, oy = -(minY + maxY) / 2d;
-            double rad = tp.Angle * Math.PI / 180d;
+            // changes, exactly as the stroke branch does. Shape text additionally shifts by the fit's
+            // alignment offsets, pre-rotation (the text frame), matching the stroke branch.
+            double ox = -(minX + maxX) / 2d + fitDx, oy = -(minY + maxY) / 2d + fitDy;
+            double rad = angleDeg * Math.PI / 180d;
             double cos = Math.Cos(rad), sin = Math.Sin(rad);
 
             // Cut each letter COMPLETELY before moving to the next. The engine's global shallow-to-deep
@@ -702,7 +728,7 @@ namespace CNC.Controls
                                          .Replace((char)13, ' ').Replace((char)10, '|'),
                 tp.FontFamily.Replace('(', '[').Replace(')', ']'),
                 tp.FontBold ? " bold" : string.Empty, tp.FontItalic ? " italic" : string.Empty,
-                tp.CapHeight, cutPasses, maxDepth, halfAngle * 360d / Math.PI));
+                capHeight, cutPasses, maxDepth, halfAngle * 360d / Math.PI));
 
             // Between rings of the same carve a short hop clears the work - nothing on this operation
             // sticks up past the stock top - where retracting to full SafeZ 193 times would spend more
@@ -1436,9 +1462,18 @@ namespace CNC.Controls
                             // parse as g-code. Sanitised exactly as BuildEngrave sanitises its own.
                             string shown = (tp.Text ?? string.Empty).Replace('(', '[').Replace(')', ']')
                                                                     .Replace((char)13, ' ').Replace((char)10, '|');
+                            // Shape text sized to fit reports the size the fit actually resolved, marked as
+                            // such - "0 mm caps" would be the field, not the cut.
+                            double descCap = tp.CapHeight;
+                            string sized = string.Empty;
+                            if (tp.HasText && tp.Geometry != WorkOrderGeometryKind.Text && WorkOrderRules.SupportsShapeText(tp.Geometry) && tp.CapHeight <= 0d)
+                            {
+                                var descFit = WorkOrderTextFit.Resolve(tp);
+                                if (descFit.Fits) { descCap = descFit.CapHeight; sized = " (sized to fit)"; }
+                            }
                             desc = tp.IsCarved
-                                ? string.Format("v-carve \"{0}\" in {1}, {2:0.#} mm caps", shown, tp.FontFamily, tp.CapHeight)
-                                : string.Format("engrave \"{0}\", {1:0.#} mm caps, {2:0.###} mm stroke", shown, tp.CapHeight, op.EngraveWidth);
+                                ? string.Format("v-carve \"{0}\" in {1}, {2:0.#} mm caps{3}", shown, tp.FontFamily, descCap, sized)
+                                : string.Format("engrave \"{0}\", {1:0.#} mm caps{2}, {3:0.###} mm stroke", shown, descCap, sized, op.EngraveWidth);
                             break;
                         default:
                             // Was "continue", which SKIPPED THE WHOLE OPERATION - BuildOperation never ran,
