@@ -2000,11 +2000,24 @@ namespace CNC.Controls
             WatchForRunEnd(model);
         }
 
+        // One watcher, ever. Without this, Generate over a still-loaded Work Order program (the
+        // boot-restored one, or a previous Generate that never ran) pushed AND armed a second time -
+        // observed live 2026-08-08 15:04: "Push: depth now 2" + every watcher trace doubled. The
+        // stacked pops happened to cancel out, but duplicate handlers and a growing snapshot stack
+        // are exactly the state-drift class this tab has been burned by before.
+        private static bool runEndWatcherArmed;
+
         // Static since the compile cache's boot-time auto-restore (2026-08-08): that path arms this
         // watcher before any WorkOrderView instance exists, and the body only ever needed the view
         // model + statics anyway. Behavior unchanged for the Generate path, which forwards above.
         private static void WatchForRunEnd(GrblViewModel model)
         {
+            if (runEndWatcherArmed)
+            {
+                DebugLog.Write("workorder", "WatchForRunEnd: already armed - not arming a second watcher");
+                return;
+            }
+            runEndWatcherArmed = true;
             bool started = false;
             System.ComponentModel.PropertyChangedEventHandler handler = null;
             handler = (s, e) =>
@@ -2022,6 +2035,7 @@ namespace CNC.Controls
                 if (!started || (st != StreamingState.Idle && st != StreamingState.NoFile))
                     return;
                 model.PropertyChanged -= handler;
+                runEndWatcherArmed = false;   // the one unsubscribe point - both exits below run through it
                 // Self-disarm without popping when the loaded job is no longer OURS - the operator
                 // generated, then loaded a different file instead of running: popping now would yank
                 // THEIR file out from under THEIR run. (The pushed stack entry is left unconsumed in
@@ -2328,7 +2342,13 @@ namespace CNC.Controls
 
             MacroProcessor.SwitchToTab?.Invoke(ViewType.GRBL);   // the Job tab
 
-            GCode.File.Push();
+            // Don't push a SECOND slot when the loaded job is already our own watched Work Order
+            // program (boot-restored, or a previous Generate that never ran) - LoadText below replaces
+            // it in place and the already-armed watcher keeps serving. Pushing again stacked snapshots
+            // and doubled the watcher (observed live 2026-08-08). A foreign loaded file still gets
+            // pushed (and thus restored at the end) exactly as before.
+            if (!(runEndWatcherArmed && model?.FileName == "Work Order"))
+                GCode.File.Push();
             GCode.File.LoadText("Work Order", toLoad);
             if (model != null)
             {
