@@ -330,8 +330,9 @@ namespace CNC.Core
         // grblHAL ends a g-code comment at the FIRST ')', so any '(' or ')' INSIDE a (comment) corrupts the
         // block - the text after the inner ')' is parsed as g-code (e.g. "1 depth pass(es)" -> stray ", DOC...").
         // Replace parens between the outer '(' .. ')' with '[' .. ']' so generated comments are always well-formed.
-        // Applied to every streamed line (directives are consumed earlier, so only comments / g-code reach here).
-        private static string SanitizeComment(string s)
+        // Public since Step 7: MacroProcessor.Run applies it per line at LOAD time (skipping directive rows,
+        // which the pump consumes and never sends) - the same protection the retired streaming loop gave.
+        public static string SanitizeComment(string s)
         {
             int open = s.IndexOf('(');
             int close = s.LastIndexOf(')');

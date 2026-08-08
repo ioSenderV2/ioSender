@@ -82,8 +82,6 @@ namespace GCode_Sender
         // Set by Run_Click when "Probe height map" is checked; consumed by Model_PropertyChanged once the
         // Start Job run's IsJobRunning transitions back to false (its own terminal state), then runs the
         // Height Map pass as a continuation. See RunHeightMapPass.
-        private bool pendingHeightMap = false;
-
         // Guards Model_PropertyChanged's PRINT-line parsing (corners/measured size/etc.) to whichever
         // StartJobView instance most recently triggered a run. Subscribe() deliberately never unsubscribes on
         // deactivate (see its own comment - a run started here must still get its results parsed even after
@@ -784,15 +782,6 @@ namespace GCode_Sender
             // fixture selection to change (see UpdateFixtureWarning).
             if (e.PropertyName == nameof(GrblViewModel.GrblState))
                 UpdateFixtureWarning();
-
-            // "Probe height map" continuation: fires once THIS run reaches its own terminal state (the run
-            // just started sets IsJobRunning true then false again when it completes - MacroProcessor.Run's
-            // generated program clears it, same as every other Start Job path).
-            if (e.PropertyName == nameof(GrblViewModel.IsJobRunning) && pendingHeightMap && model.IsJobRunning == false)
-            {
-                pendingHeightMap = false;
-                Dispatcher.BeginInvoke(new System.Action(RunHeightMapPass));
-            }
 
             if (e.PropertyName != nameof(GrblViewModel.Message))
                 return;
@@ -1513,9 +1502,19 @@ namespace GCode_Sender
                     if (AppDialogs.Show("G28 is not set. Jog to the position you want to probe the spoilboard Z from - clear of the stock in X/Y, within ~10mm above the spoilboard in Z - then click OK to set G28 there. Cancel aborts.",
                             "Setup", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
                         return;
-                    if (!MacroProcessor.Run(model, "Set G28", "G28.1\nM2", false))
-                        return;
-                    GrblWorkParameters.Get(model);   // G28 has just changed - re-read before checking it below
+                    // Step 7: Run is asynchronous now (the old engine's deferred start meant the $# re-read
+                    // below happened to slip out BEFORE the stream; an immediate start would collide it
+                    // mid-stream instead - the fs-listing/error:9 class of trap). So set G28, then re-enter
+                    // Generate from the run's terminal: the fresh $# read at the top of this block then sees
+                    // the new G28, this branch is skipped, and the flow continues exactly where it left off.
+                    // Everything above this point is side-effect-free validation, safe to re-run.
+                    MacroProcessor.Run(model, "Set G28", "G28.1\nM2", false,
+                        onDone: jobFinished =>
+                        {
+                            if (jobFinished)
+                                Dispatcher.BeginInvoke(new System.Action(() => Generate_Click(sender, e)));
+                        });
+                    return;
                 }
 
                 // Being set is only half of it: the program rapids to G28 ("G53 G0 X#5161 Y#5162"), so it
@@ -1746,20 +1745,26 @@ namespace GCode_Sender
             ResetResults();
 
             // "Probe height map" needs the origin Start Job is about to set (and, for the default Dynamic
-            // corner-fence run, the measured size) - queue it as a continuation once THIS run reaches its own
-            // terminal state (see Model_PropertyChanged's IsJobRunning watch).
-            pendingHeightMap = chkHeightMap.IsChecked == true && chkHeightMap.IsEnabled;
+            // corner-fence run, the measured size) - run it from the terminal callback below. Step 7: this
+            // used to be a pendingHeightMap flag consumed by an IsJobRunning->false watch, which under the
+            // old multi-burst engine could fire at a burst boundary and also fired after a CANCELLED run;
+            // onDone's jobFinished is the genuine program end, so a Stop/cancel no longer height-maps.
+            bool wantHeightMap = chkHeightMap.IsChecked == true && chkHeightMap.IsEnabled;
 
             // Run control (status, feed hold, override, MDI) is fixed at the main-window bottom and always
             // visible (Phase 2c), so the run can be driven without leaving this tab - no floating panel needed.
 
-            // Macro path: NGC-safe, keeps the program out of the loaded job, and shows the (MBOX,...)
-            // confirmation. confirm:true gives the operator a final "run?" before any motion (skipped when
-            // unattended - see GenerateAndRun). Claim result-parsing rights for THIS instance before kicking
-            // it off - see _activeRunner's own field comment for why this can't just be a start/stop bool
-            // around the call.
+            // Macro path: NGC-safe, shows the (MBOX,...) confirmation. confirm:true gives the operator a
+            // final "run?" before any motion (skipped when unattended - see GenerateAndRun). Claim
+            // result-parsing rights for THIS instance before kicking it off - see _activeRunner's own field
+            // comment for why this can't just be a start/stop bool around the call.
             _activeRunner = this;
-            MacroProcessor.Run(model, "Setup " + (SelectedFixture?.Name ?? string.Empty), program, true, unattended);
+            MacroProcessor.Run(model, "Setup " + (SelectedFixture?.Name ?? string.Empty), program, true, unattended,
+                onDone: jobFinished =>
+                {
+                    if (jobFinished && wantHeightMap)
+                        Dispatcher.BeginInvoke(new System.Action(RunHeightMapPass));
+                });
         }
 
         // Backs the "Generate and Run" mode-dropdown entry (see MacroProcessor.SupportsGenerateAndRun) -

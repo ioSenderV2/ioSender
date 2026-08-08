@@ -417,6 +417,25 @@ namespace CNC.Controls
                     }
             }
 
+            // Sanitize comments per line, exactly as the retired streamer did: grblHAL ends a comment at
+            // the FIRST ')' (nested parens corrupt the block - "1 depth pass(es)" -> stray g-code) and
+            // rejects over-long lines outright, and generator-built comments interpolate names of
+            // arbitrary length. Directive rows are skipped - the pump consumes them, they never reach
+            // the wire, and truncating a long (MBOX ...) message would serve nothing.
+            bool sanitized = false;
+            for (int i = 0; i < lines.Length; i++)
+                if (MacroRunner.RecognizeDirective(lines[i]) == null)
+                {
+                    string clean = MacroRunner.SanitizeComment(lines[i]);
+                    if (!ReferenceEquals(clean, lines[i]))
+                    {
+                        lines[i] = clean;
+                        sanitized = true;
+                    }
+                }
+            if (sanitized)
+                code = string.Join("\n", lines);
+
             // Confirm-before-run - but an input prompt's OK/Cancel is itself the run confirmation, so
             // when the macro has (PROMPT param, ...) fields the field dialog (shown by JobRunner.Run's
             // up-front gate) does the confirming and a separate box here would be redundant. Same rule
