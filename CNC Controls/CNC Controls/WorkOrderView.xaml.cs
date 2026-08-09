@@ -2028,7 +2028,14 @@ namespace CNC.Controls
                 // Send ONLY - not SendMDI. Step 6 arms this watcher at GENERATE time, and Cycle Start
                 // may be minutes away: a single jog in between reaches SendMDI then Idle, which under
                 // the old SendMDI-arming would have popped the program before it ever ran.
-                if (st == StreamingState.Send)
+                // AND only OUR program's Send: any other run in between - a Setup/macro run pushes the
+                // work order aside and streams under its own name - must be ignored outright, not
+                // latched. Without this gate, Setup-then-carve (2026-08-08, first boot-restored session)
+                // latched started on SETUP's Send, hit Setup's terminal with the macro loaded, took the
+                // not-ours disarm exit below, and the carve then finished with no watcher: no pop, no
+                // switch back. The macro run's own watcher (MacroProcessor.Run) restores the work order
+                // around it, so staying armed across a foreign run is exactly right.
+                if (st == StreamingState.Send && model.FileName == "Work Order")
                     started = true;
                 DebugLog.Write("workorder", string.Format("WatchForRunEnd: saw StreamingState={0}, started={1}{2}",
                     st, started, !started ? " - NOT ARMED, a terminal state here will be ignored" : string.Empty));

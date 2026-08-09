@@ -468,7 +468,11 @@ namespace CNC.Controls
                 if (e.PropertyName != nameof(GrblViewModel.StreamingState))
                     return;
                 var st = model.StreamingState;
-                if (st == StreamingState.Send)
+                // Only THIS macro's Send latches the watcher (same gate, same incident class as
+                // WorkOrderView.WatchForRunEnd): a refused start (e.g. PREREQ) leaves this armed, and
+                // without the FileName gate the next unrelated run would latch it and burn the watcher
+                // on a foreign terminal - disarming without popping this macro's pushed slot.
+                if (st == StreamingState.Send && model.FileName == name)
                     started = true;
                 if (st == StreamingState.JobFinished)
                     jobFinished = true;
