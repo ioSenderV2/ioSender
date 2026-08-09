@@ -33,8 +33,21 @@
                  bottom run bar, same as every other Generate-first tab. -->
             <!-- Work order's own name (its file's name, no path or extension) - not the word "Toolpaths",
                  which said nothing this panel doesn't already show by being full of toolpaths. -->
-            <TextBlock x:Name="txtWorkOrderName" Grid.Row="1" Margin="0,0,0,8" FontWeight="SemiBold"
-                       Text="(untitled)" ToolTip="Not yet saved" TextTrimming="CharacterEllipsis"/>
+            <!-- Right-click: the file-level operations this tab never had (user request 2026-08-08).
+                 Rename/Delete need an actual .workorder file - the Opened handler greys them out for an
+                 untitled work order rather than hiding them, so the capability stays discoverable. -->
+            <TextBlock x:Name="txtWorkOrderName" Grid.Row="1" Margin="0,0,0,8" FontWeight="SemiBold" Background="Transparent"
+                       Text="(untitled)" ToolTip="Not yet saved" TextTrimming="CharacterEllipsis">
+                <TextBlock.ContextMenu>
+                    <ContextMenu Opened="WorkOrderNameMenu_Opened">
+                        <MenuItem x:Uid="mi_worename" x:Name="miWoRename" Header="Rename..." Click="MenuRenameWorkOrder_Click"/>
+                        <MenuItem x:Uid="mi_woopencopy" x:Name="miWoOpenCopy" Header="Open Copy..." Click="MenuOpenCopyWorkOrder_Click"/>
+                        <MenuItem x:Uid="mi_woclose" x:Name="miWoClose" Header="Close" Click="MenuCloseWorkOrder_Click"/>
+                        <Separator/>
+                        <MenuItem x:Uid="mi_wodelete" x:Name="miWoDelete" Header="Delete..." Click="MenuDeleteWorkOrder_Click"/>
+                    </ContextMenu>
+                </TextBlock.ContextMenu>
+            </TextBlock>
             <Border Grid.Row="2" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="4" SnapsToDevicePixels="True">
                 <TreeView x:Name="treeToolpaths" BorderThickness="0" Background="Transparent"
                           SelectedItemChanged="treeToolpaths_SelectedItemChanged" PreviewKeyDown="TreeToolpaths_PreviewKeyDown"/>

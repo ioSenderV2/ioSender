@@ -2464,20 +2464,24 @@ namespace CNC.Controls
                 path = dlg.FileName;
             }
 
+            if (!WriteWorkOrderFile(path))
+                return false;
+
+            AdoptWorkOrderFile(path);
+            if (model != null)
+                model.Message = "Work order saved to " + path;
+            return true;
+        }
+
+        // Serialize the LIVE work order to a file - the one write everybody shares (Save, Open Copy,
+        // Rename). Errors are shown here so no caller can forget to.
+        private bool WriteWorkOrderFile(string path)
+        {
             try
             {
                 var serializer = new System.Xml.Serialization.XmlSerializer(typeof(WorkOrder));
                 using (var writer = new System.IO.StreamWriter(path))
                     serializer.Serialize(writer, workOrder);
-                currentFilePath = path;
-                pendingName = null;
-                AppConfig.Settings.Base.LastWorkOrderFilePath = currentFilePath;
-                AppConfig.Settings.Base.LastWorkOrderName = null;
-                AppConfig.Settings.Base.WorkOrderDirty = false;
-                AppConfig.Settings.Save();
-                UpdateTitleBar();
-                if (model != null)
-                    model.Message = "Work order saved to " + path;
                 return true;
             }
             catch (Exception ex)
@@ -2485,6 +2489,19 @@ namespace CNC.Controls
                 AppDialogs.Show("Could not save the work order:\n" + ex.Message, "Work order", MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
             }
+        }
+
+        // Make a just-written file THE work order file: association, boot-restore pointer, clean dirty
+        // state, repainted title. The bookkeeping SaveToDisk always did, shared with Open Copy/Rename.
+        private void AdoptWorkOrderFile(string path)
+        {
+            currentFilePath = path;
+            pendingName = null;
+            AppConfig.Settings.Base.LastWorkOrderFilePath = currentFilePath;
+            AppConfig.Settings.Base.LastWorkOrderName = null;
+            AppConfig.Settings.Base.WorkOrderDirty = false;
+            AppConfig.Settings.Save();
+            UpdateTitleBar();
         }
 
         // Prefers the name the operator already gave this work order - via New's prompt, or the file it was
@@ -2545,6 +2562,13 @@ namespace CNC.Controls
                     "Work order", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                 return;
 
+            ResetToBlankWorkOrder();
+        }
+
+        // Clear the tab to a blank, untitled work order - New's reset, shared with the title menu's
+        // Close and Delete (which do their own gating/confirming first).
+        private void ResetToBlankWorkOrder()
+        {
             // WorkOrder's own field default (Wcs = 0, "Follow Setup") is already the right starting point -
             // no explicit seeding needed here.
             workOrder = new WorkOrder();
@@ -2601,6 +2625,147 @@ namespace CNC.Controls
                 txtWorkOrderName.Text = "(untitled)" + suffix;
                 txtWorkOrderName.ToolTip = "Not yet saved";
             }
+        }
+
+        // ---- Title right-click menu (user request 2026-08-08): Rename / Open Copy / Close / Delete ----
+        // The file-level operations the tab never had - before this, renaming a work order meant closing
+        // it and renaming the .workorder in Explorer. The full path already lives in the title's tooltip.
+
+        private void WorkOrderNameMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            // Rename/Delete operate on the associated FILE, so they grey out for an untitled work order.
+            // Resolved off the menu instance rather than generated fields - a ContextMenu lives outside
+            // the visual tree and its name scope is the least reliable thing about it.
+            bool hasFile = currentFilePath != null;
+            foreach (var item in ((ContextMenu)sender).Items)
+                if (item is MenuItem mi && (mi.Name == "miWoRename" || mi.Name == "miWoDelete"))
+                    mi.IsEnabled = hasFile;
+        }
+
+        // Same picker both Rename and Open Copy use to ask for the target name: seeded next to the
+        // current file (or the work-orders folder for an untitled one). The native replace-confirm is ON
+        // here, unlike SaveToDisk's first-save picker - overwriting a DIFFERENT work order's file is
+        // destructive and has no earlier "this overwrites X" prompt covering it.
+        private string PickWorkOrderFileName(string title, string suggestedName)
+        {
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = title,
+                Filter = WorkOrderFilter,
+                AddExtension = true,
+                DefaultExt = ".workorder",
+                InitialDirectory = currentFilePath != null ? System.IO.Path.GetDirectoryName(currentFilePath) : WorkOrdersFolder(),
+                FileName = suggestedName,
+                OverwritePrompt = true
+            };
+            return dlg.ShowDialog() == true ? dlg.FileName : null;
+        }
+
+        private static bool SamePath(string a, string b)
+        {
+            try { return string.Equals(System.IO.Path.GetFullPath(a), System.IO.Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase); }
+            catch { return string.Equals(a, b, StringComparison.OrdinalIgnoreCase); }
+        }
+
+        // Rename = write the LIVE content under the new name, adopt it, then remove the old file. Going
+        // through a save rather than File.Move means unsaved edits ride along instead of being lost or
+        // silently flushed into the OLD name first - and a failed write leaves the original untouched.
+        private void MenuRenameWorkOrder_Click(object sender, RoutedEventArgs e)
+        {
+            if (currentFilePath == null)
+                return;
+
+            string newPath = PickWorkOrderFileName("Rename work order", System.IO.Path.GetFileNameWithoutExtension(currentFilePath));
+            if (newPath == null || SamePath(newPath, currentFilePath))
+                return;
+
+            string oldPath = currentFilePath;
+            if (!WriteWorkOrderFile(newPath))
+                return;
+
+            try
+            {
+                System.IO.File.Delete(oldPath);
+            }
+            catch (Exception ex)
+            {
+                // The rename itself succeeded - the new file exists and is adopted below - so tell the
+                // operator the leftover exists rather than failing an operation that is already done.
+                AppDialogs.Show(string.Format("Renamed, but the old file could not be removed:\n{0}\n\n{1}", oldPath, ex.Message),
+                    "Work order", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+
+            AdoptWorkOrderFile(newPath);
+            if (model != null)
+                model.Message = "Work order renamed to " + newPath;
+        }
+
+        // Open Copy = save the LIVE content under a new name and continue editing THAT file - the
+        // original stays on disk as it last was. (With Rename above this is the "duplicate for the next
+        // variant" half; it also works for an untitled work order, where it is simply the first save.)
+        private void MenuOpenCopyWorkOrder_Click(object sender, RoutedEventArgs e)
+        {
+            string suggested = SuggestedFileName() + " copy";
+            string newPath = PickWorkOrderFileName("Open a copy of this work order", suggested);
+            if (newPath == null)
+                return;
+            if (currentFilePath != null && SamePath(newPath, currentFilePath))
+            {
+                AppDialogs.Show("That is the current file - pick a different name for the copy.",
+                    "Work order", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (!WriteWorkOrderFile(newPath))
+                return;
+
+            AdoptWorkOrderFile(newPath);
+            if (model != null)
+                model.Message = "Now editing " + newPath;
+        }
+
+        // Close = New's clear-to-blank with Close wording: same autosave courtesy, same only-ask-when-
+        // something-would-be-lost gate (a saved, clean work order closes silently - its file has it all).
+        private void MenuCloseWorkOrder_Click(object sender, RoutedEventArgs e)
+        {
+            AutoSaveIfEnabled();
+
+            bool wouldLoseChanges = workOrder.Toolpaths.Count > 0
+                && (currentFilePath == null || AppConfig.Settings.Base.WorkOrderDirty);
+            if (wouldLoseChanges &&
+                AppDialogs.Show(string.Format("Discard the current work order ({0} toolpath{1}) and close it?",
+                        workOrder.Toolpaths.Count, workOrder.Toolpaths.Count == 1 ? "" : "s"),
+                    "Work order", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            ResetToBlankWorkOrder();
+        }
+
+        // Delete = remove the .workorder file from disk AND close it on the tab. One confirm covers both
+        // (it names the file and says the tab closes too); no autosave first - saving content into a file
+        // that is about to be deleted would be absurd, and the confirm is the operator accepting the loss.
+        private void MenuDeleteWorkOrder_Click(object sender, RoutedEventArgs e)
+        {
+            if (currentFilePath == null)
+                return;
+
+            if (AppDialogs.Show(string.Format("Delete this work order file from disk?\n\n{0}\n\nThis cannot be undone, and the work order closes with it.", currentFilePath),
+                    "Work order", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                System.IO.File.Delete(currentFilePath);
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show("Could not delete the work order file:\n" + ex.Message, "Work order", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            ResetToBlankWorkOrder();
+            if (model != null)
+                model.Message = "Work order deleted.";
         }
 
         private void btnLoad_Click(object sender, RoutedEventArgs e)
