@@ -781,13 +781,13 @@ namespace CNC.Controls
         }
         private bool SpindleOverrideCoarseMinus(Key key)
         {
-            Comms.com.WriteByte(GrblConstants.CMD_SPINDLE_OVR_COARSE_PLUS);
+            Comms.com.WriteByte(GrblConstants.CMD_SPINDLE_OVR_COARSE_MINUS);
 
             return true;
         }
         private bool SpindleOverrideCoarsePlus(Key key)
         {
-            Comms.com.WriteByte(GrblConstants.CMD_SPINDLE_OVR_COARSE_MINUS);
+            Comms.com.WriteByte(GrblConstants.CMD_SPINDLE_OVR_COARSE_PLUS);
 
             return true;
         }
