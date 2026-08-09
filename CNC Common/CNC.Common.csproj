@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CNC.Common - shared non-wire infrastructure for the client/server split: the plumbing BOTH sides
+  need but that carries no machine data and no wire shapes. ViewModelBase (INPC base every view
+  model derives from), the UiContext/SyncTarget thread marshalling, and generic helpers.
+
+  WHY IT EXISTS: client projects must drop their CNC Core reference (the contracts-only client
+  discipline), but C# requires referencing the assembly that defines a used type's BASE class -
+  so as long as ViewModelBase lived in CNC Core, no consumer of any view model could ever cut the
+  reference. Sharing a LIBRARY is not the pass-C#-objects cheat; only machine-data instances
+  crossing the client/server boundary are. Nothing in here may know about controllers, comms,
+  g-code or wire messages - if a type needs any of those it belongs in CNC Core or CNC.Contracts.
+
+  Types moved here from CNC Core keep their original namespace (CNC.Core) so the move needed zero
+  call-site churn - same discipline as CNC.Contracts. This is the LEGACY net462 project the
+  solution builds; CNC.Common.net8.csproj (same folder, same sources, NOT in the .sln) is the
+  portability probe - the same two-project pattern as CNC Core and CNC Contracts.
+-->
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}</ProjectGuid>
+    <OutputType>library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>CNC.Common</RootNamespace>
+    <AssemblyName>CNC.Common</AssemblyName>
+    <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <WarningLevel>4</WarningLevel>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="HelperClasses.cs" />
+    <Compile Include="Threading.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

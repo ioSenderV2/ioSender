@@ -30,6 +30,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CNC.Contracts", "..\CNC Con
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CNC.Client", "..\CNC Client\CNC Client\CNC.Client.csproj", "{6C2E7A2D-6C0B-4B0A-9F0E-6B6B7D6A1234}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CNC.Common", "..\CNC Common\CNC.Common.csproj", "{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -118,6 +120,14 @@ Global
 		{9448A265-0B77-4235-A5F5-BDE212EC75E7}.Release|Any CPU.Build.0 = Release|Any CPU
 		{9448A265-0B77-4235-A5F5-BDE212EC75E7}.Release|x86.ActiveCfg = Release|Any CPU
 		{9448A265-0B77-4235-A5F5-BDE212EC75E7}.Release|x86.Build.0 = Release|Any CPU
+		{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}.Debug|x86.Build.0 = Debug|Any CPU
+		{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}.Release|x86.ActiveCfg = Release|Any CPU
+		{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}.Release|x86.Build.0 = Release|Any CPU
 		{6C2E7A2D-6C0B-4B0A-9F0E-6B6B7D6A1234}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{6C2E7A2D-6C0B-4B0A-9F0E-6B6B7D6A1234}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6C2E7A2D-6C0B-4B0A-9F0E-6B6B7D6A1234}.Debug|x86.ActiveCfg = Debug|Any CPU

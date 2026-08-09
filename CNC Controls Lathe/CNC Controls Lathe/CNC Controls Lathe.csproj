@@ -128,6 +128,10 @@
       <Project>{9448A265-0B77-4235-A5F5-BDE212EC75E7}</Project>
       <Name>CNC.Contracts</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\CNC Common\CNC.Common.csproj">
+      <Project>{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}</Project>
+      <Name>CNC.Common</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\CNC Core\CNC Core\CNC Core.csproj">
       <Project>{f245ff89-a838-4d6e-aa40-92cfd3d072d3}</Project>
       <Name>CNC Core</Name>

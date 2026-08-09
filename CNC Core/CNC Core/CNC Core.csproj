@@ -75,6 +75,14 @@
       <Project>{9448A265-0B77-4235-A5F5-BDE212EC75E7}</Project>
       <Name>CNC.Contracts</Name>
     </ProjectReference>
+    <!-- Shared non-wire infrastructure (ViewModelBase, UiContext/SyncTarget, generic helpers) -
+         moved out so client projects can drop their CNC Core reference without losing the INPC
+         base class (referencing a type requires referencing its base's assembly). Same namespaces,
+         no call-site changes. CNC.Common references nothing. -->
+    <ProjectReference Include="..\..\CNC Common\CNC.Common.csproj">
+      <Project>{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}</Project>
+      <Name>CNC.Common</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ActionCommand.cs" />
@@ -111,7 +119,6 @@
     <Compile Include="GCodeProgram.cs" />
     <Compile Include="GCodeProgramComments.cs" />
     <Compile Include="Geometry.cs" />
-    <Compile Include="Threading.cs" />
     <Compile Include="GrblViewModel.cs" />
     <Compile Include="MachineState.cs" />
     <Compile Include="MachineDeltaProducer.cs" />
@@ -136,7 +143,6 @@
     <Compile Include="YModem.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="HelperClasses.cs" />
   </ItemGroup>
   <ItemGroup>
     <!-- Feeds & Speeds export/apply JSON (FeedsSpeedsExport.cs) - no JSON library existed in the solution

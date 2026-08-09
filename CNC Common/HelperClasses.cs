@@ -16,7 +16,6 @@ using System.Threading;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using System.Diagnostics;
-using CNC.GCode;
 using System.IO;
 
 namespace CNC.Core
