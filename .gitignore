@@ -43,6 +43,7 @@ scene_debug.log
 
 # Claude Code: per-turn state written by the turn-loop hooks (tools/claude-hooks/)
 .claude/turn-state.json
+**/.claude/turn-state.json
 .claude/settings.local.json
 .claude/worktrees/
 .claude/scheduled_tasks.lock
