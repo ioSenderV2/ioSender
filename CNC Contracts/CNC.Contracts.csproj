@@ -54,6 +54,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="GrblConstants.cs" />
+    <Compile Include="SettingEnums.cs" />
     <Compile Include="MachineEnums.cs" />
     <Compile Include="GCodeEnums.cs" />
     <Compile Include="StateMessages.cs" />
