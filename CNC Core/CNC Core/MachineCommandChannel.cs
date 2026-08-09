@@ -74,11 +74,17 @@ namespace CNC.Core
     public class MachineCommandChannel : IMachineCommands
     {
         private readonly GrblViewModel model;
+        private readonly JobRunner runner;
         private long nextId = 0;
 
-        public MachineCommandChannel(GrblViewModel model)
+        // runner is optional so a host that only jogs (or a harness that only tests jogging) need not
+        // build a streaming engine; run-control commands then refuse rather than throw. No static
+        // JobRunner.Instance exists to fall back on, deliberately - same no-static-in-Core rule as
+        // GCodeProgram (a server has no "the one" job runner; the host wires the instance it means).
+        public MachineCommandChannel(GrblViewModel model, JobRunner runner = null)
         {
             this.model = model ?? throw new ArgumentNullException(nameof(model));
+            this.runner = runner;
         }
 
         public Task<CommandResult> Jog(JogCommand jog)
@@ -94,6 +100,75 @@ namespace CNC.Core
             bool sent = model.Keyboard.Execute(jog);
 
             return Task.FromResult(sent ? CommandResult.Ok(id) : CommandResult.Fail(id, "nothing to jog (no axes moving, or jog mode not set)"));
+        }
+
+        // Run control: the gates are the engine's OWN enable-state - CanRun/CanStop/CanRewind, the exact
+        // booleans the run bar's buttons bind - so a client through this channel is refused precisely when
+        // the button would be greyed, and there is no second copy of the gating logic to drift. The host
+        // keeps that state fresh the same way it does for its buttons (the engine's handlers write most of
+        // it; ioSender's JobControl adds the idle/file-load refresh, and a headless host owns that role).
+
+        public Task<CommandResult> RunProgram(int fromBlock)
+        {
+            long id = System.Threading.Interlocked.Increment(ref nextId);
+
+            if (runner == null)
+                return Task.FromResult(CommandResult.Fail(id, "no job runner attached to this channel"));
+            if (!runner.CanRun)
+                return Task.FromResult(CommandResult.Fail(id, "run is not available in the current state"));
+
+            runner.Run(fromBlock);
+
+            return Task.FromResult(CommandResult.Ok(id));
+        }
+
+        public Task<CommandResult> StopJob()
+        {
+            long id = System.Threading.Interlocked.Increment(ref nextId);
+
+            if (runner == null)
+                return Task.FromResult(CommandResult.Fail(id, "no job runner attached to this channel"));
+            if (!runner.CanStop)
+                return Task.FromResult(CommandResult.Fail(id, "there is no run to stop"));
+
+            // Abort(), NOT Stop() - the naming is inverted (found on real hardware 2026-08-08, see
+            // JobRunner.Run's onOperatorCancel comment): Stop() marks the job operator-stopped FIRST,
+            // which suppresses the CMD_STOP byte in StreamingIdle's Stop case. Abort() is what the
+            // run bar's Stop button calls, and it lets the stop byte go out.
+            runner.Abort();
+
+            return Task.FromResult(CommandResult.Ok(id));
+        }
+
+        public Task<CommandResult> RewindJob()
+        {
+            long id = System.Threading.Interlocked.Increment(ref nextId);
+
+            if (runner == null)
+                return Task.FromResult(CommandResult.Fail(id, "no job runner attached to this channel"));
+            if (!runner.CanRewind)
+                return Task.FromResult(CommandResult.Fail(id, "there is nothing to rewind"));
+
+            runner.Rewind();
+
+            return Task.FromResult(CommandResult.Ok(id));
+        }
+
+        public Task<CommandResult> Mdi(string command)
+        {
+            long id = System.Threading.Interlocked.Increment(ref nextId);
+
+            if (runner == null)
+                return Task.FromResult(CommandResult.Fail(id, "no job runner attached to this channel"));
+            if (string.IsNullOrWhiteSpace(command))
+                return Task.FromResult(CommandResult.Fail(id, "no command supplied"));
+
+            // Accepted means HANDED to the engine, not delivered: SendCommand itself still drops a
+            // command whose streaming state disallows it (with a -debuglog=jobrunner trace) - the same
+            // behaviour the UI's MDI field gets. The console/state stream carries the actual outcome.
+            runner.SendCommand(command);
+
+            return Task.FromResult(CommandResult.Ok(id));
         }
     }
 }

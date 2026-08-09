@@ -86,6 +86,12 @@ namespace GCode_Sender
         // see its construction below for why it exists before anything consumes it.
         private CNC.Core.MachineStateStream stateStream;
 
+        // The in-process command channel (step 6a, the other direction): Jog + run control, wired to
+        // the REAL JobRunner instance the run bar drives. Same additive pattern as the state stream -
+        // nothing in the app calls it yet; constructing it proves the wiring and gives a future
+        // out-of-process transport its exact in-process reference behaviour.
+        private CNC.Core.MachineCommandChannel commandChannel;
+
         public MainWindow()
         {
             CNC.Core.Resources.Path = AppDomain.CurrentDomain.BaseDirectory;
@@ -220,6 +226,7 @@ namespace GCode_Sender
                 // now: run with -debuglog=delta and every message appears in the debug log as its
                 // wire JSON.
                 stateStream = new CNC.Core.MachineStateStream(viewModel);
+                commandChannel = new CNC.Core.MachineCommandChannel(viewModel, RunControl.Runner);
             }
 
             // The run control is now fixed at the main-window bottom (always visible on every tab), so the

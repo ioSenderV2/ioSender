@@ -328,18 +328,134 @@ static class Probe
             Comms.com = null;
         }
 
+        // ---- Run control across the boundary: the REAL JobRunner, headless, streaming through fake comms ----
+        // This is the first time the streaming engine itself runs where the out-of-process server will
+        // live: .NET 8, no WPF, no seams registered (every unset default is the headless one), a fake
+        // transport playing the controller. The harness takes the HOST's routing role (what JobControl
+        // does in the app): state reports route to GrblStateChanged, and IsActive is set because a
+        // headless server's run controls are always "the surface being looked at".
+        Console.WriteLine("Run control through the real JobRunner (headless stream, stop, rewind, MDI):");
+        {
+            var fake = new FakeStreamComms();
+            Comms.com = fake;
+
+            // Present a grblHAL controller: the $I handshake sets this in the app (Grbl.GetInfo), and the
+            // engine's Stop semantics genuinely fork on it (grblHAL flushes with CMD_STOP; legacy grbl can
+            // only pause). The setter is internal, so the probe reaches it the blunt way.
+            typeof(GrblInfo).GetProperty(nameof(GrblInfo.IsGrblHAL)).GetSetMethod(true).Invoke(null, new object[] { true });
+
+            var rcModel = new GrblViewModel();
+            var runner = new JobRunner();
+            runner.Attach(rcModel);
+            runner.IsActive = true;
+            rcModel.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(GrblViewModel.GrblState))
+                    runner.GrblStateChanged(rcModel.GrblState);
+            };
+
+            var noRunner = new MachineCommandChannel(rcModel);
+            Check(!noRunner.RunProgram(0).Result.Success, "RunProgram on a channel with no runner refuses instead of throwing");
+
+            var chan = new MachineCommandChannel(rcModel, runner);
+            Check(!chan.RunProgram(0).Result.Success, "RunProgram with nothing loaded is refused (CanRun gate)");
+            Check(!chan.StopJob().Result.Success, "StopJob with nothing running is refused (CanStop gate)");
+            Check(!chan.RewindJob().Result.Success, "RewindJob with nothing part-streamed is refused (CanRewind gate)");
+
+            // A tiny in-memory program, built the way LoadText builds one, made the streamed source.
+            var prog = new GCodeProgram(rcModel);
+            prog.AddBlock("probe.nc", CNC.Core.Action.New);
+            prog.AddBlock("G21", CNC.Core.Action.Add);
+            prog.AddBlock("G90", CNC.Core.Action.Add);
+            prog.AddBlock("G4P0", CNC.Core.Action.Add);
+            prog.AddBlock("M2", CNC.Core.Action.End);
+            runner.Source = prog;
+
+            rcModel.DataReceived("<Idle|MPos:0.000,0.000,0.000|FS:0,0>");
+            Check(runner.CanRun, "an idle report with a program loaded arms CanRun via the engine's own handler");
+
+            PumpLog.Enabled = true;   // %TEMP%\iosender-startjob.log - the pump's own tracer
+            PumpLog.Clear();
+
+            Check(chan.RunProgram(0).Result.Success, "RunProgram is accepted");
+
+            // Play the controller: ack each line as it arrives, both ways the real comms layer publishes a
+            // reply (the model's response event for the state machine, ReplyClassified for the pump).
+            // The engine's run-end contract (StreamingSendFile.JobFinished -> AwaitIdle.Idle): finish,
+            // AUTO-REWIND, settle back to ready - all inline at the last ack. JobComplete/CanRewind are
+            // momentary inside that chain, so the observables a client really has are the ones asserted
+            // here: the run stops running, the lines all went out, and the engine is rewound + re-armed.
+            int acked = 0, t0 = Environment.TickCount;
+            while (rcModel.IsJobRunning != false && Environment.TickCount - t0 < 10000)
+            {
+                if (fake.WriteLineCount > acked)
+                {
+                    acked++;
+                    rcModel.DataReceived("ok");
+                    fake.RaiseReply(Comms.ReplyClass.Ack, "ok");
+                }
+                else
+                    System.Threading.Thread.Sleep(1);
+            }
+            Check(rcModel.IsJobRunning == false, "the program streamed to completion against acks alone");
+            Check(fake.WriteLineCount == 4 && fake.WriteAt(0) == "G21" && fake.WriteAt(3) == "M2",
+                  "all 4 lines went to the wire in program order (got " + fake.WriteLineCount + ")");
+            Check(runner.CurrentBlock == 0, "the engine auto-rewound at completion (the run-end contract)");
+            Check(runner.CanRun, "CanRun re-armed for the next run");
+            Check(!chan.RewindJob().Result.Success, "RewindJob after completion is refused - the engine already rewound");
+
+            // The armed path: force the gate the way a host owns enable-state (JobControl writes CanRun the
+            // same way) purely to prove the channel drives the engine's REAL rewind - the engine keeps
+            // programs rewound on its own, so the armed state is rare (errored runs parked awaiting action).
+            runner.CanRewind = true;
+            Check(chan.RewindJob().Result.Success && runner.CurrentBlock == 0 && !runner.CanRewind,
+                  "an armed RewindJob drives the engine's real rewind and the enables resettle");
+
+            // Second run, and this time the controller never acks: stop it mid-stream.
+            Check(chan.RunProgram(0).Result.Success, "a second run starts after completion");
+            t0 = Environment.TickCount;
+            while (!runner.CanStop && Environment.TickCount - t0 < 2000)
+                System.Threading.Thread.Sleep(1);
+            Check(chan.StopJob().Result.Success, "StopJob mid-stream is accepted (CanStop gate)");
+            Check(fake.LastByte == GrblConstants.CMD_STOP,
+                  "StopJob put the CMD_STOP byte on the wire (the Abort-not-Stop wiring, hw lesson 2026-08-08)");
+            int writesAfterStop = fake.WriteLineCount;
+            System.Threading.Thread.Sleep(100);   // give an incorrectly-still-alive pump time to betray itself
+            Check(fake.WriteLineCount == writesAfterStop, "no further lines are streamed after StopJob");
+            rcModel.DataReceived("<Idle|MPos:0.000,0.000,0.000|FS:0,0>");
+            Check(rcModel.IsJobRunning == false && runner.CanRun,
+                  "the stop settles like the run bar's Stop: idle again, re-armed to run");
+
+            // MDI rides the same engine door the UI's input field uses.
+            int before = fake.WriteLineCount;
+            Check(chan.Mdi("G92.1").Result.Success, "an MDI line is accepted when idle");
+            bool mdiOut = false;
+            for (int i = before; i < fake.WriteLineCount; i++)
+                mdiOut |= fake.WriteAt(i) == "G92.1";
+            Check(mdiOut, "the MDI line reached the wire");
+            rcModel.DataReceived("ok");
+            Check(!chan.Mdi("").Result.Success, "an empty MDI line is refused");
+
+            Comms.com = null;
+        }
+
         Console.WriteLine(failures == 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED");
         return failures == 0 ? 0 : 1;
     }
 
-    // Minimal StreamComms double: records the last realtime byte and the last multi-byte write (what
-    // JogController.Send ultimately calls) without opening any real transport. Every other member is
-    // a harmless default - this harness never exercises them.
+    // Minimal StreamComms double: records the last realtime byte and every string write (what the
+    // JogController and the StreamPump ultimately call) without opening any real transport, and can
+    // play the controller's half of the conversation by raising ReplyClassified - the exact event the
+    // pump taps for acks on the real comms read thread. Every other member is a harmless default.
     sealed class FakeStreamComms : StreamComms
     {
         public byte LastByte;
         public int WriteCount;
         public string LastWrite;
+        public readonly List<string> Writes = new List<string>();
+
+        // The controller's reply, as the comms layer would classify and publish it to the pump.
+        public void RaiseReply(Comms.ReplyClass cls, string reply) { ReplyClassified?.Invoke(cls, reply); }
 
         public bool IsOpen => true;
         public int OutCount => 0;
@@ -357,8 +473,10 @@ static class Probe
         public int ReadByte() { return -1; }
         public void WriteByte(byte data) { LastByte = data; WriteCount++; }
         public void WriteBytes(byte[] bytes, int len) { LastWrite = System.Text.Encoding.ASCII.GetString(bytes, 0, len); }
-        public void WriteString(string data) { LastWrite = data; }
-        public void WriteCommand(string command) { LastWrite = command; }
+        public void WriteString(string data) { LastWrite = data; lock (Writes) Writes.Add(data.TrimEnd('\r', '\n')); }
+        public void WriteCommand(string command) { LastWrite = command; lock (Writes) Writes.Add(command); }
+        public int WriteLineCount { get { lock (Writes) return Writes.Count; } }
+        public string WriteAt(int i) { lock (Writes) return Writes[i]; }
         public string GetReply(string command) { return string.Empty; }
         public void AwaitAck() { }
         public void AwaitAck(string command) { }

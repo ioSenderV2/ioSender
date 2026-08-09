@@ -20,9 +20,20 @@
  *    the in-process implementation completes synchronously, because a real transport's round trip is
  *    genuinely asynchronous and the interface should not have to change shape when one arrives.
  *
- * Run control (Start/Stop/Rewind/Feed-Hold-as-a-job-transition) and MDI are NOT in this slice - they
- * hang off JobRunner's own state machine, which has not been decided how it crosses this boundary yet.
- * Jog was chosen first because JogCommand was already a portable DTO with nothing else in the way.
+ * Run control (RunProgram/StopJob/RewindJob) and MDI crossed the boundary 2026-08-08, one slice after
+ * Jog. The shape follows Jog exactly: each command is a new DOOR into the real JobRunner - the engine
+ * that already drives the run bar - never a second implementation. Semantics worth writing down:
+ *
+ *  - RunProgram means "the operator pressed Run": resume a hold, cycle-start a tool change, or start
+ *    streaming the program from FromBlock - whatever the engine's state machine decides, exactly as
+ *    the run-bar button does. Which program runs is the SERVER's business (its loaded job, or a host-
+ *    registered active-program policy); the client does not get to pick.
+ *  - A CommandResult's Success means ACCEPTED, not "it worked". The refusal gate is the engine's own
+ *    enable-state (CanRun/CanStop/CanRewind - the exact booleans the run bar's buttons bind), so a
+ *    client through this channel is refused precisely when the button would be greyed. What the
+ *    machine then actually did arrives on the state stream, same truth-source rule as the realtime
+ *    channel above.
+ *  - Feed Hold is NOT here - it is realtime (above), by design.
  */
 
 using System;
@@ -99,5 +110,21 @@ namespace CNC.Contracts
     public interface IMachineCommands
     {
         Task<CommandResult> Jog(JogCommand jog);
+
+        /// <summary>"The operator pressed Run": start the server's program from <paramref name="fromBlock"/>,
+        /// or resume a hold/tool-change - the engine's state machine decides, exactly as the run bar does.
+        /// Refused (Success false) when Run is not available in the current state.</summary>
+        Task<CommandResult> RunProgram(int fromBlock);
+
+        /// <summary>"The operator pressed Stop": abort the run in progress. Refused when there is nothing
+        /// to stop. (Feed Hold is NOT this - a hold is realtime, see IMachineRealtimeChannel.)</summary>
+        Task<CommandResult> StopJob();
+
+        /// <summary>Rewind a part-streamed program to its start. Refused when there is nothing to rewind.</summary>
+        Task<CommandResult> RewindJob();
+
+        /// <summary>One manual g-code/system command line (MDI). Accepted means queued with the engine;
+        /// the reply, like all machine truth, arrives via the state stream/console - not here.</summary>
+        Task<CommandResult> Mdi(string command);
     }
 }

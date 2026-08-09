@@ -944,6 +944,11 @@ namespace CNC.Controls
         // reads exactly as it did before the engine moved. Same approach as MacroProcessor.Run forwarding to
         // MacroRunner.Run: relocating the code should not churn 17 unrelated call sites.
 
+        /// <summary>The engine instance itself - for host wiring that needs the real JobRunner (the
+        /// command channel's run-control door, MainWindow's MachineCommandChannel). Everything else
+        /// should keep using the forwarders below.</summary>
+        public JobRunner Runner { get { return runner; } }
+
         /// <summary>The program the streamer reads - a tool can point this at its own in-memory program.</summary>
         public IProgramSource Source
         {
