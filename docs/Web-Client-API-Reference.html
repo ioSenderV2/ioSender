@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ioSender V2 &mdash; Server API Reference</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #1b1f23; font-size: 11pt; line-height: 1.5;
+         max-width: 64em; margin: 24px auto; padding: 0 20px; background: #fff; }
+  h1 { font-size: 22pt; margin: 0 0 2px; }
+  h1 + .sub { color: #57606a; font-size: 10.5pt; margin-bottom: 20px; }
+  h2 { font-size: 14pt; margin: 32px 0 8px; color: #0a3069; border-bottom: 1px solid #d0d7de; padding-bottom: 4px; }
+  h3 { font-size: 11.5pt; margin: 20px 0 5px; color: #0a3069; }
+  h4 { font-size: 10.5pt; margin: 14px 0 4px; color: #24292f; font-family: "Cascadia Code", Consolas, monospace; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  code, .mono { font-family: "Cascadia Code", Consolas, monospace; font-size: 9.7pt;
+                background: #f6f8fa; border: 1px solid #eaeef2; border-radius: 4px; padding: 0 4px; }
+  pre { font-family: "Cascadia Code", Consolas, monospace; font-size: 9.5pt; background: #f6f8fa;
+        border: 1px solid #d0d7de; border-radius: 6px; padding: 10px 12px; overflow-x: auto; line-height: 1.45; }
+  pre code { background: none; border: none; padding: 0; }
+  a { color: #0969da; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  strong { font-weight: 600; }
+
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; font-size: 9.7pt; }
+  th { text-align: left; border-bottom: 1.5px solid #d0d7de; padding: 5px 8px; color: #57606a; font-weight: 600; }
+  td { padding: 4px 8px; border-bottom: 1px solid #eaeef2; vertical-align: top; }
+  td.num { text-align: right; font-family: Consolas, monospace; white-space: nowrap; }
+  td.c { font-family: "Cascadia Code", Consolas, monospace; font-size: 9.3pt; white-space: nowrap; }
+  tr.grp td { background: #f6f8fa; font-weight: 600; color: #24292f; font-size: 9.8pt; }
+
+  .meta { border: 1px solid #d0d7de; border-radius: 6px; padding: 10px 14px; margin: 12px 0 18px; background: #f6f8fa; font-size: 10pt; }
+  .meta div { margin: 3px 0; }
+  .label { display: inline-block; width: 74px; color: #57606a; font-weight: 600; vertical-align: top; }
+
+  .box { border: 1px solid #d0d7de; border-left-width: 4px; border-radius: 6px; padding: 9px 13px; margin: 12px 0; font-size: 10pt; }
+  .rule { border-left-color: #0a3069; background: #f4f7fc; }
+  .trap { border-left-color: #d97706; background: #fffaf2; }
+  .open { border-left-color: #8250df; background: #faf7ff; }
+  .box .bt { font-weight: 700; font-size: 8.5pt; letter-spacing: .04em; text-transform: uppercase; display: block; margin-bottom: 3px; }
+  .rule .bt { color: #0a3069; } .trap .bt { color: #d97706; } .open .bt { color: #8250df; }
+  .box p:first-of-type { margin-top: 0; } .box p:last-child { margin-bottom: 0; }
+
+  .tag { display: inline-block; border-radius: 10px; padding: 0 7px; font-size: 8.3pt; font-weight: 700; vertical-align: 8%; white-space: nowrap; }
+  .t-built { background: #1a7f37; color: #fff; }
+  .t-new   { background: #0a3069; color: #fff; }
+  .t-open  { background: #8250df; color: #fff; }
+  .t-rt    { background: #cf222e; color: #fff; }
+  .lvl { display: inline-block; border-radius: 3px; padding: 0 6px; font-size: 8.5pt; font-weight: 600; border: 1px solid; white-space: nowrap; }
+  .l-q { color:#57606a; border-color:#d0d7de; background:#f6f8fa; }
+  .l-a { color:#0a3069; border-color:#9ec5f0; background:#eef6ff; }
+  .l-i { color:#1a7f37; border-color:#9bd6ac; background:#f2fbf4; }
+  .l-r { color:#8250df; border-color:#d3bdf5; background:#faf7ff; }
+  .muted { color: #57606a; }
+  .foot { color: #57606a; font-size: 9pt; margin-top: 32px; border-top: 1px solid #d0d7de; padding-top: 10px; }
+  .toc { border:1px solid #d0d7de; border-radius:6px; padding:10px 16px; margin:14px 0 22px; font-size:10pt; background:#fbfcfd; }
+  .toc ol { margin:4px 0; }
+  @media print { body { max-width:none; margin:0; } h2,h3 { page-break-after: avoid; } .box, table, pre { page-break-inside: avoid; } }
+</style>
+</head>
+<body>
+
+<h1>Server API reference</h1>
+<div class="sub">The complete surface a client may use. ioSender V2, draft 1 &mdash; 2026&#8209;08&#8209;09.</div>
+
+<div class="meta">
+  <div><span class="label">Scope</span> Everything the serving host exposes: two sockets, the messages it pushes, and every call a client can make. This is the <em>reference</em>. Rationale for the design choices lives in <code>docs/Web-Client-API-Design.html</code>; the inventory of what the WPF client does today is <code>docs/Command-Surface-Catalog.md</code>.</div>
+  <div><span class="label">Status</span> <span class="tag t-built">BUILT</span> exists in&#8209;process today &middot; <span class="tag t-new">SPEC</span> designed here, not written &middot; <span class="tag t-open">OPEN</span> needs a decision first.</div>
+  <div><span class="label">Units</span> Every coordinate and feedrate is in the machine&rsquo;s <em>current</em> units. <code>isMetric</code> on the state snapshot says which. The server never converts.</div>
+</div>
+
+<div class="toc">
+<strong>Contents</strong>
+<ol>
+  <li><a href="#shape">The shape of the API &mdash; three tiers and the rule</a></li>
+  <li><a href="#conn">Connections, handshake, envelopes</a></li>
+  <li><a href="#push">Server &rarr; client messages</a></li>
+  <li><a href="#rt">Tier 1 &mdash; the realtime socket</a></li>
+  <li><a href="#cmd">Tier 2 &mdash; typed commands</a></li>
+  <li><a href="#raw">Tier 3 &mdash; raw MDI</a></li>
+  <li><a href="#err">Refusals, outcomes, error codes</a></li>
+  <li><a href="#not">Deliberately not in the API</a></li>
+</ol>
+</div>
+
+<h2 id="shape">1. The shape of the API &mdash; three tiers and the rule</h2>
+
+<p>The API is not purely generic and not purely typed. It is three tiers, and which tier a thing belongs to
+follows one rule rather than taste.</p>
+
+<div class="box rule"><span class="bt">The membership rule</span>
+<p>A capability gets its <strong>own typed command</strong> when the server knows or does something the client cannot
+safely reproduce. In practice that is one of four things:</p>
+<ol style="margin-bottom:0">
+  <li><strong>The server owns machine state the client lacks</strong> &mdash; jog clamping against <code>MaxTravel</code>,
+      soft&#8209;limit handling, <code>ForceSetOrigin</code>, axis letters, lathe mapping. All of this lives in
+      <code>JogController</code> and none of it should be re&#8209;implemented over a network.</li>
+  <li><strong>Ordering is a safety property</strong> &mdash; Safe&#8209;Z retract before a lateral move; the fast /
+      retract / slow phases of a probe. As separate lines a client can interleave something between them.</li>
+  <li><strong>Completion means something specific</strong> &mdash; a probe is done when the machine is Idle, a setting
+      write is done when its reply text has been read. See <a href="#await">await levels</a>.</li>
+  <li><strong>It is not g&#8209;code at all</strong> &mdash; realtime bytes, run control, filesystem operations.</li>
+</ol>
+</div>
+
+<p>Everything else goes through the raw door. That door is not a fallback embarrassment &mdash; MDI is a real
+operator feature (the console entry box), macros are arbitrary g&#8209;code, and there will always be a command
+nobody wrapped.</p>
+
+<table>
+<tr><th style="width:9%">Tier</th><th style="width:20%">Channel</th><th style="width:26%">Shape</th><th>What lives here</th></tr>
+<tr>
+  <td><span class="tag t-rt">1</span></td>
+  <td>realtime socket</td>
+  <td>a name, no reply</td>
+  <td>Single&#8209;byte controller commands &mdash; feed hold, reset, jog cancel, overrides &mdash; plus continuous jog. Never queued, never gated on an answer.</td>
+</tr>
+<tr>
+  <td><span class="tag t-new">2</span></td>
+  <td>main socket</td>
+  <td><code>op</code> + typed <code>arg</code> + result</td>
+  <td>Anything meeting the rule above: jog step, run control, homing, offsets, probing, settings, filesystem, queries.</td>
+</tr>
+<tr>
+  <td><span class="tag t-new">3</span></td>
+  <td>main socket</td>
+  <td><code>mdi</code> + one string</td>
+  <td>One line of g&#8209;code or one <code>$</code> system command, exactly as typed. The escape hatch.</td>
+</tr>
+</table>
+
+<div class="box trap"><span class="bt">Trap &mdash; do not collapse tier 1 into tier 3</span>
+Several controls in the WPF client send realtime bytes <em>as text</em> today: <code>SpindleControl.xaml.cs:136</code>
+and <code>CoolantControl.xaml.cs:56/58/60</code> pass <code>GrblCommand.Flood</code>/<code>.Mist</code>, which are single
+control characters, into a string path. A sweep that maps every <code>ExecuteCommand</code> to <code>mdi</code> would
+quietly put the coolant and spindle&#8209;stop buttons behind head&#8209;of&#8209;line blocking. They belong in tier 1.</div>
+
+<h2 id="conn">2. Connections, handshake, envelopes</h2>
+
+<h3>2.1 Endpoints</h3>
+
+<table>
+<tr><th style="width:26%">Endpoint</th><th style="width:14%">Protocol</th><th>Purpose</th></tr>
+<tr><td class="c">GET /</td><td>HTTP</td><td>The web client itself &mdash; static files served from the host.</td></tr>
+<tr><td class="c">GET /api/hello</td><td>HTTP</td><td>Unauthenticated probe: server version, protocol version, whether a machine is connected. Lets a client show something useful before opening sockets.</td></tr>
+<tr><td class="c">WS /ws/main</td><td>WebSocket</td><td>State, streams, tier&#8209;2 and tier&#8209;3 commands. JSON text frames plus binary frames for geometry.</td></tr>
+<tr><td class="c">WS /ws/realtime</td><td>WebSocket</td><td>Tier&#8209;1 only. Separate socket on purpose &mdash; see the box below.</td></tr>
+</table>
+
+<div class="box rule"><span class="bt">Why two sockets</span>
+TCP is ordered, so on one socket a feed hold queues behind whatever is already in flight &mdash; a geometry burst,
+a delta storm, a program upload. A dedicated socket with <code>TCP_NODELAY</code> has nothing ahead of it. The server
+side must match: its own thread, writing straight to the controller&rsquo;s realtime path, never through the job
+queue. A second socket that then posts onto the same work queue buys nothing.</div>
+
+<h3>2.2 Handshake</h3>
+
+<p>On <code>/ws/main</code> the server speaks first, unprompted, and in this order:</p>
+
+<pre><code>&lt;- { "type":"hello",        "protocol":1, "server":"2.42.0", "sessionId":"a1b2", "role":"observer" }
+&lt;- { "type":"capabilities", ... }          // machine capability document, or null if disconnected
+&lt;- { "type":"settings",     ... }          // values + descriptors
+&lt;- { "type":"state.delta",  "seq":1041, "changed":["All"], "state":{...} }   // full snapshot
+</code></pre>
+
+<p>A client is fully populated after four messages and needs no initial requests. Reconnect replays the same
+four. <code>role</code> is <code>"operator"</code> or <code>"observer"</code> &mdash; see <a href="#lease">&sect;5.1</a>.</p>
+
+<h3 id="await">2.3 Envelopes</h3>
+
+<p><strong>Client &rarr; server</strong>, main socket. Every call has the same envelope:</p>
+
+<pre><code>-&gt; { "id": 42, "op": "setSetting", "await": "reply", "arg": { "id": 110, "value": "5000" } }</code></pre>
+
+<table>
+<tr><th style="width:14%">Field</th><th style="width:14%">Type</th><th>Meaning</th></tr>
+<tr><td class="c">id</td><td>number</td><td>Client&#8209;assigned correlation id, unique per connection. Echoed on every reply.</td></tr>
+<tr><td class="c">op</td><td>string</td><td>The command name, from <a href="#cmd">&sect;5</a>.</td></tr>
+<tr><td class="c">await</td><td>string</td><td>How complete the client wants it before <code>command.completed</code> is sent. Optional; each command has a sensible default.</td></tr>
+<tr><td class="c">arg</td><td>object</td><td>Command&#8209;specific, documented per command.</td></tr>
+</table>
+
+<p><strong>The four await levels.</strong> This is the part of the API most worth understanding, because the same
+command means different things at different levels, and because the existing client has four inconsistent
+implementations of this idea &mdash; timeouts from 400&nbsp;ms to unbounded, two different definitions of &ldquo;done&rdquo;.
+The server owns the waiting; the client just says how much of it it wants.</p>
+
+<table>
+<tr><th style="width:16%">Level</th><th style="width:34%">Completed when</th><th>Use it for</th></tr>
+<tr><td><span class="lvl l-q">queued</span></td><td>The server accepted it and the engine&rsquo;s own gate passed. Immediate.</td><td>Fire&#8209;and&#8209;forget; UI that derives truth from the state stream anyway.</td></tr>
+<tr><td><span class="lvl l-a">acknowledged</span></td><td>The controller replied <code>ok</code> or <code>error:N</code>.</td><td>Default for most commands. Offsets, unlock, filesystem.</td></tr>
+<tr><td><span class="lvl l-r">reply</span></td><td>As <code>acknowledged</code>, and the reply text is returned in the result.</td><td>Settings writes (the <code>error:N</code> message matters), <code>$G</code>/<code>$#</code> queries, diagnostics.</td></tr>
+<tr><td><span class="lvl l-i">idle</span></td><td>Everything outstanding is acked <strong>and</strong> two consecutive <code>&lt;Idle|</code> status reports have arrived.</td><td>Motion the client must sequence behind: probe, goto, home, macro call.</td></tr>
+</table>
+
+<div class="box rule"><span class="bt">Implementation note</span>
+The <code>idle</code> predicate is not new work. <code>StreamPump</code>&rsquo;s <code>(WAITIDLE)</code> dispatch barrier is exactly
+this &mdash; everything acked plus <strong>two consecutive</strong> Idle reports, event&#8209;driven rather than spinning
+&mdash; and it is hardware&#8209;verified. Two reports matter: one can be sampled before a queued move has started.
+Every level is bounded by a timeout; there is no unbounded wait in this API.</div>
+
+<p><strong>Server &rarr; client</strong> replies, correlated by <code>id</code>:</p>
+
+<pre><code>&lt;- { "type":"command.accepted",  "id":42 }
+&lt;- { "type":"command.completed", "id":42, "outcome":"ok", "reply":"ok", "elapsedMs":31 }
+
+&lt;- { "type":"command.rejected",  "id":43, "code":"notPermitted",
+     "message":"This session is an observer." }
+&lt;- { "type":"command.completed", "id":44, "outcome":"error", "code":"controllerError",
+     "reply":"error:9", "message":"G-code locked out during alarm or jog state", "elapsedMs":12 }</code></pre>
+
+<p><code>command.accepted</code> always precedes <code>command.completed</code>, so a UI can grey a button immediately and
+show a spinner until completion. A rejection produces <code>command.rejected</code> alone &mdash; nothing was sent to the
+machine.</p>
+
+<h2 id="push">3. Server &rarr; client messages</h2>
+
+<table>
+<tr><th style="width:22%">type</th><th style="width:12%">Status</th><th style="width:18%">Cadence</th><th>Payload</th></tr>
+<tr><td class="c">hello</td><td><span class="tag t-new">SPEC</span></td><td>once, on connect</td><td>protocol/server version, sessionId, role</td></tr>
+<tr><td class="c">capabilities</td><td><span class="tag t-new">SPEC</span></td><td>connect, firmware change</td><td>&sect;3.1</td></tr>
+<tr><td class="c">settings</td><td><span class="tag t-new">SPEC</span></td><td>connect, after <code>$RST</code></td><td>&sect;3.2</td></tr>
+<tr><td class="c">settings.changed</td><td><span class="tag t-new">SPEC</span></td><td>per write</td><td><code>{ id, value }</code></td></tr>
+<tr><td class="c">state.delta</td><td><span class="tag t-built">BUILT</span></td><td>5&ndash;10&nbsp;Hz</td><td>&sect;3.3</td></tr>
+<tr><td class="c">console</td><td><span class="tag t-new">SPEC</span></td><td>batched ~250&nbsp;ms</td><td>&sect;3.4</td></tr>
+<tr><td class="c">job.progress</td><td><span class="tag t-new">SPEC</span></td><td>coalesced ~10&nbsp;Hz</td><td>&sect;3.5</td></tr>
+<tr><td class="c">program.loaded</td><td><span class="tag t-new">SPEC</span></td><td>per load</td><td>name, block count, limits, programId</td></tr>
+<tr><td class="c">geometry.begin / .end</td><td><span class="tag t-new">SPEC</span></td><td>per load</td><td>&sect;3.6</td></tr>
+<tr><td class="c">event</td><td><span class="tag t-new">SPEC</span></td><td>as they happen</td><td>&sect;3.7</td></tr>
+<tr><td class="c">prompt</td><td><span class="tag t-new">SPEC</span></td><td>mid&#8209;macro</td><td>&sect;3.8</td></tr>
+<tr><td class="c">command.accepted / .completed / .rejected</td><td><span class="tag t-new">SPEC</span></td><td>per call</td><td>&sect;2.3</td></tr>
+</table>
+
+<h3>3.1 <code>capabilities</code></h3>
+
+<p>A projection of <code>GrblInfo</code> &mdash; about 55 values parsed from the <code>$I</code> handshake. This is a
+<strong>capability document</strong>: it decides which UI exists at all. No filesystem view without <code>hasFS</code>, no
+tool table when <code>numTools</code> is 0 (as on this machine), and <code>axisLetters</code> drives every DRO and jog
+control. Effectively immutable per connection.</p>
+
+<pre><code>{ "type":"capabilities",
+  "connected": true,
+  "firmware":"grblHAL", "version":"1.1f", "build":20260712, "isGrblHAL":true,
+  "identity":"...", "driver":"...", "options":"...",
+  "axisLetters":"XYZ", "axisCount":3,
+  "maxTravel":  [500.0, 400.0, 120.0],
+  "resolution": [0.005, 0.005, 0.005],
+  "homingEnabled":true, "homingDirection":["X","Y","Z"],
+  "numTools":0, "numFans":1, "hasATC":false, "manualToolChange":true,
+  "hasSDCard":false, "hasFS":true, "hasYModem":true, "uploadProtocol":"YM",
+  "hasPIDLog":false, "hasRTC":true, "hasVariableSpindle":true, "hasReversableSpindle":true,
+  "latheMode":"Disabled", "expressionsSupported":true, "rotationSupported":true,
+  "serialBufferSize":128, "planBufferSize":16,
+  "optionalSignals":["BlockDelete","OptionalStop"],
+  "probes":[ {"id":0,"name":"Standard"} ] }</code></pre>
+
+<div class="box trap"><span class="bt">Trap</span>
+<code>GrblInfo</code> is a <strong>static class</strong> in Core. This message is a DTO populated <em>from</em> it, not a
+relocation of it. Nothing in Core should stop reading <code>GrblInfo</code>, and no static may enter the contracts
+assembly.</div>
+
+<h3>3.2 <code>settings</code></h3>
+
+<p>Two things the client needs, and it needs both: the <strong>values</strong>, and the <strong>descriptors</strong> that make an
+editor possible. grblHAL reports descriptors itself when it advertises them; legacy Grbl needs the bundled table.
+Descriptors arrive once; values change individually via <code>settings.changed</code>.</p>
+
+<pre><code>{ "type":"settings",
+  "values": { "110":"5000.000", "111":"5000.000", "13":"0", ... },
+  "groups": [ { "id":6, "name":"Axis 0" }, ... ],
+  "descriptors": [
+    { "id":110, "groupId":6, "name":"X-axis maximum rate", "unit":"mm/min",
+      "dataType":"FLOAT", "min":0, "max":null, "values":null, "description":"..." },
+    { "id":13,  "groupId":3, "name":"Report in inches", "unit":"",
+      "dataType":"BOOL", "values":null, "description":"..." }
+  ] }</code></pre>
+
+<p><code>dataType</code> is the string form of <code>GrblSettingDetails.DataTypes</code>:
+<code>BOOL</code>, <code>BITFIELD</code>, <code>XBITFIELD</code>, <code>RADIOBUTTONS</code>, <code>AXISMASK</code>, <code>INTEGER</code>,
+<code>FLOAT</code>, <code>TEXT</code>, <code>PASSWORD</code>, <code>IP4</code>. For the mask and enum types, <code>values</code> carries the
+member names in bit order.</p>
+
+<h3>3.3 <code>state.delta</code> <span class="tag t-built">BUILT</span></h3>
+
+<p>The existing <code>MachineDelta</code>. <code>seq</code> increases by exactly 1 per message; a gap means the client missed
+one and must resync via <a href="#resync"><code>requestSnapshot</code></a> rather than keep applying. A full snapshot is
+simply a delta with <code>changed:["All"]</code>, so connect, resync and steady state are one code path.</p>
+
+<pre><code>{ "type":"state.delta", "seq":1042,
+  "changed":["Position","FeedRate","GrblState"],
+  "state": {
+    "grblState": { "state":"Run", "substate":0, "lastAlarm":0, "error":0, "mpg":false },
+    "position":[10.125, -4.0, 2.5],
+    "feedRate":800.0,
+    "isMetric":true,
+    ...
+  } }</code></pre>
+
+<table>
+<tr><th style="width:24%">Field</th><th>Notes</th></tr>
+<tr><td class="c">changed</td><td><strong>An array of field names, not a bitmask.</strong> Fields not listed have unspecified content and must be ignored. <code>["All"]</code> is a full snapshot.</td></tr>
+<tr><td class="c">position</td><td>Where you are <strong>in work coordinates</strong> &mdash; this is the field a DRO shows.</td></tr>
+<tr><td class="c">machinePosition</td><td>Machine coordinates.</td></tr>
+<tr><td class="c">null elements</td><td>A null in a position array means that axis has no reading (not homed, never reported). NaN never crosses the wire.</td></tr>
+</table>
+
+<div class="box trap"><span class="bt">Two traps this message has already sprung</span>
+<p><strong>Bitmask &rarr; names is not cosmetic.</strong> JavaScript&rsquo;s bitwise operators coerce to 32&#8209;bit signed
+integers and the field set is already at bit 33, so a numeric mask would make <code>isMetric</code> and
+<code>isMPGActive</code> silently unreadable in a browser &mdash; and <code>isMetric</code> is what says whether every
+coordinate here is millimetres or inches.</p>
+<p><strong><code>position</code>, not <code>workPosition</code>.</strong> The old contract also had a <code>workPosition</code> field
+populated only when the controller reports WPos &mdash; which an MPos&#8209;reporting machine, the default and this
+one, never does. It was null forever and it fooled the C# mirror window. This spec renames the derived value to
+<code>position</code> and drops the trap.</p>
+</div>
+
+<h3>3.4 <code>console</code></h3>
+
+<p>Every controller reply as the console tab shows it, batched. Not decoration &mdash; it is how an operator
+diagnoses a machine.</p>
+
+<pre><code>{ "type":"console", "lines":[
+    { "t":1754706123123, "dir":"tx", "text":"G0 X10" },
+    { "t":1754706123140, "dir":"rx", "text":"ok" } ] }</code></pre>
+
+<div class="box trap"><span class="bt">Trap</span>
+<strong>Batch it, cap it, never one frame per line.</strong> This exact content at this exact rate already killed the
+WPF UI once: the console re&#8209;joined 2000 lines per response line and left the UI echoing for minutes after the
+wire went quiet. Coalesce on a ~250&nbsp;ms timer and cap scrollback server&#8209;side.</div>
+
+<h3>3.5 <code>job.progress</code></h3>
+
+<pre><code>{ "type":"job.progress", "programId":7, "running":true,
+  "currentBlock":1043, "totalBlocks":8192,
+  "executedToVertex":21044,          // index into the cut buffer - see 3.6
+  "elapsedMs":94500, "state":"Run" }</code></pre>
+
+<h3>3.6 Geometry &mdash; <code>geometry.begin</code>, binary frames, <code>geometry.end</code></h3>
+
+<p>The client never parses g&#8209;code. The server runs the existing <code>GCodeEmulator</code> &mdash; where the parser, arc
+interpolation, WCS rotation and height map already live and are hardware&#8209;proven &mdash; and ships the same five
+vertex collections the WPF renderer builds, as packed little&#8209;endian <code>float32</code> triples that drop straight
+into a three.js <code>BufferGeometry</code>.</p>
+
+<pre><code>&lt;- { "type":"geometry.begin", "programId":7,
+     "buffers": { "cut":184320, "rapid":2048, "retract":512, "toolOrigin":2 },
+     "bounds": { "min":[0,0,-3.2], "max":[120.5,80.0,5.0] } }
+&lt;- [binary frame] [binary frame] ...
+&lt;- { "type":"geometry.end", "programId":7 }</code></pre>
+
+<p><code>buffers</code> gives vertex counts up front so the client can preallocate once. Each binary frame is a chunk:</p>
+
+<table>
+<tr><th style="width:16%">Offset</th><th style="width:14%">Type</th><th style="width:22%">Field</th><th>Notes</th></tr>
+<tr><td class="c">0</td><td class="c">char[4]</td><td class="c">magic</td><td><code>"IOGB"</code></td></tr>
+<tr><td class="c">4</td><td class="c">uint8</td><td class="c">version</td><td>1</td></tr>
+<tr><td class="c">5</td><td class="c">uint8</td><td class="c">bufferId</td><td>0 cut &middot; 1 rapid &middot; 2 retract &middot; 3 toolOrigin</td></tr>
+<tr><td class="c">6</td><td class="c">uint16</td><td class="c">flags</td><td>bit 0 = last chunk of this buffer</td></tr>
+<tr><td class="c">8</td><td class="c">uint32</td><td class="c">programId</td><td>Discard chunks whose id is not the current program &mdash; guards a reload mid&#8209;transfer</td></tr>
+<tr><td class="c">12</td><td class="c">uint32</td><td class="c">vertexOffset</td><td>Index of the first vertex in this chunk</td></tr>
+<tr><td class="c">16</td><td class="c">uint32</td><td class="c">vertexCount</td><td></td></tr>
+<tr><td class="c">20</td><td class="c">float32[]</td><td class="c">xyz</td><td><code>3 &times; vertexCount</code>, little&#8209;endian</td></tr>
+</table>
+
+<p><strong>The executed overlay is not a buffer.</strong> It is <code>executedToVertex</code> on <code>job.progress</code> &mdash; an
+index into the cut buffer that the client renders as a draw range. Re&#8209;sending geometry per progress tick would
+be absurd: a 220k&#8209;line program is several megabytes before arc expansion.</p>
+
+<h3>3.7 <code>event</code></h3>
+
+<pre><code>{ "type":"event", "kind":"alarm",   "code":1,  "message":"Hard limit triggered..." }
+{ "type":"event", "kind":"error",   "code":9,  "message":"G-code locked out during alarm or jog state" }
+{ "type":"event", "kind":"message", "text":"Tool change: insert T3" }
+{ "type":"event", "kind":"connection", "connected":false, "reason":"link lost" }</code></pre>
+
+<div class="box trap"><span class="bt">Trap</span>
+An <code>Alarm:N</code> is <strong>not</strong> an <code>error:N</code>. An alarm does not produce an <code>error:</code> reply, so a
+naive ack wait <em>times out</em> on one instead of failing fast. Any await level must watch the state stream for
+<code>Alarm</code>, not only the reply text.</div>
+
+<h3>3.8 <code>prompt</code></h3>
+
+<p>A running macro can stop and ask the operator something &mdash; the <code>(MBOX ...)</code> and <code>(PROMPT ...)</code>
+directives. The server sends a prompt and blocks the stream until an answer arrives.</p>
+
+<pre><code>&lt;- { "type":"prompt", "promptId":3, "kind":"mbox", "buttons":"okCancel",
+     "text":"Jog to the corner and set zero, then press OK" }
+-&gt; { "id":51, "op":"answerPrompt", "arg":{ "promptId":3, "answer":"ok" } }</code></pre>
+
+<div class="box trap"><span class="bt">Trap</span>
+<strong>Cancel is not a soft finish.</strong> Prior moves may still be physically executing, so a cancelled prompt
+routes to the engine&rsquo;s real abort path. In this codebase that method is <code>Abort()</code>, not <code>Stop()</code> &mdash;
+the naming is inverted, and <code>Stop()</code> means &ldquo;already stopped, do not send the stop byte&rdquo;. Wiring cancel to
+<code>Stop()</code> once let a Z axis run to completion after the operator cancelled.</div>
+
+<h2 id="rt">4. Tier 1 &mdash; the realtime socket</h2>
+
+<p>Text frames carrying a command name. No id, no reply, no result &mdash; by design. <strong>The source of truth for
+&ldquo;did the hold take&rdquo; is the machine&rsquo;s next status report on the state stream</strong>, never a round trip here.
+Gating a feed&#8209;hold button on an answer would recreate the starvation bug this socket exists to avoid.</p>
+
+<pre><code>-&gt; feedHold
+-&gt; feedOverrideCoarsePlus</code></pre>
+
+<h3>4.1 Command set</h3>
+
+<table>
+<tr><th style="width:34%">Name</th><th style="width:10%">Status</th><th>Notes</th></tr>
+<tr class="grp"><td colspan="3">Machine control</td></tr>
+<tr><td class="c">feedHold</td><td><span class="tag t-built">BUILT</span></td><td></td></tr>
+<tr><td class="c">cycleStart</td><td><span class="tag t-built">BUILT</span></td><td></td></tr>
+<tr><td class="c">softReset</td><td><span class="tag t-built">BUILT</span></td><td></td></tr>
+<tr><td class="c">jogCancel</td><td><span class="tag t-built">BUILT</span></td><td></td></tr>
+<tr><td class="c">stop</td><td><span class="tag t-new">SPEC</span></td><td>0x19. Distinct from the tier&#8209;2 <code>stopJob</code>.</td></tr>
+<tr><td class="c">safetyDoor</td><td><span class="tag t-built">BUILT</span></td><td></td></tr>
+<tr><td class="c">optionalStopToggle &middot; singleBlockToggle</td><td><span class="tag t-built">BUILT</span></td><td></td></tr>
+<tr><td class="c">mpgModeToggle &middot; autoReportingToggle</td><td><span class="tag t-built">BUILT</span></td><td></td></tr>
+<tr><td class="c">probeConnectedToggle</td><td><span class="tag t-new">SPEC</span></td><td>0xA4</td></tr>
+<tr class="grp"><td colspan="3">Overrides</td></tr>
+<tr><td class="c">feedOverrideReset &middot; &hellip;CoarsePlus &middot; &hellip;CoarseMinus &middot; &hellip;FinePlus &middot; &hellip;FineMinus</td><td><span class="tag t-built">BUILT</span></td><td></td></tr>
+<tr><td class="c">rapidOverrideFull &middot; &hellip;Medium &middot; &hellip;Low</td><td><span class="tag t-built">BUILT</span></td><td></td></tr>
+<tr><td class="c">spindleOverrideReset &middot; &hellip;CoarsePlus &middot; &hellip;CoarseMinus &middot; &hellip;FinePlus &middot; &hellip;FineMinus</td><td><span class="tag t-built">BUILT</span></td><td></td></tr>
+<tr><td class="c">spindleStop</td><td><span class="tag t-built">BUILT</span></td><td></td></tr>
+<tr><td class="c">coolantFloodToggle &middot; coolantMistToggle</td><td><span class="tag t-built">BUILT</span></td><td></td></tr>
+<tr><td class="c">fan0Toggle</td><td><span class="tag t-new">SPEC</span></td><td>0x8A</td></tr>
+<tr class="grp"><td colspan="3">Continuous jog &mdash; see 4.2</td></tr>
+<tr><td class="c">jog.start &middot; jog.keepalive &middot; jog.stop</td><td><span class="tag t-new">SPEC</span></td><td>The only tier&#8209;1 messages carrying an argument</td></tr>
+</table>
+
+<p>Deliberately <em>not</em> here: <code>statusReport</code> / <code>statusReportAll</code> (0x80/0x87). All ten call sites for
+those mean &ldquo;give me a fresh snapshot now&rdquo;, which is <a href="#resync"><code>requestSnapshot</code></a> on the state
+stream &mdash; the semantically right door, and already in the contract.</p>
+
+<h3 id="deadman">4.2 Continuous jog &mdash; the dead&#8209;man protocol</h3>
+
+<div class="box trap"><span class="bt">The most safety-critical part of this API</span>
+<p>Locally, cancel&#8209;on&#8209;release is a key&#8209;up delivering <code>0x85</code> in microseconds. Over a network the
+release packet can be delayed or lost, and <strong>the failure mode is an axis that does not stop.</strong> So release is
+never the mechanism. <strong>The client proves it is still holding the key; the server stops the axis the moment that
+proof lapses.</strong></p>
+</div>
+
+<pre><code>-&gt; { "op":"jog.start", "axes":{"X":1,"Y":-1}, "mode":"fast" }
+-&gt; { "op":"jog.keepalive" }        // every 100 ms while the key is held
+-&gt; { "op":"jog.keepalive" }
+-&gt; { "op":"jog.stop" }             // normal release - server sends 0x85 immediately</code></pre>
+
+<table>
+<tr><th style="width:26%">Rule</th><th>Value / behaviour</th></tr>
+<tr><td>Keepalive interval</td><td>100&nbsp;ms, client&#8209;driven</td></tr>
+<tr><td>Server deadline</td><td>250&nbsp;ms after the last message. On expiry the server issues <code>jogCancel</code> unconditionally.</td></tr>
+<tr><td>Socket close</td><td>Treated as an immediate deadline expiry. A closed tab stops the axis.</td></tr>
+<tr><td>Ordering</td><td><code>jog.start</code> renders through the real <code>JogController</code> &mdash; clamping, soft limits, <code>ForceSetOrigin</code>, G91/G53, axis letters, lathe mapping. The client never formats <code>$J=</code>.</td></tr>
+</table>
+
+<div class="box trap"><span class="bt">Known hazard this interacts with</span>
+A <code>$J=</code> cancelled a few milliseconds after it was issued gets flushed by grblHAL with <strong>no reply at
+all</strong>, which once wedged jogging completely until an app restart (fixed by <code>ReleaseFlushedJogMdi</code>). Network
+jitter makes that timing common rather than rare, so the server&#8209;side jog path must keep that release valve and
+must purge stale queued jogs rather than replay them.</div>
+
+<h2 id="cmd">5. Tier 2 &mdash; typed commands</h2>
+
+<p>All on <code>/ws/main</code>, all using the <a href="#await">envelope</a>. &ldquo;Default&rdquo; is the await level used when the
+client omits one.</p>
+
+<h3 id="lease">5.1 Session</h3>
+
+<table>
+<tr><th style="width:22%">op</th><th style="width:32%">arg</th><th style="width:14%">Default</th><th>Notes</th></tr>
+<tr><td class="c">requestOperator</td><td>&mdash;</td><td><span class="lvl l-a">acknowledged</span></td><td>Ask for the operator lease. <span class="tag t-open">OPEN</span></td></tr>
+<tr><td class="c">releaseOperator</td><td>&mdash;</td><td><span class="lvl l-q">queued</span></td><td></td></tr>
+<tr><td class="c" id="resync">requestSnapshot</td><td>&mdash;</td><td><span class="lvl l-q">queued</span></td><td>Force a full <code>state.delta</code>. The Seq&#8209;gap resync path. <span class="tag t-built">BUILT</span></td></tr>
+<tr><td class="c">answerPrompt</td><td><code>{ promptId, answer }</code></td><td><span class="lvl l-q">queued</span></td><td>&sect;3.8</td></tr>
+</table>
+
+<div class="box open"><span class="bt">Open &mdash; blocks this section</span>
+Because the web client attaches to a <em>running WPF app</em>, two clients can command one machine from day one and
+there is no rule yet. My recommendation is an <strong>operator lease</strong>: one holder, the WPF host by default,
+handover explicit and visible in both UIs, everyone else read&#8209;only. The alternative &mdash; last writer wins
+&mdash; means two people can jog the same axis from different rooms. This decides whether the envelope needs a lease
+token, so it wants settling before implementation.</div>
+
+<h3>5.2 Motion and position</h3>
+
+<table>
+<tr><th style="width:22%">op</th><th style="width:34%">arg</th><th style="width:14%">Default</th><th>Notes</th></tr>
+<tr><td class="c">jog</td><td><code>{ directions:[], distance, feedrate, mode, cancelFirst }</code></td><td><span class="lvl l-q">queued</span></td><td>One bounded step. <span class="tag t-built">BUILT</span> &mdash; existing <code>JogCommand</code>. Continuous jog is tier 1.</td></tr>
+<tr><td class="c">home</td><td><code>{ axes:["X","Y","Z"] }</code> &mdash; omit for all</td><td><span class="lvl l-i">idle</span></td><td>See the silence trap below.</td></tr>
+<tr><td class="c">unlock</td><td>&mdash;</td><td><span class="lvl l-a">acknowledged</span></td><td><code>$X</code>. 14 sites today.</td></tr>
+<tr><td class="c">gotoPosition</td><td><code>{ target:{X,Y,Z}, system:"machine"|"work", safeZ:true }</code></td><td><span class="lvl l-i">idle</span></td><td><strong>Composite.</strong> Retract to safe Z, move laterally, then descend &mdash; ordering is the safety property, so it is one command.</td></tr>
+<tr><td class="c">probe</td><td><code>{ axis, direction, depth, feedFast, feedSlow, latchDistance, retract }</code></td><td><span class="lvl l-i">idle</span></td><td><strong>Composite.</strong> The three&#8209;phase G38.2 fast / retract / slow cycle. Result carries the triggered position and success flag.</td></tr>
+<tr><td class="c">setCoordinateOffset</td><td><code>{ kind:"G92"|"G10L2"|"G10L20"|"G28.1"|"G30.1", system:"G54", axes:{X,Y,Z} }</code></td><td><span class="lvl l-a">acknowledged</span></td><td>25 sites &mdash; the largest single group. Persistent machine state, so the ack genuinely matters; follow with <code>queryParameters</code>.</td></tr>
+</table>
+
+<div class="box trap"><span class="bt">Trap &mdash; homing</span>
+<strong>grblHAL goes completely silent for the whole homing cycle.</strong> No status reports, no replies. A liveness
+check that treats silence as a dead link will abort a real homing run &mdash; which has happened here. The
+<code>idle</code> await on <code>home</code> must tolerate a long quiet period, and any watchdog must know about it.</div>
+
+<h3>5.3 Program and run control</h3>
+
+<table>
+<tr><th style="width:22%">op</th><th style="width:34%">arg</th><th style="width:14%">Default</th><th>Notes</th></tr>
+<tr><td class="c">runProgram</td><td><code>{ fromBlock:0 }</code></td><td><span class="lvl l-q">queued</span></td><td><span class="tag t-built">BUILT</span> &mdash; &ldquo;the operator pressed Run&rdquo;: start, resume a hold, or cycle&#8209;start a tool change. The engine&rsquo;s state machine decides, exactly as the run bar does.</td></tr>
+<tr><td class="c">stopJob</td><td>&mdash;</td><td><span class="lvl l-q">queued</span></td><td><span class="tag t-built">BUILT</span> &mdash; abort the run. <em>Not</em> feed hold, which is tier 1.</td></tr>
+<tr><td class="c">rewindJob</td><td>&mdash;</td><td><span class="lvl l-q">queued</span></td><td><span class="tag t-built">BUILT</span></td></tr>
+<tr><td class="c">loadProgram</td><td><code>{ source:"upload"|"server"|"text", name, text? }</code></td><td><span class="lvl l-a">acknowledged</span></td><td>Triggers <code>program.loaded</code> then the geometry stream.</td></tr>
+<tr><td class="c">closeProgram</td><td>&mdash;</td><td><span class="lvl l-q">queued</span></td><td></td></tr>
+<tr><td class="c">macroCall</td><td><code>{ number, q? }</code></td><td><span class="lvl l-i">idle</span></td><td><code>G65P<em>n</em></code>. Controller&#8209;side macros only.</td></tr>
+</table>
+
+<div class="box trap"><span class="bt">Trap &mdash; which program runs is the server&rsquo;s business</span>
+<code>runProgram</code> does not take a program. The server runs its loaded job. A client that could name a file to run
+would be picking what a second operator&rsquo;s machine does. Also note the run&#8209;end contract: finish &rarr;
+auto&#8209;rewind &rarr; re&#8209;arm happens inline at the last ack, so <code>jobComplete</code> and &ldquo;can rewind&rdquo; are
+<em>momentary</em>. A client&rsquo;s real observables are <code>running:false</code> plus <code>currentBlock:0</code>.</div>
+
+<h3>5.4 Settings and queries</h3>
+
+<table>
+<tr><th style="width:22%">op</th><th style="width:34%">arg</th><th style="width:14%">Default</th><th>Notes</th></tr>
+<tr><td class="c">setSetting</td><td><code>{ id:110, value:"5000" }</code></td><td><span class="lvl l-r">reply</span></td><td>Needs the reply: a rejected value returns <code>error:N</code>, resolved to its message server&#8209;side.</td></tr>
+<tr><td class="c">resetSettings</td><td><code>{ scope:"$" }</code></td><td><span class="lvl l-r">reply</span></td><td><code>$RST=</code>. Re&#8209;sends the whole <code>settings</code> message afterwards.</td></tr>
+<tr><td class="c">queryParserState</td><td>&mdash;</td><td><span class="lvl l-r">reply</span></td><td><code>$G</code></td></tr>
+<tr><td class="c">queryParameters</td><td>&mdash;</td><td><span class="lvl l-r">reply</span></td><td><code>$#</code> &mdash; the read&#8209;back after every offset write.</td></tr>
+<tr><td class="c">trinamicDiagnostics</td><td><code>{ report:"M122"|"M914" }</code></td><td><span class="lvl l-r">reply</span></td><td></td></tr>
+<tr><td class="c">pidReport</td><td>&mdash;</td><td><span class="lvl l-r">reply</span></td><td>Only when <code>hasPIDLog</code>.</td></tr>
+<tr><td class="c">setRtc</td><td><code>{ iso8601 }</code></td><td><span class="lvl l-a">acknowledged</span></td><td>Only when <code>hasRTC</code>.</td></tr>
+<tr><td class="c">reboot</td><td>&mdash;</td><td><span class="lvl l-q">queued</span></td><td><code>$REBOOT</code>. The link drops; expect a connection event.</td></tr>
+</table>
+
+<h3>5.5 Controller filesystem</h3>
+
+<p>Present only when <code>hasFS</code> or <code>hasSDCard</code>. All 12 sites are in the SD card view today.</p>
+
+<table>
+<tr><th style="width:22%">op</th><th style="width:34%">arg</th><th style="width:14%">Default</th><th>Notes</th></tr>
+<tr><td class="c">fs.list</td><td><code>{ path:"/" }</code></td><td><span class="lvl l-r">reply</span></td><td>Returns entries plus mounts.</td></tr>
+<tr><td class="c">fs.read</td><td><code>{ path }</code></td><td><span class="lvl l-r">reply</span></td><td><code>$F&lt;=</code></td></tr>
+<tr><td class="c">fs.delete</td><td><code>{ path }</code></td><td><span class="lvl l-a">acknowledged</span></td><td><code>$FD=</code></td></tr>
+<tr><td class="c">fs.setCwd / fs.getCwd</td><td><code>{ path }</code> / &mdash;</td><td><span class="lvl l-a">acknowledged</span></td><td><code>$CWD=</code> / <code>$PWD</code></td></tr>
+<tr><td class="c">fs.run</td><td><code>{ path }</code></td><td><span class="lvl l-q">queued</span></td><td><code>$F=</code> &mdash; the controller streams it itself; the sender is not in the loop.</td></tr>
+<tr><td class="c">fs.upload</td><td>binary stream</td><td>&mdash;</td><td>YModem. Its own framing, not a command envelope.</td></tr>
+</table>
+
+<div class="box trap"><span class="bt">Trap &mdash; never list the filesystem mid&#8209;stream</span>
+A <code>$F</code> or <code>$CWD</code> issued while a job or macro is streaming produced <code>error:9</code> and killed a run
+before it wrote its work origin. Guard on the <strong>sender&rsquo;s</strong> job state, never on the controller&rsquo;s
+<code>GrblState</code> &mdash; a macro sitting at a wait looks Idle. The server must refuse these with
+<code>busy</code> rather than pass them through.</div>
+
+<h2 id="raw">6. Tier 3 &mdash; raw MDI</h2>
+
+<table>
+<tr><th style="width:22%">op</th><th style="width:34%">arg</th><th style="width:14%">Default</th><th>Notes</th></tr>
+<tr><td class="c">mdi</td><td><code>{ line:"G0 X10 Y10" }</code></td><td><span class="lvl l-a">acknowledged</span></td><td><span class="tag t-built">BUILT</span> &mdash; one line, exactly as typed, through the same parse path the MDI box uses.</td></tr>
+</table>
+
+<p>One line per call, never a batch: a batch would be a program, and programs go through <code>loadProgram</code> so they
+get validation, geometry and progress. The server still applies its normal line handling &mdash; parse, block
+counting, response logging &mdash; so an MDI line behaves exactly as one typed into the desktop client.</p>
+
+<div class="box trap"><span class="bt">Trap &mdash; never stream o&#8209;word flow control</span>
+<code>o100 if [...]</code> and friends belong <strong>only</strong> in a <code>.macro</code> file on the controller. Streaming one
+line&#8209;by&#8209;line wedges the interpreter: MPos freezes, jogging dies, and reverting does not fix it &mdash; it
+needs a soft reset, <code>$X</code> and a re&#8209;home. The server should refuse o&#8209;word lines through <code>mdi</code>
+rather than pass them along.</div>
+
+<h2 id="err">7. Refusals, outcomes, error codes</h2>
+
+<p><strong>Refusal is not failure.</strong> A <code>command.rejected</code> means nothing reached the machine. The gates are the
+engine&rsquo;s own enable&#8209;state &mdash; the same booleans the WPF run bar&rsquo;s buttons bind &mdash; so a client is
+refused precisely when the corresponding button would be greyed. There is no second gating implementation to drift
+out of step.</p>
+
+<table>
+<tr><th style="width:22%">code</th><th>Meaning</th></tr>
+<tr><td class="c">notPermitted</td><td>This session is an observer, not the operator.</td></tr>
+<tr><td class="c">notAvailable</td><td>The engine refuses in the current state &mdash; nothing to stop, cannot run, not connected.</td></tr>
+<tr><td class="c">busy</td><td>A job or macro is streaming and this command must not interleave (see the filesystem trap).</td></tr>
+<tr><td class="c">unsupported</td><td>The connected controller lacks the capability &mdash; check <code>capabilities</code> first.</td></tr>
+<tr><td class="c">badRequest</td><td>Malformed argument, unknown <code>op</code>, unknown axis letter.</td></tr>
+</table>
+
+<p><code>command.completed</code> carries an <code>outcome</code> instead &mdash; the command <em>was</em> sent:</p>
+
+<table>
+<tr><th style="width:22%">outcome</th><th>Meaning</th></tr>
+<tr><td class="c">ok</td><td>Reached the requested await level cleanly.</td></tr>
+<tr><td class="c">error</td><td>Controller replied <code>error:N</code>. <code>reply</code> has the raw text, <code>message</code> the resolved description.</td></tr>
+<tr><td class="c">alarm</td><td>An alarm ended the wait. <code>code</code> is the alarm number.</td></tr>
+<tr><td class="c">timeout</td><td>The await level was not reached in time. Every level is bounded.</td></tr>
+<tr><td class="c">cancelled</td><td>A <code>cancelCommand</code> or a machine reset ended it.</td></tr>
+</table>
+
+<h2 id="not">8. Deliberately not in the API</h2>
+
+<table>
+<tr><th style="width:30%">Not exposed</th><th>Why</th></tr>
+<tr><td>Raw byte write to the controller</td><td>Tier 1 covers every realtime byte by name. An arbitrary&#8209;byte door would let a client bypass every gate in this document, and no legitimate client needs it.</td></tr>
+<tr><td>Streaming a program line&#8209;by&#8209;line from the client</td><td>Flow control, buffer accounting, tool changes, probing look&#8209;ahead and the barrier directives all live in the server&rsquo;s streamer. A client that streams is a second, worse streamer &mdash; and would inherit none of the hardware&#8209;verified behaviour.</td></tr>
+<tr><td>Choosing which file <code>runProgram</code> runs</td><td>The loaded job is server state, shared by every client.</td></tr>
+<tr><td>Sender configuration (<code>App.config</code>)</td><td>Desktop client state &mdash; window geometry, themes, editor choice. The web client has its own preferences; it does not edit the desktop client&rsquo;s.</td></tr>
+<tr><td>g&#8209;code parsing or geometry generation client&#8209;side</td><td>The server already does it, correctly, with arcs, WCS rotation and height maps. Two implementations would disagree, and the client&rsquo;s would be the wrong one.</td></tr>
+</table>
+
+<div class="foot">
+ioSender V2 &mdash; <code>docs/Web-Client-API-Reference.html</code>, draft 1. Rationale and open decisions:
+<code>docs/Web-Client-API-Design.html</code>. Present&#8209;day inventory: <code>docs/Command-Surface-Catalog.md</code>.
+Nothing in this document is implemented yet except the items marked BUILT, which exist in&#8209;process and are
+hardware&#8209;verified.
+</div>
+
+</body>
+</html>
