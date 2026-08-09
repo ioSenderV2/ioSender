@@ -32,6 +32,7 @@ TARGETS = [
     ('ioSender XL/ioSender XL/StartJobView.xaml', 'ioSender'),
     ('ioSender XL/ioSender XL/ProgramPanel.xaml', 'ioSender'),
     ('ioSender XL/ioSender XL/MainWindow.xaml', 'ioSender'),
+    ('ioSender XL/ioSender XL/MirrorWindow.xaml', 'ioSender'),
 
     # CNC.Controls.WPF (the main controls library)
     ('CNC Controls/CNC Controls/JobControl.xaml', 'CNC.Controls.WPF'),

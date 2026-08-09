@@ -96,6 +96,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="MirrorWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="HeightMapView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -127,6 +131,9 @@
     </Compile>
     <Compile Include="StartJobView.xaml.cs">
       <DependentUpon>StartJobView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="MirrorWindow.xaml.cs">
+      <DependentUpon>MirrorWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="HeightMapView.xaml.cs">
       <DependentUpon>HeightMapView.xaml</DependentUpon>
@@ -204,6 +211,10 @@
     <ProjectReference Include="..\..\CNC Converters\CNC Converters.csproj">
       <Project>{8F9C264C-D9A5-418A-A1BE-84052059387F}</Project>
       <Name>CNC Converters</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\CNC Client\CNC Client\CNC.Client.csproj">
+      <Project>{6C2E7A2D-6C0B-4B0A-9F0E-6B6B7D6A1234}</Project>
+      <Name>CNC.Client</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\CNC Contracts\CNC.Contracts.csproj">
       <Project>{9448A265-0B77-4235-A5F5-BDE212EC75E7}</Project>

@@ -208,3 +208,18 @@ ioSender.g.en-US.resources:mainwindow.baml,mnu_tools:System.Windows.Controls.Hea
 ioSender.g.en-US.resources:mainwindow.baml,lbl_copied:System.Windows.Controls.TextBlock.Text,Text,True,True,,Copied
 ioSender.g.en-US.resources:mainwindow.baml,lbl_messageHistoryHint:System.Windows.Controls.TextBlock.Text,Text,True,True,,Click for the full message history since launch.
 ioSender.g.en-US.resources:programpanel.baml,txt_estRunTime:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Estimated run time at the programmed feed rates. No acceleration model, so a program of many short moves will take longer than this."
+ioSender.g.en-US.resources:mainwindow.baml,mnu_machineMirror:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Machine _mirror
+ioSender.g.en-US.resources:mainwindow.baml,mnu_machineMirror:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Read-only live view of the machine state as seen through the client/server wire protocol - a diagnostic for the split. Any disagreement with the main window is a protocol bug.
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirfootnote:System.Windows.Controls.TextBlock.Text,Text,True,True,,Read-only view fed solely by the MachineDelta stream - the same data a remote client would see. Any disagreement with the main window is a wire-protocol bug.
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirstate:System.Windows.Controls.TextBlock.Text,Text,True,True,,State
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirhomed:System.Windows.Controls.TextBlock.Text,Text,True,True,,Homed
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirmpos:System.Windows.Controls.TextBlock.Text,Text,True,True,,Machine position
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirwpos:System.Windows.Controls.TextBlock.Text,Text,True,True,,Work position
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirwco:System.Windows.Controls.TextBlock.Text,Text,True,True,,Work offset
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirwcs:System.Windows.Controls.TextBlock.Text,Text,True,True,,WCS / Tool
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirtlo:System.Windows.Controls.TextBlock.Text,Text,True,True,,TLO reference
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirfeed:System.Windows.Controls.TextBlock.Text,Text,True,True,,Feed
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirspindle:System.Windows.Controls.TextBlock.Text,Text,True,True,,Spindle
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirsignals:System.Windows.Controls.TextBlock.Text,Text,True,True,,Signals
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirprobe:System.Windows.Controls.TextBlock.Text,Text,True,True,,Probe
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirreporting:System.Windows.Controls.TextBlock.Text,Text,True,True,,Reporting

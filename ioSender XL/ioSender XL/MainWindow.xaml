@@ -60,6 +60,8 @@
             </MenuItem>
             <MenuItem x:Uid="mnu_tools" x:Name="menuTools" Header="_Tools">
                 <MenuItem x:Uid="mnu_camera" x:Name="menuCamera" Header="_Camera" Click="CameraOpen_Click"/>
+                <MenuItem x:Uid="mnu_machineMirror" x:Name="menuMachineMirror" Header="Machine _mirror" Click="machineMirror_Click"
+                          ToolTip="Read-only live view of the machine state as seen through the client/server wire protocol - a diagnostic for the split. Any disagreement with the main window is a protocol bug."/>
                 <!-- SD Card, Feeds and Speeds, the former Tools tab's tools, ... appended here -->
             </MenuItem>
             <MenuItem x:Uid="mnu_help" x:Name="menuHelp" Header="_Help">

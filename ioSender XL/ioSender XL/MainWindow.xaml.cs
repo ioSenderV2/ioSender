@@ -2952,6 +2952,24 @@ namespace GCode_Sender
         }
 #endif
 
+        // Tools > Machine mirror: the MachineMirror's first real WPF consumer (client/server split,
+        // 6a read-side proof) - a read-only window fed exclusively by the MachineDelta stream, never
+        // GrblViewModel. One instance at a time; a second click brings the open one forward.
+        private MirrorWindow mirrorWindow = null;
+        private void machineMirror_Click(object sender, RoutedEventArgs e)
+        {
+            if (mirrorWindow != null)
+            {
+                mirrorWindow.Activate();
+                return;
+            }
+            if (stateStream == null)
+                return;   // no view model at startup means no stream to mirror - nothing useful to show
+            mirrorWindow = new MirrorWindow(stateStream) { Owner = this };
+            mirrorWindow.Closed += (s, ev) => mirrorWindow = null;
+            mirrorWindow.Show();
+        }
+
         // Public entry point for the "pop out the console" gesture (double-clicking the Console tab -
         // JobWorkspace.BuildCenter wires it), replacing the removed "Open Console" menu item.
         public void OpenConsoleWindow()
