@@ -456,9 +456,10 @@ the question, and last&#8209;writer&#8209;wins would mean two people jogging the
       hit feed hold because I am not the operator&rdquo; is the wrong failure &mdash; and it is also what resolves the
       hole in a single&#8209;writer design: if the holder&rsquo;s browser dies at 60% through a program, any viewer can
       still halt the machine. Viewers may stop, not adjust.</li>
-  <li><strong>The WPF client must be able to go genuinely read&#8209;only</strong> during 6a. That is real work in a UI
-      never designed for it, it is throwaway work, and it should be budgeted rather than assumed. It first bites at
-      build step 3 &mdash; steps 1&ndash;2 have the web client read&#8209;only by construction.</li>
+  <li><strong>The WPF client never has to honour the lease.</strong> An earlier draft budgeted making it
+      read&#8209;only; that work is cut (&sect;7). On the real machine WPF writes as it always has and any attached web
+      client is a viewer, which cannot write by construction; full write access happens on a separate simulator rig.
+      The lease is enforced only among clients built to understand it.</li>
 </ul>
 
 <h2>6. Safety items that are new because it is a network</h2>
@@ -503,19 +504,66 @@ the question, and last&#8209;writer&#8209;wins would mean two people jogging the
   </li>
 </ol>
 
-<h2>7. Suggested build order</h2>
+<h2>7. Build order and the two-rig strategy</h2>
 
-<p>Each step leaves a working app, the same discipline as steps 1&ndash;5 of the split.</p>
+<div class="box decided"><span class="bt">Decided &mdash; user, 2026&#8209;08&#8209;09</span>
+<strong>No WPF read&#8209;only work.</strong> The effort goes into the server API and a conformance suite that gates a
+release instead. The WPF client is frozen exactly as it is and gets zero changes for the web client&rsquo;s benefit.</div>
+
+<h3>Two rigs, and the side-by-side comparison survives</h3>
+
+<p>The reason this costs nothing is that the two things WPF was needed for are separable, and only one of them ever
+required the read&#8209;only work.</p>
 
 <table>
-<tr><th style="width:6%">#</th><th style="width:32%">Step</th><th>Why here</th></tr>
-<tr><td class="num">1</td><td><strong>Transport endpoint + <code>MachineDelta</code> only</strong></td><td>A read&#8209;only page showing DRO and machine state beside the running WPF app. Proves framing, the names&#8209;not&#8209;bits reshape and the generated TS types &mdash; and it <em>is</em> the side&#8209;by&#8209;side verification rig everything later leans on.</td></tr>
-<tr><td class="num">2</td><td>Capabilities + settings + console</td><td>The client stops being a toy; still zero machine writes.</td></tr>
-<tr><td class="num">3</td><td>Realtime channel + jog with the dead&#8209;man design</td><td>First writes. Hardware&#8209;verified deliberately and on its own.</td></tr>
-<tr><td class="num">4</td><td>Completion levels + unified <code>MachineCommandAck</code></td><td>Unblocks the offset / settings / query command groups.</td></tr>
-<tr><td class="num">5</td><td>Geometry + the three.js viewer</td><td>Large, independent, and carries no new machine&#8209;write risk.</td></tr>
-<tr><td class="num">6</td><td>Run control and job progress</td><td>Last, because it is the code most able to hurt a machine &mdash; and by then everything under it has real mileage.</td></tr>
+<tr><th style="width:22%">Rig</th><th style="width:26%">Drives</th><th style="width:20%">Web client is</th><th>Buys</th></tr>
+<tr>
+  <td><strong>Real machine</strong></td>
+  <td>WPF client, unchanged, sole writer</td>
+  <td>a <strong>viewer</strong></td>
+  <td>Live side&#8209;by&#8209;side verification of the whole read path against a known&#8209;good client &mdash; the original argument for hosting in WPF, and it needs <em>no</em> lease enforcement, because a viewer cannot write by construction.</td>
+</tr>
+<tr>
+  <td><strong>Simulator</strong></td>
+  <td>A second server instance on the grblHAL simulator</td>
+  <td>the <strong>operator</strong>, full write access</td>
+  <td>Every write path, every command, every refusal, every safety invariant &mdash; repeatably, in CI, with no iron at risk. Real firmware, so it is not a mock.</td>
+</tr>
 </table>
+
+<p>The insight is that <strong>the read&#8209;only work was never what bought the side&#8209;by&#8209;side comparison</strong> &mdash;
+it was only ever needed to let the web client write <em>to the same machine WPF was driving</em>, which is a thing we
+have no reason to want. Splitting the rigs deletes the requirement instead of satisfying it.</p>
+
+<p>Write paths are better validated on the simulator anyway: eyeballing two UIs proves that two renderings agree,
+which is a read&#8209;path question. Whether a probe issued its three phases in the right order is a wire&#8209;trace
+question, and it wants a repeatable harness, not a human watching. The web client first writes to real iron at 6b,
+when WPF is gone and the tier&#8209;5 hardware smoke covers it deliberately.</p>
+
+<h3>Steps</h3>
+
+<p>Each step leaves a working app, the same discipline as steps 1&ndash;5 of the split. <strong>Every step ships with
+its conformance tests</strong> &mdash; the suite is not a phase at the end, it grows with the API, and a command
+without tests does not ship.</p>
+
+<table>
+<tr><th style="width:6%">#</th><th style="width:30%">Step</th><th style="width:14%">Tiers</th><th>Why here</th></tr>
+<tr><td class="num">0</td><td><strong>Simulator rig + CI harness skeleton</strong></td><td>0</td><td>First, because everything after it is validated by it. The simulator, a scripted server launch, and the tier&#8209;0 contract checks folded in from <code>delta-probe</code>. Cheap: the pieces exist.</td></tr>
+<tr><td class="num">1</td><td>Transport endpoint + <code>MachineDelta</code></td><td>0&ndash;1</td><td>A read&#8209;only page beside the real machine. Proves framing, names&#8209;not&#8209;bits, the generated TS types &mdash; and stands up the side&#8209;by&#8209;side rig. Includes the two&#8209;socket independence test, which is the second socket&rsquo;s whole justification.</td></tr>
+<tr><td class="num">2</td><td>Capabilities + settings + console</td><td>0&ndash;1</td><td>The client stops being a toy; still zero writes anywhere.</td></tr>
+<tr><td class="num">3</td><td>Realtime channel + jog dead&#8209;man + the lease</td><td>2&ndash;3</td><td><strong>First writes &mdash; on the simulator, not on iron.</strong> The dead&#8209;man and the stopping&#8209;set exemption are safety invariants from the moment they exist.</td></tr>
+<tr><td class="num">4</td><td>Completion levels + unified <code>MachineCommandAck</code></td><td>2&ndash;3</td><td>Unblocks the offset / settings / query groups, and retires four inconsistent helpers including one that can hang forever.</td></tr>
+<tr><td class="num">5</td><td>Geometry + the three.js viewer</td><td>1, 4</td><td>Large, independent, no new machine&#8209;write risk. Where the performance budgets get their first real numbers.</td></tr>
+<tr><td class="num">6</td><td>Run control and job progress</td><td>2&ndash;4</td><td>Last, because it is the code most able to hurt a machine &mdash; and by then everything under it has mileage.</td></tr>
+<tr><td class="num">7</td><td><strong>6b: endpoint moves into the .NET&nbsp;8 process</strong></td><td>all + 5</td><td>WPF exits. The first tier&#8209;5 hardware smoke of the web client driving real iron happens here, deliberately and scripted.</td></tr>
+</table>
+
+<div class="box trap"><span class="bt">What this strategy gives up, stated honestly</span>
+The web client&rsquo;s write paths get no real&#8209;machine exposure until step 7. The simulator is option&#8209;matched
+real firmware, so it is a strong proxy &mdash; but it is not iron, and this project has been bitten before by things
+that passed everywhere except on the machine (the simulator boots with limit pins asserted; a sim probe run read an
+instant <code>ALARM:1</code> as a pass). That is exactly why tier 5 exists and why it is signed off by a human who
+watched it. The trade is deliberate: throwaway UI work exchanged for a permanent test asset.</div>
 
 <h2>8. Open questions, collected</h2>
 

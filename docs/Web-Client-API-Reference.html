@@ -85,6 +85,7 @@
   <li><a href="#raw">Tier 3 &mdash; raw MDI</a></li>
   <li><a href="#err">Refusals, outcomes, error codes</a></li>
   <li><a href="#not">Deliberately not in the API</a></li>
+  <li><a href="#conform">Conformance suite and the release gate</a></li>
 </ol>
 </div>
 
@@ -560,11 +561,16 @@ the hazard. So the hard case &mdash; holder vanishes at 60% through a program &m
 machine immediately via the stopping set, and once it is no longer running the lease becomes takeable normally. No
 deadlock, and no path where two people are driving.</div>
 
-<div class="box trap"><span class="bt">Implementation note &mdash; this lands at build step 3, not step 1</span>
-Steps 1&ndash;2 of the build order have the web client read&#8209;only <em>by construction</em>, so the lease costs
-nothing there. It first matters at step 3, when the client writes &mdash; and during 6a that is also when the WPF
-app has to be able to <strong>genuinely go read&#8209;only</strong>, which is real work in a UI never designed for it and
-should be budgeted rather than assumed. It is temporary work: at 6b the WPF client is gone.</div>
+<div class="box rule"><span class="bt">Implementation note &mdash; the WPF client never has to honour this</span>
+<p>An earlier draft said the WPF app would need to go genuinely read&#8209;only when it did not hold the lease. That
+work has been <strong>cut</strong> (user decision, 2026&#8209;08&#8209;09): it is throwaway effort in a UI never designed
+for it, and the two&#8209;rig strategy removes the need instead of paying for it.</p>
+<p>The real machine is driven by the WPF client, which writes as it always has, while a web client attached to that
+same host is a <strong>viewer</strong> &mdash; and a viewer cannot write by construction, so no enforcement is required on
+the WPF side at all. Full write access is exercised on a <em>separate</em> server instance running against the grblHAL
+simulator, where the web client holds the lease and the conformance suite lives. The lease is therefore enforced
+only among clients that were built to understand it.</p>
+</div>
 
 <div class="box open"><span class="bt">Still open &mdash; adjacent, not settled by this</span>
 Losing the lease does <strong>not</strong> stop a running job: the job is server&#8209;side and keeps streaming, which is
@@ -695,6 +701,168 @@ out of step.</p>
 <tr><td>Sender configuration (<code>App.config</code>)</td><td>Desktop client state &mdash; window geometry, themes, editor choice. The web client has its own preferences; it does not edit the desktop client&rsquo;s.</td></tr>
 <tr><td>g&#8209;code parsing or geometry generation client&#8209;side</td><td>The server already does it, correctly, with arcs, WCS rotation and height maps. Two implementations would disagree, and the client&rsquo;s would be the wrong one.</td></tr>
 </table>
+
+<h2 id="conform">9. Conformance suite and the release gate</h2>
+
+<p>A specification without a conformance suite is a wish. This section defines what must pass before a server build
+is fit to drive a machine, and it is the artifact that answers &ldquo;is this release ready?&rdquo; with something other
+than a feeling.</p>
+
+<div class="box rule"><span class="bt">Governing principle &mdash; earned the hard way</span>
+<p><strong>A harness must never observe through the code under test.</strong> This protocol has already shipped a bug
+past a fully green harness: <code>GrblState</code> serialized as <code>{}</code> on the wire, and the mirror&#8209;vs&#8209;source
+test did not notice because <em>both sides compared through the same serializer</em>. The round trip was
+self&#8209;consistently wrong.</p>
+<p>So conformance asserts on <strong>wire form</strong>, not on round&#8209;trip equality: the JSON must literally contain
+<code>"Run"</code>, the <code>changed</code> array must literally contain <code>"Position"</code>, a probe must produce three
+<em>observed</em> writes in order on a captured wire trace. Equality tests are permitted only <em>in addition</em>.</p>
+</div>
+
+<h3>9.1 Where each tier runs</h3>
+
+<table>
+<tr><th style="width:8%">Tier</th><th style="width:22%">Name</th><th style="width:24%">Runs against</th><th>Machine needed</th></tr>
+<tr><td class="num">0</td><td>Contract</td><td>types + serializer only</td><td>none</td></tr>
+<tr><td class="num">1</td><td>Transport</td><td>real sockets on loopback</td><td>none &mdash; fake controller</td></tr>
+<tr><td class="num">2</td><td>Protocol behaviour</td><td><strong>grblHAL simulator</strong></td><td>none &mdash; real firmware, no iron</td></tr>
+<tr><td class="num">3</td><td>Safety invariants</td><td>simulator, adversarial conditions</td><td>none</td></tr>
+<tr><td class="num">4</td><td>Performance budgets</td><td>simulator, under load</td><td>none</td></tr>
+<tr><td class="num">5</td><td>Hardware smoke</td><td>the real machine</td><td>yes &mdash; short, manual, scripted</td></tr>
+</table>
+
+<p>Tiers 0&ndash;4 are automated and are the release gate. Tier 5 is a deliberately short human checklist for the
+things a simulator cannot prove. <strong>The simulator is the workhorse</strong>: it is option&#8209;matched to the real
+controller, homing&#8209;capable, published by CI, and already driven by <code>tools/waitidle-probe</code> &mdash; so
+&ldquo;real firmware, no risk&rdquo; is an existing capability rather than something to build.</p>
+
+<h3>9.2 Tier 0 &mdash; contract conformance</h3>
+
+<p>No sockets, no machine. Extends the existing <code>tools/delta-probe</code> (79 checks today).</p>
+
+<ul>
+  <li>Every contract type round&#8209;trips through the <em>production</em> serializer configuration, and the emitted
+      JSON is asserted by <strong>form</strong>: enum members appear as names, <code>changed</code> is an array of field
+      names, no numeric bitmask survives anywhere, no <code>NaN</code> appears, and no object serializes empty.</li>
+  <li><strong>The delta property:</strong> applying only the flagged fields to a fresh mirror must produce a mirror
+      equal to the full source state. This is what catches a field that changed but was not flagged &mdash; the
+      failure that silently freezes one value on every client.</li>
+  <li>Seq discipline: strictly +1; an injected gap must drive a resync rather than continued application; a full
+      snapshot notifies every property, not only changed ones.</li>
+  <li><strong>Generated TypeScript matches the C# source of truth.</strong> Regenerate and diff in CI &mdash; a drifted
+      <code>contracts.ts</code> fails the build rather than reaching a browser.</li>
+</ul>
+
+<h3>9.3 Tier 1 &mdash; transport conformance</h3>
+
+<p>Real WebSocket connections on loopback against a fake controller. Extends <code>tools/websocket-probe</code>
+(23 checks today, already proving reassembly, ordering, connection loss and reconnect).</p>
+
+<ul>
+  <li>Handshake completeness and order: <code>hello</code>, <code>capabilities</code>, <code>settings</code>, snapshot &mdash;
+      a client is fully populated with no requests.</li>
+  <li>Reconnect replays the handshake; a resumed session never applies a stale delta.</li>
+  <li>Binary geometry framing: chunk header fields, reassembly into the announced vertex counts, and a
+      <code>programId</code> mismatch discarding stale chunks after a mid&#8209;transfer reload.</li>
+  <li><strong>The headline test &mdash; two&#8209;socket independence.</strong> Saturate the main socket with a
+      multi&#8209;megabyte geometry transfer, then send <code>feedHold</code> on the realtime socket and assert the byte
+      reaches the controller within budget. <em>This single test is the entire justification for the second socket</em>;
+      if it is not asserted, the design is decorative.</li>
+  <li>Backpressure: a deliberately slow client must never stall the machine. A viewer that stops reading gets
+      dropped, not allowed to throttle the streamer.</li>
+  <li>Half&#8209;open detection: a link killed without a FIN must be noticed rather than written into forever.</li>
+</ul>
+
+<h3>9.4 Tier 2 &mdash; protocol behaviour, against the simulator</h3>
+
+<p>The largest tier and the one that earns its keep. Every command in &sect;&sect;4&ndash;6, exercised end to end
+against real grblHAL firmware.</p>
+
+<ul>
+  <li><strong>Per command:</strong> accepted when it should be, refused with the <em>correct code</em> when it should
+      not be, and completing at each supported await level.</li>
+  <li><strong>Composites verified on the wire trace, never on the return value.</strong> <code>probe</code> must produce
+      fast, retract and slow phases in that order; <code>gotoPosition</code> must retract Z before any lateral motion.
+      A command that returns success having done the moves in the wrong order is precisely the bug worth catching,
+      and only the trace shows it.</li>
+  <li><strong>Await levels are real:</strong> <code>acknowledged</code> completes on the reply, <code>idle</code> not until
+      motion has actually finished. Assert the machine was still moving when <code>acknowledged</code> fired &mdash;
+      otherwise the levels are indistinguishable and one of them is lying.</li>
+  <li><strong>Every wait is bounded.</strong> A wait that does not return within its timeout is an automatic failure.
+      There is no such thing as an acceptable unbounded wait in this API.</li>
+  <li>An alarm terminates any outstanding wait promptly &mdash; it must not sit until timeout, which is what happens
+      when only reply text is watched.</li>
+  <li><strong>Lease semantics:</strong> a second writer is refused; a viewer&rsquo;s stopping&#8209;set commands succeed;
+      takeover is refused mid&#8209;job and granted when idle; closing the holder&rsquo;s socket releases the lease; the
+      <code>session</code> broadcast reaches every connection.</li>
+  <li>Refusals that protect the machine actually fire: an o&#8209;word line through <code>mdi</code>, a filesystem
+      listing mid&#8209;stream.</li>
+</ul>
+
+<h3>9.5 Tier 3 &mdash; safety invariants</h3>
+
+<p>A small set that must never regress. These are not features; each one exists because something went wrong.</p>
+
+<table>
+<tr><th style="width:34%">Invariant</th><th>Test</th></tr>
+<tr><td>Feed hold always gets through</td><td>Under a saturated main socket, mid&#8209;job, with a delta storm running. Latency budgeted, not merely non&#8209;infinite.</td></tr>
+<tr><td>A viewer can stop the machine</td><td>Every member of the stopping set, from a session that holds no lease.</td></tr>
+<tr><td>Jog stops when the client stops proving it is there</td><td>Kill the keepalive: cancel must be issued at the deadline. Kill the <em>socket</em> mid&#8209;jog: the axis must stop. Both, separately.</td></tr>
+<tr><td>A cancelled jog cannot wedge jogging</td><td>Issue <code>$J=</code> and cancel a few milliseconds later, repeatedly, then jog again &mdash; the flushed&#8209;jog release path must recover every time.</td></tr>
+<tr><td>Homing silence is not treated as death</td><td>Run a full homing cycle with the watchdog armed; the firmware goes quiet for the whole cycle and nothing may abort it.</td></tr>
+<tr><td>A prompt cancel actually stops motion</td><td>Assert the stop byte on the wire and that motion ceased &mdash; not merely that the dialog closed.</td></tr>
+<tr><td>No unbounded wait exists</td><td>Static: every await path has a timeout. Dynamic: induce a silent controller and assert every level returns.</td></tr>
+</table>
+
+<h3>9.6 Tier 4 &mdash; performance budgets</h3>
+
+<p>Numbers, so regressions are visible before they are felt. Initial budgets are placeholders to be set from the
+first real measurements, then defended.</p>
+
+<table>
+<tr><th style="width:44%">Measure</th><th style="width:20%">Budget</th><th>Why it matters</th></tr>
+<tr><td>Feed hold: request &rarr; byte on the wire, under load</td><td>&lt; 50&nbsp;ms p99</td><td>The number the whole two&#8209;socket design exists to protect</td></tr>
+<tr><td>Jog start latency</td><td>&lt; 50&nbsp;ms p99</td><td>Above this, jogging feels broken and operators overshoot</td></tr>
+<tr><td>Sustained delta rate with N viewers</td><td>no drop at 10&nbsp;Hz</td><td>Fan&#8209;out must not degrade the operator&rsquo;s own client</td></tr>
+<tr><td>220k&#8209;line program: load &rarr; <code>program.loaded</code></td><td>set from measurement</td><td>Already a known cliff &mdash; this path was 32&nbsp;s once</td></tr>
+<tr><td>Geometry transfer for the same program</td><td>set from measurement</td><td>Largest payload in the system</td></tr>
+<tr><td>Server memory over a long job</td><td>flat</td><td>A leak here appears as an aborted job hours in</td></tr>
+</table>
+
+<h3>9.7 Tier 5 &mdash; hardware smoke</h3>
+
+<p>Deliberately short, because a long manual checklist gets skipped. Only what the simulator cannot prove: real
+motion, real limits, a real spindle, real timing.</p>
+
+<ol>
+  <li>Connect; DRO tracks a manual jog on all axes; homing completes and the position is right.</li>
+  <li>Feed hold during a real cut, then resume. Stop during a real cut &mdash; motion must cease promptly.</li>
+  <li>Continuous jog to the edge of travel; release; confirm it stops without overshoot. Then pull the network
+      mid&#8209;jog and confirm the axis stops.</li>
+  <li>A real probe cycle, and a coordinate offset written and read back.</li>
+  <li>One complete program run, start to finish, with the viewer tracking progress.</li>
+</ol>
+
+<h3>9.8 The release gate</h3>
+
+<div class="box rule"><span class="bt">A server build is fit to drive a machine when</span>
+<ol style="margin-bottom:0">
+  <li>Tiers 0&ndash;4 are green in CI, with <strong>zero</strong> skipped tests &mdash; a skip is a failure that has been
+      dressed up.</li>
+  <li>Every performance budget is met, and any budget that <em>changed</em> is explained in the commit that changed it.</li>
+  <li>The generated <code>contracts.ts</code> is byte&#8209;identical to a fresh regeneration.</li>
+  <li>Tier 5 has been run against real iron on this build, and signed off by a human who watched it.</li>
+  <li>Every new command added since the last release arrived <em>with</em> its tier&#8209;2 tests. A command without
+      conformance tests does not ship.</li>
+</ol>
+</div>
+
+<div class="box trap"><span class="bt">Trap &mdash; the failure mode this suite is guarding against</span>
+Every serious bug in this project&rsquo;s recent history was found by <em>running</em> something, not by reading it: a
+guard bounded by construction that verified against itself and let a real machine crash at full speed; a state
+struct that serialized empty past a green harness; a jog that wedged the controller until restart. Compiling proves
+nothing, and a harness that shares an assumption with the code proves less than nothing, because it manufactures
+confidence. <strong>Every check in this suite should be able to answer: what input would make this fail?</strong> If
+nothing would, the check is decorative &mdash; delete it or fix it.</div>
 
 <div class="foot">
 ioSender V2 &mdash; <code>docs/Web-Client-API-Reference.html</code>, draft 1. Rationale and open decisions:
