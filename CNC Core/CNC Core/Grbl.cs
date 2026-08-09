@@ -61,13 +61,8 @@ namespace CNC.Core
     // GrblConstants moved to CNC Contracts (GrblConstants.cs), same namespace - the command
     // bytes/strings ARE the wire protocol, and clients need them without a CNC.Core reference.
 
-    public enum CameraMoveMode
-    {
-        XAxisFirst = 1,
-        YAxisFirst = 2,
-        BothAxes = 3
-    }
-
+    // CameraMoveMode moved to CNC.Controls (ICamera.cs), same namespace - camera move sequencing is
+    // client policy, not machine state; nothing in Core reads it.
     // GrblStates moved to CNC Contracts (MachineEnums.cs), same namespace - the wire messages carry it.
     // GrblMode, GrblEncoderMode, GrblSetting and grblHALSetting moved to CNC Contracts
     // (SettingEnums.cs), same namespace - the $-setting number map is wire addressing.
