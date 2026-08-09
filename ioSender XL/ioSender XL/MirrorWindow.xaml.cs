@@ -100,7 +100,11 @@ namespace GCode_Sender
                 + (mirror.AxisHomed != AxisFlags.None ? "  (" + mirror.AxisHomed + ")" : string.Empty);
 
             txtMPos.Text = Axes(mirror.MachinePosition);
-            txtWPos.Text = Axes(mirror.WorkPosition);
+            // Position, NOT WorkPosition: the DRO's work coordinates are the parser-derived Position
+            // field (MPos - WCO). The WorkPosition storage is only written when the controller itself
+            // reports WPos ($10 report mask) - on an MPos-reporting machine (the default) it stays
+            // null forever, which this window duly displayed as "-" on its first live outing.
+            txtWPos.Text = Axes(mirror.Position);
             txtWco.Text = Axes(mirror.WorkPositionOffset);
 
             txtWcsTool.Text = (string.IsNullOrEmpty(mirror.WorkCoordinateSystem) ? "-" : mirror.WorkCoordinateSystem)
