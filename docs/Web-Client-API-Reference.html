@@ -70,7 +70,7 @@
 <div class="meta">
   <div><span class="label">Scope</span> Everything the serving host exposes: two sockets, the messages it pushes, and every call a client can make. This is the <em>reference</em>. Rationale for the design choices lives in <code>docs/Web-Client-API-Design.html</code>; the inventory of what the WPF client does today is <code>docs/Command-Surface-Catalog.md</code>.</div>
   <div><span class="label">Host</span> The server is a <strong>self&#8209;contained .NET&nbsp;8 process</strong>; the WPF client goes away. During 6a the endpoint is hosted <em>inside</em> the existing WPF app purely as scaffolding, so the new client can be validated beside a known&#8209;good one &mdash; see <a href="#hosting">&sect;2.0</a>. <strong>This document specifies the target.</strong> Nothing here depends on which process is listening.</div>
-  <div><span class="label">Status</span> <span class="tag t-built">BUILT</span> exists in&#8209;process today &middot; <span class="tag t-new">SPEC</span> designed here, not written &middot; <span class="tag t-open">OPEN</span> needs a decision first.</div>
+  <div><span class="label">Status</span> <span class="tag t-built">BUILT</span> exists in&#8209;process today &middot; <span class="tag t-new">SPEC</span> designed here, not written &middot; <span class="tag t-open">OPEN</span> needs a decision first. Live progress: <strong><a href="Roadmap.html">docs/Roadmap.html</a></strong> (split <em>steps</em> 1&ndash;7, web&#8209;client <em>phases</em> A&ndash;H).</div>
   <div><span class="label">Units</span> Every coordinate and feedrate is in the machine&rsquo;s <em>current</em> units. <code>isMetric</code> on the state snapshot says which. The server never converts.</div>
 </div>
 

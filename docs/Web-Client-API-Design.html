@@ -71,7 +71,7 @@
 <div class="meta">
   <div><span class="label">Companion</span> <code>Command-Surface-Catalog.md</code> enumerates <em>what</em> the client does to the machine today (~235 write sites / 40 files). This document decides <em>how</em> those cross a wire.</div>
   <div><span class="label">Status</span> Design, not built. <span class="tag t-ok">DECIDED</span> is settled &middot; <span class="tag t-q">OPEN</span> needs a call before implementation &middot; <span class="tag t-warn">TRAP</span> is a known way to get this wrong.</div>
-  <div><span class="label">Branch</span> <code>pr/portable-core</code> &mdash; step 6a of the client/server split.</div>
+  <div><span class="label">Branch</span> <code>pr/portable-core</code> &mdash; split step 6a. Live status of every step and phase: <strong><a href="Roadmap.html">docs/Roadmap.html</a></strong>.</div>
 </div>
 
 <h2>0. Where this sits</h2>
@@ -540,26 +540,32 @@ which is a read&#8209;path question. Whether a probe issued its three phases in 
 question, and it wants a repeatable harness, not a human watching. The web client first writes to real iron at 6b,
 when WPF is gone and the tier&#8209;5 hardware smoke covers it deliberately.</p>
 
-<h3>Steps</h3>
+<h3>Phases</h3>
 
-<p>Each step leaves a working app, the same discipline as steps 1&ndash;5 of the split. <strong>Every step ships with
-its conformance tests</strong> &mdash; the suite is not a phase at the end, it grows with the API, and a command
+<div class="box decided"><span class="bt">Naming</span>
+The web client uses <strong>lettered phases A&ndash;H</strong>; the split uses <strong>numbered steps 1&ndash;7</strong>.
+They were both &ldquo;steps&rdquo; and collided &mdash; &ldquo;step 3&rdquo; meant two different things. A letter is always a
+web&#8209;client phase; &ldquo;6a&rdquo;/&ldquo;6b&rdquo; is always a split step. Live status for both:
+<strong><a href="Roadmap.html">docs/Roadmap.html</a></strong>.</div>
+
+<p>Each phase leaves a working app, the same discipline as steps 1&ndash;5 of the split. <strong>Every phase ships with
+its conformance tests</strong> &mdash; the suite is not a stage at the end, it grows with the API, and a command
 without tests does not ship.</p>
 
 <table>
-<tr><th style="width:6%">#</th><th style="width:30%">Step</th><th style="width:14%">Tiers</th><th>Why here</th></tr>
-<tr><td class="num">0</td><td><strong>Simulator rig + CI harness skeleton</strong></td><td>0</td><td>First, because everything after it is validated by it. The simulator, a scripted server launch, and the tier&#8209;0 contract checks folded in from <code>delta-probe</code>. Cheap: the pieces exist.</td></tr>
-<tr><td class="num">1</td><td>Transport endpoint + <code>MachineDelta</code></td><td>0&ndash;1</td><td>A read&#8209;only page beside the real machine. Proves framing, names&#8209;not&#8209;bits, the generated TS types &mdash; and stands up the side&#8209;by&#8209;side rig. Includes the two&#8209;socket independence test, which is the second socket&rsquo;s whole justification.</td></tr>
-<tr><td class="num">2</td><td>Capabilities + settings + console</td><td>0&ndash;1</td><td>The client stops being a toy; still zero writes anywhere.</td></tr>
-<tr><td class="num">3</td><td>Realtime channel + jog dead&#8209;man + the lease</td><td>2&ndash;3</td><td><strong>First writes &mdash; on the simulator, not on iron.</strong> The dead&#8209;man and the stopping&#8209;set exemption are safety invariants from the moment they exist.</td></tr>
-<tr><td class="num">4</td><td>Completion levels + unified <code>MachineCommandAck</code></td><td>2&ndash;3</td><td>Unblocks the offset / settings / query groups, and retires four inconsistent helpers including one that can hang forever.</td></tr>
-<tr><td class="num">5</td><td>Geometry + the three.js viewer</td><td>1, 4</td><td>Large, independent, no new machine&#8209;write risk. Where the performance budgets get their first real numbers.</td></tr>
-<tr><td class="num">6</td><td>Run control and job progress</td><td>2&ndash;4</td><td>Last, because it is the code most able to hurt a machine &mdash; and by then everything under it has mileage.</td></tr>
-<tr><td class="num">7</td><td><strong>6b: endpoint moves into the .NET&nbsp;8 process</strong></td><td>all + 5</td><td>WPF exits. The first tier&#8209;5 hardware smoke of the web client driving real iron happens here, deliberately and scripted.</td></tr>
+<tr><th style="width:6%">&nbsp;</th><th style="width:30%">Phase</th><th style="width:14%">Tiers</th><th>Why here</th></tr>
+<tr><td class="num">A</td><td><strong>Simulator rig + CI harness skeleton</strong></td><td>0</td><td>First, because everything after it is validated by it. The simulator, a scripted server launch, and the tier&#8209;0 contract checks folded in from <code>delta-probe</code>. Cheap: the pieces exist.</td></tr>
+<tr><td class="num">B</td><td>Transport endpoint + <code>MachineDelta</code></td><td>0&ndash;1</td><td>A read&#8209;only page beside the real machine. Proves framing, names&#8209;not&#8209;bits, the generated TS types &mdash; and stands up the side&#8209;by&#8209;side rig. Includes the two&#8209;socket independence test, which is the second socket&rsquo;s whole justification.</td></tr>
+<tr><td class="num">C</td><td>Capabilities + settings + console</td><td>0&ndash;1</td><td>The client stops being a toy; still zero writes anywhere.</td></tr>
+<tr><td class="num">D</td><td>Realtime channel + jog dead&#8209;man + the lease</td><td>2&ndash;3</td><td><strong>First writes &mdash; on the simulator, not on iron.</strong> The dead&#8209;man and the stopping&#8209;set exemption are safety invariants from the moment they exist.</td></tr>
+<tr><td class="num">E</td><td>Completion levels + unified <code>MachineCommandAck</code></td><td>2&ndash;3</td><td>Unblocks the offset / settings / query groups, and retires four inconsistent helpers including one that can hang forever.</td></tr>
+<tr><td class="num">F</td><td>Geometry + the three.js viewer</td><td>1, 4</td><td>Large, independent, no new machine&#8209;write risk. Where the performance budgets get their first real numbers.</td></tr>
+<tr><td class="num">G</td><td>Run control and job progress</td><td>2&ndash;4</td><td>Last of the API work, because it is the code most able to hurt a machine &mdash; and by then everything under it has mileage.</td></tr>
+<tr><td class="num">H</td><td><strong>Split 6b: endpoint moves into the .NET&nbsp;8 process</strong></td><td>all + 5</td><td>WPF exits. The first tier&#8209;5 hardware smoke of the web client driving real iron happens here, deliberately and scripted.</td></tr>
 </table>
 
 <div class="box trap"><span class="bt">What this strategy gives up, stated honestly</span>
-The web client&rsquo;s write paths get no real&#8209;machine exposure until step 7. The simulator is option&#8209;matched
+The web client&rsquo;s write paths get no real&#8209;machine exposure until phase H. The simulator is option&#8209;matched
 real firmware, so it is a strong proxy &mdash; but it is not iron, and this project has been bitten before by things
 that passed everywhere except on the machine (the simulator boots with limit pins asserted; a sim probe run read an
 instant <code>ALARM:1</code> as a pass). That is exactly why tier 5 exists and why it is signed off by a human who
