@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\CNC Contracts\CNC.Contracts.net8.csproj" />
+    <ProjectReference Include="..\..\CNC Common\CNC.Common.net8.csproj" />
   </ItemGroup>
 
 </Project>

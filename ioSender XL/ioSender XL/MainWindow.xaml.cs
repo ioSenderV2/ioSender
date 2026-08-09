@@ -227,6 +227,11 @@ namespace GCode_Sender
                 // wire JSON.
                 stateStream = new CNC.Core.MachineStateStream(viewModel);
                 commandChannel = new CNC.Core.MachineCommandChannel(viewModel, RunControl.Runner);
+
+                // The ambient client (contracts-only discipline): views that have dropped their
+                // CNC Core reference read the machine through this wire-fed twin instead of
+                // Grbl.GrblViewModel. First consumer: the Camera tab.
+                CNC.Client.MachineClient.Attach(stateStream);
             }
 
             // The run control is now fixed at the main-window bottom (always visible on every tab), so the

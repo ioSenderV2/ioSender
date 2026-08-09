@@ -57,14 +57,22 @@
     <Reference Include="System" />
   </ItemGroup>
   <ItemGroup>
-    <!-- ONLY reference in this project - see the header comment. -->
+    <!-- Contracts (the wire) + Common (shared non-wire infra: ViewModelBase, UiContext). NEVER
+         CNC Core - that is the contracts-only client discipline this assembly exists to enforce. -->
     <ProjectReference Include="..\..\CNC Contracts\CNC.Contracts.csproj">
       <Project>{9448A265-0B77-4235-A5F5-BDE212EC75E7}</Project>
       <Name>CNC.Contracts</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\CNC Common\CNC.Common.csproj">
+      <Project>{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}</Project>
+      <Name>CNC.Common</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="MachineMirror.cs" />
+    <Compile Include="MachineViewModel.cs" />
+    <Compile Include="MachineClient.cs" />
+    <Compile Include="Position.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
