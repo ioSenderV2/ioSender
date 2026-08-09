@@ -144,6 +144,7 @@ namespace CNC.Client
             if ((changed & MachineField.LatheMode) != 0) { _latheMode = s.LatheMode; Notify(nameof(LatheMode)); }
             if ((changed & MachineField.HomedState) != 0) { _homedState = s.HomedState; Notify(nameof(HomedState)); }
             if ((changed & MachineField.IsMPGActive) != 0) { _isMPGActive = s.IsMPGActive; Notify(nameof(IsMPGActive)); }
+            if ((changed & MachineField.IsMetric) != 0) { _isMetric = s.IsMetric; Notify(nameof(IsMetric)); }
         }
 
         private GrblState _grblState;
@@ -160,6 +161,7 @@ namespace CNC.Client
         private LatheMode _latheMode;
         private HomedState _homedState;
         private bool? _isMPGActive;
+        private bool _isMetric = true;
 
         public GrblState GrblState { get { return _grblState; } }
         public double?[] MachinePosition { get { return _machinePosition; } }
@@ -196,5 +198,6 @@ namespace CNC.Client
         public LatheMode LatheMode { get { return _latheMode; } }
         public HomedState HomedState { get { return _homedState; } }
         public bool? IsMPGActive { get { return _isMPGActive; } }
+        public bool IsMetric { get { return _isMetric; } }
     }
 }

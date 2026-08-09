@@ -76,8 +76,9 @@ namespace CNC.Contracts
         LatheMode = 1L << 30,
         HomedState = 1L << 31,
         IsMPGActive = 1L << 32,
+        IsMetric = 1L << 33,
 
-        All = (1L << 33) - 1
+        All = (1L << 34) - 1
     }
 
     /// <summary>
@@ -121,6 +122,10 @@ namespace CNC.Contracts
 
         /// <summary>True when status reports carry machine coordinates, false for work coordinates.</summary>
         public bool IsMachinePosition { get; set; }
+
+        /// <summary>Units mode from the controller's $13 report-inches setting: true = metric
+        /// (millimeters). A client needs this to interpret every coordinate on this snapshot.</summary>
+        public bool IsMetric { get; set; } = true;
 
         /// <summary>Whether the last probe cycle triggered; ProbePosition is meaningless when false.</summary>
         public bool IsProbeSuccess { get; set; }

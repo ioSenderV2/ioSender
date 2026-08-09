@@ -544,6 +544,13 @@ namespace CNC.Core
                 }
             }
         }
+        // Units mode ($13) storage seam - MeasureViewModel raises the notifications, MachineState
+        // holds the value so the delta producer can put it on the wire.
+        protected override bool IsMetricStore
+        {
+            get { return State.IsMetric; }
+            set { State.IsMetric = value; }
+        }
         public bool IsProbing { get { return _isProbing; } set { _isProbing = value; OnPropertyChanged(); } }
         public bool ProgramEnd { get { return _pgmEnd; } set { _pgmEnd = value; if (_pgmEnd) OnPropertyChanged(); } }
         public int GrblError { get { return State.GrblState.Error; } set { State.GrblState.Error = value; OnPropertyChanged(); } }

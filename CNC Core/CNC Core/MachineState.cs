@@ -122,6 +122,11 @@ namespace CNC.Core
         // True when status reports carry MPos (machine coordinates); false when they carry WPos.
         public bool IsMachinePosition { get; set; }
 
+        // Units mode from the controller's $13 setting (report-inches): true = metric. Machine truth
+        // a client needs to interpret every coordinate it displays or publishes (Grbl.cs sets it from
+        // GrblSetting.ReportInches; MeasureViewModel.IsMetricStore is the notification seam).
+        public bool IsMetric { get; set; } = true;
+
         // Whether the last probe cycle triggered.
         public bool IsProbeSuccess { get; set; }
 

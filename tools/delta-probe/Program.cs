@@ -67,6 +67,7 @@ static class Probe
         if ((c & MachineField.LatheMode) != 0) mirror.LatheMode = s.LatheMode;
         if ((c & MachineField.HomedState) != 0) mirror.HomedState = s.HomedState;
         if ((c & MachineField.IsMPGActive) != 0) mirror.IsMPGActive = s.IsMPGActive;
+        if ((c & MachineField.IsMetric) != 0) mirror.IsMetric = s.IsMetric;
     }
 
     // Deep-equal via JSON: property order is declaration order, NaN never occurs (nulls on the wire),
@@ -157,6 +158,15 @@ static class Probe
               "delta carries only flagged fields");
         Apply(mirror, d3);
         Check(SameState(mirror, producer.Snapshot().State), "mirror == source after delta 3");
+
+        // 7b. IsMetric ($13 units mode): flip to imperial - exact flag, value crosses, mirror converges.
+        //     Defaults are true on both MachineState and MachineSnapshot, so only a real flip may flag.
+        state.IsMetric = false;
+        var dm = producer.Poll();
+        Check(dm != null && dm.Changed == MachineField.IsMetric && dm.State.IsMetric == false,
+              "IsMetric flip flags exactly IsMetric and carries false");
+        Apply(mirror, dm);
+        Check(SameState(mirror, producer.Snapshot().State), "mirror == source after IsMetric flip");
 
         // ---- MachineStateStream: the in-process channel, driven through the REAL parser ----
         Console.WriteLine("MachineStateStream via GrblViewModel.DataReceived:");

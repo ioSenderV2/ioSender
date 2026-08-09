@@ -50,6 +50,7 @@ namespace CNC.Core
         private LatheMode lastLatheMode;
         private HomedState lastHomedState;
         private bool? lastIsMPGActive;
+        private bool lastIsMetric = true;    // match MachineState's default so a fresh producer only flags a real change
 
         public MachineDeltaProducer(MachineState state)
         {
@@ -172,6 +173,8 @@ namespace CNC.Core
                 changed |= MachineField.HomedState;
             if (state.IsMPGActive != lastIsMPGActive)
                 changed |= MachineField.IsMPGActive;
+            if (state.IsMetric != lastIsMetric)
+                changed |= MachineField.IsMetric;
 
             return changed;
         }
@@ -216,6 +219,7 @@ namespace CNC.Core
             lastLatheMode = state.LatheMode;
             lastHomedState = state.HomedState;
             lastIsMPGActive = state.IsMPGActive;
+            lastIsMetric = state.IsMetric;
         }
 
         private static double?[] ToWire(Position p, int numAxes)
@@ -283,6 +287,7 @@ namespace CNC.Core
             if ((changed & MachineField.LatheMode) != 0) s.LatheMode = state.LatheMode;
             if ((changed & MachineField.HomedState) != 0) s.HomedState = state.HomedState;
             if ((changed & MachineField.IsMPGActive) != 0) s.IsMPGActive = state.IsMPGActive;
+            if ((changed & MachineField.IsMetric) != 0) s.IsMetric = state.IsMetric;
 
             return s;
         }
