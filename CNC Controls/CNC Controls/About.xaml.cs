@@ -56,7 +56,7 @@ namespace CNC.Controls
         private void About_Load(object sender, System.EventArgs e)
         {
             Title = version;
-            if (CNC.Core.Resources.IsLegacyController)
+            if (CNC.Core.GrblInfo.IsLegacyController)
                 Title += " (legacy mode)";
             if((DataContext as GrblViewModel).IsMPGActive != true)
                 GrblInfo.Get();

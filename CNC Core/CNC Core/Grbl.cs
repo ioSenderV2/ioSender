@@ -112,62 +112,9 @@ namespace CNC.Core
     // The GrblState struct moved to CNC Contracts (MachineEnums.cs), same namespace - it is the wire
     // shape of the controller's run state and MachineState.GrblState's type.
 
-    public class Resources
-    {
-        public static string Path { get; set; }
-        public static string Locale { get; set; }
-        public static string IniName { get; set; }
-        public static string IniFile { get { return (System.IO.Path.IsPathRooted(IniName) ? "" : ConfigPath) + IniName; } }
-        public static string DebugFile { get; set; } = string.Empty;
-        public static string ConfigPath { get; set; }
-        public static bool IsLegacyController { get; set; } = false; // Set true if controller is legacy v1.1
-
-        public static string BackupsFolder { get { return System.IO.Path.Combine(ConfigPath, "Backups"); } }
-
-        // Shared by the crash log, debug log and console log: resolve (and create) the "logs"
-        // subfolder under the config dir, falling back to %AppData%\ioSender\logs (ConfigPath may
-        // still be unresolved this early in startup, e.g. during a crash before settings load), and
-        // as a last resort the app's own base directory. Never throws.
-        public static string ResolveLogsDirectory()
-        {
-            string dir;
-            try
-            {
-                dir = ConfigPath;
-                if (string.IsNullOrEmpty(dir) || dir == "./" || !System.IO.Path.IsPathRooted(dir))
-                    dir = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), "ioSender");
-                dir = System.IO.Path.Combine(dir, "logs");
-                System.IO.Directory.CreateDirectory(dir);
-            }
-            catch
-            {
-                try
-                {
-                    dir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
-                    System.IO.Directory.CreateDirectory(dir);
-                }
-                catch { dir = AppDomain.CurrentDomain.BaseDirectory; }
-            }
-            return dir;
-        }
-
-        // Every MacroProcessor.Run() call writes its g-code here first (see MacroProcessor.cs) - a
-        // persistent, inspectable copy of the LAST thing each Generate button actually built, named after
-        // the run (e.g. "Start Job" -> "start_job.macro"). Overwritten each run - this is a debugging aid,
-        // not a history; the streamed program itself is never saved to disk otherwise.
-        public static string GeneratedFolder { get { return System.IO.Path.Combine(ConfigPath, "Generated"); } }
-
-        // Odd Jobs work orders saved by name (Save.../Load... on the Work Order tab). Distinct from the single
-        // live work order kept in App.config, which is just "what the tab was left showing".
-        public static string WorkOrdersFolder { get { return System.IO.Path.Combine(ConfigPath, "WorkOrders"); } }
-
-        static Resources()
-        {
-            ConfigPath = Path = @"./";
-            Locale = "en-US";
-            IniName = "App.config";
-        }
-    }
+    // Resources (the config/locale/logs path statics) moved to CNC Common (Resources.cs), same
+    // namespace - pure host-environment paths both sides need. Its IsLegacyController flag was
+    // machine truth parked on a paths class; it lives on GrblInfo now.
 
     public static class Grbl
     {
@@ -878,6 +825,10 @@ namespace CNC.Core
             }
         }
         public static string SignalLetters { get; private set; } = "XYZABCUVWEPRDHSLTOMF"; // Keep in sync with Signals enum above!!
+        // Moved here from Resources: "controller is legacy Grbl v1.1" is machine truth, and every
+        // reader sits next to GrblInfo.IsGrblHAL/Build checks anyway. Set by AppConfig from the
+        // connection profile; gates the extended-protocol requests below.
+        public static bool IsLegacyController { get; set; } = false;
         public static string PositionFormatString { get; private set; } = string.Empty;
         public static string Version { get; private set; } = string.Empty;
         public static int Build { get; private set; } = 0;
@@ -1060,7 +1011,7 @@ namespace CNC.Core
         public static bool Get(GrblViewModel model)
         {
             bool? res = null;
-            bool getExtended = !Resources.IsLegacyController && ExtendedProtocol; // && Build >= 20201109;
+            bool getExtended = !GrblInfo.IsLegacyController && ExtendedProtocol; // && Build >= 20201109;
             CancellationToken cancellationToken = new CancellationToken();
 
             PollGrbl.Suspend();
@@ -1110,7 +1061,7 @@ namespace CNC.Core
                 Axes.Add(new Axis(i, AxisIndexToLetter(_numAxes == 2 && i == 1 ? 2 : i)));
             }
 
-            if (!Resources.IsLegacyController)
+            if (!GrblInfo.IsLegacyController)
                 IsGrblHAL = IsGrblHAL || Firmware == "grblHAL";
 
             if (IsLoaded)
@@ -1230,7 +1181,7 @@ namespace CNC.Core
                 while (res == null)
                     EventUtils.DoEvents();
             }
-            else if (!Resources.IsLegacyController)
+            else if (!GrblInfo.IsLegacyController)
                 IsGrblHAL = model.Firmware == "grblHAL";
 
             PollGrbl.Resume();
@@ -3217,7 +3168,7 @@ namespace CNC.Core
         public static bool Load(GrblViewModel model)
         {
             bool? res = null;
-            bool load, getExtended = !Resources.IsLegacyController && GrblInfo.IsGrblHAL && GrblInfo.Build >= 20200716;
+            bool load, getExtended = !GrblInfo.IsLegacyController && GrblInfo.IsGrblHAL && GrblInfo.Build >= 20200716;
             CancellationToken cancellationToken = new CancellationToken();
 
             PollGrbl.Suspend();

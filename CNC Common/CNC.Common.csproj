@@ -53,6 +53,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="HelperClasses.cs" />
+    <Compile Include="Resources.cs" />
     <Compile Include="Threading.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

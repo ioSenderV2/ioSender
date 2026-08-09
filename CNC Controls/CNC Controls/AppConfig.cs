@@ -1788,7 +1788,7 @@ namespace CNC.Controls
                         break;
 
                     case "-islegacy":
-                        CNC.Core.Resources.IsLegacyController = true;
+                        CNC.Core.GrblInfo.IsLegacyController = true;
                         break;
 
                     // Preload a program on startup: --LoadFile <path> opens a single g-code file.
