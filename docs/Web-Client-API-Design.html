@@ -76,14 +76,22 @@
 
 <h2>0. Where this sits</h2>
 
-<p>The web pivot (2026&#8209;08&#8209;08) made <code>ioSender.exe</code> the serving host: it already constructs
-<code>MachineStateStream</code> and <code>MachineCommandChannel</code> in&#8209;process in <code>MainWindow</code>. What is missing
-is a transport endpoint and the rest of the surface &mdash; today the wire carries machine state one way and jog /
-run&#8209;control / MDI / realtime the other, which is perhaps 15% of what a usable client needs.</p>
+<p><strong>The destination is a self&#8209;contained .NET&nbsp;8 server process with no WPF anywhere</strong> &mdash; that is
+step 6b and the v3.0 gate. <code>CNC.Core</code> is already WPF&#8209;free and has run headless on .NET&nbsp;8 against the
+real controller, so the destination is not speculative.</p>
 
-<p>The verification story this unlocks is the reason to build it in this order: the web client connects to the
-<strong>running WPF app</strong>, so the known&#8209;good client and the new client render the same machine side by side,
-live. That is the machine&#8209;mirror&#8209;window trick scaled to a whole UI, and it is available exactly once.</p>
+<p>What the web pivot (2026&#8209;08&#8209;08) added is an <em>interim</em>: during 6a the endpoint is hosted inside
+<code>ioSender.exe</code>, which already constructs <code>MachineStateStream</code> and <code>MachineCommandChannel</code>
+in&#8209;process in <code>MainWindow</code>. That is scaffolding, not architecture. It buys one thing, and it is worth a
+lot: the web client can be developed and checked <strong>beside a known&#8209;good client rendering the same machine
+live</strong>, so when the two disagree the reference implementation is not the variable. It is the
+machine&#8209;mirror&#8209;window trick scaled to a whole UI, and it is available exactly once &mdash; only while both
+clients exist.</p>
+
+<p>What is missing either way is a transport endpoint and the rest of the surface: today the wire carries machine
+state one way and jog / run&#8209;control / MDI / realtime the other, perhaps 15% of what a usable client needs.
+<strong>Nothing in the API depends on which process is listening</strong>, which is what makes the 6a&rarr;6b move a
+hosting change rather than a redesign.</p>
 
 <div class="box decided"><span class="bt">Decided</span>
 <strong>TypeScript + three.js</strong>, served as static files by the host. No client install on any platform.
@@ -157,7 +165,7 @@ Contract types are generated from <code>CNC.Contracts.dll</code> rather than han
   <line x1="696" y1="146" x2="582" y2="146" stroke="#57606a" stroke-width="1.6" marker-end="url(#ah)"/>
 </svg>
 </div>
-<div class="cap">The WPF UI becomes a peer client of the same in&#8209;process channels. Both clients render one machine, which is what makes disagreement between them a visible protocol bug.</div>
+<div class="cap"><strong>The 6a arrangement.</strong> The WPF UI becomes a peer client of the same in&#8209;process channels &mdash; both clients render one machine, which is what makes disagreement between them a visible protocol bug. At 6b the host box becomes a headless .NET&nbsp;8 process and the dashed WPF box disappears; nothing else in the diagram changes.</div>
 
 <h3>Why two connections rather than two logical channels on one</h3>
 
@@ -427,18 +435,31 @@ stay as they are until the web client needs each path? Migrating is more churn n
 
 <h2>5. Multi&#8209;client authority</h2>
 
-<p>The web client connects to a <em>running WPF app</em>, so from day one two clients can command one machine. That is
-unavoidable given the chosen verification setup, and there is no rule for it yet.</p>
+<div class="box decided"><span class="bt">Decided &mdash; user, 2026&#8209;08&#8209;09</span>
+<strong>One writer, unlimited read&#8209;only viewers.</strong> Exactly one session holds an <em>operator lease</em>;
+every other session receives every stream in full but has its commands refused. Full protocol specification in
+<code>Web-Client-API-Reference.html</code> &sect;5.1.</div>
 
-<p>State goes to everyone &mdash; an observer is always safe. Commands are the question.</p>
+<p>This was forced by the verification setup &mdash; during 6a the web client attaches to an endpoint hosted in the
+running WPF app, so two clients can reach one machine from day one &mdash; but it is the right answer for the target
+architecture too, where the host is the headless .NET&nbsp;8 server and a shop could easily have a wall panel, a
+laptop and a phone all pointed at the same machine. State goes to everyone; a viewer is always safe. Commands were
+the question, and last&#8209;writer&#8209;wins would mean two people jogging the same axis from different rooms.</p>
 
-<div class="box open"><span class="bt">Open &mdash; needs your call</span>
-<p>My recommendation is an <strong>operator lease</strong>: exactly one connection holds it, the WPF host holds it by
-default, handover is explicit and visible in both UIs, and everyone else is read&#8209;only with greyed controls.</p>
-<p>The alternative &mdash; free&#8209;for&#8209;all, last writer wins &mdash; is genuinely dangerous. Two operators jogging the
-same axis from different rooms stops being hypothetical the moment this is reachable from a phone. This affects the
-command envelope (it needs a lease token), so it wants deciding before implementation, not after.</p>
-</div>
+<p>Three consequences worth carrying into implementation:</p>
+
+<ul>
+  <li><strong>No session is privileged.</strong> The lease is a protocol object, not a property of being the WPF
+      client. Any rule that only makes sense while WPF exists is a design mistake, since WPF is scaffolding.</li>
+  <li><strong>The stopping set needs no lease.</strong> <code>feedHold</code>, <code>stop</code>, <code>softReset</code>,
+      <code>jogCancel</code> and <code>spindleStop</code> are open to every session including viewers. &ldquo;I could not
+      hit feed hold because I am not the operator&rdquo; is the wrong failure &mdash; and it is also what resolves the
+      hole in a single&#8209;writer design: if the holder&rsquo;s browser dies at 60% through a program, any viewer can
+      still halt the machine. Viewers may stop, not adjust.</li>
+  <li><strong>The WPF client must be able to go genuinely read&#8209;only</strong> during 6a. That is real work in a UI
+      never designed for it, it is throwaway work, and it should be budgeted rather than assumed. It first bites at
+      build step 3 &mdash; steps 1&ndash;2 have the web client read&#8209;only by construction.</li>
+</ul>
 
 <h2>6. Safety items that are new because it is a network</h2>
 
@@ -500,11 +521,11 @@ command envelope (it needs a lease token), so it wants deciding before implement
 
 <table>
 <tr><th style="width:6%">#</th><th style="width:46%">Question</th><th>Why it blocks</th></tr>
-<tr><td class="num">1</td><td>Multi&#8209;client authority &mdash; operator lease, or free&#8209;for&#8209;all?</td><td>Shapes the command envelope (lease token)</td></tr>
-<tr><td class="num">2</td><td>Migrate the WPF client&rsquo;s ~50 ack&#8209;wait sites onto the unified helper now, or lazily?</td><td>Scope of &sect;4</td></tr>
-<tr><td class="num">3</td><td>Client&#8209;vanish policy: hold a running job, or only cancel jogs?</td><td>Safety, and a genuine judgment call</td></tr>
-<tr><td class="num">4</td><td>Does v3.0 get cut at &ldquo;browser client over a real transport&rdquo;? The versioning note says separate processes; this is arguably equivalent</td><td>Release plumbing needs a one&#8209;shot major&#8209;bump override</td></tr>
-<tr><td class="num">5</td><td>Is <code>SimulatorManager</code> server&#8209;side? Long&#8209;standing &ldquo;ask before moving&rdquo; item, and a web client makes it concrete</td><td>Ownership</td></tr>
+<tr><td class="num">1</td><td>Migrate the WPF client&rsquo;s ~50 ack&#8209;wait sites onto the unified helper now, or lazily?</td><td>Scope of &sect;4</td></tr>
+<tr><td class="num">2</td><td>Client&#8209;vanish policy: should a vanished operator trigger a feed hold during a run, or nothing? <span class="muted">(Losing the lease already does <em>not</em> stop the job &mdash; that part is settled.)</span></td><td>Safety, and a genuine judgment call</td></tr>
+<tr><td class="num">3</td><td>Does v3.0 get cut at 6b, when the endpoint moves into the .NET&nbsp;8 process? The versioning note says separate processes, which that is</td><td>Release plumbing needs a one&#8209;shot major&#8209;bump override</td></tr>
+<tr><td class="num">4</td><td>Is <code>SimulatorManager</code> server&#8209;side? Long&#8209;standing &ldquo;ask before moving&rdquo; item, and a web client makes it concrete</td><td>Ownership</td></tr>
+<tr class="grp"><td class="num">&mdash;</td><td colspan="2"><strong>Settled 2026&#8209;08&#8209;09:</strong> multi&#8209;client authority &rarr; one writer (operator lease), unlimited read&#8209;only viewers, stopping set exempt. See &sect;5.</td></tr>
 </table>
 
 <div class="foot">

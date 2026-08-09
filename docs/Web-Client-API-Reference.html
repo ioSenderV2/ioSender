@@ -69,6 +69,7 @@
 
 <div class="meta">
   <div><span class="label">Scope</span> Everything the serving host exposes: two sockets, the messages it pushes, and every call a client can make. This is the <em>reference</em>. Rationale for the design choices lives in <code>docs/Web-Client-API-Design.html</code>; the inventory of what the WPF client does today is <code>docs/Command-Surface-Catalog.md</code>.</div>
+  <div><span class="label">Host</span> The server is a <strong>self&#8209;contained .NET&nbsp;8 process</strong>; the WPF client goes away. During 6a the endpoint is hosted <em>inside</em> the existing WPF app purely as scaffolding, so the new client can be validated beside a known&#8209;good one &mdash; see <a href="#hosting">&sect;2.0</a>. <strong>This document specifies the target.</strong> Nothing here depends on which process is listening.</div>
   <div><span class="label">Status</span> <span class="tag t-built">BUILT</span> exists in&#8209;process today &middot; <span class="tag t-new">SPEC</span> designed here, not written &middot; <span class="tag t-open">OPEN</span> needs a decision first.</div>
   <div><span class="label">Units</span> Every coordinate and feedrate is in the machine&rsquo;s <em>current</em> units. <code>isMetric</code> on the state snapshot says which. The server never converts.</div>
 </div>
@@ -141,6 +142,30 @@ quietly put the coolant and spindle&#8209;stop buttons behind head&#8209;of&#820
 
 <h2 id="conn">2. Connections, handshake, envelopes</h2>
 
+<h3 id="hosting">2.0 What process is serving this</h3>
+
+<p>Two phases, one contract. Nothing in this document changes between them &mdash; the same endpoints, messages and
+commands, only a different process listening.</p>
+
+<table>
+<tr><th style="width:14%">Phase</th><th style="width:30%">Host</th><th>Why</th></tr>
+<tr>
+  <td><strong>6a</strong><br><span class="muted">interim</span></td>
+  <td>Endpoint hosted <em>inside</em> the WPF app (<code>HttpListener</code>, net462)</td>
+  <td><strong>Scaffolding, not architecture.</strong> The WPF client is a known&#8209;good reference implementation, so a web client developed beside it can be checked against something already proven on real iron &mdash; when behaviour differs, the reference is not the variable. That advantage exists exactly once, and only while both clients exist.</td>
+</tr>
+<tr>
+  <td><strong>6b</strong><br><span class="muted">target</span></td>
+  <td>Self&#8209;contained <strong>.NET&nbsp;8</strong> server process; no WPF anywhere</td>
+  <td>The real product: <code>dotnet publish --self-contained</code> so no user installs a runtime. This is the v3.0 gate. <code>CNC.Core</code> is already WPF&#8209;free and proven headless on .NET&nbsp;8 against a real controller.</td>
+</tr>
+</table>
+
+<div class="box rule"><span class="bt">Consequence for readers</span>
+Where this document says &ldquo;the server&rdquo; it means the net8 process. The WPF app appears only as one more
+<em>client session</em> during 6a &mdash; it holds no special privilege in the protocol, and the API has no concept of
+it. Any rule that would only make sense while WPF exists is a design mistake.</div>
+
 <h3>2.1 Endpoints</h3>
 
 <table>
@@ -161,14 +186,15 @@ queue. A second socket that then posts onto the same work queue buys nothing.</d
 
 <p>On <code>/ws/main</code> the server speaks first, unprompted, and in this order:</p>
 
-<pre><code>&lt;- { "type":"hello",        "protocol":1, "server":"2.42.0", "sessionId":"a1b2", "role":"observer" }
+<pre><code>&lt;- { "type":"hello",        "protocol":1, "server":"3.0.0", "sessionId":"a1b2", "role":"viewer" }
 &lt;- { "type":"capabilities", ... }          // machine capability document, or null if disconnected
 &lt;- { "type":"settings",     ... }          // values + descriptors
 &lt;- { "type":"state.delta",  "seq":1041, "changed":["All"], "state":{...} }   // full snapshot
 </code></pre>
 
 <p>A client is fully populated after four messages and needs no initial requests. Reconnect replays the same
-four. <code>role</code> is <code>"operator"</code> or <code>"observer"</code> &mdash; see <a href="#lease">&sect;5.1</a>.</p>
+four. Every session starts as a <code>"viewer"</code> and must ask for the operator lease to write &mdash; see
+<a href="#lease">&sect;5.1</a>.</p>
 
 <h3 id="await">2.3 Envelopes</h3>
 
@@ -209,7 +235,7 @@ Every level is bounded by a timeout; there is no unbounded wait in this API.</di
 &lt;- { "type":"command.completed", "id":42, "outcome":"ok", "reply":"ok", "elapsedMs":31 }
 
 &lt;- { "type":"command.rejected",  "id":43, "code":"notPermitted",
-     "message":"This session is an observer." }
+     "message":"This session is a viewer; the operator lease is held by \"shop laptop\"." }
 &lt;- { "type":"command.completed", "id":44, "outcome":"error", "code":"controllerError",
      "reply":"error:9", "message":"G-code locked out during alarm or jog state", "elapsedMs":12 }</code></pre>
 
@@ -404,6 +430,11 @@ the naming is inverted, and <code>Stop()</code> means &ldquo;already stopped, do
 &ldquo;did the hold take&rdquo; is the machine&rsquo;s next status report on the state stream</strong>, never a round trip here.
 Gating a feed&#8209;hold button on an answer would recreate the starvation bug this socket exists to avoid.</p>
 
+<p><strong>Permissions:</strong> the <a href="#panic">stopping set</a> &mdash; <code>feedHold</code>, <code>stop</code>,
+<code>softReset</code>, <code>jogCancel</code>, <code>spindleStop</code> &mdash; is open to <em>every</em> session including
+read&#8209;only viewers. Everything else on this socket, overrides included, requires the operator lease. Viewers may
+stop, not adjust.</p>
+
 <pre><code>-&gt; feedHold
 -&gt; feedOverrideCoarsePlus</code></pre>
 
@@ -469,22 +500,77 @@ must purge stale queued jogs rather than replay them.</div>
 <p>All on <code>/ws/main</code>, all using the <a href="#await">envelope</a>. &ldquo;Default&rdquo; is the await level used when the
 client omits one.</p>
 
-<h3 id="lease">5.1 Session</h3>
+<h3 id="lease">5.1 Sessions and the operator lease</h3>
+
+<div class="box rule"><span class="bt">Decided</span>
+<strong>Exactly one session may write. Any number may watch.</strong> The writer holds the <em>operator lease</em>;
+every other session is a viewer and receives every stream in full, but its commands are refused. There is no
+privileged session &mdash; the lease is a protocol object, not a property of which client you happen to be.</div>
+
+<h4>Rules</h4>
+
+<table>
+<tr><th style="width:26%">Rule</th><th>Behaviour</th></tr>
+<tr><td>Initial state</td><td>The lease is <strong>unheld</strong>. A server with no operator is a valid, safe state &mdash; the machine simply takes no new commands.</td></tr>
+<tr><td>Acquire</td><td><code>requestOperator</code> is granted immediately when the lease is free. First requester wins; there is no queue and no priority.</td></tr>
+<tr><td>Release</td><td>Explicitly via <code>releaseOperator</code>, or <strong>automatically</strong> on socket close or heartbeat lapse (below). A lease is never orphaned by a client that crashes or a laptop that sleeps.</td></tr>
+<tr><td>Heartbeat</td><td>The holder sends <code>heartbeat</code> on the main socket every <strong>2&nbsp;s</strong>; the server releases the lease after <strong>6&nbsp;s</strong> of silence. Deliberately far slower than the 250&nbsp;ms jog dead&#8209;man &mdash; losing the lease is disruptive, stopping an axis is not.</td></tr>
+<tr><td>Takeover</td><td><code>requestOperator { takeover:true }</code> forcibly displaces the current holder, but <strong>only while no job is running</strong>. Mid&#8209;job it is refused with <code>busy</code>. Rationale below.</td></tr>
+<tr><td>Visibility</td><td>Every lease change broadcasts a <code>session</code> message to <em>all</em> connections, so every UI can show who is driving without polling.</td></tr>
+<tr><td>Losing it</td><td>A displaced holder is told, and must immediately reflect read&#8209;only in its UI. It does not get a veto.</td></tr>
+</table>
+
+<h4>Commands</h4>
 
 <table>
 <tr><th style="width:22%">op</th><th style="width:32%">arg</th><th style="width:14%">Default</th><th>Notes</th></tr>
-<tr><td class="c">requestOperator</td><td>&mdash;</td><td><span class="lvl l-a">acknowledged</span></td><td>Ask for the operator lease. <span class="tag t-open">OPEN</span></td></tr>
-<tr><td class="c">releaseOperator</td><td>&mdash;</td><td><span class="lvl l-q">queued</span></td><td></td></tr>
-<tr><td class="c" id="resync">requestSnapshot</td><td>&mdash;</td><td><span class="lvl l-q">queued</span></td><td>Force a full <code>state.delta</code>. The Seq&#8209;gap resync path. <span class="tag t-built">BUILT</span></td></tr>
-<tr><td class="c">answerPrompt</td><td><code>{ promptId, answer }</code></td><td><span class="lvl l-q">queued</span></td><td>&sect;3.8</td></tr>
+<tr><td class="c">requestOperator</td><td><code>{ takeover?:false, name?:"shop laptop" }</code></td><td><span class="lvl l-a">acknowledged</span></td><td>Granted if free. Refused <code>notPermitted</code> if held and <code>takeover</code> is false; refused <code>busy</code> if held, <code>takeover</code> is true and a job is running. <code>name</code> is a human label shown to the other sessions.</td></tr>
+<tr><td class="c">releaseOperator</td><td>&mdash;</td><td><span class="lvl l-q">queued</span></td><td>Always succeeds. A viewer calling it is a no&#8209;op.</td></tr>
+<tr><td class="c">heartbeat</td><td>&mdash;</td><td><span class="lvl l-q">queued</span></td><td>Holder only. Viewers need not send one.</td></tr>
+<tr><td class="c" id="resync">requestSnapshot</td><td>&mdash;</td><td><span class="lvl l-q">queued</span></td><td>Force a full <code>state.delta</code>. The Seq&#8209;gap resync path. <strong>Viewers may call this</strong> &mdash; it reads. <span class="tag t-built">BUILT</span></td></tr>
+<tr><td class="c">answerPrompt</td><td><code>{ promptId, answer }</code></td><td><span class="lvl l-q">queued</span></td><td>Holder only &mdash; a prompt is part of a run. &sect;3.8</td></tr>
 </table>
 
-<div class="box open"><span class="bt">Open &mdash; blocks this section</span>
-Because the web client attaches to a <em>running WPF app</em>, two clients can command one machine from day one and
-there is no rule yet. My recommendation is an <strong>operator lease</strong>: one holder, the WPF host by default,
-handover explicit and visible in both UIs, everyone else read&#8209;only. The alternative &mdash; last writer wins
-&mdash; means two people can jog the same axis from different rooms. This decides whether the envelope needs a lease
-token, so it wants settling before implementation.</div>
+<p>The <code>session</code> broadcast:</p>
+
+<pre><code>&lt;- { "type":"session", "operator":{ "sessionId":"a1b2", "name":"shop laptop", "self":false },
+     "viewers":3 }
+&lt;- { "type":"session", "operator":null, "viewers":4 }      // lease released or lapsed</code></pre>
+
+<h4 id="panic">What a viewer may still do &mdash; the stopping set</h4>
+
+<div class="box rule"><span class="bt">The safety exception, and it is not negotiable</span>
+<p>A short set of <strong>tier&#8209;1 stopping commands requires no lease and is available to every connected
+session</strong>, viewers included:</p>
+<p style="margin:6px 0"><code>feedHold</code> &middot; <code>stop</code> &middot; <code>softReset</code> &middot; <code>jogCancel</code> &middot; <code>spindleStop</code></p>
+<p>&ldquo;I could not hit feed hold because I am not the operator&rdquo; is the wrong failure mode, full stop. It is also the
+answer to the obvious hole in a single&#8209;writer design: if the holder&rsquo;s browser dies mid&#8209;job, anybody
+watching can still stop the machine &mdash; without waiting out the 6&nbsp;s heartbeat, and without needing the lease
+they cannot get while a job is running.</p>
+</div>
+
+<p>Everything else needs the lease, including the overrides. The line is <strong>viewers may stop, not adjust</strong>: a
+viewer who wants the feed slower holds instead, which is the safer instrument anyway. Every other tier&#8209;1
+command, all of tier 2 except the reads noted above, all of tier 3, and continuous jog are holder&#8209;only.</p>
+
+<div class="box rule"><span class="bt">Why takeover is blocked mid-job but stopping is not</span>
+They answer different questions. Taking the lease mid&#8209;job means <em>a second person starts steering a machine
+that is already cutting</em>, which is the exact scenario single&#8209;writer exists to prevent. Stopping means ending
+the hazard. So the hard case &mdash; holder vanishes at 60% through a program &mdash; resolves as: any viewer halts the
+machine immediately via the stopping set, and once it is no longer running the lease becomes takeable normally. No
+deadlock, and no path where two people are driving.</div>
+
+<div class="box trap"><span class="bt">Implementation note &mdash; this lands at build step 3, not step 1</span>
+Steps 1&ndash;2 of the build order have the web client read&#8209;only <em>by construction</em>, so the lease costs
+nothing there. It first matters at step 3, when the client writes &mdash; and during 6a that is also when the WPF
+app has to be able to <strong>genuinely go read&#8209;only</strong>, which is real work in a UI never designed for it and
+should be budgeted rather than assumed. It is temporary work: at 6b the WPF client is gone.</div>
+
+<div class="box open"><span class="bt">Still open &mdash; adjacent, not settled by this</span>
+Losing the lease does <strong>not</strong> stop a running job: the job is server&#8209;side and keeps streaming, which is
+the right default (a dropped wifi link must not abandon a part mid&#8209;cut). What is still undecided is whether a
+vanished holder should trigger a <em>feed hold</em> during a run, or nothing at all. Holding a paying job because a
+laptop slept is its own kind of harm.</div>
 
 <h3>5.2 Motion and position</h3>
 
@@ -581,9 +667,9 @@ out of step.</p>
 
 <table>
 <tr><th style="width:22%">code</th><th>Meaning</th></tr>
-<tr><td class="c">notPermitted</td><td>This session is an observer, not the operator.</td></tr>
+<tr><td class="c">notPermitted</td><td>This session is a viewer, not the operator &mdash; or it asked for a lease another session holds. The reply names the holder. Note the <a href="#panic">stopping set</a> is never refused for this reason.</td></tr>
 <tr><td class="c">notAvailable</td><td>The engine refuses in the current state &mdash; nothing to stop, cannot run, not connected.</td></tr>
-<tr><td class="c">busy</td><td>A job or macro is streaming and this command must not interleave (see the filesystem trap).</td></tr>
+<tr><td class="c">busy</td><td>A job or macro is streaming and this command must not interleave (see the filesystem trap) &mdash; also the refusal for a lease takeover attempted mid&#8209;job.</td></tr>
 <tr><td class="c">unsupported</td><td>The connected controller lacks the capability &mdash; check <code>capabilities</code> first.</td></tr>
 <tr><td class="c">badRequest</td><td>Malformed argument, unknown <code>op</code>, unknown axis letter.</td></tr>
 </table>
