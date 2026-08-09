@@ -202,11 +202,21 @@
              Feed Hold / Stop / MDI are always reachable regardless of the active tab. -->
         <Border x:Name="runControlBorder" DockPanel.Dock="Bottom" BorderBrush="#FFCCCCCC" BorderThickness="0,1,0,0" Background="#FFF5F5F5">
             <Grid Margin="6,4">
-                <!-- Four columns: [button row | jog pad | signals+feed | overrides]. The button-row column is the
-                     star, so it grows to consume the slack up to the jog pad; the other three are content-sized and
-                     ride at the right edge, adjacent to each other. -->
+                <!-- LAYOUT PASS 2026-08-09. Five columns:
+                     [button row | jog pad | jog config | signals | feeds+overrides]
+                     The button-row column is the star, so it grows to consume the slack up to the jog pad;
+                     the other four are content-sized and ride at the right edge, adjacent to each other.
+
+                     The strip is deliberately TALLER than before: the right-hand groups are now three rows
+                     each (three overrides, three signal groups, three jog fields), which is the vertical
+                     real estate this pass was asked for. Height comes from the content, not a fixed value,
+                     so the strip grows and shrinks with what is actually in it.
+
+                     This XAML is knowingly throwaway - the desktop client retires at phase H. The point is
+                     to settle a layout worth porting to the web client, so treat it as the design surface. -->
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
@@ -274,21 +284,42 @@
                                      visibility gate as Timelapse, set alongside it in MainWindow.xaml.cs). -->
                                 <ToggleButton x:Uid="btnAllRecord" x:Name="btnAllRecord" MinWidth="36" Margin="6,0,0,0" VerticalAlignment="Center" Focusable="False" Visibility="Collapsed" ToolTip="OBS Control - All: click to start/stop every camera together" Style="{StaticResource RecordToggleStyle}" Checked="AllRecord_Toggled" Unchecked="AllRecord_Toggled"/>
                             </StackPanel>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                <cnccontrols:KbdDefaultSpeedControl Margin="0,0,16,0"/>
-                                <cnccontrols:JogPresetSelector/>
-                            </StackPanel>
+                            <!-- Jog distance / feed / kbd speed used to sit here, on the State line. They moved
+                                 to their own "Jog config" column in the right-hand group (2026-08-09 layout
+                                 pass) so all the jogging controls read as one cluster next to the pad. -->
                         </Grid>
                     </StackPanel>
                 <!-- Jog pad (col 1): shrunk arrows-only copy of the Jog-tab control (selection shared via JogData),
                      riding at the left of the right-hand group, just past the button-row column. -->
-                <cnccontrols:JogBaseControl x:Name="jogPad" Grid.Column="1" ArrowsOnly="True" Margin="18,0,10,0" VerticalAlignment="Center">
-                    <cnccontrols:JogBaseControl.LayoutTransform>
-                        <ScaleTransform ScaleX="0.65" ScaleY="0.65"/>
-                    </cnccontrols:JogBaseControl.LayoutTransform>
-                </cnccontrols:JogBaseControl>
-                <!-- Signals (col 2): indicators (flush to top) + current feed rate under them; butts against the jog pad. -->
-                <StackPanel Grid.Column="2" Orientation="Vertical" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                <StackPanel Grid.Column="1" Orientation="Vertical" Margin="18,0,10,0" VerticalAlignment="Center">
+                    <cnccontrols:JogBaseControl x:Name="jogPad" ArrowsOnly="True" HorizontalAlignment="Center">
+                        <cnccontrols:JogBaseControl.LayoutTransform>
+                            <ScaleTransform ScaleX="0.65" ScaleY="0.65"/>
+                        </cnccontrols:JogBaseControl.LayoutTransform>
+                    </cnccontrols:JogBaseControl>
+                    <!-- Continuous jog: hold-to-move rather than step-per-click. Bound to the same
+                         IsContinuousJoggingEnabled the jog tab and keyboard handler already share, so the
+                         two surfaces cannot disagree about which mode the machine is in. -->
+                    <CheckBox x:Uid="chk_jogContinuous" x:Name="chkJogContinuous" Content="Continuous"
+                              IsChecked="{Binding Path=Keyboard.IsContinuousJoggingEnabled, Mode=TwoWay}"
+                              HorizontalAlignment="Center" Margin="0,4,0,0" FontSize="11"
+                              ToolTip="Hold a jog button to move continuously; release to stop."/>
+                </StackPanel>
+
+                <!-- Jog config (col 2): the three numbers that decide what a jog does, together and next to
+                     the pad they govern. Moved off the State line in this pass. -->
+                <StackPanel Grid.Column="2" Orientation="Vertical" VerticalAlignment="Center" Margin="0,0,14,0">
+                    <cnccontrols:JogPresetSelector HorizontalAlignment="Left"/>
+                    <cnccontrols:KbdDefaultSpeedControl HorizontalAlignment="Left" Margin="0,6,0,0"/>
+                </StackPanel>
+                <!-- Signals (col 3). TARGET is three LABELLED rows - Limits (X Y Z), Faults (W F), Probe
+                     (P T) - which needs SignalsControl to grow a grouping option; it currently renders one
+                     undifferentiated block. Placed in its own column here so the arrangement is settled and
+                     only the control's internals are outstanding.
+                     Letter key, from GrblInfo.SignalLetters: H = Hold input, S = Cycle Start input,
+                     T = Optional Stop, W = W-axis limit, F = Motor Fault, P = Probe, D = Safety Door,
+                     E = E-stop, R = Reset, M = Motor Warning, O = Probe Disconnected, L = Block Delete. -->
+                <StackPanel Grid.Column="3" Orientation="Vertical" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Left">
                     <cnccontrols:SignalsControl VerticalAlignment="Top" Margin="0">
                         <cnccontrols:SignalsControl.LayoutTransform>
                             <ScaleTransform ScaleX="0.86" ScaleY="0.86"/>
@@ -311,8 +342,11 @@
                         <cnccontrols:NumericTextBox Value="{Binding Path=FeedRate, Mode=OneWay}" Format="####0" IsReadOnly="True" Focusable="False" MinWidth="68" Margin="4,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
-                <!-- Right: feed / rapids override controls, given ~25% more room. -->
-                <cnccontrols:FeedControl Grid.Column="3" OverridesOnly="True" Margin="10,0,4,0" VerticalAlignment="Center">
+                <!-- Feeds + overrides (col 4). TARGET is three rows - Feed rate / Rapids (capped 100%) /
+                     Spindle RPM, each with its live value beside its override - and FeedControl currently
+                     carries only the first two. The spindle row needs adding to that control; the column
+                     position is settled here. -->
+                <cnccontrols:FeedControl Grid.Column="4" OverridesOnly="True" Margin="10,0,4,0" VerticalAlignment="Center">
                     <cnccontrols:FeedControl.LayoutTransform>
                         <ScaleTransform ScaleX="0.82" ScaleY="0.82"/>
                     </cnccontrols:FeedControl.LayoutTransform>
