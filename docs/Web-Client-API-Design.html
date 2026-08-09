@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ioSender V2 &mdash; Web Client API Design</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #1b1f23; font-size: 11pt; line-height: 1.5;
+         max-width: 62em; margin: 24px auto; padding: 0 20px; background: #fff; }
+  h1 { font-size: 22pt; margin: 0 0 2px; }
+  h1 + .sub { color: #57606a; font-size: 10.5pt; margin-bottom: 20px; }
+  h2 { font-size: 14pt; margin: 30px 0 8px; color: #0a3069; border-bottom: 1px solid #d0d7de; padding-bottom: 4px; }
+  h3 { font-size: 11.5pt; margin: 18px 0 5px; color: #0a3069; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  code, .mono { font-family: "Cascadia Code", Consolas, monospace; font-size: 9.7pt;
+                background: #f6f8fa; border: 1px solid #eaeef2; border-radius: 4px; padding: 0 4px; }
+  pre { font-family: "Cascadia Code", Consolas, monospace; font-size: 9.7pt; background: #f6f8fa;
+        border: 1px solid #d0d7de; border-radius: 6px; padding: 10px 12px; overflow-x: auto; line-height: 1.5; }
+  pre code { background: none; border: none; padding: 0; }
+  a { color: #0969da; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  strong { font-weight: 600; }
+
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 14px; font-size: 9.8pt; }
+  th { text-align: left; border-bottom: 1.5px solid #d0d7de; padding: 5px 8px; color: #57606a; font-weight: 600; }
+  td { padding: 4px 8px; border-bottom: 1px solid #eaeef2; vertical-align: top; }
+  td.num { text-align: right; font-family: Consolas, monospace; white-space: nowrap; }
+  tr.sub-hdr td { background: #f6f8fa; font-weight: 600; color: #24292f; }
+
+  .meta { border: 1px solid #d0d7de; border-radius: 6px; padding: 10px 14px; margin: 12px 0 18px; background: #f6f8fa; font-size: 10pt; }
+  .meta div { margin: 3px 0; }
+  .label { display: inline-block; width: 78px; color: #57606a; font-weight: 600; vertical-align: top; }
+
+  .box { border: 1px solid #d0d7de; border-left-width: 4px; border-radius: 6px; padding: 9px 13px; margin: 12px 0; font-size: 10pt; }
+  .decided { border-left-color: #1a7f37; background: #f2fbf4; }
+  .open    { border-left-color: #8250df; background: #faf7ff; }
+  .trap    { border-left-color: #d97706; background: #fffaf2; }
+  .box .bt { font-weight: 700; font-size: 8.5pt; letter-spacing: .04em; text-transform: uppercase; display: block; margin-bottom: 3px; }
+  .decided .bt { color: #1a7f37; }
+  .open .bt    { color: #8250df; }
+  .trap .bt    { color: #d97706; }
+  .box p:first-of-type { margin-top: 0; }
+  .box p:last-child { margin-bottom: 0; }
+
+  .tag { display: inline-block; border-radius: 10px; padding: 0 8px; font-size: 8.5pt; font-weight: 700; vertical-align: 2%; }
+  .t-ok   { background: #1a7f37; color: #fff; }
+  .t-q    { background: #8250df; color: #fff; }
+  .t-warn { background: #d97706; color: #fff; }
+  .t-new  { background: #0a3069; color: #fff; }
+  .muted { color: #57606a; }
+  .add { color: #1a7f37; } .del { color: #cf222e; } .chg { color: #d97706; }
+
+  .diagram { border: 1px solid #d0d7de; border-radius: 8px; padding: 14px; margin: 14px 0 6px; background: #fbfcfd; }
+  .diagram svg { width: 100%; height: auto; display: block; }
+  .cap { color: #57606a; font-size: 9.5pt; margin: 6px 2px 18px; }
+
+  .foot { color: #57606a; font-size: 9pt; margin-top: 30px; border-top: 1px solid #d0d7de; padding-top: 10px; }
+
+  @media print { body { max-width: none; margin: 0; } h2 { page-break-after: avoid; } .box, table, pre { page-break-inside: avoid; } }
+</style>
+</head>
+<body>
+
+<h1>Web client &mdash; API design</h1>
+<div class="sub">The calls the server must support. Design document, 2026&#8209;08&#8209;08.</div>
+
+<div class="meta">
+  <div><span class="label">Companion</span> <code>Command-Surface-Catalog.md</code> enumerates <em>what</em> the client does to the machine today (~235 write sites / 40 files). This document decides <em>how</em> those cross a wire.</div>
+  <div><span class="label">Status</span> Design, not built. <span class="tag t-ok">DECIDED</span> is settled &middot; <span class="tag t-q">OPEN</span> needs a call before implementation &middot; <span class="tag t-warn">TRAP</span> is a known way to get this wrong.</div>
+  <div><span class="label">Branch</span> <code>pr/portable-core</code> &mdash; step 6a of the client/server split.</div>
+</div>
+
+<h2>0. Where this sits</h2>
+
+<p>The web pivot (2026&#8209;08&#8209;08) made <code>ioSender.exe</code> the serving host: it already constructs
+<code>MachineStateStream</code> and <code>MachineCommandChannel</code> in&#8209;process in <code>MainWindow</code>. What is missing
+is a transport endpoint and the rest of the surface &mdash; today the wire carries machine state one way and jog /
+run&#8209;control / MDI / realtime the other, which is perhaps 15% of what a usable client needs.</p>
+
+<p>The verification story this unlocks is the reason to build it in this order: the web client connects to the
+<strong>running WPF app</strong>, so the known&#8209;good client and the new client render the same machine side by side,
+live. That is the machine&#8209;mirror&#8209;window trick scaled to a whole UI, and it is available exactly once.</p>
+
+<div class="box decided"><span class="bt">Decided</span>
+<strong>TypeScript + three.js</strong>, served as static files by the host. No client install on any platform.
+Contract types are generated from <code>CNC.Contracts.dll</code> rather than hand&#8209;mirrored (&sect;1.2).</div>
+
+<h2>1. Transport and framing</h2>
+
+<div class="box decided"><span class="bt">Decided</span>
+<strong>WebSocket, two connections</strong> &mdash; JSON text frames for control, binary frames for bulk geometry.</div>
+
+<div class="diagram">
+<svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="ah" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#57606a"/>
+    </marker>
+    <marker id="ahg" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#1a7f37"/>
+    </marker>
+  </defs>
+
+  <!-- web client -->
+  <rect x="8" y="62" width="168" height="140" rx="7" fill="#fff" stroke="#0a3069" stroke-width="1.5"/>
+  <text x="92" y="88" text-anchor="middle" font-size="12.5" font-weight="600" fill="#0a3069">Web client</text>
+  <text x="92" y="106" text-anchor="middle" font-size="10.5" fill="#57606a">TypeScript</text>
+  <text x="92" y="122" text-anchor="middle" font-size="10.5" fill="#57606a">three.js viewer</text>
+  <rect x="26" y="136" width="132" height="24" rx="4" fill="#f6f8fa" stroke="#d0d7de"/>
+  <text x="92" y="152" text-anchor="middle" font-size="9.5" fill="#24292f">generated contracts.ts</text>
+  <text x="92" y="182" text-anchor="middle" font-size="9.5" fill="#57606a">browser &mdash; no install</text>
+
+  <!-- host -->
+  <rect x="292" y="26" width="290" height="248" rx="7" fill="#fff" stroke="#0a3069" stroke-width="1.5"/>
+  <text x="437" y="48" text-anchor="middle" font-size="12.5" font-weight="600" fill="#0a3069">ioSender.exe &mdash; serving host</text>
+
+  <rect x="308" y="62" width="258" height="26" rx="4" fill="#f6f8fa" stroke="#d0d7de"/>
+  <text x="437" y="79" text-anchor="middle" font-size="9.7" fill="#24292f">HttpListener + AcceptWebSocketAsync</text>
+
+  <rect x="308" y="96" width="258" height="26" rx="4" fill="#eef6ff" stroke="#0969da"/>
+  <text x="437" y="113" text-anchor="middle" font-size="9.7" fill="#0a3069">MachineStateStream &mdash; deltas, Seq&#8209;gapped</text>
+
+  <rect x="308" y="130" width="258" height="26" rx="4" fill="#eef6ff" stroke="#0969da"/>
+  <text x="437" y="147" text-anchor="middle" font-size="9.7" fill="#0a3069">MachineCommandChannel &mdash; queued</text>
+
+  <rect x="308" y="164" width="258" height="26" rx="4" fill="#f2fbf4" stroke="#1a7f37"/>
+  <text x="437" y="181" text-anchor="middle" font-size="9.7" fill="#1a7f37">MachineRealtimeChannel &mdash; own thread</text>
+
+  <rect x="308" y="204" width="258" height="26" rx="4" fill="#fbfcfd" stroke="#8c959f" stroke-dasharray="3 2"/>
+  <text x="437" y="221" text-anchor="middle" font-size="9.7" fill="#57606a">WPF UI &mdash; peer client, in&#8209;process</text>
+
+  <text x="437" y="252" text-anchor="middle" font-size="9.3" fill="#57606a">CNC.Core &mdash; parser, emulator, JobRunner, StreamPump</text>
+
+  <!-- controller -->
+  <rect x="700" y="88" width="172" height="88" rx="7" fill="#fff" stroke="#0a3069" stroke-width="1.5"/>
+  <text x="786" y="118" text-anchor="middle" font-size="12.5" font-weight="600" fill="#0a3069">grblHAL</text>
+  <text x="786" y="136" text-anchor="middle" font-size="10.5" fill="#57606a">controller</text>
+  <text x="786" y="156" text-anchor="middle" font-size="9.3" fill="#57606a">serial / telnet / ws</text>
+
+  <!-- main channel -->
+  <line x1="176" y1="112" x2="286" y2="112" stroke="#57606a" stroke-width="1.6" marker-end="url(#ah)"/>
+  <line x1="286" y1="132" x2="176" y2="132" stroke="#57606a" stroke-width="1.6" marker-end="url(#ah)"/>
+  <text x="231" y="105" text-anchor="middle" font-size="9.2" font-weight="600" fill="#24292f">main ws</text>
+  <text x="231" y="150" text-anchor="middle" font-size="8.8" fill="#57606a">JSON + binary</text>
+
+  <!-- realtime channel -->
+  <line x1="176" y1="182" x2="286" y2="182" stroke="#1a7f37" stroke-width="2" marker-end="url(#ahg)"/>
+  <text x="231" y="175" text-anchor="middle" font-size="9.2" font-weight="600" fill="#1a7f37">realtime ws</text>
+  <text x="231" y="196" text-anchor="middle" font-size="8.8" fill="#1a7f37">1 byte, never queued</text>
+
+  <!-- host to controller -->
+  <line x1="582" y1="126" x2="696" y2="126" stroke="#57606a" stroke-width="1.6" marker-end="url(#ah)"/>
+  <line x1="696" y1="146" x2="582" y2="146" stroke="#57606a" stroke-width="1.6" marker-end="url(#ah)"/>
+</svg>
+</div>
+<div class="cap">The WPF UI becomes a peer client of the same in&#8209;process channels. Both clients render one machine, which is what makes disagreement between them a visible protocol bug.</div>
+
+<h3>Why two connections rather than two logical channels on one</h3>
+
+<p>TCP is ordered, so on a single socket a Feed Hold sits behind whatever is already in flight &mdash; a geometry
+burst, a delta storm, a program upload. That is head&#8209;of&#8209;line blocking, and it is a bug this project
+<em>already shipped once</em>: comms replies at <code>Normal(9)</code> outranked operator input at <code>Input(5)</code>, so a dense
+job dispatched no Feed Hold for its entire duration (fixed <code>bbd5207</code>). A dedicated socket with
+<code>TCP_NODELAY</code> has nothing ahead of it to block on.</p>
+
+<div class="box trap"><span class="bt">Trap</span>
+<strong>The socket is the easy half.</strong> A second listener that then posts onto the same server work queue buys
+nothing &mdash; it moves starvation from the wire to the server. The realtime handler needs its own thread writing
+<strong>straight to <code>Comms.com.WriteByte</code></strong>, never through the job pipeline. That is already how
+<code>MachineRealtimeChannel</code> behaves in&#8209;process; the transport must not undo it. The lesson from
+<code>bbd5207</code> was that the transport was never the bug &mdash; the marshal was.</div>
+
+<p><strong>Hosting on net462:</strong> <code>HttpListener</code> with <code>AcceptWebSocketAsync</code> &mdash; the same approach
+<code>tools/websocket-probe</code> already proves in this repo against the real <code>WebsocketStream</code>. No Kestrel, no
+sidecar, no new runtime dependency in the WPF host. When the net8 server process eventually takes over (the 6b /
+v3.0 gate), the endpoint contract is unchanged.</p>
+
+<h3 id="names">1.1 &nbsp;<code>MachineField</code> crosses the wire as names, not bits</h3>
+
+<div class="box decided"><span class="bt">Decided</span>
+Serialize <code>MachineDelta.Changed</code> as a string array &mdash; <code>["Position","FeedRate"]</code> &mdash; with
+<code>"All"</code> as the snapshot sentinel.</div>
+
+<p>This one is forced, not stylistic. <code>Changed</code> is a 64&#8209;bit flags enum and <code>MachineMirror</code> tests it
+bitwise about 34 times per delta. <strong>JavaScript&rsquo;s bitwise operators coerce their operands to 32&#8209;bit signed
+integers</strong>, and the contract is already past that line: <code>IsMPGActive</code> is bit 32, <code>IsMetric</code> is bit 33.
+In a browser <code>changed &amp; 8589934592</code> evaluates to <code>0</code> unconditionally, so a naive TypeScript mirror would
+silently never apply those fields &mdash; and <code>IsMetric</code> is what tells the client whether every coordinate on
+the snapshot is millimetres or inches.</p>
+
+<p>Names retire the bit budget entirely (the contract has a great deal of growing left to do), remove bit arithmetic
+from every client, make <code>-debuglog=delta</code> wire logs readable, and give forward compatibility for free &mdash; an
+older client ignoring a name it does not recognise is exactly what the contract already demands of unflagged fields.
+C# keeps the enum internally; only the serialized form changes, through a name&#8596;flag map at the boundary. The cost
+is roughly 60&ndash;80 bytes per delta instead of 8, at 5&ndash;10&nbsp;Hz.</p>
+
+<h3>1.2 &nbsp;Three smaller things settled while here</h3>
+
+<table>
+<tr><th style="width:22%">Item</th><th>Decision</th></tr>
+<tr>
+  <td><code>IncludeFields</code></td>
+  <td><span class="tag t-ok">DECIDED</span> Required <code>true</code> on <em>every</em> wire serializer, warned in <code>MachineEnums.cs</code> on the <code>GrblState</code> struct itself. A fields&#8209;only struct otherwise serializes as <code>{}</code> &mdash; this already shipped once and was caught only by a live wire log (<code>93ce632</code>), because the harness compared through the same serializer.</td>
+</tr>
+<tr>
+  <td>Position naming</td>
+  <td><span class="tag t-ok">DECIDED</span> Rename <code>Position</code>&nbsp;&rarr;&nbsp;<code>WorkPosition</code>, and the current <code>WorkPosition</code>&nbsp;&rarr;&nbsp;<code>WorkPositionReported</code> or drop it. Today <code>WorkPosition</code> is populated only when the controller reports WPos, which an MPos&#8209;reporting machine &mdash; the default, and this one &mdash; never does, so it is null <em>forever</em>, while the derived <code>Position</code> is what &ldquo;where am I in work coordinates&rdquo; actually means. This caught the C# mirror window (<code>fc1333e8</code>); a remote client author will hit it too. Fix before 6b freezes the wire.</td>
+</tr>
+<tr>
+  <td>TS types</td>
+  <td><span class="tag t-ok">DECIDED</span> Generated from <code>CNC.Contracts.dll</code> by a small net8 reflection tool (<code>tools/tsgen</code>, same pattern as <code>tools/delta-probe</code>), wired as a pre&#8209;build step rather than a chore someone remembers to run. It must carry XML doc comments through as TSDoc &mdash; the <em>semantics</em> are the part that bites, and they already live as comments in <code>StateMessages.cs</code>.</td>
+</tr>
+</table>
+
+<h2>2. Server &rarr; client: the streams</h2>
+
+<p>Machine state exists and is hardware&#8209;verified. Everything else below does not exist yet.</p>
+
+<table>
+<tr><th style="width:20%">Stream</th><th style="width:14%">Shape</th><th style="width:20%">Cadence</th><th>Notes</th></tr>
+<tr><td><code>MachineDelta</code></td><td>JSON</td><td>5&ndash;10&nbsp;Hz</td><td><span class="tag t-ok">BUILT</span> <code>MachineStateStream</code>, live and hardware&#8209;verified</td></tr>
+<tr><td>Capabilities</td><td>one JSON doc</td><td>connect / reconnect</td><td><code>GrblInfo</code> &mdash; &sect;2.1</td></tr>
+<tr><td>Settings</td><td>JSON map + descriptors</td><td>connect, on change</td><td><code>$$</code> / <code>GrblSettings</code> &mdash; &sect;2.2</td></tr>
+<tr><td>Console</td><td>JSON lines, batched</td><td>coalesced ~250&nbsp;ms</td><td>&sect;2.3</td></tr>
+<tr><td>JobProgress</td><td>JSON</td><td>coalesced ~10&nbsp;Hz</td><td>current block, elapsed, executed&#8209;to index</td></tr>
+<tr><td>Geometry</td><td><strong>binary</strong></td><td>on program load</td><td>&sect;2.4 &mdash; the big one</td></tr>
+<tr><td>Events</td><td>JSON</td><td>as they happen</td><td>alarms, errors, operator messages, prompts</td></tr>
+<tr><td>Filesystem</td><td>JSON</td><td>on request</td><td>controller SD / FS listing</td></tr>
+</table>
+
+<h3>2.1 &nbsp;Capabilities (<code>GrblInfo</code>)</h3>
+
+<p>About 55 values parsed from the <code>$I</code> handshake: <code>IsGrblHAL</code>, <code>Firmware</code>/<code>Version</code>/<code>Build</code>,
+<code>AxisFlags</code>, <code>MaxTravel</code>, <code>TravelResolution</code>, <code>NumTools</code>, <code>NumFans</code>, <code>HasATC</code>,
+<code>HasSDCard</code>, <code>HasFS</code>, <code>HasYModem</code>, <code>HasPIDLog</code>, <code>HasRTC</code>, <code>HomingEnabled</code>,
+<code>HomingDirection</code>, <code>OptionalSignals</code>, <code>SerialBufferSize</code>, <code>PlanBufferSize</code>, <code>LatheMode</code>,
+<code>ExpressionsSupported</code>, <code>RotationSupported</code>, plus the <code>Axes</code> and <code>Probes</code> collections.</p>
+
+<p>This is a <strong>capability document</strong>: it decides which UI exists at all. No SD&#8209;card view without
+<code>HasSDCard</code>, no tool table without <code>NumTools</code> (this machine reports <code>N_TOOLS 0</code>), and axis count and
+letters drive every DRO and jog control. It is effectively immutable per connection, so it is a snapshot sent on
+connect and re&#8209;sent on reconnect or firmware change &mdash; there is already a <code>FirmwareChangedHook</code> to hang
+that on.</p>
+
+<div class="box trap"><span class="bt">Trap</span>
+<code>GrblInfo</code> is a <strong>static class</strong>. Crossing the wire needs a <code>MachineCapabilities</code> contract DTO
+populated <em>from</em> it &mdash; not a move. Nothing in Core should stop reading <code>GrblInfo</code>, and the no&#8209;static&#8209;in&#8209;contracts
+rule stands.</div>
+
+<h3>2.2 &nbsp;Settings</h3>
+
+<p>Two distinct things, and the client needs both: the <strong>values</strong> (<code>$n=v</code>, a few hundred of them) and the
+<strong>descriptors</strong> &mdash; name, group, unit, datatype, min/max, enum members &mdash; that <code>GrblConfigControl</code>
+builds its editor from. grblHAL reports descriptors itself when <code>HasSettingDescriptions</code>; legacy Grbl needs the
+bundled table. Send descriptors once alongside capabilities, values as a map plus per&#8209;setting change events.</p>
+
+<h3>2.3 &nbsp;Console / reply stream</h3>
+
+<p>Every controller reply as the console tab shows it, plus the sender&rsquo;s own annotations. This is not decoration
+&mdash; it is how an operator diagnoses a machine, and how we will diagnose the web client. Source is
+<code>OnResponseReceived</code> / <code>ResponseLog</code>, and it must honour the existing <code>Silent</code> and
+<code>ResponseLogVerbose</code> flags.</p>
+
+<div class="box trap"><span class="bt">Trap</span>
+<strong>Coalesce it.</strong> The same content at the same rate already killed the WPF UI once: binding whole console
+content through a join&#8209;all converter on a mutating collection re&#8209;joined 2000 lines per response line and
+left the UI echoing for minutes after the wire went quiet (fixed <code>3c97839</code> with a dirty flag and a 250&nbsp;ms
+timer). Batch on a timer, cap scrollback server&#8209;side, and never send one frame per line during a dense
+stream.</div>
+
+<h3>2.4 &nbsp;Geometry &mdash; the viewer feed</h3>
+
+<p>This is the piece that most shapes the transport, and the good news is that the work is already done server&#8209;side.
+<code>Renderer.Render(List&lt;GCodeToken&gt;)</code> runs <code>GCodeEmulator.Execute(tokens)</code> and produces exactly five
+vertex collections: <code>CutLines</code>, <code>RapidLines</code>, <code>RetractLines</code>, <code>ToolOrigin</code>, and
+<code>ExecutedLines</code> (the progress overlay). The emulator is portable Core and already proven headless on .NET&nbsp;8.</p>
+
+<div class="box decided"><span class="bt">Decided</span>
+<strong>The client never parses g&#8209;code.</strong> The server emulates &mdash; where the parser, arc interpolation, WCS
+rotation and height map already live and are hardware&#8209;proven &mdash; and the wire carries packed
+<code>Float32Array</code> vertex buffers, which is exactly what a three.js <code>BufferGeometry</code> consumes with zero
+transformation.</div>
+
+<p>Sizing drives the rest. A 220k&#8209;line program at one segment per line is roughly 5&nbsp;MB of XYZ float pairs, and
+arcs expand to many segments each, so it can be considerably more. Consequences:</p>
+
+<ul>
+  <li><strong>Binary frames, not JSON.</strong> Base64 inside JSON would inflate about 33% and cost a parse on the
+      largest payload in the system.</li>
+  <li><strong>Chunked, with progress</strong>, so the viewer draws incrementally and the UI is never blocked.</li>
+  <li><strong><code>ExecutedLines</code> is not a buffer</strong> &mdash; it is an index into the cut buffer. Send
+      &ldquo;executed to vertex N&rdquo; on the progress stream and let the client re&#8209;colour by draw range. Re&#8209;sending
+      geometry per progress tick would be absurd.</li>
+  <li>Program <strong>load</strong> is a server&#8209;side operation with client&#8209;visible progress. It is not instantaneous:
+      a 220k&#8209;line load took 32&nbsp;s before the <code>OnPropertyChanged</code> marshalling fix brought it to 2.6&nbsp;s.</li>
+</ul>
+
+<h2>3. Client &rarr; server: the call surface</h2>
+
+<h3>3.1 &nbsp;Realtime channel &mdash; mostly built</h3>
+
+<p><code>RealtimeCommand</code> already covers 45 of the catalogued sites 1:1. Missing members, from catalog &sect;B
+(18 sites): <code>Stop</code> (0x19 &mdash; the grblHAL realtime Stop, <em>not</em> <code>StopJob</code>),
+<code>ProbeConnectedToggle</code> (0xA4), <code>Fan0Toggle</code> (0x8A), <code>PidReport</code> (0xA2).</p>
+
+<p><code>StatusReport</code> / <code>StatusReportAll</code> (0x80/0x87, 10 sites) should <strong>not</strong> become realtime members.
+Every one of those sites means &ldquo;give me a fresh snapshot now&rdquo;, which is <code>RequestSnapshot()</code> on the state
+stream &mdash; already in the contract, and semantically the right door.</p>
+
+<div class="box trap"><span class="bt">Trap</span>
+<strong>Realtime bytes disguised as text.</strong> <code>SpindleControl.xaml.cs:136</code> and
+<code>CoolantControl.xaml.cs:56/58/60</code> send single control characters as <em>strings</em>
+(<code>GrblCommand.Flood</code>/<code>.Mist</code> are control chars, not g&#8209;code). They must route to the realtime channel.
+A naive &ldquo;<code>ExecuteCommand</code>&nbsp;&rarr;&nbsp;<code>Mdi</code>&rdquo; sweep would quietly put the coolant button behind
+head&#8209;of&#8209;line blocking.</div>
+
+<h3>3.2 &nbsp;Queued commands</h3>
+
+<p>Built: <code>Jog</code>, <code>RunProgram</code>, <code>StopJob</code>, <code>RewindJob</code>, <code>Mdi</code>. Proposed additions in the
+catalog&rsquo;s ranked order, with the completion level (&sect;4) each one needs:</p>
+
+<table>
+<tr><th style="width:34%">Command</th><th class="num" style="width:9%">Sites</th><th style="width:20%">Await level</th><th>Note</th></tr>
+<tr><td><code>SetCoordinateOffset</code><br><span class="muted">G92 / G10 L1 / L2 / L20 / G28.1 / G30.1</span></td><td class="num">25</td><td>Acknowledged, then re&#8209;query</td><td>Persistent machine state &mdash; the ack genuinely matters</td></tr>
+<tr><td><code>Unlock</code> <span class="muted">(<code>$X</code>)</span></td><td class="num">14</td><td>Acknowledged</td><td></td></tr>
+<tr><td>Filesystem group<br><span class="muted"><code>$F</code>, <code>$F&lt;=</code>, <code>$FD=</code>, <code>$CWD=</code>, <code>$PWD</code>, <code>$REBOOT</code></span></td><td class="num">12</td><td>Acknowledged</td><td>All <code>SDCardView</code>; <code>$FR</code> is the existing <code>RewindJob</code></td></tr>
+<tr><td><code>QueryParserState</code> / <code>QueryParameters</code><br><span class="muted">(<code>$G</code> / <code>$#</code>)</span></td><td class="num">11</td><td><strong>Reply&#8209;carrying</strong></td><td>Read&#8209;back after every offset write</td></tr>
+<tr><td><code>Probe</code> <span class="muted">(3&#8209;phase G38.2)</span></td><td class="num">9</td><td><strong>Idle</strong></td><td>A protocol, not three MDI lines &mdash; see below</td></tr>
+<tr><td><code>GotoPosition</code> <span class="muted">(Safe&#8209;Z ordered G53 G0)</span></td><td class="num">9</td><td><strong>Idle</strong></td><td>Ordering must stay atomic &mdash; see below</td></tr>
+<tr><td><code>SetSetting</code> / <code>ResetSettings</code><br><span class="muted">(<code>$n=v</code> / <code>$RST=$</code>)</span></td><td class="num">8</td><td><strong>Reply&#8209;carrying</strong></td><td>Needs the <code>error:N</code> text, resolved</td></tr>
+<tr><td><code>Home</code> <span class="muted">(<code>$H</code>)</span></td><td class="num">7</td><td><strong>Idle</strong></td><td>grblHAL goes silent for the whole cycle &mdash; see &sect;6</td></tr>
+<tr><td><code>TrinamicDiagnostics</code> <span class="muted">(M122/M914)</span></td><td class="num">6</td><td>Reply&#8209;carrying</td><td></td></tr>
+<tr><td><code>MacroCall</code> <span class="muted">(G65P<em>n</em>)</span></td><td class="num">4</td><td>Idle</td><td></td></tr>
+<tr><td><code>SetRtc</code>, <code>Reboot</code></td><td class="num">2</td><td>Acknowledged</td><td></td></tr>
+<tr><td><code>FileUpload</code> <span class="muted">(YModem)</span></td><td class="num">&mdash;</td><td colspan="2">Its own streaming shape, not a command</td></tr>
+</table>
+
+<div class="box decided"><span class="bt">Decided</span>
+<strong>Composites are deliberate.</strong> <code>Probe</code> and <code>GotoPosition</code> are sequences whose <em>ordering is a
+safety property</em> &mdash; Safe&#8209;Z retract before lateral move; fast probe, retract, slow probe. Exposing them as
+three MDI lines lets a client interleave something between them, over a network, with a spinning tool. They belong
+server&#8209;side as one command.</div>
+
+<h2>4. The blocking decision: accepted vs completed</h2>
+
+<p>The catalog names this as what blocks the offset, settings and probe groups. Having now read all four ack&#8209;wait
+helpers, here is what is actually in the code.</p>
+
+<h3>What exists &mdash; four implementations of one idea, none of them agreeing</h3>
+
+<p>Every one is <code>new Thread(() =&gt; WaitFor.AckResponse(...))</code> plus <code>while (res == null) EventUtils.DoEvents()</code>:</p>
+
+<table>
+<tr><th style="width:27%">Helper</th><th style="width:19%">Timeout</th><th style="width:19%">Writes via</th><th style="width:19%">Listens on</th><th style="width:8%">Reply?</th><th style="width:8%">Cancel?</th></tr>
+<tr><td><code>Grbl.WaitForResponse</code></td><td>5000&nbsp;ms</td><td><code>ExecuteCommand</code> <span class="muted">(MDI/ParseBlock)</span></td><td><code>model.OnResponseReceived</code></td><td>no</td><td>no</td></tr>
+<tr><td><code>Grbl.WaitForIdle</code></td><td>1000&nbsp;ms ack, then <span class="del"><strong>unbounded</strong></span></td><td><code>ExecuteCommand</code></td><td>same</td><td>no</td><td>no</td></tr>
+<tr><td><code>ProbingViewModel.WaitForResponse</code></td><td>5000&nbsp;ms</td><td><code>ExecuteCommand</code></td><td><code>Grbl.OnResponseReceived</code></td><td>no</td><td><span class="add">yes</span></td></tr>
+<tr><td><code>ProbingViewModel.WaitForIdle</code></td><td>1100&nbsp;ms + 120&nbsp;s cap</td><td><code>ExecuteCommand</code></td><td><code>OnRealtimeStatusProcessed</code></td><td>no</td><td><span class="add">yes</span></td></tr>
+<tr><td><code>OffsetView.WriteCommandAndWait</code></td><td>1500&nbsp;ms</td><td><span class="chg">raw <code>WriteCommand</code></span></td><td><code>parameters.OnResponseReceived</code></td><td>no</td><td>no</td></tr>
+<tr><td><code>GrblConfigControl.SetSetting</code></td><td><span class="chg">400&nbsp;ms</span></td><td><span class="chg">raw <code>WriteCommand</code></span></td><td><code>model.OnResponseReceived</code></td><td><span class="add">yes</span></td><td>no</td></tr>
+</table>
+
+<p>Three findings worth stating plainly:</p>
+
+<ol>
+  <li><strong><code>Grbl.WaitForIdle</code> has no overall cap.</strong> It loops <code>SingleEvent(5000)</code> until the state
+      reads <code>Idle</code>, forever. <code>ProbingViewModel</code>&rsquo;s equivalent grew a 120&nbsp;s cap and an <code>Alarm</code>
+      check; the Core one never did. Same family as the untimed <code>Comms.AwaitAck</code> that <code>AtcMacros</code>
+      had to wrap by hand.</li>
+  <li><strong>They do not agree on what &ldquo;done&rdquo; means</strong> &mdash; <code>ok</code> received, versus a <em>status
+      report</em> showing <code>Idle</code>. Those differ by the entire duration of a move.</li>
+  <li><strong>Every one blocks by pumping the message loop.</strong> This is the landmine already flagged for 6b:
+      around 70 <code>DoEvents</code> sites, with connect, settings&#8209;read and macro handshakes all built as
+      synchronous&#8209;reply designs. Over a wire they cannot stay that way.</li>
+</ol>
+
+<h3>Proposed design &mdash; three named completion levels, and the server does the waiting</h3>
+
+<div class="box decided"><span class="bt">Proposed</span>
+The client does <strong>not</strong> wait for the machine. The <em>server</em> does, because it is next to the machine and
+already knows how. The client gets a promise.</div>
+
+<pre><code>Queued        server accepted it; the engine's own gate passed     (immediate)
+Acknowledged  controller replied ok / error:N                      (what 4 of the 6 mean)
+Idle          everything acked AND machine back to Idle            (what the other 2 mean)</code></pre>
+
+<p>The command envelope carries an <code>id</code> and the desired <code>await</code> level. The server replies
+<code>CommandAccepted{id}</code> or <code>CommandRejected{id, reason}</code> immediately, then
+<code>CommandCompleted{id, outcome, replyText, elapsedMs}</code> when the level is reached. The TypeScript client wraps
+that as a promise resolving at the requested level; the two&#8209;stage form is available for UI &mdash; grey the button
+on accept, spinner until complete &mdash; without being mandatory.</p>
+
+<div class="box decided"><span class="bt">Reuse, do not reinvent</span>
+For the <code>Idle</code> level, <code>StreamPump</code>&rsquo;s <code>(WAITIDLE)</code> dispatch barrier is <em>exactly</em> this
+predicate &mdash; everything outstanding acked <strong>plus two consecutive <code>&lt;Idle|</code> reports</strong> &mdash; it is
+event&#8209;driven rather than DoEvents&#8209;spinning, and it is <strong>hardware&#8209;verified</strong> (2026&#8209;08&#8209;08: wire
+silent 10,250&nbsp;ms through real Z moves, tail out 1&nbsp;ms after clear, zero alarms). Two consecutive reports
+matter: one is not enough, because a report can be sampled before a queued move has started.</div>
+
+<p>Several things fall out of this that are worth having regardless of the web client:</p>
+
+<ul>
+  <li><strong>Every wait becomes bounded</strong>, including <code>Idle</code> &mdash; take <code>ProbingViewModel</code>&rsquo;s
+      120&nbsp;s, not Core&rsquo;s &infin;. That is a real bug fix.</li>
+  <li><strong>Reply text is always carried.</strong> <code>SetSetting</code>&rsquo;s need generalizes; resolve <code>error:N</code>
+      to its message server&#8209;side via <code>GrblErrors.GetMessage</code> so every client gets it for free.</li>
+  <li><strong>Cancellation</strong> is a <code>CancelCommand{id}</code> on the main channel &mdash; probing already needs it and
+      is the only helper that has it today.</li>
+  <li><strong>Alarm terminates any wait</strong>, as <code>ProbingViewModel.WaitForIdle</code> does and the others do not.</li>
+  <li>Server&#8209;side the four helpers collapse into <strong>one</strong> <code>MachineCommandAck</code> in Core, with the
+      existing WPF call sites becoming its callers. One implementation shared by both clients &mdash; not a fifth.</li>
+</ul>
+
+<div class="box trap"><span class="bt">Trap</span>
+An <code>Alarm:N</code> is <em>not</em> an <code>error:N</code>. An ack wait therefore <strong>times out</strong> on an alarm instead of
+failing fast &mdash; which is how a validate run once sat there burning its full timeout. The unified helper must
+watch the state stream for <code>Alarm</code>, not just the reply text.</div>
+
+<div class="box open"><span class="bt">Open &mdash; needs your call</span>
+Do the WPF client&rsquo;s ~50 existing ack&#8209;wait call sites migrate onto the unified helper as part of this work, or
+stay as they are until the web client needs each path? Migrating is more churn now, and strictly better afterwards
+&mdash; one implementation, proven by the client that already runs on real iron.</div>
+
+<h2>5. Multi&#8209;client authority</h2>
+
+<p>The web client connects to a <em>running WPF app</em>, so from day one two clients can command one machine. That is
+unavoidable given the chosen verification setup, and there is no rule for it yet.</p>
+
+<p>State goes to everyone &mdash; an observer is always safe. Commands are the question.</p>
+
+<div class="box open"><span class="bt">Open &mdash; needs your call</span>
+<p>My recommendation is an <strong>operator lease</strong>: exactly one connection holds it, the WPF host holds it by
+default, handover is explicit and visible in both UIs, and everyone else is read&#8209;only with greyed controls.</p>
+<p>The alternative &mdash; free&#8209;for&#8209;all, last writer wins &mdash; is genuinely dangerous. Two operators jogging the
+same axis from different rooms stops being hypothetical the moment this is reachable from a phone. This affects the
+command envelope (it needs a lease token), so it wants deciding before implementation, not after.</p>
+</div>
+
+<h2>6. Safety items that are new because it is a network</h2>
+
+<ol>
+  <li>
+    <p><strong>Continuous jog must be dead&#8209;man&rsquo;d.</strong> Today cancel&#8209;on&#8209;release is a local key&#8209;up
+    delivering <code>0x85</code> in microseconds. Over a network the release packet can be lost or delayed &mdash; and the
+    failure mode is an axis that does not stop. Design: <code>JogStart</code> begins motion, the client heartbeats while the
+    key is held, and the <strong>server</strong> issues <code>JogCancel</code> the moment a heartbeat is missed. Never rely on the
+    release message arriving. This is the single most safety&#8209;critical piece of the web client.</p>
+    <p class="muted">Related and already known: a <code>$J=</code> cancelled 3&nbsp;ms later gets flushed by grblHAL with
+    <em>no reply</em>, which wedged jogging entirely until restart (fix <code>3eb08c6</code>). Network jitter makes that
+    timing common rather than rare.</p>
+  </li>
+  <li>
+    <p><strong>Client&#8209;vanish watchdog.</strong> The realtime handler serves &ldquo;operator pressed hold&rdquo; and &ldquo;client
+    disappeared&rdquo; through one code path.</p>
+    <div class="box open" style="margin:8px 0 0"><span class="bt">Open &mdash; needs your call</span>
+    Does a vanished client during a <em>running job</em> trigger Feed Hold, or only during a jog? Holding a paying job
+    because a laptop went to sleep is its own kind of harm.</div>
+  </li>
+  <li>
+    <p><strong>A dead socket has no symptom.</strong> <code>Socket.Connected</code> reflects the last I/O, not live state, so
+    writes &ldquo;succeed&rdquo; forever into a half&#8209;open link &mdash; this project went 5240 polls into a dead link once.
+    The client must detect staleness itself. The <code>Seq</code>&#8209;gap rule already does this for state; the same
+    discipline (count what you sent against what came back over the same window) applies to commands.</p>
+  </li>
+  <li>
+    <p><strong>Never gate a Feed Hold button on the main channel&rsquo;s health</strong>, or on a command round trip. Show
+    &ldquo;held&rdquo; when the <em>controller&rsquo;s status report</em> says <code>Hold</code>. The realtime channel is
+    fire&#8209;and&#8209;forget precisely so this stays true.</p>
+  </li>
+  <li>
+    <p><strong>Silence is not death.</strong> grblHAL goes completely silent for the duration of a homing cycle, and a
+    naive link&#8209;watchdog aborted a real one because of it. Any liveness check the web layer adds must know that
+    &mdash; the existing <code>LinkMonitor</code> lesson applies unchanged one layer up.</p>
+  </li>
+  <li>
+    <p><span class="tag t-ok">DECIDED</span> <strong>Bind to loopback until auth exists.</strong> Auth becomes mandatory the
+    moment this leaves the loopback interface (6c), not before.</p>
+  </li>
+</ol>
+
+<h2>7. Suggested build order</h2>
+
+<p>Each step leaves a working app, the same discipline as steps 1&ndash;5 of the split.</p>
+
+<table>
+<tr><th style="width:6%">#</th><th style="width:32%">Step</th><th>Why here</th></tr>
+<tr><td class="num">1</td><td><strong>Transport endpoint + <code>MachineDelta</code> only</strong></td><td>A read&#8209;only page showing DRO and machine state beside the running WPF app. Proves framing, the names&#8209;not&#8209;bits reshape and the generated TS types &mdash; and it <em>is</em> the side&#8209;by&#8209;side verification rig everything later leans on.</td></tr>
+<tr><td class="num">2</td><td>Capabilities + settings + console</td><td>The client stops being a toy; still zero machine writes.</td></tr>
+<tr><td class="num">3</td><td>Realtime channel + jog with the dead&#8209;man design</td><td>First writes. Hardware&#8209;verified deliberately and on its own.</td></tr>
+<tr><td class="num">4</td><td>Completion levels + unified <code>MachineCommandAck</code></td><td>Unblocks the offset / settings / query command groups.</td></tr>
+<tr><td class="num">5</td><td>Geometry + the three.js viewer</td><td>Large, independent, and carries no new machine&#8209;write risk.</td></tr>
+<tr><td class="num">6</td><td>Run control and job progress</td><td>Last, because it is the code most able to hurt a machine &mdash; and by then everything under it has real mileage.</td></tr>
+</table>
+
+<h2>8. Open questions, collected</h2>
+
+<table>
+<tr><th style="width:6%">#</th><th style="width:46%">Question</th><th>Why it blocks</th></tr>
+<tr><td class="num">1</td><td>Multi&#8209;client authority &mdash; operator lease, or free&#8209;for&#8209;all?</td><td>Shapes the command envelope (lease token)</td></tr>
+<tr><td class="num">2</td><td>Migrate the WPF client&rsquo;s ~50 ack&#8209;wait sites onto the unified helper now, or lazily?</td><td>Scope of &sect;4</td></tr>
+<tr><td class="num">3</td><td>Client&#8209;vanish policy: hold a running job, or only cancel jogs?</td><td>Safety, and a genuine judgment call</td></tr>
+<tr><td class="num">4</td><td>Does v3.0 get cut at &ldquo;browser client over a real transport&rdquo;? The versioning note says separate processes; this is arguably equivalent</td><td>Release plumbing needs a one&#8209;shot major&#8209;bump override</td></tr>
+<tr><td class="num">5</td><td>Is <code>SimulatorManager</code> server&#8209;side? Long&#8209;standing &ldquo;ask before moving&rdquo; item, and a web client makes it concrete</td><td>Ownership</td></tr>
+</table>
+
+<div class="foot">
+ioSender V2 &mdash; <code>docs/Web-Client-API-Design.html</code>. Companion to <code>docs/Command-Surface-Catalog.md</code>
+and <code>docs/WPF-Core-Coupling-Map.md</code>. Design only; nothing here is built.
+</div>
+
+</body>
+</html>
