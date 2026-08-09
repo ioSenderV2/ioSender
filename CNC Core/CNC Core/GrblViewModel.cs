@@ -54,7 +54,7 @@ namespace CNC.Core
         private bool has_wco = false, _hasFans = false, _multiProbe = false;
         private SDState _sdMounted = SDState.Unmounted;
         private bool _flood, _mist, _fan0, _toolChange, _reset, _isJobRunning, _pgmEnd, _isParserStateLive;
-        private bool _isCameraVisible = false, _responseLogVerbose = false, _isProbing = false, _hasOutline = false, _isLoading = false;
+        private bool _isCameraVisible = false, _responseLogVerbose = false, _hasOutline = false, _isLoading = false;
         private bool _isDryRunMode = false;
         private bool _feedOverrideDisabled = false, _rpmOverrideDisabled = false, _feedHoldDisabled = false;
         private int _line, _scrollpos, _blocks = 0, _startFromBlock = 0, _executingBlock = 0, _auxinValue = -2, _spindle_num = 0;
@@ -70,7 +70,6 @@ namespace CNC.Core
         public Action<string> OnGrblReset;
         public Action<string> OnRealtimeStatusProcessed;
         public Action<string> OnWCOUpdated;
-        public Action<Position> OnCameraProbe;
 
         // Incremented the instant a transition INTO Alarm is parsed (see DataReceived) - a latch, not a
         // sampled value, so a caller polling GrblState.State later can miss an alarm entirely if the
@@ -274,10 +273,10 @@ namespace CNC.Core
         public ICommand MDICommand { get; private set; }
         public ICommand StartFromBlock { get; private set; }
 
-        public void CameraProbed(Position position)
-        {
-            OnCameraProbe?.Invoke(position);
-        }
+        // IsProbing + CameraProbed/OnCameraProbe DELETED (contracts-only discipline): they were
+        // client-to-client coordination (camera <-> probing view) riding on this model as an event
+        // hub. Both live on CNC.Client.MachineViewModel now - deleted rather than orphaned so there
+        // are not two plausible hubs with one live (the dead-KeypressHandler.cs lesson).
 
         private bool ApplyCommand(string command)
         {
@@ -551,7 +550,6 @@ namespace CNC.Core
             get { return State.IsMetric; }
             set { State.IsMetric = value; }
         }
-        public bool IsProbing { get { return _isProbing; } set { _isProbing = value; OnPropertyChanged(); } }
         public bool ProgramEnd { get { return _pgmEnd; } set { _pgmEnd = value; if (_pgmEnd) OnPropertyChanged(); } }
         public int GrblError { get { return State.GrblState.Error; } set { State.GrblState.Error = value; OnPropertyChanged(); } }
         public StreamingState StreamingState { get { return _streamingState; } set { if (_streamingState != value) { _streamingState = value; OnPropertyChanged(); } } }

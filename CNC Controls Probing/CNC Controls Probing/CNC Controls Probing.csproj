@@ -117,6 +117,11 @@
       <Project>{9448A265-0B77-4235-A5F5-BDE212EC75E7}</Project>
       <Name>CNC.Contracts</Name>
     </ProjectReference>
+    <!-- The camera-probe hub + IsProbing live on the client twin now (camera dropped CNC Core). -->
+    <ProjectReference Include="..\..\CNC Client\CNC Client\CNC.Client.csproj">
+      <Project>{6C2E7A2D-6C0B-4B0A-9F0E-6B6B7D6A1234}</Project>
+      <Name>CNC.Client</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\CNC Common\CNC.Common.csproj">
       <Project>{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}</Project>
       <Name>CNC.Common</Name>
