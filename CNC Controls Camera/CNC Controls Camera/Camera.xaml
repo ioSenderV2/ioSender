@@ -7,7 +7,7 @@
         mc:Ignorable="d"
         Title="Sender" SizeToContent="WidthAndHeight"
         Topmost="True"
-        Closing="Window_Closing" Icon="App.ico" ShowInTaskbar="False" ResizeMode="NoResize">
+        Closing="Window_Closing" Icon="App.ico" ShowInTaskbar="False" ResizeMode="CanResize">
     <Window.TaskbarItemInfo>
         <TaskbarItemInfo/>
     </Window.TaskbarItemInfo>
