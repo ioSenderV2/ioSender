@@ -118,7 +118,6 @@
     <Compile Include="ControllerValidator.cs" />
     <Compile Include="GCodeProgram.cs" />
     <Compile Include="GCodeProgramComments.cs" />
-    <Compile Include="Geometry.cs" />
     <Compile Include="GrblViewModel.cs" />
     <Compile Include="MachineState.cs" />
     <Compile Include="MachineDeltaProducer.cs" />

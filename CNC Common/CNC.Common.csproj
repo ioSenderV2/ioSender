@@ -8,8 +8,10 @@
   discipline), but C# requires referencing the assembly that defines a used type's BASE class -
   so as long as ViewModelBase lived in CNC Core, no consumer of any view model could ever cut the
   reference. Sharing a LIBRARY is not the pass-C#-objects cheat; only machine-data instances
-  crossing the client/server boundary are. Nothing in here may know about controllers, comms,
-  g-code or wire messages - if a type needs any of those it belongs in CNC Core or CNC.Contracts.
+  crossing the client/server boundary are. Nothing in here may know about controllers, comms, or
+  wire messages - if a type needs any of those it belongs in CNC Core or CNC.Contracts. The g-code
+  DOCUMENT MODEL (pure parse/build/geometry, no machine I/O) is deliberately admitted: both sides
+  need it, and it is a library, not a boundary (user decision 2026-08-08).
 
   Types moved here from CNC Core keep their original namespace (CNC.Core) so the move needed zero
   call-site churn - same discipline as CNC.Contracts. This is the LEGACY net462 project the
@@ -52,6 +54,8 @@
     <Reference Include="System" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="GCodeAction.cs" />
+    <Compile Include="Geometry.cs" />
     <Compile Include="HelperClasses.cs" />
     <Compile Include="Resources.cs" />
     <Compile Include="Threading.cs" />

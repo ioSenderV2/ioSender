@@ -48,12 +48,8 @@ using CNC.GCode;
 
 namespace CNC.Core
 {
-    public enum Action
-    {
-        New,
-        Add,
-        End
-    }
+    // The Action enum moved to CNC Common (GCodeAction.cs), same namespace - first piece of the
+    // g-code document model to go shared (converters/transformers are client-side document tooling).
 
     public class GCodeBlock : ViewModelBase
     {
