@@ -286,6 +286,17 @@ namespace CNC.Core
                 var samples = SampleBoundary(contours, cell * SampleFraction);
                 var buckets = new PointGrid(samples, f.x0, f.y0, cell, f.nx, f.ny, maxDist);
 
+                // Splits the per-cell cost between its two calls. This loop is ~99.7% of a Work Order
+                // Generate (measured: 148.3 s of 148.7 s on a 13-character V-carve), and the two do very
+                // different amounts of work: NearestDistance goes through a bucketed PointGrid, while
+                // Inside ray-casts EVERY edge of EVERY contour for EVERY cell with no acceleration at
+                // all. Which of them dominates decides whether the answer is a faster inside-test or a
+                // faster nearest-search, so it is measured rather than assumed.
+                // Timestamps are only taken when logging is on; ~30 ns x cells is nothing against a
+                // multi-second build but would be a visible tax on a small one.
+                bool timing = DebugLog.Enabled;
+                long tNear = 0, tInside = 0;
+
                 f.dist = new double[f.nx * f.ny];
                 for (int j = 0; j < f.ny; j++)
                 {
@@ -293,12 +304,31 @@ namespace CNC.Core
                     for (int i = 0; i < f.nx; i++)
                     {
                         double px = f.x0 + i * cell;
+
+                        long t0 = timing ? System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
                         double d = buckets.NearestDistance(px, py);
+                        long t1 = timing ? System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
+                        bool ins = Inside(contours, px, py);
+                        if (timing)
+                        {
+                            long t2 = System.Diagnostics.Stopwatch.GetTimestamp();
+                            tNear += t1 - t0;
+                            tInside += t2 - t1;
+                        }
+
                         // Sign carries inside/outside; magnitude is the distance either way. Outside
                         // values are kept (negative) rather than clamped so marching squares can find the
                         // zero crossing - the boundary pass - by interpolation like any other level.
-                        f.dist[j * f.nx + i] = Inside(contours, px, py) ? Math.Min(d, maxDist * FarFactor) : -d;
+                        f.dist[j * f.nx + i] = ins ? Math.Min(d, maxDist * FarFactor) : -d;
                     }
+                }
+
+                if (timing)
+                {
+                    double toMs = 1000d / System.Diagnostics.Stopwatch.Frequency;
+                    DebugLog.Write("vcarve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "field {0}x{1}={2} cells | nearest={3:0}ms | inside={4:0}ms | {5} verts, {6} samples",
+                        f.nx, f.ny, f.nx * f.ny, tNear * toMs, tInside * toMs, total, samples.Count));
                 }
                 return f;
             }
