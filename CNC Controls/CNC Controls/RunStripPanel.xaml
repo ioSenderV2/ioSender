@@ -78,11 +78,15 @@
             <Setter Property="Padding" Value="2,0"/>
         </Style>
 
-        <Style x:Key="GroupHeaderStyle" TargetType="TextBlock">
+        <!-- Column frame. The header stays deliberately small and muted: it names the group, it does
+             not compete with the values inside it. -->
+        <Style x:Key="ColumnGroupStyle" TargetType="GroupBox">
+            <Setter Property="Padding" Value="8,4,8,6"/>
+            <Setter Property="BorderBrush" Value="#FFBFBFBF"/>
+            <Setter Property="Foreground" Value="#FF666666"/>
             <Setter Property="FontSize" Value="10"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="#FF666666"/>
-            <Setter Property="Margin" Value="0,0,0,3"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
 
         <!-- A signal lamp: the letter itself, dim when clear and red when asserted. Colour is set from
@@ -100,8 +104,7 @@
     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
 
         <!-- ==================== JOGGING ==================== -->
-        <StackPanel Orientation="Vertical" Margin="0,0,16,0">
-            <TextBlock x:Uid="hdr_jogging" Text="JOGGING" Style="{StaticResource GroupHeaderStyle}"/>
+        <GroupBox x:Uid="grp_jogging" Header="JOGGING" Style="{StaticResource ColumnGroupStyle}" Margin="0,0,10,0">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -139,11 +142,10 @@
                     <Button x:Name="btnKbdFast" Style="{StaticResource SpeedChoiceStyle}" Click="KbdFast_Click"/>
                 </StackPanel>
             </Grid>
-        </StackPanel>
+        </GroupBox>
 
         <!-- ==================== SIGNALS ==================== -->
-        <StackPanel Orientation="Vertical" Margin="0,0,16,0">
-            <TextBlock x:Uid="hdr_signals" Text="SIGNALS" Style="{StaticResource GroupHeaderStyle}"/>
+        <GroupBox x:Uid="grp_signals" Header="SIGNALS" Style="{StaticResource ColumnGroupStyle}" Margin="0,0,10,0">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -170,11 +172,10 @@
                            HorizontalAlignment="Left" Margin="0,2,0,0"
                            ToolTip="Tool length offset reference. Blank until one has been set."/>
             </Grid>
-        </StackPanel>
+        </GroupBox>
 
         <!-- ==================== FEEDS AND SPEEDS ==================== -->
-        <StackPanel Orientation="Vertical">
-            <TextBlock x:Uid="hdr_feedsSpeeds" Text="FEEDS AND SPEEDS" Style="{StaticResource GroupHeaderStyle}"/>
+        <GroupBox x:Uid="grp_feedsSpeeds" Header="FEEDS AND SPEEDS" Style="{StaticResource ColumnGroupStyle}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -212,6 +213,6 @@
                     <Button x:Uid="btn_spindleOvrPlus" Style="{StaticResource NudgeButtonStyle}" Content="+" Click="SpindleOvrPlus_Click" ToolTip="Spindle override up"/>
                 </StackPanel>
             </Grid>
-        </StackPanel>
+        </GroupBox>
     </StackPanel>
 </UserControl>
