@@ -306,51 +306,12 @@
                               ToolTip="Hold a jog button to move continuously; release to stop."/>
                 </StackPanel>
 
-                <!-- Jog config (col 2): the three numbers that decide what a jog does, together and next to
-                     the pad they govern. Moved off the State line in this pass. -->
-                <StackPanel Grid.Column="2" Orientation="Vertical" VerticalAlignment="Center" Margin="0,0,14,0">
-                    <cnccontrols:JogPresetSelector HorizontalAlignment="Left"/>
-                    <cnccontrols:KbdDefaultSpeedControl HorizontalAlignment="Left" Margin="0,6,0,0"/>
-                </StackPanel>
-                <!-- Signals (col 3). TARGET is three LABELLED rows - Limits (X Y Z), Faults (W F), Probe
-                     (P T) - which needs SignalsControl to grow a grouping option; it currently renders one
-                     undifferentiated block. Placed in its own column here so the arrangement is settled and
-                     only the control's internals are outstanding.
-                     Letter key, from GrblInfo.SignalLetters: H = Hold input, S = Cycle Start input,
-                     T = Optional Stop, W = W-axis limit, F = Motor Fault, P = Probe, D = Safety Door,
-                     E = E-stop, R = Reset, M = Motor Warning, O = Probe Disconnected, L = Block Delete. -->
-                <StackPanel Grid.Column="3" Orientation="Vertical" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                    <cnccontrols:SignalsControl VerticalAlignment="Top" Margin="0">
-                        <cnccontrols:SignalsControl.LayoutTransform>
-                            <ScaleTransform ScaleX="0.86" ScaleY="0.86"/>
-                        </cnccontrols:SignalsControl.LayoutTransform>
-                    </cnccontrols:SignalsControl>
-                    <!-- The unit label that used to sit after the readout is gone - on this bar the room is
-                         better spent on digits, so the unit moved into the tooltip (issue #21). ToolTip is on
-                         the panel so it covers the "Feed:" label and the readout alike. MinWidth is sized for
-                         the 5 digits Format="####0" can produce, allowing for the NumericTextBox style's 8px
-                         horizontal padding + 1px border.
-                         The tooltip is a composed TextBlock rather than a Binding+StringFormat on purpose:
-                         LocBaml can only reach literal values, so a StringFormat's prose would be permanently
-                         English. Splitting it lets the wording live in an x:Uid'd Run (localized like every
-                         other tooltip) while the unit stays live off FeedrateUnit. -->
-                    <StackPanel Orientation="Horizontal" Margin="2,4,0,0">
-                        <StackPanel.ToolTip>
-                            <TextBlock><Run x:Uid="txt_runFeedTip" Text="Current feed rate"/><Run Text=" ("/><Run Text="{Binding Path=FeedrateUnit, Mode=OneWay}"/><Run Text=")"/></TextBlock>
-                        </StackPanel.ToolTip>
-                        <Label Content="Feed:" Padding="0" VerticalAlignment="Center"/>
-                        <cnccontrols:NumericTextBox Value="{Binding Path=FeedRate, Mode=OneWay}" Format="####0" IsReadOnly="True" Focusable="False" MinWidth="68" Margin="4,0,0,0" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </StackPanel>
-                <!-- Feeds + overrides (col 4). TARGET is three rows - Feed rate / Rapids (capped 100%) /
-                     Spindle RPM, each with its live value beside its override - and FeedControl currently
-                     carries only the first two. The spindle row needs adding to that control; the column
-                     position is settled here. -->
-                <cnccontrols:FeedControl Grid.Column="4" OverridesOnly="True" Margin="10,0,4,0" VerticalAlignment="Center">
-                    <cnccontrols:FeedControl.LayoutTransform>
-                        <ScaleTransform ScaleX="0.82" ScaleY="0.82"/>
-                    </cnccontrols:FeedControl.LayoutTransform>
-                </cnccontrols:FeedControl>
+                <!-- The right half, built to docs/RunStrip-Layout-Spec.md: three headed columns
+                     (Jogging | Signals | Feeds and Speeds). Replaces the separate JogPresetSelector,
+                     KbdDefaultSpeedControl, SignalsControl and FeedControl that used to occupy these
+                     columns - see that spec for why none of them fitted the shape asked for. -->
+                <cnccontrols:RunStripPanel Grid.Column="2" Grid.ColumnSpan="3" x:Name="runStripPanel"
+                                           Margin="4,0,4,0" VerticalAlignment="Center"/>
             </Grid>
         </Border>
         <!-- Top margin clears the main-nav tab STRIP (header row only) so the always-visible flyout panels

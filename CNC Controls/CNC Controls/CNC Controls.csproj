@@ -338,6 +338,13 @@
     <Compile Include="OutlineFlyout.xaml.cs">
       <DependentUpon>OutlineFlyout.xaml</DependentUpon>
     </Compile>
+    <Page Include="RunStripPanel.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Compile Include="RunStripPanel.xaml.cs">
+      <DependentUpon>RunStripPanel.xaml</DependentUpon>
+    </Compile>
     <Compile Include="OverrideControl.xaml.cs">
       <DependentUpon>OverrideControl.xaml</DependentUpon>
     </Compile>
