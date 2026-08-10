@@ -10,7 +10,7 @@
     <!--
         The run strip's right half, built to the spec in docs/RunStrip-Layout-Spec.md.
 
-        Three headed columns - Jogging | Signals | Feeds and Speeds - sitting to the right of the jog
+        Three headed columns - Jogging | Signals | Overrides - sitting to the right of the jog
         pad. Written rather than assembled from existing controls because the two pieces it would have
         reused do not fit: OverrideControl is slider-based where this wants a compact "- value +"
         stepper, and SignalsControl renders one undifferentiated block with no way to group it.
@@ -194,7 +194,7 @@
         </GroupBox>
 
         <!-- ==================== FEEDS AND SPEEDS ==================== -->
-        <GroupBox x:Uid="grp_feedsSpeeds" Header="FEEDS AND SPEEDS" Style="{StaticResource ColumnGroupStyle}">
+        <GroupBox x:Uid="grp_overrides" Header="OVERRIDES" Style="{StaticResource ColumnGroupStyle}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>

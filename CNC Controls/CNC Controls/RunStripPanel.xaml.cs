@@ -1,5 +1,5 @@
 ﻿/*
- * RunStripPanel.xaml.cs - the run strip's right half (Jogging | Signals | Feeds and Speeds).
+ * RunStripPanel.xaml.cs - the run strip's right half (Jogging | Signals | Overrides).
  *
  * Spec: docs/RunStrip-Layout-Spec.md.
  *
