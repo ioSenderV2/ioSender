@@ -23,11 +23,11 @@
         <!-- One consistent look for every "-" / "+" nudge button in here. Small, square, and flat, so
              three rows of them read as a column of values rather than a wall of buttons. -->
         <Style x:Key="NudgeButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="20"/>
-            <Setter Property="Height" Value="19"/>
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="25"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontSize" Value="16"/>
             <Setter Property="Focusable" Value="False"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
@@ -35,8 +35,8 @@
         <Style x:Key="RowLabelStyle" TargetType="TextBlock">
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="HorizontalAlignment" Value="Right"/>
-            <Setter Property="Margin" Value="0,0,6,0"/>
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="0,0,7,0"/>
+            <Setter Property="FontSize" Value="16"/>
         </Style>
 
         <!-- The value between the nudges. Read-only: these are machine truth (an override percentage
@@ -45,10 +45,24 @@
         <Style x:Key="ValueStyle" TargetType="TextBlock">
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="MinWidth" Value="42"/>
+            <Setter Property="MinWidth" Value="58"/>
             <Setter Property="TextAlignment" Value="Center"/>
             <Setter Property="FontFamily" Value="Consolas"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontSize" Value="18"/>
+        </Style>
+
+        <!-- One of two mutually exclusive speeds. Flat and unbordered until it is the active one,
+             so the pair reads as a choice rather than as two buttons to press. -->
+        <Style x:Key="SpeedChoiceStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="52"/>
+            <Setter Property="Padding" Value="6,1"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
         </Style>
 
         <Style x:Key="GroupHeaderStyle" TargetType="TextBlock">
@@ -63,8 +77,8 @@
              a resource entry per instance, and a missing x:Key is a runtime-only crash. -->
         <Style x:Key="SignalLetterStyle" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="Consolas"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Margin" Value="0,0,5,0"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="Margin" Value="0,0,7,0"/>
             <Setter Property="Foreground" Value="#FFBBBBBB"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
@@ -81,7 +95,6 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -102,13 +115,16 @@
                 </StackPanel>
 
                 <TextBlock x:Uid="lbl_kbdDef" Grid.Row="2" Grid.Column="0" Text="Kbd Def:" Style="{StaticResource RowLabelStyle}"/>
-                <local:KbdDefaultSpeedControl x:Name="kbdSpeed" Grid.Row="2" Grid.Column="1" Margin="0,3,0,0" VerticalAlignment="Center"/>
-
-                <TextBlock x:Uid="lbl_continuous" Grid.Row="3" Grid.Column="0" Text="Continuous:" Style="{StaticResource RowLabelStyle}"/>
-                <CheckBox x:Uid="chk_continuousJog" x:Name="chkContinuous" Grid.Row="3" Grid.Column="1"
-                          Margin="2,4,0,0" VerticalAlignment="Center" HorizontalAlignment="Left"
-                          Checked="Continuous_Changed" Unchecked="Continuous_Changed"
-                          ToolTip="Hold a jog button to move continuously; release to stop."/>
+                <!-- Just the two speeds, with the active one highlighted. The unit lives in the
+                     tooltip: on a strip this dense the digits are worth more than "mm/min", and the
+                     operator already knows what their machine measures in. -->
+                <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0,3,0,0" VerticalAlignment="Center">
+                    <StackPanel.ToolTip>
+                        <TextBlock><Run x:Uid="txt_kbdDefTip" Text="Default keyboard jog speed"/><Run Text=" ("/><Run Text="{Binding Path=FeedrateUnit, Mode=OneWay}"/><Run Text=")"/></TextBlock>
+                    </StackPanel.ToolTip>
+                    <Button x:Name="btnKbdSlow" Style="{StaticResource SpeedChoiceStyle}" Click="KbdSlow_Click"/>
+                    <Button x:Name="btnKbdFast" Style="{StaticResource SpeedChoiceStyle}" Click="KbdFast_Click"/>
+                </StackPanel>
             </Grid>
         </StackPanel>
 

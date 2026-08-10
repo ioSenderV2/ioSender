@@ -38,6 +38,11 @@ namespace CNC.Controls
         private static readonly Brush LampOff = new SolidColorBrush(Color.FromRgb(0xBB, 0xBB, 0xBB));
         private static readonly Brush LampOn = Brushes.Red;
 
+        // The active keyboard-speed choice. Same pale-green highlight the desktop bar already uses
+        // for "this is the one in effect".
+        private static readonly Brush SelectedBrush = new SolidColorBrush(Color.FromRgb(0xC8, 0xE6, 0xC9));
+        private static readonly Brush SelectedBorder = new SolidColorBrush(Color.FromRgb(0x66, 0xA6, 0x6A));
+
         // letter -> which Signals bit it reports. Built once; see the spec for the full letter key.
         private readonly List<KeyValuePair<TextBlock, Signals>> lamps = new List<KeyValuePair<TextBlock, Signals>>();
 
@@ -114,7 +119,6 @@ namespace CNC.Controls
             UpdateOverrides();
             UpdateTlo();
             UpdateJog();
-            chkContinuous.IsChecked = model != null && model.Keyboard != null && model.Keyboard.IsContinuousJoggingEnabled;
         }
 
         private void UpdateSignals()
@@ -148,6 +152,45 @@ namespace CNC.Controls
                 return;
             lblJogDistance.Text = model.Keyboard.JogStepDistance.ToString("0.###");
             lblJogSpeed.Text = ((int)JogFeedrate) + "";
+            UpdateKbdSpeeds();
+        }
+
+        /// <summary>
+        /// The two default keyboard-jog speeds, with the active one highlighted. Values come from the
+        /// controller's own slow/fast jog feedrates rather than being hardcoded, so changing them in
+        /// settings changes what this offers.
+        /// </summary>
+        private void UpdateKbdSpeeds()
+        {
+            var rates = model == null || model.Keyboard == null ? null : model.Keyboard.JogFeedrates;
+            if (rates == null || rates.Length <= (int)JogMode.Fast)
+                return;
+
+            btnKbdSlow.Content = ((int)rates[(int)JogMode.Slow]).ToString();
+            btnKbdFast.Content = ((int)rates[(int)JogMode.Fast]).ToString();
+
+            bool fast = model.Keyboard.DefaultSpeedFast;
+            Highlight(btnKbdSlow, !fast);
+            Highlight(btnKbdFast, fast);
+        }
+
+        private static void Highlight(Button button, bool active)
+        {
+            button.Background = active ? SelectedBrush : Brushes.Transparent;
+            button.BorderBrush = active ? SelectedBorder : Brushes.Transparent;
+            button.FontWeight = active ? FontWeights.Bold : FontWeights.Normal;
+        }
+
+        private void KbdSlow_Click(object sender, RoutedEventArgs e) { SetKbdSpeed(false); }
+        private void KbdFast_Click(object sender, RoutedEventArgs e) { SetKbdSpeed(true); }
+
+        private void SetKbdSpeed(bool fast)
+        {
+            if (model != null && model.Keyboard != null)
+            {
+                model.Keyboard.DefaultSpeedFast = fast;
+                UpdateKbdSpeeds();
+            }
         }
 
         // The step-jog feedrate. Kept on the controller so the jog pad, keyboard and this panel all
@@ -197,12 +240,6 @@ namespace CNC.Controls
         {
             JogFeedrate = Math.Max(JogSpeedMin, JogFeedrate + delta);
             UpdateJog();
-        }
-
-        private void Continuous_Changed(object sender, RoutedEventArgs e)
-        {
-            if (model != null && model.Keyboard != null)
-                model.Keyboard.IsContinuousJoggingEnabled = chkContinuous.IsChecked == true;
         }
 
         // ---------------------------------------------------------------- overrides
