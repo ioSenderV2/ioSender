@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Headless build/launch for ioSender XL - no Visual Studio GUI needed.
 
@@ -334,6 +334,18 @@ if ($Launch -or $DefaultConfig) {
         if (Test-Path $exe) {
             $finalArgs = @($AppArgs)
             if ($Headless -and -not ($finalArgs -contains '-headless')) { $finalArgs += '-headless' }
+
+            # TWO-RIG RULE, encoded here so it cannot be forgotten at the prompt: testing the WEB
+            # CLIENT means testing WRITES from a half-built client, and those go to the SIMULATOR,
+            # never to real iron. So -webserver implies -simulator unless a connection was named
+            # explicitly. Launching WITHOUT -webserver leaves the connection alone entirely - the app
+            # uses whatever it is configured for, which is what you want when testing the sender
+            # itself.
+            if ((Get-WebServerPort -Tokens $finalArgs) -gt 0 -and
+                -not ($finalArgs -match '^-(simulator|port|baud)')) {
+                Write-Host "==> -webserver: adding -simulator (web-client writes never go to real iron)." -ForegroundColor Yellow
+                $finalArgs += '-simulator'
+            }
 
             # Start-Process -ArgumentList joins array elements with a bare space and does NOT re-quote ones
             # that contain whitespace - so a multi-word value (e.g. -message="two words") silently split back
