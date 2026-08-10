@@ -99,6 +99,14 @@ namespace CNC.Controls
 
             DataContextChanged += OnDataContextChanged;
 
+            // The first paint happens on DataContextChanged, which MainWindow raises during its
+            // InitializeComponent - BEFORE AppConfig.Settings.LoadConfig runs a few lines later. So that
+            // paint has no settings to read AND cannot subscribe to them, leaving the Kbd Def speeds
+            // showing JogController's defaults for the rest of the session. Loaded is the first moment
+            // the config is guaranteed present (MainWindow's own comment on the LoadConfig call says as
+            // much: it is loaded "before any control Loaded handler"), so repaint there.
+            Loaded += (s2, e2) => UpdateKbdSpeeds();
+
             // The bars are sized from ActualWidth, so they have to be redrawn whenever the strip
             // reflows - otherwise a resized box keeps a bar scaled for its old width.
             SizeChanged += (s2, e2) => UpdateOverrides();
@@ -329,12 +337,30 @@ namespace CNC.Controls
                 };
             }
 
+            // The NUMBERS come from the persisted jog settings too, not from model.Keyboard.JogFeedrates.
+            // That array is only a mirror, filled by JobView.ApplyJogConfig - which runs well after this
+            // panel first paints - and until then it holds JogController's hardcoded {100, 200, 500}. So
+            // Fast displayed a flat 500 regardless of the configured speed, and stayed there until a click
+            // or a JogStep change happened to call this again.
             var rates = model == null || model.Keyboard == null ? null : model.Keyboard.JogFeedrates;
-            if (rates == null || rates.Length <= (int)JogMode.Fast)
-                return;
+            bool haveRates = rates != null && rates.Length > (int)JogMode.Fast;
 
-            btnKbdSlow.Content = ((int)rates[(int)JogMode.Slow]).ToString();
-            btnKbdFast.Content = ((int)rates[(int)JogMode.Fast]).ToString();
+            double slow, fast;
+            if (JogSettings != null)
+            {
+                slow = JogSettings.SlowFeedrate;
+                fast = JogSettings.FastFeedrate;
+            }
+            else if (haveRates)
+            {
+                slow = rates[(int)JogMode.Slow];
+                fast = rates[(int)JogMode.Fast];
+            }
+            else
+                return;     // nothing to paint from yet - the Loaded handler runs this again
+
+            btnKbdSlow.Content = ((int)slow).ToString();
+            btnKbdFast.Content = ((int)fast).ToString();
 
             // AppConfig.Settings.Jog.DefaultSpeedFast is the source of truth - it is what the
             // Keyboard Jogging panel writes and what persists. The controller's own copy is a live
@@ -345,11 +371,11 @@ namespace CNC.Controls
             // DataContext during InitializeComponent, which fires DataContextChanged -> RefreshAll
             // while AppConfig.Settings is still null. Crashed startup once (2026-08-10). Fall back to
             // the controller's copy, which is populated by then.
-            bool fast = JogSettings != null
+            bool useFast = JogSettings != null
                 ? JogSettings.DefaultSpeedFast
-                : model.Keyboard.DefaultSpeedFast;
-            Highlight(btnKbdSlow, !fast);
-            Highlight(btnKbdFast, fast);
+                : (model != null && model.Keyboard != null && model.Keyboard.DefaultSpeedFast);
+            Highlight(btnKbdSlow, !useFast);
+            Highlight(btnKbdFast, useFast);
         }
 
         private static void Highlight(Button button, bool active)
