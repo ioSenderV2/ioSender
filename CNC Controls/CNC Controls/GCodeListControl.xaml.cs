@@ -304,7 +304,12 @@ namespace CNC.Controls
             // nudged a column splitter. ItemContainerGenerator raises this however the items change and
             // whichever collection is bound, so this one hook covers the file load, the Work Order handoff,
             // SetProgram, and the empty-at-startup case that the Loaded call alone could never fix.
-            grdGCode.ItemContainerGenerator.ItemsChanged += (s, ea) => RefreshDataColumnWidth();
+            // The source highlight rides the same hook, for the same reason. It is derived from
+            // GCode.File.IsLoaded - which is simply "are there any blocks" - so it becomes wrong the moment
+            // rows appear and nothing recomputes it. Loading a file did exactly that: the list rendered
+            // white, and only a tab switch (which pokes MacroProcessor and raises ActiveProgramChanged) put
+            // it right. Assigning the same frozen brush again is a no-op, so this is safe to run per batch.
+            grdGCode.ItemContainerGenerator.ItemsChanged += (s, ea) => { RefreshDataColumnWidth(); RefreshSourceHighlight(); };
 
             // While the grid is empty the Data column carries an explicit pixel width (see
             // RefreshDataColumnWidth), and a pixel width does not follow a resize the way Star would - so
