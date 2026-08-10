@@ -599,24 +599,24 @@ namespace CNC.Controls
             if (string.IsNullOrEmpty(wcs) || values.Length < 2 || !(values[1] is double offset))
                 return null;
 
-            string line2;
-            if (values.Length <= 2)
-                line2 = string.Format(CultureInfo.CurrentCulture, "({0} + G92 combined)", wcs);
-            else
-            {
-                double? tlo = values[2] is double t && !double.IsNaN(t) ? t : (double?)null;
-                line2 = tlo.HasValue
-                    ? string.Format(CultureInfo.CurrentCulture, "({0} + G92 + TLO {1:0.000} combined)", wcs, tlo.Value)
-                    : string.Format(CultureInfo.CurrentCulture, "({0} + G92 + TLO combined)", wcs);
-            }
+            // What the offset is MADE OF. TLO is named only where it is actually tracked (the Z binding
+            // supplies it): naming it on an axis whose component list does not include it is how this
+            // tooltip came to contradict itself.
+            string parts = wcs + " + G92";
+            if (values.Length > 3 && values[3] is double tlo && !double.IsNaN(tlo))
+                parts += string.Format(CultureInfo.CurrentCulture, " + TLO {0:0.000}", tlo);
 
-            // Spell the relation out, not just the total. The DRO is not "where the machine is" - it is where
-            // the machine is MINUS every offset in effect, and that difference is exactly what a zero means.
-            // Sign convention is the firmware's own (grblHAL gcode.c, the G10 L20 case): all three offsets
-            // SUBTRACT, so a tool length offset moves the readout the same direction G92 does, not the opposite.
-            string line3 = string.Format(CultureInfo.CurrentCulture, "Work = machine - ({0} + G92 + TLO)", wcs);
+            string components = string.Format(CultureInfo.CurrentCulture, "Offset {0:0.000} = {1}", offset, parts);
 
-            return string.Format(CultureInfo.CurrentCulture, "Total {0} offset: {1:0.000}\n{2}\n{3}", parameter, offset, line2, line3);
+            // "Total X offset: 148.341" on its own never said what it was an offset OF, and it is not the
+            // number in the box - it is what gets SUBTRACTED from the machine position to produce that
+            // number (GrblViewModel: Position.Set(MachinePosition - WorkPositionOffset)). Show the whole
+            // sum with the live values so the readout and the offset visibly reconcile.
+            if (values.Length > 2 && values[2] is double mpos && !double.IsNaN(mpos))
+                return string.Format(CultureInfo.CurrentCulture, "{0} {1:0.000} = machine {2:0.000} - offset {3:0.000}\n{4}",
+                                      parameter, mpos - offset, mpos, offset, components);
+
+            return components;
         }
         public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         {
