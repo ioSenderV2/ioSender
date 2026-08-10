@@ -438,10 +438,16 @@ namespace CNC.Controls
             if (model == null)
                 return;
 
-            // A spindle the firmware says cannot reverse has no CCW to offer, so the option is not
-            // shown at all rather than shown-and-refused. Re-evaluated here rather than once at
-            // startup because GrblInfo only knows this after the $I handshake, which lands later.
-            rbSpindleCCW.Visibility = GrblInfo.HasReversableSpindle ? Visibility.Visible : Visibility.Collapsed;
+            // Which directions the spindle/VFD can actually run is an APP SETTING the operator
+            // configures and has verified against their machine (Settings:App > Work Order > Spindle
+            // direction), NOT GrblInfo.HasReversableSpindle - which is what this used to read, and
+            // why a CW-only machine still saw CCW here while the Spindle panel correctly hid it.
+            // Same predicate as SpindleControl.ApplyDirectionCapability, deliberately.
+            var cap = AppConfig.Settings.Base == null
+                ? SpindleDirectionCapability.Bidirectional
+                : AppConfig.Settings.Base.SpindleDirectionCapability;
+            rbSpindleCCW.Visibility = cap == SpindleDirectionCapability.FixedCW ? Visibility.Collapsed : Visibility.Visible;
+            rbSpindleCW.Visibility = cap == SpindleDirectionCapability.FixedCCW ? Visibility.Collapsed : Visibility.Visible;
 
             SpindleState state = model.SpindleState.Value;
             syncing = true;

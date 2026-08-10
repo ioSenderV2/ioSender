@@ -238,8 +238,20 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                                <!-- Coolant, on the line under Home/Unlock/Reset. -->
-                                <cnccontrols:CoolantControl VerticalAlignment="Center"/>
+                                <!-- Coolant as ONE line. Built here rather than hosting CoolantControl,
+                                     which stacks its two switches vertically inside its own group box -
+                                     right for a panel, too tall for a strip. The toggles are the same
+                                     control it uses, bound to the same Flood/Mist and raising the same
+                                     realtime toggle bytes, so behaviour is unchanged. -->
+                                <TextBlock x:Uid="lbl_coolant" Text="Coolant:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <cnccontrols:ToggleControl x:Uid="lbl_stripFlood" x:Name="swFlood" Tag="Flood" Label="Flood"
+                                                           IsChecked="{Binding Path=Flood, Mode=OneWay}" VerticalAlignment="Center"
+                                                           Margin="0,0,12,0" Click="Coolant_Click"
+                                                           ToolTip="Turn flood coolant on or off."/>
+                                <cnccontrols:ToggleControl x:Uid="lbl_stripMist" x:Name="swMist" Tag="Mist" Label="Mist"
+                                                           IsChecked="{Binding Path=Mist, Mode=OneWay}" VerticalAlignment="Center"
+                                                           Click="Coolant_Click"
+                                                           ToolTip="Turn mist coolant on or off."/>
                                 <!-- The status MESSAGE strip is gone from the bottom bar; this opens the
                                      same history window its click used to, so a message that scrolled past
                                      is still reachable without a permanent strip of screen spent on it. -->

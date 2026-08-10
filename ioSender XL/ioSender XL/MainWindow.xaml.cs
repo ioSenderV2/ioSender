@@ -2976,6 +2976,24 @@ namespace GCode_Sender
         /// leads straight into typing. Merely showing the window would leave focus wherever it was
         /// and the first thing typed would go nowhere.
         /// </summary>
+        /// <summary>
+        /// Run strip coolant toggles. Same commands CoolantControl sends - GrblCommand.Flood/Mist are
+        /// single realtime CONTROL CHARACTERS, not g-code text, so they go straight out rather than
+        /// being queued behind streamed lines.
+        /// </summary>
+        private void Coolant_Click(object sender, RoutedEventArgs e)
+        {
+            var model = DataContext as GrblViewModel;
+            if (model == null)
+                return;
+
+            string tag = (sender as FrameworkElement)?.Tag as string;
+            if (tag == "Flood")
+                model.ExecuteCommand(GrblCommand.Flood);
+            else if (tag == "Mist")
+                model.ExecuteCommand(GrblCommand.Mist);
+        }
+
         private void MdiConsole_Click(object sender, RoutedEventArgs e)
         {
             // NOT openConsole(): that is a TOGGLE, so pressing this with the console already up hid
