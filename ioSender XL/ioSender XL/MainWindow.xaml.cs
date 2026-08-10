@@ -382,7 +382,6 @@ namespace GCode_Sender
             // shifted the whole window layout up/down on every message - distracting; see FlashMessage for
             // the replacement notice mechanism). Doubled once here rather than hardcoding a size, so it
             // always tracks whatever the ambient/theme default actually is.
-            lblMessage.FontSize *= 2.0;
 
             // Demo-video timelapse toggle is a capture-only affordance: show it only when the demo
             // marker facility is armed (-demomarker), hidden in normal use.
@@ -436,22 +435,10 @@ namespace GCode_Sender
                 return;
             }
 
-            if (msgFlashBorder == null || string.IsNullOrWhiteSpace((DataContext as GrblViewModel)?.Message))
-                return;
-
-            var color = isError ? FlashColorError : FlashColorNormal;
-            var brush = new SolidColorBrush(color);
-            msgFlashBorder.Background = brush;
-
-            var anim = new ColorAnimation
-            {
-                From = color,
-                To = Colors.Transparent,
-                Duration = TimeSpan.FromSeconds(5),
-                FillBehavior = FillBehavior.Stop   // Completed below sets the real final value
-            };
-            anim.Completed += (s, e) => msgFlashBorder.Background = Brushes.Transparent;
-            brush.BeginAnimation(SolidColorBrush.ColorProperty, anim);
+            // The message strip this used to flash is gone from the run strip (2026-08-10). A
+            // message that nothing displays is a message lost, so arriving text now OPENS the log
+            // window instead - and refreshes it if it is already up.
+            ShowMessageLog();
         }
 
         // ---- -testserver: make the window permanently non-activatable (see the constructor comment) ----
@@ -2262,11 +2249,35 @@ namespace GCode_Sender
         // in a plain scrollable window opened at the end (newest). The status line shows one message at a
         // time and overwrites freely - this is the "what did it say a minute ago" answer. A snapshot, not
         // live: click again for a fresh one.
-        private void Message_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        // The one status-log window. Kept rather than recreated so a new message can refresh what is
+        // already on screen instead of stacking a second copy of it.
+        private Window messageLogWindow;
+        private TextBox messageLogText;
+
+        private void ViewStatus_Click(object sender, RoutedEventArgs e)
+        {
+            ShowMessageLog();
+        }
+
+        /// <summary>
+        /// Show the status-message log, creating it on first use and refreshing it after. Called both
+        /// by the Status button and whenever a message arrives - the run strip no longer carries a
+        /// message strip, so this window IS how a message gets seen.
+        /// </summary>
+        private void ShowMessageLog()
         {
             var log = (DataContext as GrblViewModel)?.MessageLog;
             if (log == null || log.Count == 0)
                 return;
+
+            if (messageLogWindow != null)
+            {
+                messageLogText.Text = string.Join(Environment.NewLine, log);
+                messageLogText.ScrollToEnd();
+                if (!messageLogWindow.IsVisible)
+                    messageLogWindow.Show();
+                return;
+            }
 
             var text = new TextBox
             {
@@ -2299,18 +2310,12 @@ namespace GCode_Sender
                     win.Close();
                 }
             };
+            win.Closed += (s2, e2) => { messageLogWindow = null; messageLogText = null; };
+            messageLogWindow = win;
+            messageLogText = text;
             win.Show();
         }
 
-        private void CopyMessage_Click(object sender, RoutedEventArgs e)
-        {
-            string text = (DataContext as GrblViewModel)?.Message ?? string.Empty;
-            if (string.IsNullOrEmpty(text))
-                return;                     // nothing to copy - leave the clipboard alone rather than clear it
-
-            if (CopyToClipboard(text))
-                FlashCopied();
-        }
 
         // True only if the text is verifiably on the clipboard. Retries because the failure is a transient
         // lock, not a bad argument - the standard mitigation for CLIPBRD_E_CANT_OPEN.
@@ -2335,21 +2340,9 @@ namespace GCode_Sender
             return false;
         }
 
-        private DispatcherTimer copiedTimer = null;
-
-        private void FlashCopied()
-        {
-            lblCopied.Visibility = Visibility.Visible;
-
-            if (copiedTimer == null)
-            {
-                copiedTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
-                copiedTimer.Tick += (s, a) => { copiedTimer.Stop(); lblCopied.Visibility = Visibility.Collapsed; };
-            }
-
-            copiedTimer.Stop();    // restart the window on a repeated click rather than letting it expire early
-            copiedTimer.Start();
-        }
+        // FlashCopied and its "Copied" label lived on the run strip's message widget, which was
+        // removed with that widget (2026-08-10). CopyMessage_Click is likewise unreachable now - the
+        // status log window is where a message gets read and copied from.
 
         private void AttachBasePropertyChangedHandler()
         {
