@@ -969,7 +969,7 @@ CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_macrosConfig:System.W
 CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_mainPageConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Customize which panels appear on the main page.
 CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_simulatorConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Configure and build the bundled grblHAL simulator.
 CNC.Controls.WPF.g.en-US.resources:drocontrol.baml,grp_dro:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Current machine/work position for each axis. Click Zero all to reset the displayed work position to 0.
-CNC.Controls.WPF.g.en-US.resources:drocontrol.baml,btn_zeroAll:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Set the work coordinate to 0 on all axes at the current position.
+CNC.Controls.WPF.g.en-US.resources:drocontrol.baml,btn_zeroAll:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Make the current position the work origin on all axes: the DRO reads zero here afterwards (G10 L20). Any G92 or tool length offset in effect is accounted for.
 CNC.Controls.WPF.g.en-US.resources:drobasecontrol.baml,btnZero:System.Windows.Controls.ContentControl.Content,Button,True,True,,0
 CNC.Controls.WPF.g.en-US.resources:drobasecontrol.baml,btnZero:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Set the work coordinate to 0 on this axis at the current position.
 CNC.Controls.WPF.g.en-US.resources:jogcontrol.baml,grp_uijog:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Move the machine along each axis. Pick a step distance/feed preset, or hold for continuous jog."
@@ -1593,3 +1593,6 @@ CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,rb_spindleCCW:System.Windo
 CNC.Controls.WPF.g.en-US.resources:statuscontrol.baml,txt_runTime:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Elapsed time of the current or last job.
 CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,str_resetGrblDefaults:System.String.$Content,None,True,True,,Restore ALL controller settings to firmware defaults ($RST=$)? This overwrites the current $ settings on the machine.
 CNC.Controls.WPF.g.en-US.resources:macroexecutecontrol.baml,str_noMacros:System.String.$Content,None,True,True,,No macros defined. Go to Settings: Macros to define.
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_setTipOrigin:System.String.$Content,None,True,True,,Make the current position the {0} origin: the DRO reads zero here afterwards (G10 L20). Any G92 or tool length offset in effect is accounted for.
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_setTipMachinePos:System.String.$Content,None,True,True,,"Store the current MACHINE position in {0} (G10 L2) - a fixed machine reference such as a toolsetter. G92 and tool length offsets are NOT subtracted, so the DRO will not read zero here."
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_setTipPredefined:System.String.$Content,None,True,True,,Store the current MACHINE position as {0} ({0}.1).

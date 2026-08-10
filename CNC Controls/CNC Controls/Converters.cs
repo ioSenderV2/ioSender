@@ -610,7 +610,13 @@ namespace CNC.Controls
                     : string.Format(CultureInfo.CurrentCulture, "({0} + G92 + TLO combined)", wcs);
             }
 
-            return string.Format(CultureInfo.CurrentCulture, "Total {0} offset: {1:0.000}\n{2}", parameter, offset, line2);
+            // Spell the relation out, not just the total. The DRO is not "where the machine is" - it is where
+            // the machine is MINUS every offset in effect, and that difference is exactly what a zero means.
+            // Sign convention is the firmware's own (grblHAL gcode.c, the G10 L20 case): all three offsets
+            // SUBTRACT, so a tool length offset moves the readout the same direction G92 does, not the opposite.
+            string line3 = string.Format(CultureInfo.CurrentCulture, "Work = machine - ({0} + G92 + TLO)", wcs);
+
+            return string.Format(CultureInfo.CurrentCulture, "Total {0} offset: {1:0.000}\n{2}\n{3}", parameter, offset, line2, line3);
         }
         public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         {

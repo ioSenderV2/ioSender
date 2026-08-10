@@ -141,7 +141,7 @@
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>
             <Button x:Uid="btn_zeroAll" x:Name="btnZeroAll" Content="Zero all" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" Focusable="False" MinWidth="180" HorizontalAlignment="Center" Margin="2,3" Click="btnZeroAll_Click"
-                    ToolTip="Set the work coordinate to 0 on all axes at the current position."/>
+                    ToolTip="Make the current position the work origin on all axes: the DRO reads zero here afterwards (G10 L20). Any G92 or tool length offset in effect is accounted for."/>
         </StackPanel>
     </GroupBox>
 </UserControl>

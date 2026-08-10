@@ -13,6 +13,9 @@
     <system:String x:Uid="str_validateMin" x:Key="ValAllowedMin">Invalid input: minimum allowed value is {0}.</system:String>
     <system:String x:Uid="str_validateMax" x:Key="ValAllowedMax">Invalid input: maximum allowed value is {0}.</system:String>
     <system:String x:Uid="str_validateNotIP4" x:Key="ValNotIPV4">Invalid input: not an IP4 address..</system:String>
+    <system:String x:Uid="str_setTipOrigin" x:Key="SetTipOrigin">Make the current position the {0} origin: the DRO reads zero here afterwards (G10 L20). Any G92 or tool length offset in effect is accounted for.</system:String>
+    <system:String x:Uid="str_setTipMachinePos" x:Key="SetTipMachinePos">Store the current MACHINE position in {0} (G10 L2) - a fixed machine reference such as a toolsetter. G92 and tool length offsets are NOT subtracted, so the DRO will not read zero here.</system:String>
+    <system:String x:Uid="str_setTipPredefined" x:Key="SetTipPredefined">Store the current MACHINE position as {0} ({0}.1).</system:String>
     <system:String x:Uid="str_msgWait" x:Key="MsgWaiting">Waiting for controller ({0})...</system:String>
     <system:String x:Uid="str_msgNoCommAlarm" x:Key="MsgNoCommAlarm">Controller is not able to communicate due to alarm {0}, attempting a soft reset.</system:String>
     <system:String x:Uid="str_msgResetFailed" x:Key="MsgResetFailed">Controller soft reset failed, exiting.</system:String>
