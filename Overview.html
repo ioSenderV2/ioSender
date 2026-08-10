@@ -154,7 +154,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>217 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>233 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -191,6 +191,10 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Mashing a D-pad direction or the run bar jog pad could leave the controller answering nothing at all; the guard against that now covers every input and can actually see its acknowledgement.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr205">205</a></td></tr>
 <tr><td>Thirteen top-level tabs cut to four &mdash; Setup, Job, Work Order, Offsets. The rest open as their own windows from File and Tools, and where each one lives is a layout slot you can change.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr210">210</a></td></tr>
 <tr><td>Hide the jog pad or just its five go-to buttons; the right-hand panels then fill one column instead of always spreading across two, and stop sitting under the flyouts.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr213">213</a></td></tr>
+<tr><td>A purpose-built run strip replaces the old bar; the bottom status bar is gone</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr220">220</a></td></tr>
+<tr><td>A message history window, opened from the status line, that also pops itself when a message arrives</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr221">221</a></td></tr>
+<tr><td>Feed Hold and Stop now outrank controller traffic instead of queueing behind it</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr225">225</a></td></tr>
+<tr><td>A jog cancelled before the controller parsed it left jogging dead until restart</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr228">228</a></td></tr>
 </table>
 
 <h3>Machine setup &amp; settings</h3>
@@ -234,6 +238,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>A search hit found in a tooltip now says which control that tooltip belongs to, so the answer is "hover Send comments", not "it is on this page somewhere".</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr209">209</a></td></tr>
 <tr><td>How the app looks and behaves moved off the Application page into its own General page; the dead Theme dropdown is gone.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr211">211</a></td></tr>
 <tr><td>SD Card, Probing, Height Map and Lathe Tools were listed in the Tools menu but greyed out and unclickable; the two that could be opened then crashed on the way in.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr215">215</a></td></tr>
+<tr><td>Park positions checked against the envelope, work origins stored in the right frame, Validate corrected</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr226">226</a></td></tr>
+<tr><td>Probe prompts name the probe and tip, and the corner probe has one code path</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr231">231</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -297,6 +303,10 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>A run of real-hardware bugs: rapids from a false origin, traverses at cutting height, a dry run that did not protect, and alarms that did not abort.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr201">201</a></td></tr>
 <tr><td>Probing conductive stock with a real touch plate silently dropped the plate thickness and lip compensation &mdash; 12&nbsp;mm of Z error.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr202">202</a></td></tr>
 <tr><td>Stepper calibration, Squareness and Surface spoilboard leave the Tools tab for where they already live; the tab itself disappears when the controller supports none of what remains.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr204">204</a></td></tr>
+<tr><td>Macros and g-code programs share a single streaming engine, and a Work Order is a single press</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr219">219</a></td></tr>
+<tr><td>Engrave text on a Work Order with a single-stroke font and a V-bit</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr222">222</a></td></tr>
+<tr><td>Any installed font, carved to depth-varying passes from its true outlines</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr223">223</a></td></tr>
+<tr><td>Tick Text on a line, circle, oval, square or rectangle and text is fitted inside it</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr224">224</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -310,6 +320,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>SD Card tab queries its own mount status on activate instead of bailing out to "No card" before the controller has actually reported one.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr168">168</a></td></tr>
 <tr><td>Machine Setup's macro-provisioning gate no longer false-trips when a realtime status report interleaves with the checksum read.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr175">175</a></td></tr>
 <tr><td>Dead time between Setup steps removed, corner retreats cut from 20mm to 5mm, and the ATC macro update no longer wedges the app until it is restarted.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr207">207</a></td></tr>
+<tr><td>Silence is no longer read as a dead link during homing or a firmware upload</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr227">227</a></td></tr>
 </table>
 
 <h3>Program view &amp; G-code</h3>
@@ -334,6 +345,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Setup no longer crashes on a first-ever/cold session; a Work Order run's live ok/* status now shows in the real docked Job tab list instead of a floating panel.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr196">196</a></td></tr>
 <tr><td>A 220,000-line program loads in 2.6 s instead of 32 s, and the status line now says what the load is doing.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr216">216</a></td></tr>
 <tr><td>On the Job screen with nothing loaded, the program list's Data column was a sliver with its own heading clipped; it now fills the list.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr217">217</a></td></tr>
+<tr><td>A 220k-line load went from 32s to under 3s, and the console no longer freezes the app</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr229">229</a></td></tr>
+<tr><td>Compile progress and timing, plus an estimated run time for any loaded program</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr230">230</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -406,6 +419,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Dragging a tab header no longer crashes the app or strands it with an invisible page and a stuck cursor.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr191">191</a></td></tr>
 <tr><td>A missing section now inherits the shipped template's curated value, and one unreadable section can no longer take every other section down with it.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr200">200</a></td></tr>
 <tr><td>A tab that multiplied on every launch, a setup prompt that reappeared for ever, Esc stolen from every window, and a scroll wheel that only worked over the scrollbar.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr214">214</a></td></tr>
+<tr><td>The machine engine is separated from the desktop UI and compiles as a plain .NET 8 library</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr218">218</a></td></tr>
+<tr><td>A crash log that survives the crash, and three crashes on startup and connect</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr232">232</a></td></tr>
+<tr><td>Fifteen small corrections across windows, offsets, the program list and Work Orders</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr233">233</a></td></tr>
 </table>
 </div>
 
@@ -664,7 +680,23 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr class="ver-hdr"><td colspan="3">Version 2.41</td></tr>
 <tr><td class="n">216</td><td><a href="#pr216">Large programs load 12&times; faster</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+87</span> <span class="del">-5</span></td></tr>
 <tr><td class="n">217</td><td><a href="#pr217">Data column no longer starts collapsed</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+45</span> <span class="del">-9</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (217 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">1913</span> <span class="del">29</span> <span class="add">+214</span><br><span class="k">Lines:</span> <span class="add">+79190</span> <span class="del">-16432</span></td></tr>
+<tr><td class="n">218</td><td><a href="#pr218">Portable core: CNC.Core runs without WPF, and builds on .NET 8</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">150</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+10527</span> <span class="del">-5440</span></td></tr>
+<tr><td class="n">219</td><td><a href="#pr219">Work Order runs in one press: one streaming engine for macros and programs</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">13</span> <span class="del">0</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+986</span> <span class="del">-940</span></td></tr>
+<tr><td class="n">220</td><td><a href="#pr220">The run strip: everything a running job needs, and the bottom status bar retired</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">31</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+1716</span> <span class="del">-391</span></td></tr>
+<tr><td class="n">221</td><td><a href="#pr221">Click the status line for every message since launch</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">11</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+263</span> <span class="del">-31</span></td></tr>
+<tr><td class="n">222</td><td><a href="#pr222">Text toolpaths: single-stroke engraving</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">17</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+894</span> <span class="del">-42</span></td></tr>
+<tr><td class="n">223</td><td><a href="#pr223">V-carving: TrueType outlines carved to shape</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">13</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+1305</span> <span class="del">-49</span></td></tr>
+<tr><td class="n">224</td><td><a href="#pr224">Shape text: text fitted inside Work Order geometry</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+476</span> <span class="del">-43</span></td></tr>
+<tr><td class="n">225</td><td><a href="#pr225">SAFETY: Feed Hold could be starved for the whole length of a dense job</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+17</span> <span class="del">-1</span></td></tr>
+<tr><td class="n">226</td><td><a href="#pr226">Safety batch: envelope, coordinate frames, and a Validate run that crashed a machine</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+360</span> <span class="del">-278</span></td></tr>
+<tr><td class="n">227</td><td><a href="#pr227">The link watchdog stops killing live operations</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">8</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+276</span> <span class="del">-34</span></td></tr>
+<tr><td class="n">228</td><td><a href="#pr228">Jogging: a cancelled jog no longer wedges the jog path</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">11</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+229</span> <span class="del">-1</span></td></tr>
+<tr><td class="n">229</td><td><a href="#pr229">Large programs load in seconds; the console stops starving the UI</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">1</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+137</span> <span class="del">-18</span></td></tr>
+<tr><td class="n">230</td><td><a href="#pr230">Generate says what it is doing, and what it will cost</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">17</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+765</span> <span class="del">-22</span></td></tr>
+<tr><td class="n">231</td><td><a href="#pr231">Probing and Setup: say what to fit, and stop parking over the spoilboard</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">19</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+319</span> <span class="del">-303</span></td></tr>
+<tr><td class="n">232</td><td><a href="#pr232">Fix batch: crashes, startup, and the connect path</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+236</span> <span class="del">-45</span></td></tr>
+<tr><td class="n">233</td><td><a href="#pr233">Fix batch: windows, dialogs and small corrections</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">39</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+864</span> <span class="del">-136</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (233 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">2266</span> <span class="del">30</span> <span class="add">+239</span><br><span class="k">Lines:</span> <span class="add">+98560</span> <span class="del">-24206</span></td></tr>
 </table>
 </div>
 
@@ -4287,6 +4319,465 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="mono">CNC Controls/CNC Controls/GCodeListControl.xaml</td><td class="num add">4</td><td class="num del">1</td></tr>
 </table>
 <div class="desc"><p>Start the app, go to the Job screen with no program loaded, and the program list's <em>Data</em> column was a sliver &mdash; narrow enough to clip its own heading mid-letter &mdash; while the rest of the list sat empty to its right. Nudging a column divider snapped it out to the full width, where it belonged all along.</p><ul><li><strong>The column is sized as &ldquo;whatever space is left over&rdquo;</strong>, and that share is worked out by spreading the available width across the list's <em>rows</em>. With no program loaded there are no rows, so the calculation has nothing to spread across and never runs. The widths therefore stayed as they were first worked out &mdash; during the very first layout, before the list had been given any width at all, when the only sensible answer was &ldquo;as narrow as possible&rdquo;.</li><li><strong>A leftover-space column is never checked against its own heading</strong>, either &mdash; it means &ldquo;a share of what remains&rdquo;, not &ldquo;at least as wide as what it says&rdquo;. With nothing holding it up it collapsed below the width of the word <em>Data</em>. It now has a floor that keeps the heading readable no matter what else happens.</li><li><strong>While the list is empty the width is now worked out directly</strong> rather than waiting for rows that are not coming, and it is recalculated when the window is resized. The moment a program is loaded the column goes back to taking its natural share.</li><li>The same recalculation now also runs when a program arrives by a route other than opening a file &mdash; Work Order handing its generated program to the Job tab, or a wizard supplying its own &mdash; which previously skipped it entirely.</li></ul><p>No column has been given a fixed size: Data still takes the remaining width and grows with the window.</p><p class="foot">The cause was measured, not deduced. Two confident explanations &mdash; an unbounded measurement from a parent container, and a simple ordering problem &mdash; were each written, tried and disproved first; logging the actual widths at each level showed the list knew its size perfectly well and the columns had simply never been asked again.</p></div>
+</div>
+<!-- ===== #218 ===== -->
+<div class="pr">
+<h2 id="pr218"><span class="badge">#218</span>Portable core: CNC.Core runs without WPF, and builds on .NET 8</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JobControl.xaml.cs</td><td class="num add">375</td><td class="num del">1433</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/JobRunner.cs</td><td class="num add">1775</td><td class="num del">10</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">57</td><td class="num del">850</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/ControllerValidator.cs</td><td class="num add">892</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/MacroRunner.cs</td><td class="num add">871</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ValidateProcessor.cs</td><td class="num add">54</td><td class="num del">798</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">54</td><td class="num del">373</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeProgram.cs</td><td class="num add">410</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/KeypressHandler.cs</td><td class="num add">0</td><td class="num del">385</td></tr>
+<tr><td class="mono">138 further files across CNC Core, CNC Controls and ioSender XL</td><td class="num add">5934</td><td class="num del">1591</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">105</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The whole machine-facing engine &mdash; connection, streaming, macros, g-code, machine state
+&mdash; used to be welded to WPF. It referenced <span class="mono">Dispatcher</span> for thread marshalling,
+<span class="mono">Media3D</span> for geometry, WPF dialogs for prompts, and the Windows registry for stored
+secrets. Nothing about running a machine needs any of that. It is now a plain library with no UI framework in
+it at all, proven by compiling and running it on .NET 8.</p>
+<ul>
+<li><strong>Thread marshalling by contract, not by Dispatcher.</strong> A portable marshaller replaces every
+<span class="mono">Dispatcher.Invoke</span>. One real bug fell out immediately: the ambient context inherited
+<span class="mono">ApplicationIdle</span> priority, so connecting hung behind idle work until something else
+happened to wake the queue.</li>
+<li><strong>The engine no longer calls the view.</strong> Streaming, macros and run control moved out of the
+WPF controls into <span class="mono">StreamPump</span>, <span class="mono">MacroRunner</span>,
+<span class="mono">JobRunner</span> and <span class="mono">ControllerValidator</span> &mdash; the g-code
+program, the ATC macros and the controller filesystem client went with them.</li>
+<li><strong>Machine state has one owner.</strong> <span class="mono">MachineState</span> holds what the
+controller reports, instead of it living as scattered fields on a view model.</li>
+<li><strong>A wire contract exists.</strong> <span class="mono">CNC.Contracts</span> carries the machine-facing
+enums and snapshot/delta messages; <span class="mono">CNC.Client</span> mirrors machine state from them. The
+Machine Mirror window is the first consumer that reads state purely through that contract.</li>
+<li><strong>Platform ties cut.</strong> Registry secrets, WMI port enumeration and the hard-link P/Invoke
+became host-supplied services; the websocket transport moved onto the framework's own
+<span class="mono">ClientWebSocket</span>.</li>
+</ul><p class="foot">Groundwork only &mdash; the sender behaves exactly as before. Nothing here changes how the app is used.</p></div>
+</div>
+<!-- ===== #219 ===== -->
+<div class="pr">
+<h2 id="pr219"><span class="badge">#219</span>Work Order runs in one press: one streaming engine for macros and programs</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/MacroRunner.cs</td><td class="num add">163</td><td class="num del">556</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/StreamPump.cs</td><td class="num add">326</td><td class="num del">22</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">18</td><td class="num del">209</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">192</td><td class="num del">12</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/JobRunner.cs</td><td class="num add">99</td><td class="num del">15</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml.cs</td><td class="num add">51</td><td class="num del">63</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">28</td><td class="num del">23</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Comms.cs</td><td class="num add">25</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeJob.cs</td><td class="num add">22</td><td class="num del">2</td></tr>
+<tr><td class="mono">7 further files across CNC Core, CNC Controls and ioSender XL</td><td class="num add">62</td><td class="num del">32</td></tr>
+</table>
+<div class="desc"><p>Macros and loaded programs used to run through two separate engines with two different ideas of
+what "wait" meant, which is why a Work Order needed a press for the setup macro and another for the carve.
+There is now one engine, and directives in the g-code tell it when to pause.</p>
+<ul>
+<li><strong>(WAITIDLE)</strong> &mdash; a dispatch barrier: hold the next block until the controller is
+genuinely idle, rather than until the last block was acknowledged.</li>
+<li><strong>(PREREQ)</strong> &mdash; a gate evaluated before a loaded program starts, so a run that cannot
+succeed is refused instead of started.</li>
+<li><strong>(MBOX)</strong> and <strong>(PROMPT)</strong> &mdash; an operator prompt mid-stream, with the
+answer available to later blocks. Cancel is wired to a real abort so the stop byte is not suppressed.</li>
+<li><strong>Work Order is one press.</strong> Setup and carve are one stream, so the race between them is gone
+by construction rather than by timing.</li>
+<li><strong>The old engine is deleted</strong> &mdash; 736 lines, including the unsleeping message-pump loop
+that was the reproducible cause of the 32-bit out-of-memory crash.</li>
+</ul></div>
+</div>
+<!-- ===== #220 ===== -->
+<div class="pr">
+<h2 id="pr220"><span class="badge">#220</span>The run strip: everything a running job needs, and the bottom status bar retired</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/RunStripPanel.xaml.cs</td><td class="num add">584</td><td class="num del">76</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/RunStripPanel.xaml</td><td class="num add">313</td><td class="num del">52</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">148</td><td class="num del">195</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">126</td><td class="num del">57</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StatusControl.xaml.cs</td><td class="num add">68</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">21</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml.cs</td><td class="num add">12</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleWindow.xaml.cs</td><td class="num add">10</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">7</td><td class="num">0</td></tr>
+<tr><td class="mono">3 further files across CNC Core, CNC Controls and ioSender XL</td><td class="num add">9</td><td class="num del">1</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">418</td><td class="num del">7</td></tr>
+</table>
+<div class="desc"><p>The main page grew by accretion: a run bar, a message strip, and a bottom status bar that
+repeated things already on screen. It is now one deliberate strip carrying what a running job actually needs,
+and the bottom status bar has been removed entirely.</p>
+<ul>
+<li><strong>A five-column right half</strong> &mdash; Jogging, Signals and Overrides as real groups, with live
+feed and spindle values, a shared jog selection, spindle direction, and probe selection.</li>
+<li><strong>Run controls, DRO and MDI on the left</strong>, with State and job elapsed time raised into view
+and the MDI console reachable without leaving the page.</li>
+<li><strong>Overrides read as a fill bar</strong> behind the value rather than as a separate readout, and
+double-clicking one resets it &mdash; which previously never fired at all.</li>
+<li><strong>The connection summary moved to the menu bar</strong>, and hides itself on a narrow window rather
+than squeezing the menu.</li>
+</ul><p class="foot">The bottom status bar is gone. Everything it showed is on the run strip or the menu bar; the Status button opens the full message history.</p></div>
+</div>
+<!-- ===== #221 ===== -->
+<div class="pr">
+<h2 id="pr221"><span class="badge">#221</span>Click the status line for every message since launch</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">178</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">46</td><td class="num del">9</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">22</td><td class="num del">14</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">10</td><td class="num del">2</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">7</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The status line shows one message at a time and overwrites freely, so anything that scrolled past
+was simply gone. Clicking it now opens the full history since launch.</p>
+<ul>
+<li><strong>The whole status line is the target</strong>, not a small button on it, and Esc closes the window.</li>
+<li><strong>It pops itself when a message arrives</strong> &mdash; with the message strip retired, a message
+nothing displays is a message lost.</li>
+<li><strong>An auto-popped window dismisses itself after 10 seconds</strong>, so an unattended notice clears
+on its own. One you opened from the Status button never self-closes, and touching an auto-popped one keeps it
+open.</li>
+<li><strong>It remembers its size and position</strong>, which matters far more for a window that shows itself
+repeatedly than for one you open on purpose.</li>
+<li><strong>Only messages the log records pop it</strong> &mdash; not every internal change of the message
+property, which previously made it appear for things that were never shown.</li>
+</ul></div>
+</div>
+<!-- ===== #222 ===== -->
+<div class="pr">
+<h2 id="pr222"><span class="badge">#222</span>Text toolpaths: single-stroke engraving</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/StrokeFont.cs</td><td class="num add">365</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderCompiler.cs</td><td class="num add">129</td><td class="num del">10</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml.cs</td><td class="num add">114</td><td class="num del">16</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CustomTool.cs</td><td class="num add">75</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderModel.cs</td><td class="num add">42</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OddJobsFeedsSpeedsDialog.xaml.cs</td><td class="num add">39</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CustomToolEditDialog.xaml.cs</td><td class="num add">15</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OddJobsFeedsSpeedsDialog.xaml</td><td class="num add">10</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml</td><td class="num add">11</td><td class="num">0</td></tr>
+<tr><td class="mono">2 further files across CNC Core, CNC Controls and ioSender XL</td><td class="num add">3</td><td class="num">0</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">91</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>A Work Order can now carry text as a toolpath, engraved with a single-stroke font &mdash; the
+letter is one pass down its centre line, not an outline to be cleared.</p>
+<ul>
+<li><strong>A stroke font in the core</strong>, so the geometry is generated rather than depending on an
+installed typeface.</li>
+<li><strong>V-bit tools carry their included angle</strong>, and an Engrave operation gets one &mdash; and can
+pick one &mdash; instead of silently inheriting an unsuitable tool.</li>
+<li><strong>Strokes are clamped to what the bit can cut</strong> at its angle and depth.</li>
+<li><strong>Three real defects fixed on the way:</strong> an Engrave operation could be dropped from the
+generated g-code entirely; the letter S was built from three strokes and carved as a mangled 5; and the
+operation diameter followed a stale copy of the tool rather than its definition.</li>
+</ul></div>
+</div>
+<!-- ===== #223 ===== -->
+<div class="pr">
+<h2 id="pr223"><span class="badge">#223</span>V-carving: TrueType outlines carved to shape</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/VCarve.cs</td><td class="num add">663</td><td class="num del">29</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/TrueTypeOutlines.cs</td><td class="num add">254</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderCompiler.cs</td><td class="num add">215</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml.cs</td><td class="num add">104</td><td class="num del">9</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderModel.cs</td><td class="num add">30</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml</td><td class="num add">9</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/CNC Core.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">28</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Beyond single-stroke engraving, text can be V-carved: the glyph's real outline is carved so the
+stroke widens and narrows the way the typeface actually draws it.</p>
+<ul>
+<li><strong>TrueType outlines become toolpath polygons</strong>, so any installed font is available.</li>
+<li><strong>A distance-field engine</strong> converts the outline into depth-varying passes for the bit's
+included angle.</li>
+<li><strong>Carve-quality passes</strong> &mdash; merged spine rings, simplified paths and flat clearing
+&mdash; instead of a naive offset ladder.</li>
+<li><strong>Each letter is cut completely before moving to the next</strong>, rather than the whole job being
+traversed once per depth.</li>
+<li><strong>Two costly bugs fixed:</strong> circles carved oversize because the nearest-boundary search
+stopped a ring early, and a carve spent its opening minutes tracing every letter outline at zero depth.</li>
+<li><strong>The distance field is memoized</strong>, so regenerating a repeat board takes seconds instead of
+minutes &mdash; keyed so that position, WCS and feeds never invalidate it.</li>
+</ul></div>
+</div>
+<!-- ===== #224 ===== -->
+<div class="pr">
+<h2 id="pr224"><span class="badge">#224</span>Shape text: text fitted inside Work Order geometry</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderModel.cs</td><td class="num add">185</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml.cs</td><td class="num add">156</td><td class="num del">13</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderCompiler.cs</td><td class="num add">50</td><td class="num del">15</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml</td><td class="num add">38</td><td class="num del">8</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">42</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Any Line, Circle, Oval, Square or Rectangle toolpath can carry text fitted inside it. The shape
+still cuts as before; the text is engraved or V-carved within it.</p>
+<ul>
+<li><strong>The fit is computed, not guessed.</strong> A cap height of zero auto-sizes to the largest that
+fits; an explicit size that does not fit is refused at Generate, by the same resolver the compiler uses, so a
+refusal and a cut can never disagree.</li>
+<li><strong>A line is a baseline</strong> &mdash; text runs along it at its angle, sitting on it, hanging
+below it or straddling it.</li>
+<li><strong>Curved shapes fit against the curve</strong>, not the bounding box, and are centred only &mdash;
+sliding a block of text inside a curve would void the fit guarantee.</li>
+<li><strong>The stock preview renders the fitted text live</strong> at its real size and placement as it is
+typed.</li>
+<li><strong>Text toolpaths arrive with their Engrave operation</strong> already attached, and the material is
+set on the panel rather than hunted for elsewhere.</li>
+</ul></div>
+</div>
+<!-- ===== #225 ===== -->
+<div class="pr">
+<h2 id="pr225"><span class="badge">#225</span>SAFETY: Feed Hold could be starved for the whole length of a dense job</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">17</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>Controller replies were marshalled onto the UI at a higher dispatcher priority than user input.
+On a dense job the reply stream never emptied, so input never got a turn: a click on Feed Hold or a keypress
+could sit unprocessed until the job ended.</p>
+<ul>
+<li><strong>The symptom was indistinguishable from a hung application</strong> &mdash; the window redrew,
+the DRO updated, and the button simply did nothing.</li>
+<li><strong>The fix is a priority change</strong>, so input is dispatched ahead of routine comms traffic.</li>
+</ul><p class="foot">This is a safety path: the whole point of Feed Hold is that it works during the densest part of a job, which is exactly when it did not.</p></div>
+</div>
+<!-- ===== #226 ===== -->
+<div class="pr">
+<h2 id="pr226"><span class="badge">#226</span>Safety batch: envelope, coordinate frames, and a Validate run that crashed a machine</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/ControllerValidator.cs</td><td class="num add">90</td><td class="num del">195</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ValidateProcessor.cs</td><td class="num add">69</td><td class="num del">79</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">107</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/MacroRunner.cs</td><td class="num add">89</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">5</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Four independent defects, each of which could put the machine somewhere it should not go.</p>
+<ul>
+<li><strong>A job whose G28/G30 park lies outside the soft-limit envelope is refused</strong> rather than
+run into a limit.</li>
+<li><strong>Work origins are stored in the tool-length reference frame</strong>, not the probe's &mdash;
+storing them in the probe's frame meant an offset that was wrong by the tool length.</li>
+<li><strong>Validate ran in the wrong coordinate frame</strong> for its visualisation job, and alarmed
+instantly on a machine homed to its minimum. Its "passed moves" program has been removed outright: it
+crashed a machine.</li>
+<li><strong>Setup no longer finishes in G49.</strong> Leaving tool-length compensation cancelled at the end
+of a setup run cut a spoilboard.</li>
+</ul></div>
+</div>
+<!-- ===== #227 ===== -->
+<div class="pr">
+<h2 id="pr227"><span class="badge">#227</span>The link watchdog stops killing live operations</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/LinkMonitor.cs</td><td class="num add">147</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/YModem.cs</td><td class="num add">68</td><td class="num del">24</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">39</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Comms.cs</td><td class="num add">12</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/EltimaStream.cs</td><td class="num add">3</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/TelnetStream.cs</td><td class="num add">2</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/SerialStream.cs</td><td class="num add">2</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/WebsocketStream.cs</td><td class="num add">2</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/CNC Core.csproj</td><td class="num add">1</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The link watchdog treated any silence from the controller as a dead connection. Two operations
+legitimately go quiet, and both were being aborted mid-flight.</p>
+<ul>
+<li><strong>grblHAL is silent for the whole homing cycle</strong> &mdash; the watchdog was ending homing
+runs on a machine that was working perfectly.</li>
+<li><strong>A YModem firmware upload was killed the same way</strong>, and polling the controller in the
+middle of a YModem packet corrupted the transfer independently of that.</li>
+<li><strong>A genuinely dead link is still detected</strong>, and now by a signal that actually means
+something: a half-open socket reports itself as connected forever because that flag reflects the last I/O,
+not the live state, so the watchdog counts received bytes against polls sent instead.</li>
+</ul></div>
+</div>
+<!-- ===== #228 ===== -->
+<div class="pr">
+<h2 id="pr228"><span class="badge">#228</span>Jogging: a cancelled jog no longer wedges the jog path</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/JobRunner.cs</td><td class="num add">72</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/JogGate.cs</td><td class="num add">44</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogUiConfigControl.xaml.cs</td><td class="num add">15</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogUiConfigControl.xaml</td><td class="num add">13</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">80</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>A jog cancel landing within a few milliseconds of the jog itself makes grblHAL discard the
+command with no reply at all &mdash; no ok, no error. The sender was waiting for that reply before sending
+anything else, so every later jog queued up behind it and jogging stayed dead until the app was restarted.</p>
+<ul>
+<li><strong>The wait is released</strong> when an unanswered jog is outstanding, the controller reports
+idle, and enough time has passed for a reply to have arrived.</li>
+<li><strong>Stale jogs are purged, never replayed.</strong> This mattered more than the wedge: the queue
+held a continuous move whose cancel had gone out minutes earlier, so draining it would have produced a large
+unrequested Z motion with nothing left to stop it.</li>
+<li><strong>A status report also reopens the separate jog gate</strong>, which had the same underlying
+firmware behaviour to contend with.</li>
+<li><strong>Continuous jog is now a setting</strong> under Jogging, rather than implied by how a control was
+used.</li>
+</ul></div>
+</div>
+<!-- ===== #229 ===== -->
+<div class="pr">
+<h2 id="pr229"><span class="badge">#229</span>Large programs load in seconds; the console stops starving the UI</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml.cs</td><td class="num add">58</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">36</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCode.cs</td><td class="num add">21</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/HelperClasses.cs</td><td class="num add">15</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml</td><td class="num add">7</td><td class="num del">8</td></tr>
+</table>
+<div class="desc"><p>Two separate performance defects that both presented as "the application has stopped
+responding".</p>
+<ul>
+<li><strong>Property-change notifications were marshalled synchronously</strong> for every row of a program
+being built off-thread, whether or not anything was listening. Skipping the marshal when there is no listener
+took a 220,000-line load from 32 seconds to under 3.</li>
+<li><strong>The console rebuilt its entire scrollback on every response line</strong>, re-joining thousands
+of lines per line received. The visible symptom was the console still echoing minutes after the wire had gone
+quiet &mdash; a dispatcher backlog, not a slow controller.</li>
+<li><strong>Loading a large program says what it is doing</strong> rather than appearing hung, and a
+stack overflow loading one is fixed &mdash; a marshal guard was re-raising its own event and recursing.</li>
+</ul></div>
+</div>
+<!-- ===== #230 ===== -->
+<div class="pr">
+<h2 id="pr230"><span class="badge">#230</span>Generate says what it is doing, and what it will cost</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeRunTime.cs</td><td class="num add">255</td><td class="num del">11</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml.cs</td><td class="num add">244</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeProgram.cs</td><td class="num add">100</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeRunTimeIndex.cs</td><td class="num add">58</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/Converters.cs</td><td class="num add">20</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCodeListControl.xaml</td><td class="num add">17</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">13</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/MacroRunner.cs</td><td class="num add">9</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeEmulator.cs</td><td class="num add">11</td><td class="num">0</td></tr>
+<tr><td class="mono">5 further files across CNC Core, CNC Controls and ioSender XL</td><td class="num add">31</td><td class="num del">1</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">7</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Generate could take minutes on a V-carve with no indication it was working, and once it finished
+there was nothing to say how long the resulting job would take.</p>
+<ul>
+<li><strong>Generate reports that it is compiling</strong>, with a wait cursor and the time it took.</li>
+<li><strong>An estimated run time</strong> is computed for any loaded program, not only a generated one,
+and shown per toolpath on each outline group header as well as for the job as a whole.</li>
+<li><strong>Compile statistics survive the "ready &mdash; press Cycle Start" prompt</strong> instead of
+being cleared by it.</li>
+<li><strong>A Work Order's compiled output is cached</strong> and restored at boot, so returning to a job
+does not pay the compile again.</li>
+</ul></div>
+</div>
+<!-- ===== #231 ===== -->
+<div class="pr">
+<h2 id="pr231"><span class="badge">#231</span>Probing and Setup: say what to fit, and stop parking over the spoilboard</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">macros/pcorner.macro</td><td class="num add">74</td><td class="num del">152</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">90</td><td class="num del">57</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ProbeDefinition.cs</td><td class="num add">37</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">13</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FixtureEditDialog.xaml</td><td class="num add">8</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml.cs</td><td class="num add">11</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StepperCalibrationProbeWizard.xaml.cs</td><td class="num add">5</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblSDCard.cs</td><td class="num add">7</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml</td><td class="num add">3</td><td class="num del">3</td></tr>
+<tr><td class="mono">4 further files across CNC Core, CNC Controls and ioSender XL</td><td class="num add">8</td><td class="num del">4</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">63</td><td class="num del">63</td></tr>
+</table>
+<div class="desc"><p>The probing prompts assumed you already knew which probe they meant, and the corner routine had
+grown a second path that behaved differently from the first.</p>
+<ul>
+<li><strong>Prompts name the probe and its tip diameter</strong> when asking for it, and the install prompt
+says what to actually go and fit.</li>
+<li><strong>The fixture dialog stopped telling you to park over the spoilboard</strong> in its Set/Test
+position guidance.</li>
+<li><strong>All four corners build the same program.</strong> The corner macro's discovery path is deleted
+&mdash; every call supplies its own floor, so there is one path through the probe rather than two that could
+disagree.</li>
+<li><strong>The probe macros print every input before they move</strong>, so what the macro believes is
+visible before anything is committed to motion.</li>
+<li><strong>ATC macros install from Machine Setup</strong> without needing the SD Card window opened first,
+and a successful install is reported as success rather than as an error.</li>
+</ul></div>
+</div>
+<!-- ===== #232 ===== -->
+<div class="pr">
+<h2 id="pr232"><span class="badge">#232</span>Fix batch: crashes, startup, and the connect path</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppDialogs.cs</td><td class="num add">65</td><td class="num del">8</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/App.xaml.cs</td><td class="num add">58</td><td class="num del">15</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/CrashReporter.cs</td><td class="num add">41</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/RunStripPanel.xaml.cs</td><td class="num add">34</td><td class="num del">10</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">23</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/LogFile.cs</td><td class="num add">15</td><td class="num del">2</td></tr>
+</table>
+<div class="desc"><p>Four defects around the least forgiving moments in the app's life: starting up, connecting, and
+crashing.</p>
+<ul>
+<li><strong>The crash log survives the crash it is recording.</strong> The reporter could itself fail while
+writing, losing exactly the report that mattered &mdash; and the first fix for that introduced two more
+defects, found by the next crash.</li>
+<li><strong>Reading settings on connect could crash</strong> &mdash; the settings arrived into a list that
+was being enumerated at the same time, because the marshal that delivered them is asynchronous.</li>
+<li><strong>A dialog raised during shutdown answers its default</strong> instead of crashing, with the catch
+filtered on the shutdown flag so genuine dialog bugs still fail loudly.</li>
+<li><strong>A startup crash from reading configuration before it was loaded</strong> is fixed.</li>
+</ul></div>
+</div>
+<!-- ===== #233 ===== -->
+<div class="pr">
+<h2 id="pr233"><span class="badge">#233</span>Fix batch: windows, dialogs and small corrections</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml.cs</td><td class="num add">192</td><td class="num del">12</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderModel.cs</td><td class="num add">114</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppDialogs.cs</td><td class="num add">56</td><td class="num del">8</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">58</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OffsetFlyout.xaml.cs</td><td class="num add">41</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/Converters.cs</td><td class="num add">25</td><td class="num del">19</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCodeListControl.xaml.cs</td><td class="num add">41</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">13</td><td class="num del">27</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblSDCard.cs</td><td class="num add">36</td><td class="num">0</td></tr>
+<tr><td class="mono">17 further files across CNC Core, CNC Controls and ioSender XL</td><td class="num add">211</td><td class="num del">38</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">77</td><td class="num del">17</td></tr>
+</table>
+<div class="desc"><p>Accumulated small defects, each individually minor.</p>
+<ul>
+<li><strong>Offsets:</strong> a work origin is set with G10 L20 and the tooltips say so; the DRO tooltip
+shows the sum and stops naming tool-length offset on axes that do not carry it.</li>
+<li><strong>Windows:</strong> closing a menu-hosted window returns focus to ioSender rather than to another
+application; the camera window is resizable and sized to its content, which had been clipping the
+use-as-probe button.</li>
+<li><strong>Work Orders:</strong> a title right-click menu for Rename, Open Copy, Close and Delete; Bamboo
+added to the feeds-and-speeds chart and the material lists.</li>
+<li><strong>Program view:</strong> lines are marked complete when executed rather than when acknowledged;
+the source highlight is re-marked when rows appear; a g-code explanation balloon could be left on screen
+indefinitely.</li>
+<li><strong>Correctness:</strong> the keyboard spindle coarse override pair was inverted; the controller
+filesystem is never enumerated mid-stream, which produced a hard error that killed a run; Reset could not
+clear an error message; loading a file containing #-expressions failed.</li>
+<li><strong>The Rewind button is removed</strong> &mdash; the mechanism is kept, the button was a trap.</li>
+</ul></div>
 </div>
 </section>
 
