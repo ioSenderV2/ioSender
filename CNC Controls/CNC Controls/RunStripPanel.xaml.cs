@@ -255,6 +255,10 @@ namespace CNC.Controls
         }
 
         // Double-click either value box to put its override back to 100%.
+        //
+        // PREVIEW (tunnelling), not the bubbling event: the TextBox sitting on top of the fill bar
+        // handles the click itself and marks it handled, so a bubbling handler on the Grid never ran
+        // and the double-click silently did nothing. Preview reaches the Grid on the way DOWN.
         private void FeedOvrReset_DoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             if (e.ClickCount == 2) Send(GrblConstants.CMD_FEED_OVR_RESET);

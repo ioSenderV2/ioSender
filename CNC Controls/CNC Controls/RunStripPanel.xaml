@@ -210,7 +210,7 @@
                 <TextBlock x:Uid="lbl_ovrFeed" Grid.Row="0" Grid.Column="0" Text="Feed rate:" Style="{StaticResource RowLabelStyle}"/>
                 <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
                     <Button x:Uid="btn_feedOvrMinus" Style="{StaticResource NudgeButtonStyle}" Content="&#8722;" Click="FeedOvrMinus_Click" ToolTip="Feed override down"/>
-                    <Grid x:Name="feedHost" MouseLeftButtonUp="FeedOvrReset_DoubleClick">
+                    <Grid x:Name="feedHost" Background="Transparent" PreviewMouseLeftButtonDown="FeedOvrReset_DoubleClick">
                         <!-- The bar behind the digits IS the override: how far it fills says how much,
                              its colour says which way. Half-full green is 100% - normal - so a glance
                              tells you the machine is running the program's own feed. -->
@@ -234,7 +234,7 @@
                 <TextBlock x:Uid="lbl_ovrSpindle" Grid.Row="2" Grid.Column="0" Text="Spindle:" Style="{StaticResource RowLabelStyle}"/>
                 <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0,3,0,0">
                     <Button x:Uid="btn_spindleOvrMinus" Style="{StaticResource NudgeButtonStyle}" Content="&#8722;" Click="SpindleOvrMinus_Click" ToolTip="Spindle override down"/>
-                    <Grid x:Name="spindleHost" MouseLeftButtonUp="SpindleOvrReset_DoubleClick">
+                    <Grid x:Name="spindleHost" Background="Transparent" PreviewMouseLeftButtonDown="SpindleOvrReset_DoubleClick">
                         <Rectangle x:Name="spindleFill" HorizontalAlignment="Left" RadiusX="2" RadiusY="2"/>
                         <TextBox x:Name="txtSpindleRpm" Style="{StaticResource EditValueStyle}"
                                  Background="Transparent" BorderBrush="#FF9A9A9A"
