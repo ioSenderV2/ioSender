@@ -1823,3 +1823,6 @@ CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,txt_kbdDefTip:System.Windo
 CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,grp_jogging:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,JOGGING
 CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,grp_signals:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,SIGNALS
 CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,grp_feedsSpeeds:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,FEEDS AND SPEEDS
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,rb_spindleOff:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Off
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,rb_spindleCW:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,CW
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,rb_spindleCCW:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,CCW
