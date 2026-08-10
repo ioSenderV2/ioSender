@@ -227,3 +227,5 @@ ioSender.g.en-US.resources:mainwindow.baml,chk_jogContinuous:System.Windows.Cont
 ioSender.g.en-US.resources:mainwindow.baml,chk_jogContinuous:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Hold a jog button to move continuously; release to stop.
 ioSender.g.en-US.resources:mainwindow.baml,btn_mdiConsole:System.Windows.Controls.ContentControl.Content,Button,True,True,,MDI Console
 ioSender.g.en-US.resources:mainwindow.baml,btn_mdiConsole:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Open the console with the caret in its input box. Esc closes it.
+ioSender.g.en-US.resources:mainwindow.baml,btn_viewStatus:System.Windows.Controls.ContentControl.Content,Button,True,True,,Status
+ioSender.g.en-US.resources:mainwindow.baml,btn_viewStatus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show the status message history since launch.
