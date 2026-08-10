@@ -2337,9 +2337,17 @@ namespace GCode_Sender
                 Owner = this,
                 Width = 700,
                 Height = 440,
+                MinWidth = 300,
+                MinHeight = 200,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Content = text
             };
+            // This window is closed and rebuilt on every show, so without this its size and position reset
+            // every time - and it shows itself unprompted whenever a message arrives, so it would keep
+            // reappearing wherever IT chose rather than where it was put. Same restore/save/clamp shape as
+            // ConsoleWindow.RestorePlacement/SavePlacement.
+            RestoreStatusWindowPlacement(win);
+            win.Closing += (s2, e2) => SaveStatusWindowPlacement(win);
             win.Loaded += (s2, e2) => { text.CaretIndex = text.Text.Length; text.ScrollToEnd(); };
             // Esc closes, like the console log and every other floating window here. Bubbling KeyDown,
             // not PreviewKeyDown, for the reason ConsoleWindow.OnKeyDown documents: preview tunnels from
@@ -2358,6 +2366,49 @@ namespace GCode_Sender
             win.Show();
         }
 
+
+        // Clamped to the visible virtual desktop, so a window saved on a monitor that is no longer attached
+        // still comes back reachable rather than off-screen.
+        private static void RestoreStatusWindowPlacement(Window win)
+        {
+            var cfg = AppConfig.Settings.Base;
+
+            if (cfg == null)
+                return;
+
+            if (!double.IsNaN(cfg.StatusWindowWidth))
+                win.Width = Math.Max(Math.Min(cfg.StatusWindowWidth, SystemParameters.VirtualScreenWidth), win.MinWidth);
+            if (!double.IsNaN(cfg.StatusWindowHeight))
+                win.Height = Math.Max(Math.Min(cfg.StatusWindowHeight, SystemParameters.VirtualScreenHeight), win.MinHeight);
+
+            if (!double.IsNaN(cfg.StatusWindowLeft) && !double.IsNaN(cfg.StatusWindowTop))
+            {
+                win.WindowStartupLocation = WindowStartupLocation.Manual;
+                win.Left = Math.Max(Math.Min(cfg.StatusWindowLeft, SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - win.Width), SystemParameters.VirtualScreenLeft);
+                win.Top = Math.Max(Math.Min(cfg.StatusWindowTop, SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - win.Height), SystemParameters.VirtualScreenTop);
+            }
+        }
+
+        private static void SaveStatusWindowPlacement(Window win)
+        {
+            var cfg = AppConfig.Settings.Base;
+
+            if (cfg == null)
+                return;
+
+            Rect bounds = win.WindowState == WindowState.Normal ? new Rect(win.Left, win.Top, win.Width, win.Height) : win.RestoreBounds;
+
+            if (cfg.StatusWindowLeft == bounds.Left && cfg.StatusWindowTop == bounds.Top &&
+                 cfg.StatusWindowWidth == bounds.Width && cfg.StatusWindowHeight == bounds.Height)
+                return;     // nothing moved - don't write the config file for every close
+
+            cfg.StatusWindowLeft = bounds.Left;
+            cfg.StatusWindowTop = bounds.Top;
+            cfg.StatusWindowWidth = bounds.Width;
+            cfg.StatusWindowHeight = bounds.Height;
+
+            AppConfig.Settings.Save();
+        }
 
         // True only if the text is verifiably on the clipboard. Retries because the failure is a transient
         // lock, not a bad argument - the standard mitigation for CLIPBRD_E_CANT_OPEN.

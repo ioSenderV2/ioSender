@@ -462,6 +462,13 @@ namespace CNC.Controls
         public double ConsoleWindowTop { get; set; } = double.NaN;
         public double ConsoleWindowWidth { get; set; } = double.NaN;
         public double ConsoleWindowHeight { get; set; } = double.NaN;
+        // Status-message log window (MainWindow.ShowMessageLog). It pops itself whenever a message arrives
+        // now that the message strip is gone, so where it lands matters more than for a window you open on
+        // purpose. NaN = never saved -> the default 700x440 centred on the owner.
+        public double StatusWindowLeft { get; set; } = double.NaN;
+        public double StatusWindowTop { get; set; } = double.NaN;
+        public double StatusWindowWidth { get; set; } = double.NaN;
+        public double StatusWindowHeight { get; set; } = double.NaN;
         // Keyboard shortcuts for switching main-page tabs and Settings sub-tabs, keyed by a stable tab id
         // (e.g. "Tab.Job", "Tab.Settings.Grbl"). Empty by default - no tab has a shortcut out of the box.
         // Edited in the Key Mappings editor; dispatched at the main-window level like the console shortcut.
