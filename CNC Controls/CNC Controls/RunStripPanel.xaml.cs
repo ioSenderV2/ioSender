@@ -59,6 +59,15 @@ namespace CNC.Controls
         private bool syncing;
 
         private TextBlock lampProbe, lampToolSetter;
+        private bool subscribedToJogSettings;
+
+        /// <summary>Persisted jog settings, or null before the config has loaded - this control is
+        /// constructed and first refreshed during MainWindow's InitializeComponent, which is earlier
+        /// than that.</summary>
+        private static JogConfig JogSettings
+        {
+            get { return AppConfig.Settings == null ? null : AppConfig.Settings.Jog; }
+        }
 
         public RunStripPanel()
         {
@@ -90,14 +99,6 @@ namespace CNC.Controls
 
             DataContextChanged += OnDataContextChanged;
 
-            // The Keyboard Jogging panel writes the same setting; without this, changing it there left
-            // this panel showing the old choice until something else forced a refresh.
-            if (AppConfig.Settings != null && AppConfig.Settings.Jog != null)
-                AppConfig.Settings.Jog.PropertyChanged += (s2, e2) =>
-                {
-                    if (e2.PropertyName == "DefaultSpeedFast" || e2.PropertyName == "FastFeedrate" || e2.PropertyName == "SlowFeedrate")
-                        UpdateKbdSpeeds();
-                };
             // The bars are sized from ActualWidth, so they have to be redrawn whenever the strip
             // reflows - otherwise a resized box keeps a bar scaled for its old width.
             SizeChanged += (s2, e2) => UpdateOverrides();
@@ -313,6 +314,21 @@ namespace CNC.Controls
         /// </summary>
         private void UpdateKbdSpeeds()
         {
+            // Subscribe the FIRST time the config exists, not in the constructor: this control is
+            // built during MainWindow's InitializeComponent, before the config is loaded, so a
+            // constructor-time subscription silently never happened and this panel then ignored every
+            // change made in the Keyboard Jogging panel for the rest of the session.
+            if (!subscribedToJogSettings && JogSettings != null)
+            {
+                subscribedToJogSettings = true;
+                JogSettings.PropertyChanged += (s2, e2) =>
+                {
+                    if (e2.PropertyName == "DefaultSpeedFast" || e2.PropertyName == "FastFeedrate" ||
+                        e2.PropertyName == "SlowFeedrate")
+                        UpdateKbdSpeeds();
+                };
+            }
+
             var rates = model == null || model.Keyboard == null ? null : model.Keyboard.JogFeedrates;
             if (rates == null || rates.Length <= (int)JogMode.Fast)
                 return;
@@ -324,7 +340,14 @@ namespace CNC.Controls
             // Keyboard Jogging panel writes and what persists. The controller's own copy is a live
             // mirror of it, so reading the controller here made this panel and that one disagree the
             // moment either was changed.
-            bool fast = AppConfig.Settings.Jog.DefaultSpeedFast;
+            //
+            // ⚠ NULL until the config is loaded, and this runs BEFORE that: MainWindow sets its
+            // DataContext during InitializeComponent, which fires DataContextChanged -> RefreshAll
+            // while AppConfig.Settings is still null. Crashed startup once (2026-08-10). Fall back to
+            // the controller's copy, which is populated by then.
+            bool fast = JogSettings != null
+                ? JogSettings.DefaultSpeedFast
+                : model.Keyboard.DefaultSpeedFast;
             Highlight(btnKbdSlow, !fast);
             Highlight(btnKbdFast, fast);
         }
@@ -343,7 +366,8 @@ namespace CNC.Controls
         {
             // Write BOTH, exactly as the Keyboard Jogging panel does: the setting (which persists and
             // is what every other surface reads) and the live controller copy (so it takes effect now).
-            AppConfig.Settings.Jog.DefaultSpeedFast = fast;
+            if (JogSettings != null)
+                JogSettings.DefaultSpeedFast = fast;
             if (model != null && model.Keyboard != null)
                 model.Keyboard.DefaultSpeedFast = fast;
             UpdateKbdSpeeds();
