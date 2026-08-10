@@ -295,40 +295,56 @@ namespace CNC.Core
                 // Timestamps are only taken when logging is on; ~30 ns x cells is nothing against a
                 // multi-second build but would be a visible tax on a small one.
                 bool timing = DebugLog.Enabled;
-                long tNear = 0, tInside = 0;
+                long[] acc = new long[2];   // 0 = nearest, 1 = inside; summed ACROSS threads
 
                 f.dist = new double[f.nx * f.ny];
-                for (int j = 0; j < f.ny; j++)
-                {
-                    double py = f.y0 + j * cell;
-                    for (int i = 0; i < f.nx; i++)
+
+                // Rows are independent: every cell reads only shared immutable state (the bucket grid and
+                // the contours) and writes its own slot in dist, so a row never touches another row's
+                // memory. Nothing here is order-dependent, so the field is bit-identical to the serial
+                // version - this is throughput only.
+                System.Threading.Tasks.Parallel.For(0, f.ny,
+                    () => new long[2],
+                    (j, loopState, local) =>
                     {
-                        double px = f.x0 + i * cell;
-
-                        long t0 = timing ? System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
-                        double d = buckets.NearestDistance(px, py);
-                        long t1 = timing ? System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
-                        bool ins = Inside(contours, px, py);
-                        if (timing)
+                        double py = f.y0 + j * cell;
+                        for (int i = 0; i < f.nx; i++)
                         {
-                            long t2 = System.Diagnostics.Stopwatch.GetTimestamp();
-                            tNear += t1 - t0;
-                            tInside += t2 - t1;
-                        }
+                            double px = f.x0 + i * cell;
 
-                        // Sign carries inside/outside; magnitude is the distance either way. Outside
-                        // values are kept (negative) rather than clamped so marching squares can find the
-                        // zero crossing - the boundary pass - by interpolation like any other level.
-                        f.dist[j * f.nx + i] = ins ? Math.Min(d, maxDist * FarFactor) : -d;
-                    }
-                }
+                            long t0 = timing ? System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
+                            double d = buckets.NearestDistance(px, py);
+                            long t1 = timing ? System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
+                            bool ins = Inside(contours, px, py);
+                            if (timing)
+                            {
+                                long t2 = System.Diagnostics.Stopwatch.GetTimestamp();
+                                local[0] += t1 - t0;
+                                local[1] += t2 - t1;
+                            }
+
+                            // Sign carries inside/outside; magnitude is the distance either way. Outside
+                            // values are kept (negative) rather than clamped so marching squares can find the
+                            // zero crossing - the boundary pass - by interpolation like any other level.
+                            f.dist[j * f.nx + i] = ins ? Math.Min(d, maxDist * FarFactor) : -d;
+                        }
+                        return local;
+                    },
+                    local =>
+                    {
+                        System.Threading.Interlocked.Add(ref acc[0], local[0]);
+                        System.Threading.Interlocked.Add(ref acc[1], local[1]);
+                    });
 
                 if (timing)
                 {
                     double toMs = 1000d / System.Diagnostics.Stopwatch.Frequency;
+                    // nearest/inside are CPU time SUMMED ACROSS THREADS, so they add up to more than the
+                    // wall-clock "field=" figure on the L1 line. Compare them with each other, not with it.
                     DebugLog.Write("vcarve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                        "field {0}x{1}={2} cells | nearest={3:0}ms | inside={4:0}ms | {5} verts, {6} samples",
-                        f.nx, f.ny, f.nx * f.ny, tNear * toMs, tInside * toMs, total, samples.Count));
+                        "field {0}x{1}={2} cells | nearest={3:0}ms | inside={4:0}ms (cpu, summed over {5} threads) | {6} verts, {7} samples",
+                        f.nx, f.ny, f.nx * f.ny, acc[0] * toMs, acc[1] * toMs,
+                        Environment.ProcessorCount, total, samples.Count));
                 }
                 return f;
             }
@@ -671,6 +687,22 @@ namespace CNC.Core
                 }
             }
 
+            /// <summary>Squared distance to the nearest sample in one grid cell, if it beats <paramref name="best"/>.</summary>
+            private void ScanCell(int i, int j, double px, double py, ref double best)
+            {
+                if (i < 0 || i >= nx || j < 0 || j >= ny)
+                    return;
+                var list = cells[j * nx + i];
+                if (list == null)
+                    return;
+                foreach (int idx in list)
+                {
+                    double dx = pts[idx].X - px, dy = pts[idx].Y - py;
+                    double d2 = dx * dx + dy * dy;
+                    if (d2 < best) best = d2;
+                }
+            }
+
             public double NearestDistance(double px, double py)
             {
                 int cx = (int)((px - x0) / cell);
@@ -685,24 +717,33 @@ namespace CNC.Core
                     if (ringMin > 0d && ringMin * ringMin >= best)
                         break;
 
-                    for (int j = cy - r; j <= cy + r; j++)
+                    if (r == 0)
                     {
-                        if (j < 0 || j >= ny) continue;
-                        for (int i = cx - r; i <= cx + r; i++)
-                        {
-                            if (i < 0 || i >= nx) continue;
-                            // Only the ring's edge - the interior was covered by smaller r.
-                            if (r > 0 && i != cx - r && i != cx + r && j != cy - r && j != cy + r)
-                                continue;
-                            var list = cells[j * nx + i];
-                            if (list == null) continue;
-                            foreach (int idx in list)
-                            {
-                                double dx = pts[idx].X - px, dy = pts[idx].Y - py;
-                                double d2 = dx * dx + dy * dy;
-                                if (d2 < best) best = d2;
-                            }
-                        }
+                        ScanCell(cx, cy, px, py, ref best);
+                        continue;
+                    }
+
+                    // PERIMETER ONLY. This used to loop the whole (2r+1)x(2r+1) square and `continue` past
+                    // the interior, so each ring cost QUADRATIC work to visit a LINEAR number of cells and
+                    // the walk came to ~(4/3)R^3 per query instead of ~4R^2. It dominated everything:
+                    // measured at 128.3 s of a 144.2 s Work Order Generate (89%), because this grid is a
+                    // text line - 1507x297, mostly empty - so cells far from any glyph never trigger the
+                    // early-out above and walk all the way to maxRings every time.
+                    //
+                    // The cells VISITED are exactly the ones the old skip-test let through, so the field,
+                    // the passes and the emitted g-code are unchanged - this is purely the constant factor.
+                    int jTop = cy - r, jBot = cy + r;
+                    for (int i = cx - r; i <= cx + r; i++)
+                    {
+                        ScanCell(i, jTop, px, py, ref best);
+                        ScanCell(i, jBot, px, py, ref best);
+                    }
+                    // Corners already done by the two rows above, hence the inset range.
+                    int iLeft = cx - r, iRight = cx + r;
+                    for (int j = cy - r + 1; j <= cy + r - 1; j++)
+                    {
+                        ScanCell(iLeft, j, px, py, ref best);
+                        ScanCell(iRight, j, px, py, ref best);
                     }
                 }
 
