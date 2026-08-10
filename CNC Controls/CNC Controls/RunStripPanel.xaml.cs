@@ -128,13 +128,24 @@ namespace CNC.Controls
                 lamp.Key.Foreground = (asserted & lamp.Value) != 0 ? LampOn : LampOff;
         }
 
+        /// <summary>
+        /// Feed rate and Spindle show the LIVE value; Rapids shows its percentage, because there is no
+        /// "current rapid rate" to report - only the setting. A box the operator is typing into is left
+        /// alone, or the machine's next status report would overwrite it mid-keystroke.
+        /// </summary>
         private void UpdateOverrides()
         {
             if (model == null)
                 return;
-            lblFeedOvr.Text = ((int)model.FeedOverride) + "%";
+
+            // Read-only: the feed rate is whatever the program asked for, and there is no command to
+            // set it absolutely - the override buttons are the only lever, which is exactly what they do.
+            txtFeedRate.Text = ((int)model.FeedRate).ToString();
+
             lblRapidOvr.Text = ((int)model.RapidsOverride) + "%";
-            lblSpindleOvr.Text = ((int)model.RPMOverride) + "%";
+
+            if (!txtSpindleRpm.IsKeyboardFocusWithin)
+                txtSpindleRpm.Text = ((int)model.ProgrammedRPM).ToString();
         }
 
         private void UpdateTlo()
@@ -251,19 +262,39 @@ namespace CNC.Controls
                 Comms.com.WriteByte(command);
         }
 
+        // COARSE is the 10% step in grblHAL (fine is 1%), which is what "- and + go down and up by
+        // 10%" asks for on both of these rows.
         private void FeedOvrMinus_Click(object sender, RoutedEventArgs e) { Send(GrblConstants.CMD_FEED_OVR_COARSE_MINUS); }
         private void FeedOvrPlus_Click(object sender, RoutedEventArgs e) { Send(GrblConstants.CMD_FEED_OVR_COARSE_PLUS); }
-        private void FeedOvrReset_Click(object sender, RoutedEventArgs e) { Send(GrblConstants.CMD_FEED_OVR_RESET); }
 
         private void SpindleOvrMinus_Click(object sender, RoutedEventArgs e) { Send(GrblConstants.CMD_SPINDLE_OVR_COARSE_MINUS); }
         private void SpindleOvrPlus_Click(object sender, RoutedEventArgs e) { Send(GrblConstants.CMD_SPINDLE_OVR_COARSE_PLUS); }
-        private void SpindleOvrReset_Click(object sender, RoutedEventArgs e) { Send(GrblConstants.CMD_SPINDLE_OVR_RESET); }
+
+        // ---------------------------------------------------------------- typed targets
+
+        private void SpindleRpm_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Enter) { ApplySpindleRpm(); e.Handled = true; }
+            else if (e.Key == System.Windows.Input.Key.Escape) { UpdateOverrides(); System.Windows.Input.Keyboard.ClearFocus(); }
+        }
+
+        private void SpindleRpm_LostFocus(object sender, RoutedEventArgs e) { UpdateOverrides(); }
 
         /// <summary>
-        /// Rapids has NO fine/coarse pair - grblHAL offers exactly three settings (100 / 50 / 25) as
-        /// distinct commands. So "-" and "+" walk that ladder rather than nudging a percentage, which
-        /// is why this row behaves differently from the other two. That is the firmware, not the UI.
+        /// Spindle speed IS directly settable - an S word sets the programmed RPM - so unlike feed
+        /// this needs no override arithmetic and works whether or not the machine is moving.
         /// </summary>
+        private void ApplySpindleRpm()
+        {
+            double rpm;
+            if (model == null || !double.TryParse(txtSpindleRpm.Text, out rpm) || rpm < 0d)
+            {
+                UpdateOverrides();
+                return;
+            }
+            model.ExecuteCommand("S" + ((int)rpm));
+        }
+
         private void RapidOvrMinus_Click(object sender, RoutedEventArgs e)
         {
             double current = model == null ? 100d : model.RapidsOverride;

@@ -23,11 +23,11 @@
         <!-- One consistent look for every "-" / "+" nudge button in here. Small, square, and flat, so
              three rows of them read as a column of values rather than a wall of buttons. -->
         <Style x:Key="NudgeButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="26"/>
-            <Setter Property="Height" Value="25"/>
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="27"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontSize" Value="18"/>
             <Setter Property="Focusable" Value="False"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
@@ -36,7 +36,7 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="HorizontalAlignment" Value="Right"/>
             <Setter Property="Margin" Value="0,0,7,0"/>
-            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontSize" Value="20"/>
         </Style>
 
         <!-- The value between the nudges. Read-only: these are machine truth (an override percentage
@@ -48,7 +48,7 @@
             <Setter Property="MinWidth" Value="58"/>
             <Setter Property="TextAlignment" Value="Center"/>
             <Setter Property="FontFamily" Value="Consolas"/>
-            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontSize" Value="20"/>
         </Style>
 
         <!-- One of two mutually exclusive speeds. Flat and unbordered until it is the active one,
@@ -65,6 +65,19 @@
             <Setter Property="BorderBrush" Value="Transparent"/>
         </Style>
 
+        <!-- Feed rate and Spindle show the LIVE value and accept a typed target, so they are boxes
+             rather than labels. Rapids stays a percentage: there is no "current rapid rate" to show,
+             only the setting itself. -->
+        <Style x:Key="EditValueStyle" TargetType="TextBox">
+            <Setter Property="MinWidth" Value="70"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="2,0"/>
+        </Style>
+
         <Style x:Key="GroupHeaderStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="10"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -77,7 +90,7 @@
              a resource entry per instance, and a missing x:Key is a runtime-only crash. -->
         <Style x:Key="SignalLetterStyle" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="Consolas"/>
-            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontSize" Value="20"/>
             <Setter Property="Margin" Value="0,0,7,0"/>
             <Setter Property="Foreground" Value="#FFBBBBBB"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -176,8 +189,9 @@
                 <TextBlock x:Uid="lbl_ovrFeed" Grid.Row="0" Grid.Column="0" Text="Feed rate:" Style="{StaticResource RowLabelStyle}"/>
                 <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
                     <Button x:Uid="btn_feedOvrMinus" Style="{StaticResource NudgeButtonStyle}" Content="&#8722;" Click="FeedOvrMinus_Click" ToolTip="Feed override down"/>
-                    <TextBlock x:Name="lblFeedOvr" Style="{StaticResource ValueStyle}"
-                               MouseLeftButtonUp="FeedOvrReset_Click" Cursor="Hand" ToolTip="Click to reset to 100%"/>
+                    <TextBox x:Name="txtFeedRate" Style="{StaticResource EditValueStyle}"
+                             IsReadOnly="True" Focusable="False" IsTabStop="False"
+                             ToolTip="Current feed rate (read-only - it comes from the program). The buttons step the feed override by 10%."/>
                     <Button x:Uid="btn_feedOvrPlus" Style="{StaticResource NudgeButtonStyle}" Content="+" Click="FeedOvrPlus_Click" ToolTip="Feed override up"/>
                 </StackPanel>
 
@@ -192,8 +206,9 @@
                 <TextBlock x:Uid="lbl_ovrSpindle" Grid.Row="2" Grid.Column="0" Text="Spindle:" Style="{StaticResource RowLabelStyle}"/>
                 <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0,3,0,0">
                     <Button x:Uid="btn_spindleOvrMinus" Style="{StaticResource NudgeButtonStyle}" Content="&#8722;" Click="SpindleOvrMinus_Click" ToolTip="Spindle override down"/>
-                    <TextBlock x:Name="lblSpindleOvr" Style="{StaticResource ValueStyle}"
-                               MouseLeftButtonUp="SpindleOvrReset_Click" Cursor="Hand" ToolTip="Click to reset to 100%"/>
+                    <TextBox x:Name="txtSpindleRpm" Style="{StaticResource EditValueStyle}"
+                             KeyDown="SpindleRpm_KeyDown" LostFocus="SpindleRpm_LostFocus"
+                             ToolTip="Programmed spindle RPM. Type a value and press Enter to set it; the buttons step the override by 10%."/>
                     <Button x:Uid="btn_spindleOvrPlus" Style="{StaticResource NudgeButtonStyle}" Content="+" Click="SpindleOvrPlus_Click" ToolTip="Spindle override up"/>
                 </StackPanel>
             </Grid>
