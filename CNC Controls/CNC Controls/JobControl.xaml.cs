@@ -65,6 +65,10 @@ namespace CNC.Controls
 
         private GrblViewModel model;
 
+        // MacroProcessor.ActiveProgramVersion at the time the "ready - press Run" prompt was last posted, so
+        // it is posted once per program rather than once per ready edge. -1 = nothing announced yet.
+        private int announcedProgramVersion = -1;
+
         public JobControl()
         {
             InitializeComponent();
@@ -298,10 +302,20 @@ namespace CNC.Controls
             if (model == null)
                 return;
             if (ready)
+            {
+                // Once per PROGRAM, not once per ready edge. The cue goes false and true again every time
+                // the Job tab is activated, so keying the prompt on that edge alone re-posted the same
+                // sentence on every visit - each one now also popping the status log. The version only
+                // moves when new program text is published to the program view (PublishGenerated).
+                if (announcedProgramVersion == MacroProcessor.ActiveProgramVersion)
+                    return;
+                announcedProgramVersion = MacroProcessor.ActiveProgramVersion;
+
                 // The compile stats ride along instead of being wiped: this prompt lands right after
                 // Generate posts its "compiled - N lines in X s" message, and used to overwrite it.
                 model.Message = string.Format(LibStrings.FindResource("ReadyCycleStart"), MacroProcessor.ActiveProgramName ?? "Program", RunLabels.CycleStart)
                     + (string.IsNullOrEmpty(MacroProcessor.ActiveProgramStats) ? string.Empty : "  (" + MacroProcessor.ActiveProgramStats + ")");
+            }
             else
                 // Drop the prompt along with the cue itself - previously only the (invisible) boolean flipped
                 // here, leaving the "<name> ready - press Run to run." TEXT stale on screen through an entire

@@ -123,6 +123,13 @@ namespace CNC.Controls
         // builds a program (Work Order does), cleared by PublishGenerated when a caller has none to report.
         public static string ActiveProgramStats;
 
+        // Bumped every time new program text reaches the program view (PublishGenerated, below - the one
+        // place that happens). It exists so a consumer can tell "a different program" from "the same
+        // program again": JobControl announces "<name> ready - press Run to run." once per program rather
+        // than on every false->true edge of the ready cue, since that cue also flips with tab activation
+        // and re-reading the same sentence on every visit to the Job tab is noise, not news.
+        public static int ActiveProgramVersion { get; private set; }
+
 
         // Step 7 seam (unified streaming engine): start the just-loaded job as a macro run - the shell
         // (ioSender XL) points this at its run bar's JobControl.RunMacro, since the JobControl INSTANCE
@@ -151,6 +158,7 @@ namespace CNC.Controls
         public static void PublishGenerated(string name, string program, System.Action ensureProgramView, System.Func<ProgramView> getProgramView, string stats = null)
         {
             ActiveProgramStats = stats;
+            ActiveProgramVersion++;
             SaveGeneratedCopy(name, program);
             ensureProgramView();
             var view = getProgramView();
