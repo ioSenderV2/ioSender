@@ -653,9 +653,24 @@ namespace CNC.Controls
 
             List<CNC.Core.VCarvePass> passes;
             if (carvePassCache.TryGetValue(key, out passes))
+            {
+                // Logged because the whole cost question turns on this: a HIT returns in microseconds and
+                // a MISS is the multi-minute build. A timing trace that does not say which it was is
+                // unreadable - the second Generate of the same text looks like a different engine.
+                if (DebugLog.Enabled)
+                    DebugLog.Write("workorder", string.Format(CultureInfo.InvariantCulture,
+                        "carve cache HIT ({0} passes) text=\"{1}\"", passes.Count, tp.Text));
                 return passes;
+            }
 
+            var swCarve = System.Diagnostics.Stopwatch.StartNew();
             passes = CNC.Core.VCarve.Build(polys, halfAngle, maxDepth, CarveResolution, CarveDepthStep);
+            swCarve.Stop();
+            if (DebugLog.Enabled)
+                DebugLog.Write("workorder", string.Format(CultureInfo.InvariantCulture,
+                    "carve cache MISS {0:0}ms ({1} passes, {2} contours, res={3}mm, step={4}mm) text=\"{5}\"",
+                    swCarve.Elapsed.TotalMilliseconds, passes.Count, polys.Count,
+                    CarveResolution, CarveDepthStep, tp.Text));
 
             if (carvePassCache.Count >= CarveCacheMax)
                 carvePassCache.Clear();
@@ -1530,8 +1545,21 @@ namespace CNC.Controls
 
                     // Tool number up front in the header: it's what the operator has to have in the spindle, and
                     // ProgramView's title-bar tooltip reads these to list what's still to come.
+                    //
+                    // Timing instrumentation only. The schedule index, the description and the line count are
+                    // all already computed here, so this is also exactly the granularity a progress message
+                    // could use - measured first to confirm the time is where it looks like it is, rather than
+                    // reporting per-operation progress and discovering one operation is the whole four minutes.
+                    var swOp = System.Diagnostics.Stopwatch.StartNew();
+                    int linesBefore = lines.Count;
                     AppendSection(lines, string.Format("T{0} {1} - {2}{3}", ToolNumberFor(op), tp.Name, desc, suffix),
                         BuildOperation(tp, op, usableOpen, spindleTool, spindleOn, spindleRpm, sameToolNext));
+                    swOp.Stop();
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("workorder", string.Format(CultureInfo.InvariantCulture,
+                            "compile op {0}/{1} {2:0}ms | +{3} lines | {4} - {5}",
+                            si + 1, schedule.Count, swOp.Elapsed.TotalMilliseconds,
+                            lines.Count - linesBefore, tp.Name, desc));
                     spindleTool = ToolNumberFor(op);
                     double rpmThisOp = Rpm(op);
                     if (rpmThisOp > 0d) { spindleRpm = rpmThisOp; spindleOn = sameToolNext; }

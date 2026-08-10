@@ -84,6 +84,11 @@ namespace CNC.Core
         /// V-point is simply not a facing tool. False is for the recursion itself and for callers that
         /// only want the true carve contours.
         /// </param>
+        // How deep the clearFlats recursion currently is, so each timing line says which generation it
+        // came from. ThreadStatic because the field is per-call state, not shared: a compile moved off
+        // the UI thread later must not see another thread's nesting.
+        [ThreadStatic] private static int _buildDepth;
+
         public static List<VCarvePass> Build(IList<IList<Point2D>> contours, double halfAngleRad,
                                              double maxDepth, double resolutionMm, double depthStepMm,
                                              bool clearFlats = true)
@@ -104,15 +109,35 @@ namespace CNC.Core
             // measuring it.
             double maxDist = maxDepth * tan;
 
+            // ---- timing instrumentation only; no behaviour change ----
+            // A Work Order Generate over V-carve text runs for MINUTES behind one static
+            // "Compiling..." message, and the four phases below are indistinguishable from outside, so
+            // there is no way to know which one to report progress against. Measured before designing
+            // any indicator, so it tracks whatever actually dominates rather than whichever phase was
+            // easiest to hook. The nesting level is tagged because clearFlats RE-ENTERS this method up
+            // to 20 times - untagged, those generations read as top-level runs.
+            _buildDepth++;
+            int nestLevel = _buildDepth;
+            var swTotal = System.Diagnostics.Stopwatch.StartNew();
+            var swPhase = System.Diagnostics.Stopwatch.StartNew();
+            double msField = 0d, msIso = 0d, msRidge = 0d, msFlats = 0d;
+            int isoLevels = 0, flatGens = 0, fieldCells = 0;
+            try
+            {
+
             var field = DistanceField.Build(contours, cell, maxDist);
+            msField = swPhase.Elapsed.TotalMilliseconds;
             if (field == null)
                 return passes;
+            fieldCells = field.CellCount;
 
             // Shallow to deep, outside to inside: each level's contour sits inside the previous one, so
             // cutting in this order means the tool is always stepping down into material it has already
             // opened up rather than plunging into solid stock.
+            swPhase.Restart();
             for (double depth = 0d; depth <= maxDepth + 1e-9; depth += step)
             {
+                isoLevels++;
                 double dist = depth * tan;
                 foreach (var ring in field.IsoContours(dist))
                 {
@@ -121,6 +146,8 @@ namespace CNC.Core
                     passes.Add(new VCarvePass { Depth = Math.Min(depth, maxDepth), Path = ring });
                 }
             }
+            msIso = swPhase.Elapsed.TotalMilliseconds;
+            swPhase.Restart();
 
             // The stepped levels are not enough. Consecutive passes tile the V-walls exactly - a pass's
             // flank runs through the tip of the pass above it - but the groove's bottom vertex is cut only
@@ -165,6 +192,8 @@ namespace CNC.Core
                 // Restore shallow-to-deep; List.Sort is unstable, so keep it deterministic by depth only.
                 passes.Sort((a, b) => a.Depth.CompareTo(b.Depth));
             }
+            msRidge = swPhase.Elapsed.TotalMilliseconds;
+            swPhase.Restart();
 
             if (clearFlats)
             {
@@ -174,6 +203,7 @@ namespace CNC.Core
                         region.Add(p.Path);
                 for (int gen = 0; gen < 20 && region.Count > 0; gen++)
                 {
+                    flatGens++;
                     var inner = Build(region, halfAngleRad, maxDepth, resolutionMm, depthStepMm, false);
                     region = new List<IList<Point2D>>();
                     foreach (var p in inner)
@@ -186,8 +216,23 @@ namespace CNC.Core
                     }
                 }
             }
+            msFlats = swPhase.Elapsed.TotalMilliseconds;
 
             return passes;
+
+            }
+            finally
+            {
+                _buildDepth--;
+                swTotal.Stop();
+                // "flats" INCLUDES the nested generations, which log their own L2 lines - so a top-level
+                // line whose flats dominates is answered in detail by the lines beneath it.
+                if (DebugLog.Enabled)
+                    DebugLog.Write("vcarve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "L{0} total={1:0}ms | field={2:0}ms ({3} cells) | iso={4:0}ms ({5} levels) | ridge={6:0}ms | flats={7:0}ms ({8} gens) | passes={9}",
+                        nestLevel, swTotal.Elapsed.TotalMilliseconds, msField, fieldCells,
+                        msIso, isoLevels, msRidge, msFlats, flatGens, passes.Count));
+            }
         }
 
         // ---------------------------------------------------------------------------------------------
@@ -199,6 +244,10 @@ namespace CNC.Core
             private double[] dist;      // distance to boundary, negative outside the region
             private int nx, ny;
             private double x0, y0, cell;
+
+            // Grid size, for the timing line only: it is what the field's cost actually scales with, so
+            // "field is slow" and "the grid is huge" can be told apart without guessing at the resolution.
+            public int CellCount { get { return nx * ny; } }
 
             public static DistanceField Build(IList<IList<Point2D>> contours, double cell, double maxDist)
             {
