@@ -89,6 +89,15 @@ namespace CNC.Controls
             lampToolSetter = AddProbeLetter("T", 1, "Tool setter input");
 
             DataContextChanged += OnDataContextChanged;
+
+            // The Keyboard Jogging panel writes the same setting; without this, changing it there left
+            // this panel showing the old choice until something else forced a refresh.
+            if (AppConfig.Settings != null && AppConfig.Settings.Jog != null)
+                AppConfig.Settings.Jog.PropertyChanged += (s2, e2) =>
+                {
+                    if (e2.PropertyName == "DefaultSpeedFast" || e2.PropertyName == "FastFeedrate" || e2.PropertyName == "SlowFeedrate")
+                        UpdateKbdSpeeds();
+                };
             // The bars are sized from ActualWidth, so they have to be redrawn whenever the strip
             // reflows - otherwise a resized box keeps a bar scaled for its old width.
             SizeChanged += (s2, e2) => UpdateOverrides();
@@ -167,6 +176,11 @@ namespace CNC.Controls
                 case nameof(GrblViewModel.RapidsOverride): UpdateOverrides(); break;
                 case nameof(GrblViewModel.RPMOverride):    UpdateOverrides(); break;
                 case nameof(GrblViewModel.SpindleState):  UpdateSpindleDirection(); break;
+                // GrblState changes on connect, which is the first moment GrblInfo knows what the
+                // spindle can do. Without this the CW/CCW visibility was decided BEFORE the $I reply
+                // and then never revisited - it only refreshed when the spindle state changed, which
+                // on an idle machine never happens.
+                case nameof(GrblViewModel.GrblState):     UpdateSpindleDirection(); break;
                 case nameof(GrblViewModel.TloReference):
                 case nameof(GrblViewModel.IsTloReferenceSet): UpdateTlo(); break;
                 case nameof(GrblViewModel.JogStep):        UpdateJog(); break;
@@ -306,7 +320,11 @@ namespace CNC.Controls
             btnKbdSlow.Content = ((int)rates[(int)JogMode.Slow]).ToString();
             btnKbdFast.Content = ((int)rates[(int)JogMode.Fast]).ToString();
 
-            bool fast = model.Keyboard.DefaultSpeedFast;
+            // AppConfig.Settings.Jog.DefaultSpeedFast is the source of truth - it is what the
+            // Keyboard Jogging panel writes and what persists. The controller's own copy is a live
+            // mirror of it, so reading the controller here made this panel and that one disagree the
+            // moment either was changed.
+            bool fast = AppConfig.Settings.Jog.DefaultSpeedFast;
             Highlight(btnKbdSlow, !fast);
             Highlight(btnKbdFast, fast);
         }
@@ -323,11 +341,12 @@ namespace CNC.Controls
 
         private void SetKbdSpeed(bool fast)
         {
+            // Write BOTH, exactly as the Keyboard Jogging panel does: the setting (which persists and
+            // is what every other surface reads) and the live controller copy (so it takes effect now).
+            AppConfig.Settings.Jog.DefaultSpeedFast = fast;
             if (model != null && model.Keyboard != null)
-            {
                 model.Keyboard.DefaultSpeedFast = fast;
-                UpdateKbdSpeeds();
-            }
+            UpdateKbdSpeeds();
         }
 
         // ---------------------------------------------------------------- jogging
