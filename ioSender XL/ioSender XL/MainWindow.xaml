@@ -224,9 +224,21 @@
                 <!-- Button-row region (col 0, star): three lines (MDI / run buttons / State), left-aligned; the
                      column grows to fill the slack up to the jog pad. -->
                 <StackPanel Grid.Column="0" Orientation="Vertical" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-                        <!-- MDI line: width tied to the button row so its right edge (Send) aligns with Program. -->
-                        <cnccontrols:MDIControl x:Name="mdiControl" Bare="True" HorizontalAlignment="Left" Margin="0,5,0,0"
-                                                Width="{Binding ElementName=buttonRow, Path=ActualWidth}"/>
+                        <!-- Run line. The MDI entry box that used to live here is gone: a single-line
+                             box on the strip was a worse place to type g-code than the console, which
+                             has history, multi-line paste and the replies right above it. The button
+                             opens that instead, focused and ready to type. -->
+                        <Grid Margin="0,5,0,0" Width="{Binding ElementName=buttonRow, Path=ActualWidth}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <cnccontrols:JobControl Grid.Column="0" x:Name="runControl" VerticalAlignment="Center"/>
+                            <Button x:Uid="btn_mdiConsole" x:Name="btnMdiConsole" Grid.Column="2" Content="MDI Console"
+                                    Padding="10,3" VerticalAlignment="Center" Click="MdiConsole_Click"
+                                    ToolTip="Open the console with the caret in its input box. Esc closes it."/>
+                        </Grid>
                         <!-- Button line: the row stretches to fill the star column so its right edge (Program) meets
                              the jog pad; the three groups (status / job / program) are pushed apart by star spacers
                              so the run buttons span the width instead of huddling at the left. -->
@@ -236,8 +248,12 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <cnccontrols:StatusControl Grid.Column="0" ShowState="False" VerticalAlignment="Top"/>
-                            <cnccontrols:JobControl Grid.Column="2" x:Name="runControl" VerticalAlignment="Top"/>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <cnccontrols:StatusControl ShowState="False" VerticalAlignment="Center"/>
+                                <!-- State moved up onto this line (2026-08-10), set well clear of Reset so
+                                     a readout is never mistaken for another button. -->
+                                <cnccontrols:StatusControl ShowButtons="False" VerticalAlignment="Center" Margin="28,0,0,0"/>
+                            </StackPanel>
                         </Grid>
                         <!-- State: / Check directly under Home/Unlock/Reset, with the Jog distance/feed preset
                              spinners on the same line. Width is tied to the button row so the selector's right
@@ -248,8 +264,7 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                                <cnccontrols:StatusControl ShowButtons="False" VerticalAlignment="Center"/>
-                                <!-- Demo-video timelapse marker toggle, right of the State field. Hidden unless
+                                <!-- Demo-video timelapse marker toggle. Hidden unless
                                      launched with -demomarker (visibility set in MainWindow.xaml.cs). Marks
                                      TIMELAPSE_ON/OFF into the demo marker file; see docs/demo-videos. -->
                                 <ToggleButton x:Uid="btnTimeLapse" x:Name="btnTimeLapse" Content="Timelapse" MinWidth="80" Margin="12,0,0,0" VerticalAlignment="Center" Focusable="False" Visibility="Collapsed" ToolTip="Demo capture: mark the timelapse window. Flip ON at the moment you switch the camera to timelapse, OFF when you switch back. Auto-ON a few minutes after Run if you don't; auto-OFF at job end." Checked="TimeLapse_Toggled" Unchecked="TimeLapse_Toggled">
@@ -291,7 +306,15 @@
                     </StackPanel>
                 <!-- Jog pad (col 1): shrunk arrows-only copy of the Jog-tab control (selection shared via JogData),
                      riding at the left of the right-hand group, just past the button-row column. -->
-                <StackPanel Grid.Column="1" Orientation="Vertical" Margin="18,0,10,0" VerticalAlignment="Center">
+                <!-- DRO sits immediately left of the jog pad: where you are, right beside the thing
+                     that moves you. Scaled to the strip like the pad is. -->
+                <cnccontrols:DROControl Grid.Column="1" x:Name="stripDro" VerticalAlignment="Center" Margin="14,0,0,0">
+                    <cnccontrols:DROControl.LayoutTransform>
+                        <ScaleTransform ScaleX="0.72" ScaleY="0.72"/>
+                    </cnccontrols:DROControl.LayoutTransform>
+                </cnccontrols:DROControl>
+
+                <StackPanel Grid.Column="2" Orientation="Vertical" Margin="14,0,10,0" VerticalAlignment="Center">
                     <cnccontrols:JogBaseControl x:Name="jogPad" ArrowsOnly="True" HorizontalAlignment="Center">
                         <cnccontrols:JogBaseControl.LayoutTransform>
                             <ScaleTransform ScaleX="0.65" ScaleY="0.65"/>
@@ -305,7 +328,7 @@
                      (Jogging | Signals | Feeds and Speeds). Replaces the separate JogPresetSelector,
                      KbdDefaultSpeedControl, SignalsControl and FeedControl that used to occupy these
                      columns - see that spec for why none of them fitted the shape asked for. -->
-                <cnccontrols:RunStripPanel Grid.Column="2" Grid.ColumnSpan="3" x:Name="runStripPanel"
+                <cnccontrols:RunStripPanel Grid.Column="3" Grid.ColumnSpan="2" x:Name="runStripPanel"
                                            Margin="4,0,4,0" VerticalAlignment="Center"/>
             </Grid>
         </Border>

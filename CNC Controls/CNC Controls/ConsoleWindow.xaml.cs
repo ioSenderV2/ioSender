@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ConsoleWindow.xaml.cs - part of CNC Controls library for Grbl
  *
  * v0.27 / 2020-09-19 / Io Engineering (Terje Io)
@@ -135,6 +135,15 @@ namespace CNC.Controls
             cfg.ConsoleWindowHeight = bounds.Height;
 
             AppConfig.Settings.Save();
+        }
+
+        /// <summary>Show (if hidden) and put the caret in the MDI input.</summary>
+        public void FocusInput()
+        {
+            if (!IsVisible)
+                Show();
+            Activate();
+            console.FocusInput();
         }
     }
 }

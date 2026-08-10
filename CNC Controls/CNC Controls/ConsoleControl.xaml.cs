@@ -415,5 +415,17 @@ namespace CNC.Controls
                 ? string.Format("{0} of {1}", _matchIndex + 1, _matches.Count)
                 : (_matchQuery.Length > 0 ? "no matches" : string.Empty);
         }
+
+        /// <summary>
+        /// Put the caret in the MDI input. Called when the console is opened FOR typing (the run
+        /// strip's "MDI Console" button) rather than merely shown - opening it and leaving focus
+        /// elsewhere means the first thing typed goes nowhere.
+        /// </summary>
+        public void FocusInput()
+        {
+            txtInput.Focus();
+            System.Windows.Input.Keyboard.Focus(txtInput);
+            txtInput.CaretIndex = txtInput.Text == null ? 0 : txtInput.Text.Length;
+        }
     }
 }

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * MainWindow.xaml.cs - part of ioSender
  *
  * v0.47 / 2026-04-29 / Io Engineering (Terje Io)
@@ -354,12 +354,11 @@ namespace GCode_Sender
 
         private void WireBarOverlays()
         {
-            // Console log overlay follows the command box: appears when it gets focus, dismisses once focus
-            // leaves BOTH the box and the log (so you can scroll/select/copy from the log), or on Esc.
-            mdiControl.GotKeyboardFocus += (s, e) => { _consoleOverlay = true; UpdateOverlay(); };
-            mdiControl.LostKeyboardFocus += (s, e) => ScheduleConsoleOverlayCheck();
+            // The console-log overlay used to follow the run strip's MDI box, appearing while you
+            // typed there. That box is gone (2026-08-10) - the MDI Console button opens the real
+            // console instead, which has the log, the history and multi-line paste - so only the
+            // overlay's own focus/Esc handling remains, for anything else that still shows it.
             overlayConsole.LostKeyboardFocus += (s, e) => ScheduleConsoleOverlayCheck();
-            mdiControl.PreviewKeyDown += ConsoleOverlay_Key;
             overlayConsole.PreviewKeyDown += ConsoleOverlay_Key;
 
             // A real file load creates the job's own program view and connects it (ProgramView refactor):
@@ -625,7 +624,7 @@ namespace GCode_Sender
         {
             Dispatcher.BeginInvoke(new System.Action(() =>
             {
-                if (!mdiControl.IsKeyboardFocusWithin && !overlayConsole.IsKeyboardFocusWithin)
+                if (!overlayConsole.IsKeyboardFocusWithin)
                 {
                     _consoleOverlay = false;
                     UpdateOverlay();
@@ -700,7 +699,9 @@ namespace GCode_Sender
         // The single fixed run control + MDI at the main-window bottom (Phase 2c). JobView and other tabs
         // reach them here instead of hosting their own.
         public CNC.Controls.JobControl RunControl { get { return runControl; } }
-        public CNC.Controls.MDIControl MdiControl { get { return mdiControl; } }
+        // The run strip no longer hosts an MDI box (2026-08-10); null keeps the one caller
+        // (JobView's "is the MDI focused" keyboard-jog guard) working without a special case.
+        public CNC.Controls.MDIControl MdiControl { get { return null; } }
 
         public string BaseWindowTitle { get; set; }
 
@@ -2977,6 +2978,17 @@ namespace GCode_Sender
 
         // Public entry point for the "pop out the console" gesture (double-clicking the Console tab -
         // JobWorkspace.BuildCenter wires it), replacing the removed "Open Console" menu item.
+        /// <summary>
+        /// Run strip's "MDI Console": open the console and put the caret in its input, so the button
+        /// leads straight into typing. Merely showing the window would leave focus wherever it was
+        /// and the first thing typed would go nowhere.
+        /// </summary>
+        private void MdiConsole_Click(object sender, RoutedEventArgs e)
+        {
+            openConsole();
+            UIViewModel.Console?.FocusInput();
+        }
+
         public void OpenConsoleWindow()
         {
             openConsole();
