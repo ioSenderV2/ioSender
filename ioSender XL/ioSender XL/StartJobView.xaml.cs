@@ -702,6 +702,11 @@ namespace GCode_Sender
                 if (model == null)
                     model = DataContext as GrblViewModel;
                 if (!loaded) { LoadInputs(); loaded = true; }   // restore the last estimate/options
+                // Material is now editable on the Work Order tab too (one shared value, two editors). This
+                // tab loads its inputs ONCE and then rebuilds StartJobConfig.Section wholesale from its own
+                // controls in SaveInputs on the way out - so without re-reading it here, merely visiting and
+                // leaving Setup would write the stale combo value back over an edit made in Work Order.
+                cbxMaterial.SelectedItem = cbxMaterial.Items.Cast<string>().FirstOrDefault(m => m == (Section?.Material ?? string.Empty));
                 CheckStockAgainstProgram();
                 RefreshFixtures();
                 UpdateSizeHint();

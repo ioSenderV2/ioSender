@@ -86,6 +86,11 @@ namespace CNC.Controls
             cbxTextHAlign.SelectionChanged += (s, e) => CaptureFields();
             cbxTextVAlign.SelectionChanged += (s, e) => CaptureFields();
 
+            // Same list, same source, as the Setup tab's own Material dropdown - there is one material
+            // table (FeedsSpeedsAdvisor) and this is a second editor of the one shared value, not a copy.
+            foreach (var material in CNC.Core.FeedsSpeedsAdvisor.MaterialRefs.Keys.OrderBy(m => m))
+                cbxMaterial.Items.Add(material);
+
             foreach (var f in AllFields())
                 System.ComponentModel.DependencyPropertyDescriptor
                     .FromProperty(NumericField.ValueProperty, typeof(NumericField))
@@ -174,9 +179,25 @@ namespace CNC.Controls
                 tp.IndirectSource = workOrder.Toolpaths.FirstOrDefault(t => !t.IsIndirect)?.Name;
                 UpdateIndirectName(tp);
             }
+            EnsureTextEngraveOperation(tp);
             workOrder.Toolpaths.Add(tp);
             RebuildTree(tp);
             OnWorkOrderChanged();
+        }
+
+        // A Text toolpath supports exactly one operation - Engrave - and does nothing at all without it
+        // (WorkOrderRules.AvailableOperations returns Engrave and yields nothing else for this geometry).
+        // Making the operator open the picker to choose the only thing it can offer is pure ceremony, so
+        // create it up front. NewOperation is what picks the V-bit and its feeds, so this stays one
+        // definition of what an Engrave starts life as.
+        private static void EnsureTextEngraveOperation(WorkOrderToolpath tp)
+        {
+            if (tp == null || tp.Geometry != WorkOrderGeometryKind.Text)
+                return;
+            if (tp.Operations.Any(o => o.Kind == WorkOrderOpKind.Engrave))
+                return;     // switched away and back, or loaded from a saved work order
+
+            tp.Operations.Add(NewOperation(WorkOrderOpKind.Engrave, tp));
         }
 
         // Default name is the geometry plus a running count, e.g. "Circle 1" - editable in the Name field.
@@ -729,7 +750,38 @@ namespace CNC.Controls
             else
                 txtPanelHeader.Text = "Add a toolpath to get started";
 
+            LoadMaterial();
+
             loadingFields = false;
+            UpdateFeedsSummary();
+        }
+
+        // The shared Setup material, shown on the toolpath panel. Re-read rather than remembered: Setup can
+        // change it while this view is alive, and the value belongs to the job setup, not to any toolpath.
+        private void LoadMaterial()
+        {
+            string material = StartJobConfig.Section?.Material ?? string.Empty;
+            cbxMaterial.SelectedItem = cbxMaterial.Items.Cast<string>().FirstOrDefault(m => m == material);
+        }
+
+        private void cbxMaterial_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (loadingFields)
+                return;
+
+            var s = StartJobConfig.Section;
+            if (s == null)
+                return;
+
+            string material = cbxMaterial.SelectedItem as string ?? string.Empty;
+            if (s.Material == material)
+                return;
+
+            s.Material = material;
+            AppConfig.Settings.Save();
+
+            // The material feeds every operation's suggested speeds, so the summary under the panel is
+            // stale the moment it changes.
             UpdateFeedsSummary();
         }
 
@@ -1089,6 +1141,11 @@ namespace CNC.Controls
                     selectedToolpath.IndirectSource = workOrder.Toolpaths.FirstOrDefault(t => !ReferenceEquals(t, selectedToolpath) && !t.IsIndirect)?.Name;
                 UpdateIndirectName(selectedToolpath);
             }
+
+            // Switching TO Text lands on a geometry with exactly one possible operation - give it the same
+            // head start a freshly added Text toolpath gets. The drop above has already removed whatever the
+            // previous geometry's operations were, so this cannot stack on top of them.
+            EnsureTextEngraveOperation(selectedToolpath);
 
             RebuildTree(selectedToolpath);
             LoadFields();
@@ -1911,6 +1968,10 @@ namespace CNC.Controls
                 MacroProcessor.ActiveGenerate = Generate;
                 MacroProcessor.DiscardGenerated = DiscardProgram;
                 MacroProcessor.IsProgramGenerated = false;
+                // Setup may have changed the shared material while this tab was away.
+                loadingFields = true;
+                LoadMaterial();
+                loadingFields = false;
                 UpdateValidation();
             }
             else

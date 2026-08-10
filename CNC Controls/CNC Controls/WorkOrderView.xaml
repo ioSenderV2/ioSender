@@ -158,6 +158,16 @@
                             <ComboBox x:Name="cbxTextVAlign" MinWidth="180" MinHeight="22" VerticalAlignment="Center"
                                       ToolTip="Vertical placement in the leftover room. On a Line: Top sets the text on the line, Bottom hangs it below, Center straddles it."/>
                         </StackPanel>
+                        <!-- Stock material. NOT a property of this toolpath - it is the one on the Setup tab,
+                             edited here as well so a wrong material can be corrected without leaving Work
+                             Order. Always visible: it drives every operation's feeds and speeds, not just an
+                             engrave, so hiding it behind the Text checkbox would be arbitrary. -->
+                        <StackPanel x:Name="pnlMaterialRow" Orientation="Horizontal" Margin="0,2,0,2">
+                            <Label x:Uid="lbl_womaterial" Content="Material:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Uid="cbx_womaterial" x:Name="cbxMaterial" MinWidth="180" MinHeight="22" VerticalAlignment="Center"
+                                      SelectionChanged="cbxMaterial_SelectionChanged"
+                                      ToolTip="Stock material, shared with the Setup tab - changing it here changes it there. Drives the feeds and speeds suggested for every operation in this work order."/>
+                        </StackPanel>
 
                         <!-- Surface only - see WorkOrderToolpath.EntireSpoilboard's own comment. -->
                         <StackPanel x:Name="pnlEntireSpoilboard" Orientation="Horizontal" Margin="0,0,0,6">
