@@ -373,7 +373,15 @@ namespace GCode_Sender
                     else if (e.PropertyName == nameof(GrblViewModel.IsJobRunning))
                         OnJobRunningChanged((s as GrblViewModel)?.IsJobRunning == true);
                     else if (e.PropertyName == nameof(GrblViewModel.Message))
-                        FlashMessage((s as GrblViewModel)?.IsMessageError == true);
+                    {
+                        // Only for a message the log actually RECORDS - see GrblViewModel.IsLoggableMessage.
+                        // Clearing the message is a change to the property but is not a message, and views
+                        // clear it on activate, so every tab switch used to pop this window with nothing new
+                        // in it.
+                        var msgModel = s as GrblViewModel;
+                        if (msgModel != null && GrblViewModel.IsLoggableMessage(msgModel.Message))
+                            FlashMessage(msgModel.IsMessageError);
+                    }
                     else if (e.PropertyName == nameof(GrblViewModel.ConnectionTarget))
                     {
                         UpdateConnectMenuHeader();   // keep the top-level Connect/Reconnect label current

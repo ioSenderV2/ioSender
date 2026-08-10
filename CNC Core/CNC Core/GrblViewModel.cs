@@ -844,16 +844,27 @@ namespace CNC.Core
         // for what a per-append UI rebuild does to a busy stream).
         public System.Collections.Generic.List<string> MessageLog { get; } = new System.Collections.Generic.List<string>();
 
+        /// <summary>
+        /// Whether a message is one the log actually records - and therefore the only kind worth popping
+        /// the log window for. The window follows the LOG, not the property: assigning Message raises a
+        /// change for a clear (every tab switch does one - see ProbingView.Activate) and for firmware
+        /// bookkeeping, neither of which puts a line in the log. Popping a window to show nothing new is
+        /// exactly the bug this predicate exists to prevent, so both sides ask the same question here
+        /// rather than each keeping their own copy of the rule.
+        ///
+        /// grblHAL announces which input claimed the link ("SERIAL STREAM ACTIVE", "TELNET STREAM
+        /// ACTIVE") every time one is opened. It is firmware bookkeeping, not something an operator can
+        /// act on, and switching between serial and network makes it repeat several times per reconnect.
+        /// </summary>
+        public static bool IsLoggableMessage(string message)
+        {
+            return !string.IsNullOrWhiteSpace(message)
+                && message.IndexOf("STREAM ACTIVE", StringComparison.OrdinalIgnoreCase) < 0;
+        }
+
         private void LogMessage(string message, bool isError)
         {
-            if (string.IsNullOrWhiteSpace(message))
-                return;
-
-            // grblHAL announces which input claimed the link ("SERIAL STREAM ACTIVE", "TELNET STREAM
-            // ACTIVE") every time one is opened. It is firmware bookkeeping, not something an
-            // operator can act on, and switching between serial and network makes it repeat several
-            // times per reconnect - which is noise in a log that now POPS A WINDOW when it grows.
-            if (message.IndexOf("STREAM ACTIVE", StringComparison.OrdinalIgnoreCase) >= 0)
+            if (!IsLoggableMessage(message))
                 return;
 
             MessageLog.Add(string.Format("{0:HH:mm:ss}  {1}{2}", DateTime.Now, isError ? "! " : string.Empty, message));
