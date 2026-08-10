@@ -69,7 +69,7 @@
              rather than labels. Rapids stays a percentage: there is no "current rapid rate" to show,
              only the setting itself. -->
         <Style x:Key="EditValueStyle" TargetType="TextBox">
-            <Setter Property="MinWidth" Value="70"/>
+            <Setter Property="MinWidth" Value="96"/>
             <Setter Property="TextAlignment" Value="Center"/>
             <Setter Property="FontFamily" Value="Consolas"/>
             <Setter Property="FontSize" Value="20"/>
@@ -104,6 +104,12 @@
             <Setter Property="Margin" Value="0,0,7,0"/>
             <Setter Property="Foreground" Value="#FFBBBBBB"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- P and T are the two selectable probe INPUTS, not two signals: only one is routed at a
+             time, and the other is struck through. Double-click the struck-through one to select it. -->
+        <Style x:Key="ProbeLetterStyle" TargetType="TextBlock" BasedOn="{StaticResource SignalLetterStyle}">
+            <Setter Property="Cursor" Value="Hand"/>
         </Style>
     </UserControl.Resources>
 
@@ -213,7 +219,7 @@
                 <TextBlock x:Uid="lbl_ovrRapids" Grid.Row="1" Grid.Column="0" Text="Rapids:" Style="{StaticResource RowLabelStyle}"/>
                 <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,3,0,0">
                     <Button x:Uid="btn_rapidOvrMinus" Style="{StaticResource NudgeButtonStyle}" Content="&#8722;" Click="RapidOvrMinus_Click" ToolTip="Rapids override down (100 / 50 / 25 only)"/>
-                    <TextBlock x:Name="lblRapidOvr" Style="{StaticResource ValueStyle}"
+                    <TextBlock x:Name="lblRapidOvr" Style="{StaticResource ValueStyle}" MinWidth="96"
                                MouseLeftButtonUp="RapidOvrReset_Click" Cursor="Hand" ToolTip="Click to reset to 100%"/>
                     <Button x:Uid="btn_rapidOvrPlus" Style="{StaticResource NudgeButtonStyle}" Content="+" Click="RapidOvrPlus_Click" ToolTip="Rapids override up (100 / 50 / 25 only)"/>
                 </StackPanel>

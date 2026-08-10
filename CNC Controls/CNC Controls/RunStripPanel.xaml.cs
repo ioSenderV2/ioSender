@@ -52,6 +52,8 @@ namespace CNC.Controls
         // turn a display refresh into an M3/M4/M5.
         private bool syncing;
 
+        private TextBlock lampProbe, lampToolSetter;
+
         public RunStripPanel()
         {
             InitializeComponent();
@@ -70,11 +72,54 @@ namespace CNC.Controls
 
             // Probes row, per the spec's letters. Note H and S are the HOLD and CYCLE START inputs
             // (physical panel buttons), not probe signals - kept here because the spec asked for them.
+            // H and S are the controller's FEED HOLD and CYCLE START input pins - the physical panel
+            // buttons - so they light while the button is pressed, not while the machine is holding.
             AddLamp(rowProbes, "H", Signals.Hold);
             AddLamp(rowProbes, "S", Signals.CycleStart);
-            AddLamp(rowProbes, "P", Signals.Probe);
+
+            // P and T are the two selectable probe inputs rather than two signals: grblHAL routes ONE
+            // at a time, so both show the same Probe bit and the unselected one is struck through.
+            lampProbe = AddProbeLetter("P", 0, "Standard probe input");
+            lampToolSetter = AddProbeLetter("T", 1, "Tool setter input");
 
             DataContextChanged += OnDataContextChanged;
+        }
+
+        /// <summary>
+        /// A probe-input letter. Carries the live Probe signal like any lamp, plus a strikethrough
+        /// when it is not the selected input, and a double-click to select it.
+        /// </summary>
+        private TextBlock AddProbeLetter(string letter, int probeId, string tip)
+        {
+            var block = new TextBlock
+            {
+                Text = letter,
+                Style = (Style)FindResource("ProbeLetterStyle"),
+                ToolTip = tip + " - double-click to route the probe here.",
+                Tag = probeId
+            };
+            block.MouseLeftButtonDown += ProbeLetter_Click;
+            rowProbes.Children.Add(block);
+            lamps.Add(new KeyValuePair<TextBlock, Signals>(block, Signals.Probe));
+            return block;
+        }
+
+        private void ProbeLetter_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.ClickCount != 2 || model == null)
+                return;
+
+            var block = sender as TextBlock;
+            if (block == null || !(block.Tag is int))
+                return;
+
+            int probeId = (int)block.Tag;
+            if (probeId == model.Probe)
+                return;                     // already the selected input - nothing to switch
+
+            // GrblCommand.ProbeSelect is the controller-side macro that actually routes the input;
+            // the model's own Probe property follows from the parser state it reports back.
+            model.ExecuteCommand(string.Format(GrblCommand.ProbeSelect, probeId));
         }
 
         private void AddLamp(StackPanel row, string letter, Signals signal)
@@ -108,6 +153,7 @@ namespace CNC.Controls
             switch (e.PropertyName)
             {
                 case nameof(GrblViewModel.Signals):        UpdateSignals(); break;
+                case nameof(GrblViewModel.Probe):          UpdateProbeSelection(); break;
                 case nameof(GrblViewModel.FeedOverride):   UpdateOverrides(); break;
                 case nameof(GrblViewModel.RapidsOverride): UpdateOverrides(); break;
                 case nameof(GrblViewModel.RPMOverride):    UpdateOverrides(); break;
@@ -132,6 +178,26 @@ namespace CNC.Controls
             Signals asserted = model == null ? Signals.Off : model.Signals.Value;
             foreach (var lamp in lamps)
                 lamp.Key.Foreground = (asserted & lamp.Value) != 0 ? LampOn : LampOff;
+
+            UpdateProbeSelection();
+        }
+
+        /// <summary>
+        /// Strike through whichever probe input is NOT currently routed. Reading the selection from
+        /// the model rather than remembering the last click means a probe change made anywhere else -
+        /// a macro, the probing tab, an MDI G65 - shows up here too.
+        /// </summary>
+        private void UpdateProbeSelection()
+        {
+            if (model == null || lampProbe == null)
+                return;
+
+            int selected;
+            try { selected = model.Probe; }
+            catch { return; }               // no parser state reported yet
+
+            lampProbe.TextDecorations = selected == 0 ? null : TextDecorations.Strikethrough;
+            lampToolSetter.TextDecorations = selected == 1 ? null : TextDecorations.Strikethrough;
         }
 
         /// <summary>
@@ -279,6 +345,11 @@ namespace CNC.Controls
         {
             if (model == null)
                 return;
+
+            // A spindle the firmware says cannot reverse has no CCW to offer, so the option is not
+            // shown at all rather than shown-and-refused. Re-evaluated here rather than once at
+            // startup because GrblInfo only knows this after the $I handshake, which lands later.
+            rbSpindleCCW.Visibility = GrblInfo.HasReversableSpindle ? Visibility.Visible : Visibility.Collapsed;
 
             SpindleState state = model.SpindleState.Value;
             syncing = true;
