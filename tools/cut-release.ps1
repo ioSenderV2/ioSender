@@ -140,9 +140,19 @@ $newEntries = @($entries.Values | Where-Object { $_.N -gt $previousThrough } | S
 # uses internally for Check for Updates/Roll back).
 $lines = @("## ioSender $newVersion", "")
 $lines += "### Install / update"
-$lines += "Run from CMD or PowerShell:"
+# The one-liner is PowerShell syntax and CANNOT be pasted into cmd.exe - "&" is CMD's own command
+# separator, so it dies with "& was unexpected at this time" before anything else is parsed. This
+# said "Run from CMD or PowerShell" for every release until a user hit exactly that (2026-08-10).
+# The CMD form wraps it in powershell -Command and uses SINGLE quotes for the tag: nesting double
+# quotes inside the double-quoted -Command argument is what breaks it. Both forms tested in a real
+# cmd.exe before being written here.
+$lines += "**PowerShell:**"
 $lines += '```'
 $lines += "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/$Repo/master/install.ps1))) -Tag `"$newVersion`""
+$lines += '```'
+$lines += "**Command Prompt (cmd.exe):**"
+$lines += '```'
+$lines += "powershell -NoProfile -ExecutionPolicy Bypass -Command `"& ([scriptblock]::Create((irm https://raw.githubusercontent.com/$Repo/master/install.ps1))) -Tag '$newVersion'`""
 $lines += '```'
 $lines += ""
 if ($newEntries.Count -eq 0) {

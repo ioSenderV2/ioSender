@@ -55,9 +55,13 @@ jobs:
             Commit: ${{ github.event.pull_request.head.sha }}
 
             ### Install / update
-            Run from CMD or PowerShell:
+            **PowerShell:**
             ```
             & ([scriptblock]::Create((irm https://raw.githubusercontent.com/${{ github.repository }}/master/install.ps1))) -Tag "beta-pr${{ github.event.pull_request.number }}"
+            ```
+            **Command Prompt (cmd.exe):**
+            ```
+            powershell -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/${{ github.repository }}/master/install.ps1))) -Tag 'beta-pr${{ github.event.pull_request.number }}'"
             ```
 
             **Test build only, not a release.** This release is replaced on every push to the PR and
