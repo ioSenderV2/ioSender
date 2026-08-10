@@ -28,6 +28,35 @@ jobs:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
+      # Without this a beta reported the same "2.42" as a local dev build and as the eventual real
+      # 2.42 release, so a tester could not tell what they were running. Mirrors release.yml's
+      # "Embed build commit + version" step.
+      #
+      # The base number is READ from MainWindow's legacyVersion rather than hardcoded here, so it
+      # follows the dev version automatically instead of silently going stale.
+      #
+      # Format is "<base>.beta-pr<N>" - DOTTED, deliberately. MainWindow.CompareVersions splits on
+      # "." and treats any unparseable part as 0, so "2.42.beta-pr20" reads as [2,42,0] and stays
+      # correctly newer than 2.41. A hyphenated "2.42-beta-pr20" would read as [2,0] - older than
+      # the last release - and the app would offer to "update" the beta back down to it.
+      - name: Embed build commit + beta version
+        id: betaver
+        shell: pwsh
+        run: |
+          $mw = Get-Content "ioSender XL\ioSender XL\MainWindow.xaml.cs" -Raw
+          $m = [regex]::Match($mw, 'legacyVersion\s*=\s*"([^"]+)"')
+          if (-not $m.Success) { throw "legacyVersion not found in MainWindow.xaml.cs - beta version cannot be derived" }
+          $ver = "$($m.Groups[1].Value).beta-pr${{ github.event.pull_request.number }}"
+          Write-Host "Stamping beta version: $ver"
+          "version=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+          $path = "ioSender XL\ioSender XL\BuildInfo.cs"
+          $content = Get-Content $path -Raw
+          $content = $content -replace 'CommitSha = "dev"', "CommitSha = `"${{ github.event.pull_request.head.sha }}`""
+          $content = $content -replace 'Version = "dev"', "Version = `"$ver`""
+          Set-Content $path $content -NoNewline
+          Get-Content $path
+
       - name: Build Release
         run: msbuild "ioSender XL\ioSender XL.sln" -restore -t:Build -p:Configuration=Release -m -nologo -v:minimal -clp:ErrorsOnly
 
@@ -51,6 +80,7 @@ jobs:
           body: |
             Beta build of PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}
 
+            Version: `${{ steps.betaver.outputs.version }}` &mdash; shown in the window title as `Sender (${{ steps.betaver.outputs.version }})`
             Branch: `${{ github.event.pull_request.head.ref }}`
             Commit: ${{ github.event.pull_request.head.sha }}
 
