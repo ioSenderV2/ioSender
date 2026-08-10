@@ -195,9 +195,6 @@
                                                            IsChecked="{Binding Path=Mist, Mode=OneWay}" VerticalAlignment="Center"
                                                            Click="Coolant_Click"
                                                            ToolTip="Turn mist coolant on or off."/>
-                                <!-- The status MESSAGE strip is gone from the bottom bar; this opens the
-                                     same history window its click used to, so a message that scrolled past
-                                     is still reachable without a permanent strip of screen spent on it. -->
                                 <!-- Demo-video timelapse marker toggle. Hidden unless
                                      launched with -demomarker (visibility set in MainWindow.xaml.cs). Marks
                                      TIMELAPSE_ON/OFF into the demo marker file; see docs/demo-videos. -->
@@ -233,6 +230,15 @@
                                      visibility gate as Timelapse, set alongside it in MainWindow.xaml.cs). -->
                                 <ToggleButton x:Uid="btnAllRecord" x:Name="btnAllRecord" MinWidth="36" Margin="6,0,0,0" VerticalAlignment="Center" Focusable="False" Visibility="Collapsed" ToolTip="OBS Control - All: click to start/stop every camera together" Style="{StaticResource RecordToggleStyle}" Checked="AllRecord_Toggled" Unchecked="AllRecord_Toggled"/>
                             </StackPanel>
+                            <!-- The status MESSAGE strip is gone from the bottom bar; this opens the same
+                                 history window its click used to, so a message that scrolled past is still
+                                 reachable without a permanent strip of screen spent on it. It lives in the
+                                 grid's Auto column, right-aligned: the right edge of the left group, hard
+                                 against the DRO that starts the next column. -->
+                            <Button x:Uid="btn_viewStatus" x:Name="btnViewStatus" Grid.Column="1" Content="Status"
+                                    Padding="10,2" Margin="16,0,0,0" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    Click="ViewStatus_Click"
+                                    ToolTip="Show the status message history since launch."/>
                             <!-- Jog distance / feed / kbd speed used to sit here, on the State line. They moved
                                  to their own "Jog config" column in the right-hand group (2026-08-09 layout
                                  pass) so all the jogging controls read as one cluster next to the pad. -->
