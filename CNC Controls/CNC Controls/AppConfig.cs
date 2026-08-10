@@ -463,8 +463,9 @@ namespace CNC.Controls
         public double ConsoleWindowWidth { get; set; } = double.NaN;
         public double ConsoleWindowHeight { get; set; } = double.NaN;
         // Status-message log window (MainWindow.ShowMessageLog). It pops itself whenever a message arrives
-        // now that the message strip is gone, so where it lands matters more than for a window you open on
-        // purpose. NaN = never saved -> the default 700x440 centred on the owner.
+        // now that the message strip is gone - and dismisses itself again 10s later unless touched - so
+        // where it lands matters more than for a window you open on purpose, and it lands there repeatedly.
+        // NaN = never saved -> the default 700x440 centred on the owner.
         public double StatusWindowLeft { get; set; } = double.NaN;
         public double StatusWindowTop { get; set; } = double.NaN;
         public double StatusWindowWidth { get; set; } = double.NaN;

@@ -454,8 +454,9 @@ namespace GCode_Sender
 
             // The message strip this used to flash is gone from the run strip (2026-08-10). A
             // message that nothing displays is a message lost, so arriving text now OPENS the log
-            // window instead - and refreshes it if it is already up.
-            ShowMessageLog();
+            // window instead - and refreshes it if it is already up. Popping unasked, it dismisses
+            // itself again after MessageLogAutoCloseDelay unless the operator touches it.
+            ShowMessageLog(autoPopped: true);
         }
 
         // ---- -testserver: make the window permanently non-activatable (see the constructor comment) ----
@@ -2273,6 +2274,14 @@ namespace GCode_Sender
         private Window messageLogWindow;
         private TextBox messageLogText;
 
+        // An AUTO-POPPED log window is a notification - it appeared without being asked for, so it must
+        // not sit there covering the UI until someone dismisses it. It closes itself after this long.
+        // A window the operator opened from the Status button is NOT a notification and never self-closes,
+        // and an auto-popped one stops being a notification the moment they interact with it.
+        private static readonly TimeSpan MessageLogAutoCloseDelay = TimeSpan.FromSeconds(10);
+        private DispatcherTimer messageLogAutoClose;
+        private bool messageLogAutoPopped;
+
         /// <summary>
         /// The connection summary at the right end of the menu bar: "Connected: TARGET".
         /// It shares that row with the menu, so it HIDES itself on a narrow window rather than
@@ -2306,7 +2315,7 @@ namespace GCode_Sender
 
         private void ViewStatus_Click(object sender, RoutedEventArgs e)
         {
-            ShowMessageLog();
+            ShowMessageLog(autoPopped: false);
         }
 
         /// <summary>
@@ -2314,11 +2323,16 @@ namespace GCode_Sender
         /// by the Status button and whenever a message arrives - the run strip no longer carries a
         /// message strip, so this window IS how a message gets seen.
         /// </summary>
-        private void ShowMessageLog()
+        private void ShowMessageLog(bool autoPopped)
         {
             var log = (DataContext as GrblViewModel)?.MessageLog;
             if (log == null || log.Count == 0)
                 return;
+
+            // Read BEFORE anything below mutates the state: a window that is already up and was NOT
+            // auto-popped belongs to the operator, so an arriving message may refresh it but must never
+            // start a countdown on it.
+            bool ownedByOperator = messageLogWindow != null && !messageLogAutoPopped;
 
             if (messageLogWindow != null)
             {
@@ -2326,6 +2340,7 @@ namespace GCode_Sender
                 messageLogText.ScrollToEnd();
                 if (!messageLogWindow.IsVisible)
                     messageLogWindow.Show();
+                ArmMessageLogAutoClose(autoPopped, ownedByOperator);
                 return;
             }
 
@@ -2368,10 +2383,64 @@ namespace GCode_Sender
                     win.Close();
                 }
             };
-            win.Closed += (s2, e2) => { messageLogWindow = null; messageLogText = null; };
+            // Touching the window is the operator taking ownership of it: the countdown exists to clear an
+            // UNATTENDED notification, not to snatch the window away mid-scroll. Preview, not bubbling -
+            // the TextBox fills the window and handles most input itself (the wheel certainly), so a
+            // bubbling handler would simply never see it.
+            win.PreviewMouseDown += (s2, e2) => CancelMessageLogAutoClose();
+            win.PreviewKeyDown += (s2, e2) => CancelMessageLogAutoClose();
+            win.PreviewMouseWheel += (s2, e2) => CancelMessageLogAutoClose();
+            win.Closed += (s2, e2) =>
+            {
+                messageLogWindow = null;
+                messageLogText = null;
+                CancelMessageLogAutoClose();
+            };
             messageLogWindow = win;
             messageLogText = text;
             win.Show();
+            ArmMessageLogAutoClose(autoPopped, ownedByOperator);
+        }
+
+        /// <summary>
+        /// Start, restart or stand down the auto-popped window's self-dismiss countdown.
+        /// </summary>
+        private void ArmMessageLogAutoClose(bool autoPopped, bool ownedByOperator)
+        {
+            if (!autoPopped)
+            {
+                // A deliberate open outranks any pending dismissal - including one already counting down
+                // on a window that popped by itself a moment ago.
+                CancelMessageLogAutoClose();
+                return;
+            }
+
+            if (ownedByOperator)
+                return;
+
+            messageLogAutoPopped = true;
+
+            if (messageLogAutoClose == null)
+            {
+                messageLogAutoClose = new DispatcherTimer { Interval = MessageLogAutoCloseDelay };
+                messageLogAutoClose.Tick += (s, e) =>
+                {
+                    messageLogAutoClose.Stop();
+                    if (messageLogAutoPopped)
+                        messageLogWindow?.Close();
+                };
+            }
+
+            // Restart rather than let it run on, so the message that JUST arrived gets the full delay
+            // instead of inheriting the tail of the previous one's.
+            messageLogAutoClose.Stop();
+            messageLogAutoClose.Start();
+        }
+
+        private void CancelMessageLogAutoClose()
+        {
+            messageLogAutoPopped = false;
+            messageLogAutoClose?.Stop();
         }
 
 
