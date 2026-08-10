@@ -297,13 +297,8 @@
                             <ScaleTransform ScaleX="0.65" ScaleY="0.65"/>
                         </cnccontrols:JogBaseControl.LayoutTransform>
                     </cnccontrols:JogBaseControl>
-                    <!-- Continuous jog: hold-to-move rather than step-per-click. Bound to the same
-                         IsContinuousJoggingEnabled the jog tab and keyboard handler already share, so the
-                         two surfaces cannot disagree about which mode the machine is in. -->
-                    <CheckBox x:Uid="chk_jogContinuous" x:Name="chkJogContinuous" Content="Continuous"
-                              IsChecked="{Binding Path=Keyboard.IsContinuousJoggingEnabled, Mode=TwoWay}"
-                              HorizontalAlignment="Center" Margin="0,4,0,0" FontSize="11"
-                              ToolTip="Hold a jog button to move continuously; release to stop."/>
+<!-- Continuous moved INTO the Jogging group box (2026-08-09): one checkbox for one
+                         setting, next to the distance and speed it belongs with. -->
                 </StackPanel>
 
                 <!-- The right half, built to docs/RunStrip-Layout-Spec.md: three headed columns

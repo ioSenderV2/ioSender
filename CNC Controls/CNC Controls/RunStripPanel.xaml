@@ -80,6 +80,12 @@
 
         <!-- Column frame. The header stays deliberately small and muted: it names the group, it does
              not compete with the values inside it. -->
+        <Style x:Key="DirChoiceStyle" TargetType="RadioButton">
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
         <Style x:Key="ColumnGroupStyle" TargetType="GroupBox">
             <Setter Property="Padding" Value="8,4,8,6"/>
             <Setter Property="BorderBrush" Value="#FFBFBFBF"/>
@@ -114,6 +120,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <TextBlock x:Uid="lbl_jogDistance" Grid.Row="0" Grid.Column="0" Text="Distance:" Style="{StaticResource RowLabelStyle}"/>
@@ -141,6 +148,12 @@
                     <Button x:Name="btnKbdSlow" Style="{StaticResource SpeedChoiceStyle}" Click="KbdSlow_Click"/>
                     <Button x:Name="btnKbdFast" Style="{StaticResource SpeedChoiceStyle}" Click="KbdFast_Click"/>
                 </StackPanel>
+
+                <TextBlock x:Uid="lbl_continuous" Grid.Row="3" Grid.Column="0" Text="Continuous:" Style="{StaticResource RowLabelStyle}"/>
+                <CheckBox x:Uid="chk_continuousJog" x:Name="chkContinuous" Grid.Row="3" Grid.Column="1"
+                          Margin="2,5,0,0" VerticalAlignment="Center" HorizontalAlignment="Left"
+                          Checked="Continuous_Changed" Unchecked="Continuous_Changed"
+                          ToolTip="Hold a jog button to move continuously; release to stop."/>
             </Grid>
         </GroupBox>
 
@@ -185,6 +198,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <TextBlock x:Uid="lbl_ovrFeed" Grid.Row="0" Grid.Column="0" Text="Feed rate:" Style="{StaticResource RowLabelStyle}"/>
@@ -211,6 +225,18 @@
                              KeyDown="SpindleRpm_KeyDown" LostFocus="SpindleRpm_LostFocus"
                              ToolTip="Programmed spindle RPM. Type a value and press Enter to set it; the buttons step the override by 10%."/>
                     <Button x:Uid="btn_spindleOvrPlus" Style="{StaticResource NudgeButtonStyle}" Content="+" Click="SpindleOvrPlus_Click" ToolTip="Spindle override up"/>
+                </StackPanel>
+
+                <!-- Spindle direction. Reflects what the machine reports and sets it on click; the
+                     radios are updated from the status report, so an M3 typed at the MDI or a
+                     direction change inside the program moves them too. -->
+                <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0,5,0,0" VerticalAlignment="Center">
+                    <RadioButton x:Uid="rb_spindleOff" x:Name="rbSpindleOff" GroupName="SpindleDir" Content="Off"
+                                 Style="{StaticResource DirChoiceStyle}" Checked="SpindleDir_Checked" Tag="M5"/>
+                    <RadioButton x:Uid="rb_spindleCW" x:Name="rbSpindleCW" GroupName="SpindleDir" Content="CW"
+                                 Style="{StaticResource DirChoiceStyle}" Checked="SpindleDir_Checked" Tag="M3"/>
+                    <RadioButton x:Uid="rb_spindleCCW" x:Name="rbSpindleCCW" GroupName="SpindleDir" Content="CCW"
+                                 Style="{StaticResource DirChoiceStyle}" Checked="SpindleDir_Checked" Tag="M4"/>
                 </StackPanel>
             </Grid>
         </GroupBox>

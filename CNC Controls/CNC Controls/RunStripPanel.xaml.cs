@@ -29,11 +29,11 @@ namespace CNC.Controls
 {
     public partial class RunStripPanel : UserControl
     {
-        // Jog distance ladder. Matches the step buttons the web client offers and the values an
-        // operator actually uses; the "-"/"+" buttons walk it rather than scaling arbitrarily.
-        private static readonly double[] JogDistances = { 0.01, 0.1, 1.0, 10.0, 100.0 };
-        private const double JogSpeedStep = 100d;
-        private const double JogSpeedMin = 10d;
+        // Distance, Speed and Continuous all read the SHARED JogViewModel (JogBaseControl.JogData),
+        // which is the same selection the Jog tab and the keyboard handler use. Keeping a private
+        // copy here is how two surfaces end up disagreeing about how far the next jog goes.
+        // The four presets themselves are the ones configured in Settings > Jogging.
+        private const int JogPresetCount = 4;
 
         private static readonly Brush LampOff = new SolidColorBrush(Color.FromRgb(0xBB, 0xBB, 0xBB));
         private static readonly Brush LampOn = Brushes.Red;
@@ -47,6 +47,10 @@ namespace CNC.Controls
         private readonly List<KeyValuePair<TextBlock, Signals>> lamps = new List<KeyValuePair<TextBlock, Signals>>();
 
         private GrblViewModel model;
+
+        // True while the radios are being set FROM machine state, so the Checked handler does not
+        // turn a display refresh into an M3/M4/M5.
+        private bool syncing;
 
         public RunStripPanel()
         {
@@ -107,6 +111,7 @@ namespace CNC.Controls
                 case nameof(GrblViewModel.FeedOverride):   UpdateOverrides(); break;
                 case nameof(GrblViewModel.RapidsOverride): UpdateOverrides(); break;
                 case nameof(GrblViewModel.RPMOverride):    UpdateOverrides(); break;
+                case nameof(GrblViewModel.SpindleState):  UpdateSpindleDirection(); break;
                 case nameof(GrblViewModel.TloReference):
                 case nameof(GrblViewModel.IsTloReferenceSet): UpdateTlo(); break;
                 case nameof(GrblViewModel.JogStep):        UpdateJog(); break;
@@ -119,6 +124,7 @@ namespace CNC.Controls
             UpdateOverrides();
             UpdateTlo();
             UpdateJog();
+            UpdateSpindleDirection();
         }
 
         private void UpdateSignals()
@@ -161,8 +167,13 @@ namespace CNC.Controls
         {
             if (model == null || model.Keyboard == null)
                 return;
-            lblJogDistance.Text = model.Keyboard.JogStepDistance.ToString("0.###");
-            lblJogSpeed.Text = ((int)JogFeedrate) + "";
+            var jog = JogBaseControl.JogData;
+            if (jog != null)
+            {
+                lblJogDistance.Text = jog.SelectedDistanceText;
+                lblJogSpeed.Text = jog.SelectedFeedrateText;
+                chkContinuous.IsChecked = jog.Continuous;
+            }
             UpdateKbdSpeeds();
         }
 
@@ -204,53 +215,40 @@ namespace CNC.Controls
             }
         }
 
-        // The step-jog feedrate. Kept on the controller so the jog pad, keyboard and this panel all
-        // read one value rather than three copies that drift.
-        private double JogFeedrate
-        {
-            get
-            {
-                var rates = model == null || model.Keyboard == null ? null : model.Keyboard.JogFeedrates;
-                return rates == null || rates.Length == 0 ? 0d : rates[(int)JogMode.Step];
-            }
-            set
-            {
-                var rates = model == null || model.Keyboard == null ? null : model.Keyboard.JogFeedrates;
-                if (rates != null && rates.Length > 0)
-                    rates[(int)JogMode.Step] = value;
-            }
-        }
-
         // ---------------------------------------------------------------- jogging
 
-        private void JogDistMinus_Click(object sender, RoutedEventArgs e) { StepJogDistance(-1); }
-        private void JogDistPlus_Click(object sender, RoutedEventArgs e) { StepJogDistance(1); }
+        private void JogDistMinus_Click(object sender, RoutedEventArgs e) { StepPreset(true, -1); }
+        private void JogDistPlus_Click(object sender, RoutedEventArgs e) { StepPreset(true, 1); }
+        private void JogSpeedMinus_Click(object sender, RoutedEventArgs e) { StepPreset(false, -1); }
+        private void JogSpeedPlus_Click(object sender, RoutedEventArgs e) { StepPreset(false, 1); }
 
-        private void StepJogDistance(int direction)
+        /// <summary>
+        /// Move the shared jog selection one preset up or down. There are four of each, configured in
+        /// Settings > Jogging - the buttons choose among THOSE rather than scaling a number, so this
+        /// panel and the Jog tab can never show different values.
+        /// </summary>
+        private void StepPreset(bool distance, int direction)
         {
-            if (model == null || model.Keyboard == null)
+            var jog = JogBaseControl.JogData;
+            if (jog == null)
                 return;
 
-            // Walk the ladder from whichever entry is nearest the current value, so an odd value set
-            // elsewhere still moves sensibly instead of jumping to an end.
-            double current = model.Keyboard.JogStepDistance;
-            int index = 0;
-            for (int i = 1; i < JogDistances.Length; i++)
-                if (Math.Abs(JogDistances[i] - current) < Math.Abs(JogDistances[index] - current))
-                    index = i;
+            int index = (distance ? jog.DistanceIndex : jog.FeedIndex) + direction;
+            index = Math.Max(0, Math.Min(JogPresetCount - 1, index));
 
-            index = Math.Max(0, Math.Min(JogDistances.Length - 1, index + direction));
-            model.Keyboard.JogStepDistance = JogDistances[index];
+            if (distance)
+                jog.DistanceIndex = index;
+            else
+                jog.FeedIndex = index;
+
             UpdateJog();
         }
 
-        private void JogSpeedMinus_Click(object sender, RoutedEventArgs e) { StepJogSpeed(-JogSpeedStep); }
-        private void JogSpeedPlus_Click(object sender, RoutedEventArgs e) { StepJogSpeed(JogSpeedStep); }
-
-        private void StepJogSpeed(double delta)
+        private void Continuous_Changed(object sender, RoutedEventArgs e)
         {
-            JogFeedrate = Math.Max(JogSpeedMin, JogFeedrate + delta);
-            UpdateJog();
+            var jog = JogBaseControl.JogData;
+            if (jog != null && jog.Continuous != (chkContinuous.IsChecked == true))
+                jog.Continuous = chkContinuous.IsChecked == true;
         }
 
         // ---------------------------------------------------------------- overrides
@@ -271,6 +269,33 @@ namespace CNC.Controls
         private void SpindleOvrPlus_Click(object sender, RoutedEventArgs e) { Send(GrblConstants.CMD_SPINDLE_OVR_COARSE_PLUS); }
 
         // ---------------------------------------------------------------- typed targets
+
+        /// <summary>
+        /// Reflect the direction the MACHINE reports, not the last button pressed - an M3 typed at the
+        /// MDI or a direction change inside the running program has to move these too. `syncing`
+        /// suppresses the Checked handler while we do it, or updating the display would send a command.
+        /// </summary>
+        private void UpdateSpindleDirection()
+        {
+            if (model == null)
+                return;
+
+            SpindleState state = model.SpindleState.Value;
+            syncing = true;
+            rbSpindleCW.IsChecked = (state & SpindleState.CW) != 0;
+            rbSpindleCCW.IsChecked = (state & SpindleState.CCW) != 0;
+            rbSpindleOff.IsChecked = (state & (SpindleState.CW | SpindleState.CCW)) == 0;
+            syncing = false;
+        }
+
+        private void SpindleDir_Checked(object sender, RoutedEventArgs e)
+        {
+            if (syncing || model == null)
+                return;
+            var command = (sender as System.Windows.Controls.Primitives.ToggleButton)?.Tag as string;
+            if (!string.IsNullOrEmpty(command))
+                model.ExecuteCommand(command);
+        }
 
         private void SpindleRpm_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
