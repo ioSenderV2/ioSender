@@ -27,6 +27,8 @@
         <system:String x:Uid="str_msgNoComm" x:Key="MsgNoComm">Controller is in {0} state and cannot respond, try a soft reset?</system:String>
         <system:String x:Uid="str_msgResetExit" x:Key="MsgResetExit">Controller soft reset failed, exiting.</system:String>
         <system:String x:Uid="str_msgNoResponse" x:Key="MsgNoResponse">Controller is not responding!</system:String>
+        <system:String x:Uid="str_msgConnected" x:Key="MsgConnected">Connected: {0}</system:String>
+        <system:String x:Uid="str_msgNotConnected" x:Key="MsgNotConnected">Not connected: {0} did not complete the handshake.</system:String>
         <cnccontrols:BoolToVisibleConverter x:Key="IsVisibleConverter" />
     </UserControl.Resources>
     <DockPanel Background="Transparent" MouseDown="outside_MouseDown" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">

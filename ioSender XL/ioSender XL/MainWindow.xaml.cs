@@ -379,10 +379,11 @@ namespace GCode_Sender
                         UpdateConnectMenuHeader();   // keep the top-level Connect/Reconnect label current
                         UpdateMenuBarInfo();
                     }
-                    // The menu-bar summary carries what the bottom status bar used to: which target,
-                    // and for how long. Both change while connected, so both have to drive it.
-                    else if (e.PropertyName == nameof(GrblViewModel.RunTime) ||
-                             e.PropertyName == nameof(GrblViewModel.IsConnectionLost))
+                    // The menu-bar summary says WHICH target, and nothing else. It used to append RunTime
+                    // as "for HH:MM:SS", but RunTime is the JOB timer (JobTimer, started at Cycle Start)
+                    // - not connection uptime - so it read 00:00:00 whenever a job wasn't streaming. The
+                    // elapsed time moved next to the State field, where it means something.
+                    else if (e.PropertyName == nameof(GrblViewModel.IsConnectionLost))
                         UpdateMenuBarInfo();
                 };
 
@@ -2265,7 +2266,7 @@ namespace GCode_Sender
         private TextBox messageLogText;
 
         /// <summary>
-        /// The connection summary at the right end of the menu bar: "Connected to TARGET for TIME".
+        /// The connection summary at the right end of the menu bar: "Connected: TARGET".
         /// It shares that row with the menu, so it HIDES itself on a narrow window rather than
         /// squeezing the menu - the menu is navigation, this is a readout, and a readout loses.
         /// </summary>
@@ -2284,7 +2285,7 @@ namespace GCode_Sender
             }
             else
             {
-                lblMenuBarInfo.Text = string.Format("Connected to {0} for {1}", target, model.RunTime);
+                lblMenuBarInfo.Text = string.Format("Connected: {0}", target);
                 lblMenuBarInfo.Foreground = Brushes.ForestGreen;
             }
 

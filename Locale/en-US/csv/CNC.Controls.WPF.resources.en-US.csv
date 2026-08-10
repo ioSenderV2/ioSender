@@ -1590,3 +1590,6 @@ CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,grp_feedsSpeeds:System.Win
 CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,rb_spindleOff:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Off
 CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,rb_spindleCW:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,CW
 CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,rb_spindleCCW:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,CCW
+CNC.Controls.WPF.g.en-US.resources:statuscontrol.baml,txt_runTime:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Elapsed time of the current or last job.
+CNC.Controls.WPF.g.en-US.resources:grblconfigcontrol.baml,str_resetGrblDefaults:System.String.$Content,None,True,True,,Restore ALL controller settings to firmware defaults ($RST=$)? This overwrites the current $ settings on the machine.
+CNC.Controls.WPF.g.en-US.resources:macroexecutecontrol.baml,str_noMacros:System.String.$Content,None,True,True,,No macros defined. Go to Settings: Macros to define.

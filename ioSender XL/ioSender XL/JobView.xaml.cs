@@ -550,7 +550,9 @@ namespace GCode_Sender
                 {
                     focusedControl = this;
 
-                    switch (Controller.Restart())
+                    Controller.RestartResult restartResult = Controller.Restart();
+
+                    switch (restartResult)
                     {
                         case Controller.RestartResult.Ok:
                             if (!isBooted)
@@ -567,7 +569,24 @@ namespace GCode_Sender
                             break;
                     }
 
-                    model.Message = Controller.Message;
+                    // Close the loop opened by "Waiting for controller (...)". That notice pops the status log,
+                    // so without a definite outcome the last thing on screen still reads as "waiting" long after
+                    // the connect settled - which is exactly how a connect that worked and one that quietly
+                    // didn't became indistinguishable.
+                    //
+                    // Precedence: a message Restart() set for itself wins (MsgHome on a homing-required boot says
+                    // something actionable, a generic "Connected" does not). Success needs BOTH Ok and a good
+                    // InitSystem() - Ok alone only means the controller answered. NoResponse used to fall through
+                    // this switch unannounced (the GrblInfo.IsLoaded reconnect branches all blank the response
+                    // rather than raising a dialog), and silence there is the worst of the three outcomes.
+                    if (!string.IsNullOrEmpty(Controller.Message))
+                        model.Message = Controller.Message;
+                    else if (restartResult == Controller.RestartResult.Ok && initOK == true)
+                        model.Message = string.Format((string)FindResource("MsgConnected"), AppConfig.Settings.Base.PortParams);
+                    else if (restartResult == Controller.RestartResult.NoResponse)
+                        model.Message = string.Format((string)FindResource("MsgNotConnected"), AppConfig.Settings.Base.PortParams);
+                    else
+                        model.Message = Controller.Message;
                 }
                 
                 if (initOK == null)
