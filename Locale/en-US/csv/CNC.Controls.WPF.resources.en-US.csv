@@ -1583,3 +1583,4 @@ CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_spindleOvrMinus:System
 CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_spindleOvrMinus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Spindle override down
 CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_spindleOvrPlus:System.Windows.Controls.ContentControl.Content,Button,True,True,,+
 CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_spindleOvrPlus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Spindle override up
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,txt_kbdDefTip:System.Windows.Documents.Run.Text,Text,True,True,,Default keyboard jog speed
