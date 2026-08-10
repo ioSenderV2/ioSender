@@ -1,4 +1,4 @@
-/*
+﻿/*
  * RunStripPanel.xaml.cs - the run strip's right half (Jogging | Signals | Feeds and Speeds).
  *
  * Spec: docs/RunStrip-Layout-Spec.md.
@@ -40,6 +40,12 @@ namespace CNC.Controls
 
         // The active keyboard-speed choice. Same pale-green highlight the desktop bar already uses
         // for "this is the one in effect".
+        // Override tint. Green at exactly 100% (the program's own feed), yellow below, red above -
+        // so "slower than programmed" and "faster than programmed" are never confused at a glance.
+        private static readonly Brush OverrideNormal = new SolidColorBrush(Color.FromArgb(0x66, 0x4C, 0xAF, 0x50));
+        private static readonly Brush OverrideUnder  = new SolidColorBrush(Color.FromArgb(0x77, 0xFF, 0xD5, 0x4F));
+        private static readonly Brush OverrideOver   = new SolidColorBrush(Color.FromArgb(0x66, 0xEF, 0x53, 0x50));
+
         private static readonly Brush SelectedBrush = new SolidColorBrush(Color.FromRgb(0xC8, 0xE6, 0xC9));
         private static readonly Brush SelectedBorder = new SolidColorBrush(Color.FromRgb(0x66, 0xA6, 0x6A));
 
@@ -83,6 +89,9 @@ namespace CNC.Controls
             lampToolSetter = AddProbeLetter("T", 1, "Tool setter input");
 
             DataContextChanged += OnDataContextChanged;
+            // The bars are sized from ActualWidth, so they have to be redrawn whenever the strip
+            // reflows - otherwise a resized box keeps a bar scaled for its old width.
+            SizeChanged += (s2, e2) => UpdateOverrides();
         }
 
         /// <summary>
@@ -216,8 +225,44 @@ namespace CNC.Controls
 
             lblRapidOvr.Text = ((int)model.RapidsOverride) + "%";
 
+            PaintOverride(feedFill, feedHost, model.FeedOverride);
+            PaintOverride(spindleFill, spindleHost, model.RPMOverride);
+
             if (!txtSpindleRpm.IsKeyboardFocusWithin)
                 txtSpindleRpm.Text = ((int)model.ProgrammedRPM).ToString();
+        }
+
+        /// <summary>
+        /// Fill the bar behind a value box in proportion to its override, and tint it by direction.
+        ///
+        /// The scale is override/200, so 50% fills a quarter, 100% fills half and 200% fills the box.
+        /// Putting NORMAL at half-full is the point: an unmodified program sits mid-box, and any
+        /// departure from it is visible as an asymmetry rather than as a number you have to read.
+        /// </summary>
+        private static void PaintOverride(System.Windows.Shapes.Rectangle fill, FrameworkElement host, double percent)
+        {
+            if (fill == null || host == null)
+                return;
+
+            // ActualWidth is 0 until the first layout pass; skip rather than latch a zero-width bar.
+            double width = host.ActualWidth;
+            if (width <= 0d)
+                return;
+
+            double fraction = Math.Max(0d, Math.Min(1d, percent / 200d));
+            fill.Width = width * fraction;
+            fill.Fill = percent > 100d ? OverrideOver : percent < 100d ? OverrideUnder : OverrideNormal;
+        }
+
+        // Double-click either value box to put its override back to 100%.
+        private void FeedOvrReset_DoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 2) Send(GrblConstants.CMD_FEED_OVR_RESET);
+        }
+
+        private void SpindleOvrReset_DoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 2) Send(GrblConstants.CMD_SPINDLE_OVR_RESET);
         }
 
         private void UpdateTlo()

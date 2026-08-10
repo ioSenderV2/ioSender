@@ -1,4 +1,4 @@
-<UserControl x:Class="CNC.Controls.RunStripPanel"
+﻿<UserControl x:Class="CNC.Controls.RunStripPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:CNC.Controls"
@@ -210,9 +210,16 @@
                 <TextBlock x:Uid="lbl_ovrFeed" Grid.Row="0" Grid.Column="0" Text="Feed rate:" Style="{StaticResource RowLabelStyle}"/>
                 <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
                     <Button x:Uid="btn_feedOvrMinus" Style="{StaticResource NudgeButtonStyle}" Content="&#8722;" Click="FeedOvrMinus_Click" ToolTip="Feed override down"/>
-                    <TextBox x:Name="txtFeedRate" Style="{StaticResource EditValueStyle}"
-                             IsReadOnly="True" Focusable="False" IsTabStop="False"
-                             ToolTip="Current feed rate (read-only - it comes from the program). The buttons step the feed override by 10%."/>
+                    <Grid x:Name="feedHost" MouseLeftButtonUp="FeedOvrReset_DoubleClick">
+                        <!-- The bar behind the digits IS the override: how far it fills says how much,
+                             its colour says which way. Half-full green is 100% - normal - so a glance
+                             tells you the machine is running the program's own feed. -->
+                        <Rectangle x:Name="feedFill" HorizontalAlignment="Left" RadiusX="2" RadiusY="2"/>
+                        <TextBox x:Name="txtFeedRate" Style="{StaticResource EditValueStyle}"
+                                 Background="Transparent" BorderBrush="#FF9A9A9A"
+                                 IsReadOnly="True" Focusable="False" IsTabStop="False"
+                                 ToolTip="Current feed rate (read-only - it comes from the program). The bar shows the feed override; the buttons step it by 10%, double-click to reset to 100%."/>
+                    </Grid>
                     <Button x:Uid="btn_feedOvrPlus" Style="{StaticResource NudgeButtonStyle}" Content="+" Click="FeedOvrPlus_Click" ToolTip="Feed override up"/>
                 </StackPanel>
 
@@ -227,9 +234,13 @@
                 <TextBlock x:Uid="lbl_ovrSpindle" Grid.Row="2" Grid.Column="0" Text="Spindle:" Style="{StaticResource RowLabelStyle}"/>
                 <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0,3,0,0">
                     <Button x:Uid="btn_spindleOvrMinus" Style="{StaticResource NudgeButtonStyle}" Content="&#8722;" Click="SpindleOvrMinus_Click" ToolTip="Spindle override down"/>
-                    <TextBox x:Name="txtSpindleRpm" Style="{StaticResource EditValueStyle}"
-                             KeyDown="SpindleRpm_KeyDown" LostFocus="SpindleRpm_LostFocus"
-                             ToolTip="Programmed spindle RPM. Type a value and press Enter to set it; the buttons step the override by 10%."/>
+                    <Grid x:Name="spindleHost" MouseLeftButtonUp="SpindleOvrReset_DoubleClick">
+                        <Rectangle x:Name="spindleFill" HorizontalAlignment="Left" RadiusX="2" RadiusY="2"/>
+                        <TextBox x:Name="txtSpindleRpm" Style="{StaticResource EditValueStyle}"
+                                 Background="Transparent" BorderBrush="#FF9A9A9A"
+                                 KeyDown="SpindleRpm_KeyDown" LostFocus="SpindleRpm_LostFocus"
+                                 ToolTip="Programmed spindle RPM. Type a value and press Enter to set it. The bar shows the spindle override; the buttons step it by 10%, double-click to reset to 100%."/>
+                    </Grid>
                     <Button x:Uid="btn_spindleOvrPlus" Style="{StaticResource NudgeButtonStyle}" Content="+" Click="SpindleOvrPlus_Click" ToolTip="Spindle override up"/>
                 </StackPanel>
 

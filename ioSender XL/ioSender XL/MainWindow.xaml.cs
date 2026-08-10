@@ -2985,7 +2985,11 @@ namespace GCode_Sender
         /// </summary>
         private void MdiConsole_Click(object sender, RoutedEventArgs e)
         {
-            openConsole();
+            // NOT openConsole(): that is a TOGGLE, so pressing this with the console already up hid
+            // it and FocusInput immediately showed it again - which read as a flicker and nothing
+            // else. Create it if it does not exist, then let FocusInput show and focus it.
+            if (UIViewModel.Console == null)
+                openConsole();
             UIViewModel.Console?.FocusInput();
         }
 
