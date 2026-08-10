@@ -1,4 +1,4 @@
-/*
+﻿/*
  * GrblViewModel.cs - part of CNC Controls library
  *
  * v0.47 / 2026-04-29 / Io Engineering (Terje Io)
@@ -848,6 +848,14 @@ namespace CNC.Core
         {
             if (string.IsNullOrWhiteSpace(message))
                 return;
+
+            // grblHAL announces which input claimed the link ("SERIAL STREAM ACTIVE", "TELNET STREAM
+            // ACTIVE") every time one is opened. It is firmware bookkeeping, not something an
+            // operator can act on, and switching between serial and network makes it repeat several
+            // times per reconnect - which is noise in a log that now POPS A WINDOW when it grows.
+            if (message.IndexOf("STREAM ACTIVE", StringComparison.OrdinalIgnoreCase) >= 0)
+                return;
+
             MessageLog.Add(string.Format("{0:HH:mm:ss}  {1}{2}", DateTime.Now, isError ? "! " : string.Empty, message));
             if (MessageLog.Count > 1200)
                 MessageLog.RemoveRange(0, 200);
