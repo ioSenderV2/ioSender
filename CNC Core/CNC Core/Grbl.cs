@@ -3029,6 +3029,19 @@ namespace CNC.Core
 
         public static ObservableCollection<GrblSettingDetails> Settings { get; private set; } = new ObservableCollection<GrblSettingDetails>();
 
+        /// <summary>
+        /// Serialises access to <see cref="Settings"/>. It has TWO writers on DIFFERENT threads: the
+        /// $$ parser adds directly from the comms worker, and the missing-setting path posts an Add
+        /// to the UI thread so bindings see a fully populated entry. Meanwhile the parser enumerates
+        /// the collection for every line it processes.
+        ///
+        /// That combination crashed a real connect (2026-08-10, "Collection was modified; enumeration
+        /// operation may not execute" out of GrblSettings.Process): connecting to a controller whose
+        /// settings are not already loaded queues an Add for nearly every line, so the window where a
+        /// posted Add lands mid-enumeration is wide open.
+        /// </summary>
+        private static readonly object settingsLock = new object();
+
         // Edits made in the settings editor but not yet written to the controller, keyed by setting Id.
         // The left-hand list reads these (via GrblSettingDetails.EditValue) so changes show immediately
         // without mutating Value. Applied to Value and cleared on Save (see ApplyPendingEdits/Save).
@@ -3182,7 +3195,8 @@ namespace CNC.Core
             // those stale group-less settings first so the details query rebuilds them with metadata (no duplicates).
             bool needMeta = GrblInfo.HasEnums && GrblSettingGroups.Groups.Count == 0;
             if (needMeta && Settings.Count > 0)
-                Settings.Clear();
+                lock (settingsLock)
+                    Settings.Clear();
 
             if ((load = Settings.Count == 0 || needMeta) && GrblInfo.HasEnums)
             {
@@ -3203,7 +3217,8 @@ namespace CNC.Core
             }
 
             foreach (var response in responses)
-                Settings.Add(new GrblSettingDetails(response));
+                lock (settingsLock)
+                    Settings.Add(new GrblSettingDetails(response));
 
             res = null;
             responses.Clear();
@@ -3564,7 +3579,9 @@ namespace CNC.Core
                             break;
                     }
 
-                    var setting = Settings.Where(x => x.Id == id).FirstOrDefault();
+                    GrblSettingDetails setting;
+                    lock (settingsLock)
+                        setting = Settings.Where(x => x.Id == id).FirstOrDefault();
 
                     if (setting == null)
                     {
@@ -3572,8 +3589,9 @@ namespace CNC.Core
                         var added = setting;
                         // Queued, not inline, even when already on the UI thread: the caller configures
                         // `setting` immediately below, and the original BeginInvoke meant the collection
-                        // (and anything bound to it) saw a fully populated entry.
-                        UiContext.Post(() => Settings.Add(added));
+                        // (and anything bound to it) saw a fully populated entry. The lock is what stops
+                        // that queued Add landing while this thread is enumerating - see settingsLock.
+                        UiContext.Post(() => { lock (settingsLock) Settings.Add(added); });
                     }
 
                     setting.Value = valuepair[1];
