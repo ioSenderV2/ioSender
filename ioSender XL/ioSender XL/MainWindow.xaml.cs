@@ -375,7 +375,15 @@ namespace GCode_Sender
                     else if (e.PropertyName == nameof(GrblViewModel.Message))
                         FlashMessage((s as GrblViewModel)?.IsMessageError == true);
                     else if (e.PropertyName == nameof(GrblViewModel.ConnectionTarget))
+                    {
                         UpdateConnectMenuHeader();   // keep the top-level Connect/Reconnect label current
+                        UpdateMenuBarInfo();
+                    }
+                    // The menu-bar summary carries what the bottom status bar used to: which target,
+                    // and for how long. Both change while connected, so both have to drive it.
+                    else if (e.PropertyName == nameof(GrblViewModel.RunTime) ||
+                             e.PropertyName == nameof(GrblViewModel.IsConnectionLost))
+                        UpdateMenuBarInfo();
                 };
 
             // Status message permanently shown at double size (was a 10s enlarge-then-shrink animation that
@@ -1194,6 +1202,8 @@ namespace GCode_Sender
 
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
+            UpdateMenuBarInfo();   // the summary hides itself when the window gets too narrow
+
             if(saveWinSize && !(AppConfig.Settings.Base.WindowWidth == e.NewSize.Width && AppConfig.Settings.Base.WindowHeight == e.NewSize.Height))
             {
                 AppConfig.Settings.Base.WindowWidth = WindowState == WindowState.Maximized ? -1 : e.NewSize.Width;
@@ -2253,6 +2263,37 @@ namespace GCode_Sender
         // already on screen instead of stacking a second copy of it.
         private Window messageLogWindow;
         private TextBox messageLogText;
+
+        /// <summary>
+        /// The connection summary at the right end of the menu bar: "Connected to TARGET for TIME".
+        /// It shares that row with the menu, so it HIDES itself on a narrow window rather than
+        /// squeezing the menu - the menu is navigation, this is a readout, and a readout loses.
+        /// </summary>
+        private void UpdateMenuBarInfo()
+        {
+            if (lblMenuBarInfo == null)
+                return;
+
+            var model = DataContext as GrblViewModel;
+            string target = model?.ConnectionTarget;
+
+            if (string.IsNullOrEmpty(target) || (model != null && model.IsConnectionLost))
+            {
+                lblMenuBarInfo.Text = "Not connected";
+                lblMenuBarInfo.Foreground = Brushes.Red;
+            }
+            else
+            {
+                lblMenuBarInfo.Text = string.Format("Connected to {0} for {1}", target, model.RunTime);
+                lblMenuBarInfo.Foreground = Brushes.ForestGreen;
+            }
+
+            // Below this the menu and the summary start to collide. Measured against the menu's own
+            // width rather than a guessed constant, so a longer menu (localised, or a new item) still
+            // gets the room it needs.
+            double needed = menuMain.ActualWidth + lblMenuBarInfo.DesiredSize.Width + 40;
+            lblMenuBarInfo.Visibility = ActualWidth >= needed ? Visibility.Visible : Visibility.Collapsed;
+        }
 
         private void ViewStatus_Click(object sender, RoutedEventArgs e)
         {

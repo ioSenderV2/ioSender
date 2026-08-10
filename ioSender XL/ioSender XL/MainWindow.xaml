@@ -43,7 +43,17 @@
              its own top-level item, Save/Close live on the program view, Open Console is a double-click on
              the Console tab, and Transform is in the program list's right-click menu. Exit is dropped - the
              window X / Alt+F4 (both routed through Window_Closing) quit the app. -->
-        <Menu x:Name="menuMain" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" DockPanel.Dock="Top">
+        <!-- Menu row: the menu itself plus a right-aligned connection summary. It replaces the
+             bottom status bar's Target/Run time, and hides itself on a narrow window (see
+             UpdateMenuBarInfo) rather than squeezing the menu it shares the row with. -->
+        <Grid DockPanel.Dock="Top">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="lblMenuBarInfo" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                       Margin="0,0,10,0" TextWrapping="NoWrap" Foreground="#FF3C6E3C" FontWeight="SemiBold"/>
+        <Menu x:Name="menuMain" Grid.Column="0" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}">
             <MenuItem x:Uid="mnu_connect" x:Name="menuConnect" Header="Co_nnect..." Click="connectMenuItem_Click"/>
             <!-- File / Tools carry a static skeleton here; the view entries (Machine, Settings, SD Card,
                  Feeds and Speeds, ...) are appended from the tab registry by BuildViewMenus, so a
@@ -84,80 +94,13 @@
                 <MenuItem x:Uid="mnu_about" x:Name="menuAbout" Header="_About" Click="aboutMenuItem_Click"/>
             </MenuItem>
         </Menu>
+        </Grid>
         <!-- Menu-overhaul: the toolbar row (file-action icons + quick-run macro buttons) was removed. The
              file icons duplicated the program-view header (Load/Close) or were dropped (Reload/Edit); macros
              still run by F-key (KeypressHandler) - a macro-name flyout is a possible future replacement. -->
-        <StatusBar DockPanel.Dock="Bottom">
-            <StatusBar.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" MinWidth="120" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                    </Grid>
-                </ItemsPanelTemplate>
-            </StatusBar.ItemsPanel>
-            <StatusBarItem>
-                <TextBlock TextWrapping="NoWrap">
-                    <TextBlock.Text>
-                        <MultiBinding Converter="{StaticResource BlocksToStringConverter}">
-                            <Binding Path="Blocks" />
-                            <Binding Path="BlockExecuting" />
-                        </MultiBinding>
-                    </TextBlock.Text>
-                </TextBlock>
-            </StatusBarItem>
-            <Separator Grid.Column="1" />
-            <Separator Grid.Column="3" />
-            <StatusBarItem Grid.Column="4">
-                <TextBlock x:Uid="lbl_connectionTarget" TextWrapping="NoWrap" Padding="4,0" FontWeight="SemiBold">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <!-- green when a target is connected, red when not. Text is a Setter (not a local
-                                 value) so the IsConnectionLost trigger below can override it - a directly set
-                                 Text binding would win over a trigger and never show "Not connected". -->
-                            <Setter Property="Text" Value="{Binding Path=ConnectionTarget, StringFormat=Target: {0}, TargetNullValue=Not connected}"/>
-                            <Setter Property="Foreground" Value="ForestGreen"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Path=ConnectionTarget}" Value="{x:Null}">
-                                    <Setter Property="Foreground" Value="Red"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding Path=ConnectionTarget}" Value="">
-                                    <Setter Property="Foreground" Value="Red"/>
-                                </DataTrigger>
-                                <!-- socket dropped (e.g. simulator closed): the reconnect loop keeps the
-                                     target name set, so reflect the lost state here instead -->
-                                <DataTrigger Binding="{Binding Path=IsConnectionLost}" Value="True">
-                                    <Setter Property="Foreground" Value="Red"/>
-                                    <Setter Property="Text" Value="Not connected"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                    <TextBlock.ContextMenu>
-                        <ContextMenu Opened="targetContextMenu_Opened">
-                            <MenuItem x:Uid="mnu_validate" Header="_Validate controller..." Click="validateMenuItem_Click"/>
-                        </ContextMenu>
-                    </TextBlock.ContextMenu>
-                </TextBlock>
-            </StatusBarItem>
-            <Separator Grid.Column="5" />
-            <StatusBarItem Grid.Column="6">
-                <TextBlock x:Uid="lbl_runtime" Text="{Binding Path=RunTime, StringFormat={StaticResource RunTime}}" TextWrapping="NoWrap" Padding="2,0"/>
-            </StatusBarItem>
-            <Separator Grid.Column="7" />
-            <StatusBarItem Grid.Column="8">
-                <TextBlock x:Uid="lbl_jogStep" ToolTip="Distance for keyboard step jog (with &lt;CTRL&gt; modifier)." Text="{Binding Path=JogStep, StringFormat={StaticResource JogStep}}" HorizontalAlignment="Right" TextWrapping="NoWrap" Margin="4,0"/>
-            </StatusBarItem>
-        </StatusBar>
+        <!-- The bottom status bar is gone (2026-08-10). Blocks moved onto the run line, the status
+             message became the popup log, and Target/Run time became the menu-bar summary above.
+             Jog step is the Jogging group's Distance. Nothing left to justify a whole row. -->
         <!-- Single, always-visible machine-control cluster (Phase 2c) - replaced the former floating
              run-control window and the Grbl-tab's lower-left controls. Signals + Status (state/check +
              Home/Unlock/Reset) + JobControl (Cycle Start [starts a job] / Feed Hold / Stop) +
@@ -255,9 +198,6 @@
                                 <!-- The status MESSAGE strip is gone from the bottom bar; this opens the
                                      same history window its click used to, so a message that scrolled past
                                      is still reachable without a permanent strip of screen spent on it. -->
-                                <Button x:Uid="btn_viewStatus" x:Name="btnViewStatus" Content="Status" Padding="10,2"
-                                        Margin="16,0,0,0" VerticalAlignment="Center" Click="ViewStatus_Click"
-                                        ToolTip="Show the status message history since launch."/>
                                 <!-- Demo-video timelapse marker toggle. Hidden unless
                                      launched with -demomarker (visibility set in MainWindow.xaml.cs). Marks
                                      TIMELAPSE_ON/OFF into the demo marker file; see docs/demo-videos. -->
