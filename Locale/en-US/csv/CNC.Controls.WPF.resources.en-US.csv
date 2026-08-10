@@ -1548,3 +1548,38 @@ CNC.Controls.WPF.g.en-US.resources:workorderview.baml,mi_worename:System.Windows
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,mi_woopencopy:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Open Copy...
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,mi_woclose:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Close
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,mi_wodelete:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Delete...
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,hdr_jogging:System.Windows.Controls.TextBlock.Text,Text,True,True,,JOGGING
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,lbl_jogDistance:System.Windows.Controls.TextBlock.Text,Text,True,True,,Distance:
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_jogDistMinus:System.Windows.Controls.ContentControl.Content,Button,True,True,,&#8722;
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_jogDistMinus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Smaller jog distance
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_jogDistPlus:System.Windows.Controls.ContentControl.Content,Button,True,True,,+
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_jogDistPlus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Larger jog distance
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,lbl_jogSpeed:System.Windows.Controls.TextBlock.Text,Text,True,True,,Speed:
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_jogSpeedMinus:System.Windows.Controls.ContentControl.Content,Button,True,True,,&#8722;
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_jogSpeedMinus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Slower jog
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_jogSpeedPlus:System.Windows.Controls.ContentControl.Content,Button,True,True,,+
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_jogSpeedPlus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Faster jog
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,lbl_kbdDef:System.Windows.Controls.TextBlock.Text,Text,True,True,,Kbd Def:
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,lbl_continuous:System.Windows.Controls.TextBlock.Text,Text,True,True,,Continuous:
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,chk_continuousJog:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Hold a jog button to move continuously; release to stop.
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,hdr_signals:System.Windows.Controls.TextBlock.Text,Text,True,True,,SIGNALS
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,lbl_sigLimit:System.Windows.Controls.TextBlock.Text,Text,True,True,,Limit:
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,lbl_sigSteppers:System.Windows.Controls.TextBlock.Text,Text,True,True,,Steppers:
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,lbl_sigProbes:System.Windows.Controls.TextBlock.Text,Text,True,True,,Probes:
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,lbl_tloRef:System.Windows.Controls.TextBlock.Text,Text,True,True,,TLO ref:
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,hdr_feedsSpeeds:System.Windows.Controls.TextBlock.Text,Text,True,True,,FEEDS AND SPEEDS
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,lbl_ovrFeed:System.Windows.Controls.TextBlock.Text,Text,True,True,,Feed rate:
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_feedOvrMinus:System.Windows.Controls.ContentControl.Content,Button,True,True,,&#8722;
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_feedOvrMinus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Feed override down
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_feedOvrPlus:System.Windows.Controls.ContentControl.Content,Button,True,True,,+
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_feedOvrPlus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Feed override up
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,lbl_ovrRapids:System.Windows.Controls.TextBlock.Text,Text,True,True,,Rapids:
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_rapidOvrMinus:System.Windows.Controls.ContentControl.Content,Button,True,True,,&#8722;
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_rapidOvrMinus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Rapids override down (100 / 50 / 25 only)
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_rapidOvrPlus:System.Windows.Controls.ContentControl.Content,Button,True,True,,+
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_rapidOvrPlus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Rapids override up (100 / 50 / 25 only)
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,lbl_ovrSpindle:System.Windows.Controls.TextBlock.Text,Text,True,True,,Spindle:
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_spindleOvrMinus:System.Windows.Controls.ContentControl.Content,Button,True,True,,&#8722;
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_spindleOvrMinus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Spindle override down
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_spindleOvrPlus:System.Windows.Controls.ContentControl.Content,Button,True,True,,+
+CNC.Controls.WPF.g.en-US.resources:runstrippanel.baml,btn_spindleOvrPlus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Spindle override up

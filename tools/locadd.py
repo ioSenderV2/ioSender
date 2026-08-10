@@ -36,6 +36,7 @@ TARGETS = [
 
     # CNC.Controls.WPF (the main controls library)
     ('CNC Controls/CNC Controls/JobControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/RunStripPanel.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/PortDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/AutoSquareWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/StepperCalibrationProbeWizard.xaml', 'CNC.Controls.WPF'),
