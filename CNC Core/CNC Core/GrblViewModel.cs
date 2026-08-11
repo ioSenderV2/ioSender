@@ -278,13 +278,48 @@ namespace CNC.Core
         // hub. Both live on CNC.Client.MachineViewModel now - deleted rather than orphaned so there
         // are not two plausible hubs with one live (the dead-KeypressHandler.cs lesson).
 
+        /// <summary>
+        /// Whether grblHAL would treat this as a G-CODE command - the only kind its alarm/jog lockout
+        /// rejects. System ($) commands, realtime bytes and jogs themselves must always get through:
+        /// gating those would break jog cancel and feed hold, which is far worse than an error:9.
+        /// </summary>
+        private static bool IsGCodeCommand(string command)
+        {
+            string c = command == null ? string.Empty : command.TrimStart();
+            if (c.Length <= 1)
+                return false;       // realtime byte: 0x18/0x85/!/~/? - single characters, never g-code
+            return c[0] != '$';     // $J=, $$, $X, $TPW ... - not subject to the g-code lockout
+        }
+
         private bool ApplyCommand(string command)
         {
             bool ok;
             string ucmd = command.ToUpper();
 
             if ((ok = !(GrblState.State == GrblStates.Tool && !(ucmd.StartsWith("$J=") || ucmd == "$TPW" || ucmd.Contains("G10L20")))))
-                MDI = command;
+            {
+                // A jog that has been SENT but not yet answered locks g-code out the instant it starts,
+                // while the controller still reports Idle - so this cannot be gated on GrblState, and
+                // wasn't gated at all. Zeroing Z straight after a jog returned "error:9 - G-code commands
+                // are locked out during alarm or jog state" with three Idle reports in between
+                // (2026-08-10). One seam for every caller: both the typed MDI path and the programmatic
+                // ExecuteCommand path come through here.
+                //
+                // REFUSED, never queued-and-sent-later. "G10 L20" means "make HERE read zero", and by the
+                // time the jog finishes, here has moved - in that report, a millimetre further down. A
+                // deferred zero would silently set the origin somewhere the operator never chose, which on
+                // Z is a crash or a scrapped part. Dropping it is the same doctrine JogGate already
+                // applies to jogs: the request referred to a position that no longer exists.
+                if (JogGate.Pending && IsGCodeCommand(command))
+                {
+                    ok = false;
+                    Message = "Jog still running - wait for it to stop, then try again.";
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("jobrunner", string.Format("ApplyCommand REFUSED \"{0}\" - a jog is outstanding (grblHAL would answer error:9)", command));
+                }
+                else
+                    MDI = command;
+            }
             else
             {
                 Message = LibStrings.FindResource("JoggingOnly");

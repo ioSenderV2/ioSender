@@ -35,6 +35,31 @@ namespace CNC.Core
         private static bool pending;
         private static DateTime sentAtUtc = DateTime.MinValue;
 
+        /// <summary>
+        /// A $J has been sent and not yet answered, so a g-code command sent now may be rejected.
+        /// </summary>
+        /// <remarks>
+        /// grblHAL locks G-CODE out from the moment a queued jog STARTS, but keeps reporting Idle until
+        /// then - so the status report is truthful about motion and silent about pending commands. Asking
+        /// GrblState therefore cannot answer "may I send g-code": observed 2026-08-10, a $J= dispatched,
+        /// three Idle reports, then G10L20P0Z0 -> "error:9 - G-code commands are locked out during alarm
+        /// or jog state", with the jog's own ok arriving between the two. This property is what the
+        /// question actually depends on.
+        ///
+        /// Bounded by AckTimeoutMs for the same reason TryBegin is: one dropped ok must not lock g-code
+        /// out for the rest of the session.
+        /// </remarks>
+        public static bool Pending
+        {
+            get
+            {
+                lock (sync)
+                {
+                    return pending && (DateTime.UtcNow - sentAtUtc).TotalMilliseconds < AckTimeoutMs;
+                }
+            }
+        }
+
         // True => the caller may send its $J now (and this call has recorded it as outstanding).
         // False => drop this jog entirely. Dropping a click is strictly better than risking the wedge;
         // there is no queue-and-send-later, because a jog the operator asked for half a second ago is not
