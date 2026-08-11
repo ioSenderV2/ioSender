@@ -130,6 +130,7 @@
     <Compile Include="MacroRunner.cs" />
     <Compile Include="JobRunner.cs" />
     <Compile Include="StreamPump.cs" />
+    <Compile Include="WirePacer.cs" />
     <Compile Include="Machine.cs" />
     <Compile Include="MeasureViewModel.cs" />
     <Compile Include="NetworkScanner.cs" />
