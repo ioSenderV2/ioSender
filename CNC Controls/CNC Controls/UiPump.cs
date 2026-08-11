@@ -30,11 +30,29 @@ namespace CNC.Controls
             EventUtils.Pump = DoEvents;
         }
 
+        // Every caller of this is a "wait for the controller while keeping the UI alive" loop:
+        //
+        //     while (res == null) EventUtils.DoEvents();
+        //
+        // with no delay of any kind. Each pass allocates a DispatcherFrame and a DispatcherOperation, and
+        // an unblocked UI thread runs that loop millions of times a second - so a reply that is merely
+        // SLOW (grblHAL is silent for a whole homing cycle) turns into hundreds of megabytes a second of
+        // garbage. Twice on 2026-08-11 that reached the 32-bit process ceiling and killed the app with an
+        // OutOfMemoryException at ~3.2GB, both times with the stack in this method, under
+        // GrblSDCard.Load's $CWD= wait. It is the same spin already recorded against
+        // MacroRunner.StreamProgram.
+        //
+        // The 1ms yield makes the loop cost bounded (~1000 pumps/second instead of millions) without
+        // changing what any caller sees: they are all waiting on a controller that answers in
+        // milliseconds at best, and the UI is still pumped far faster than a human or a status report can
+        // notice. Fixing it here rather than at the call sites deliberately - there are dozens of these
+        // loops, and the next one written will get the fix for free.
         private static void DoEvents()
         {
             DispatcherFrame frame = new DispatcherFrame();
             Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background, new DispatcherOperationCallback(ExitFrame), frame);
             Dispatcher.PushFrame(frame);
+            System.Threading.Thread.Sleep(1);
         }
 
         private static object ExitFrame(object f)
