@@ -247,6 +247,11 @@ namespace GCode_Sender
             // keyboard focus just by starting up.
             ShutdownMode = ShutdownMode.OnMainWindowClose;
 
+            // Every popup this app opens hands focus back to ioSender when it closes, instead of
+            // letting Windows activate whatever is next in ITS z-order - which is regularly another
+            // application. Installed before the first window is shown so nothing is missed.
+            CNC.Controls.WindowFocusReturn.Install();
+
             var splash = TestServerPort < 0 ? new SplashWindow() : null;
             splash?.Show();
 
