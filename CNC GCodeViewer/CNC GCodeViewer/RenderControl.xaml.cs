@@ -45,7 +45,10 @@ using CNC.GCode;
 
 namespace CNC.Controls.Viewer
 {
-    public partial class RenderControl : UserControl
+    // IToolpathView: Open/Close already had these exact signatures - the interface just states the
+    // contract its host relies on, instead of the host casting to this concrete type and getting null
+    // when it is handed the other implementation.
+    public partial class RenderControl : UserControl, IToolpathView
     {
         private static bool keyboardMappingsOk = false;
 

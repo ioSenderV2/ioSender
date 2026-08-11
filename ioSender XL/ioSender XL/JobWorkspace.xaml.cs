@@ -23,7 +23,13 @@ namespace GCode_Sender
 {
     public partial class JobWorkspace : UserControl
     {
-        private RenderControl gcodeRenderer;   // the 3D-view instance (built from the tree) - kept for show/clear
+        // The 3D-view instance (built from the tree) - kept for show/clear. Held as the INTERFACE, not as
+        // RenderControl: this was "ctl as RenderControl", and CarveView - the component actually
+        // registered - is a sibling UserControl, not a RenderControl, so the cast returned null and both
+        // ShowToolpath() and ClearToolpath() were silent no-ops. Loading still drew, because CarveView
+        // watches FileName itself; only the CLEAR was lost, which is why a finished job's carving stayed
+        // on the stock after the program evaporated.
+        private IToolpathView gcodeRenderer;
         private TabItem tab3D;                  // the 3D-view tab - kept so it can be hidden when 3D is disabled
         private bool view3DEnabled = true;      // mirrors the GCodeViewer setting - see Set3DViewEnabled
         private bool splitBuilt;                // which presentation is currently live
@@ -125,7 +131,7 @@ namespace GCode_Sender
                 if (node.Component == LayoutKeys.Toolpath3D)
                 {
                     tab3D = tab;
-                    gcodeRenderer = ctl as RenderControl;
+                    gcodeRenderer = ctl as IToolpathView;
                 }
                 tabGCode.Items.Add(tab);
             }
@@ -145,7 +151,7 @@ namespace GCode_Sender
 
             var view = ComponentRegistry.Get(LayoutKeys.Toolpath3D)?.Create?.Invoke();
             split3D.Content = view;
-            gcodeRenderer = view as RenderControl;
+            gcodeRenderer = view as IToolpathView;
 
             // Star widths, so the two halves keep their PROPORTIONS when the window resizes rather than
             // one half absorbing everything - the same reason the columns are "*" in the markup.

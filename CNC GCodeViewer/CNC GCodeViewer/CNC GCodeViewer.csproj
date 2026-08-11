@@ -64,6 +64,7 @@
     <Compile Include="ConfigControl.xaml.cs">
       <DependentUpon>ConfigControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="IToolpathView.cs" />
     <Compile Include="RenderControl.xaml.cs">
       <DependentUpon>RenderControl.xaml</DependentUpon>
     </Compile>

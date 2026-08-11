@@ -30,7 +30,7 @@ using Point3D = System.Windows.Media.Media3D.Point3D;
 
 namespace CNC.Controls.Viewer
 {
-    public partial class CarveView : UserControl
+    public partial class CarveView : UserControl, IToolpathView
     {
         private struct Seg { public Point3D A, B; public bool Rapid; public double Len; public double Radius; public int Shape; public double Angle; }
 
@@ -176,6 +176,38 @@ namespace CNC.Controls.Viewer
         private void Wpos_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             UpdateTool();
+        }
+
+        // ---- IToolpathView ----
+
+        /// <summary>Show a program's toolpath. The scene is rebuilt from GCode.File, so the tokens are
+        /// only the host's way of saying "there is a program now".</summary>
+        public void Open(List<GCodeToken> tokens)
+        {
+            ScheduleBuild();
+        }
+
+        /// <summary>
+        /// The program is gone, so the carve goes with it. The mesh depicts material removed BY THAT
+        /// PROGRAM: leaving it up claims the stock is cut when nothing on screen says so, and the next
+        /// job would preview onto an already-carved surface - simulated removal indistinguishable from
+        /// real. The board itself stays, uncarved, because the material is still on the table.
+        /// </summary>
+        public void Close()
+        {
+            carveVisual = null;
+            carveMesh = null;
+            meshPos = null;
+            hmap = null;
+            haveLast = false;
+            dirtyCells.Clear();
+            haveBox = false;
+            segs.Clear();
+            // The signature is built from the program, which has just emptied, so this would rebuild
+            // anyway - but only once something asks. Ask now, so the stale carve cannot be seen in the
+            // gap before the next program loads (which is exactly when the operator looks at it).
+            lastSceneSig = null;
+            ScheduleBuild();
         }
 
         private static double Travel(int axis)
@@ -341,11 +373,20 @@ namespace CNC.Controls.Viewer
         {
             double margin = 6d, top, bottom, cx, cy, sx, sy;
 
-            if (haveBox && haveStockOrigin && stockX > 0d && stockY > 0d)
+            if (haveStockOrigin && stockX > 0d && stockY > 0d)
             {
-                // Declared stock: draw the real board, in its real place. Same rule as InitHeightmap's.
-                top = Math.Max(bMax.Z, 0d);
-                bottom = Math.Min(bMin.Z, top - 1d);
+                // Declared stock (from the program, or Setup when it declares none): draw the real board
+                // in its real place. Deliberately NOT gated on haveBox - with no program loaded this used
+                // to fall through to a 150x150 stand-in at the origin, which is what an emptied Job tab
+                // showed after a run finished: a placeholder easily mistaken for the real stock being
+                // wrong. The board is on the table whether or not a program is open.
+                top = 0d;
+                bottom = stockZ > 0d ? -stockZ : -19d;
+                if (haveBox)
+                {
+                    top = Math.Max(bMax.Z, 0d);
+                    bottom = Math.Min(bottom, bMin.Z);   // a through-cut goes deeper than the stock
+                }
                 sx = stockX;
                 sy = stockY;
                 cx = stockOX + stockX / 2d;
