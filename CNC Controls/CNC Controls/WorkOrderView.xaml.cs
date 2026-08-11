@@ -2163,6 +2163,14 @@ namespace CNC.Controls
             using (var sw = new System.IO.StringWriter(sb))
                 new System.Xml.Serialization.XmlSerializer(typeof(WorkOrder)).Serialize(sw, wo);
             sb.Append("|v=").Append(System.Reflection.Assembly.GetExecutingAssembly().GetName().Version);
+            // The Setup tab's stock feeds the compiler - Thickness has always driven TrueDepth, and the
+            // stock size is now emitted as the program's own (STOCK ...) declaration - but none of it was
+            // in the fingerprint, so editing stock in Setup silently reused the previous compile. Found
+            // 2026-08-10 the hard way: a cached program with no STOCK line kept being restored after the
+            // compiler had started emitting one, which read as "the fix did nothing".
+            var stockSec = StartJobConfig.Section;
+            sb.Append("|stk=").Append(stockSec == null ? "-" :
+                stockSec.Width.ToInvariantString() + "x" + stockSec.Height.ToInvariantString() + "x" + stockSec.Thickness.ToInvariantString());
             sb.Append("|tlo=").Append(AppConfig.Settings.Base.TloRefBaseline.ToInvariantString());
             sb.Append("|spin=").Append(AppConfig.Settings.Base.SpindleDirectionCapability);
             sb.Append("|fso=").Append(GrblInfo.ForceSetOrigin);

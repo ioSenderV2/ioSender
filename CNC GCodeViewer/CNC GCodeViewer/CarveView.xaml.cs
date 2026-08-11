@@ -219,6 +219,25 @@ namespace CNC.Controls.Viewer
             // large program) on every IsVisibleChanged is what made returning to the Job tab stall for ~1-2 s;
             // when unchanged the retained visuals re-render for free - just refresh the tool cone + framing.
             string sig = SceneSignature();
+
+            // Instrumentation only (-debuglog=carve). Two fixes aimed at the stock block have now failed to
+            // change what the operator sees, so the next step is reading what this method actually does
+            // rather than reasoning about it again: whether a program is even loaded, whether the STOCK
+            // comment parsed, whether the signature short-circuit skipped the rebuild, and whether the
+            // viewport had a size to lay out into (the missing-gridlines-until-tab-switch report).
+            if (DebugLog.Enabled)
+            {
+                var st = CNC.Core.GCodeProgramComments.Stock;
+                DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "BuildScene vp={0:0}x{1:0} children={2} sigChanged={3} loaded={4} haveBox={5} tokens={6} | stock={7} | file=\"{8}\"",
+                    viewport.ActualWidth, viewport.ActualHeight, viewport.Children.Count,
+                    sig != lastSceneSig, GCode.File.IsLoaded, haveBox, GCode.File.Tokens?.Count ?? 0,
+                    st == null ? "(none declared)" : string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "X={0:0.###} Y={1:0.###} Z={2:0.###} hasOrigin={3} OX={4:0.###} OY={5:0.###}",
+                        st.Value.X, st.Value.Y, st.Value.Z, st.Value.HasOrigin, st.Value.OX, st.Value.OY),
+                    model?.FileName ?? string.Empty));
+            }
+
             if (sig == lastSceneSig && viewport.Children.Count > 0)
             {
                 UpdateTool();
@@ -322,6 +341,16 @@ namespace CNC.Controls.Viewer
             }
 
             double h = Math.Max(top - bottom, 1d);
+
+            // Instrumentation only. The no-program fallback here is a 150x150 block at the origin, which
+            // is easy to mistake for a wrongly-sized stock - so the log says outright which branch drew it.
+            if (DebugLog.Enabled)
+                DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "AddStock branch={0} | centre {1:0.##},{2:0.##} size {3:0.##} x {4:0.##} mm | z {5:0.##}..{6:0.##}",
+                    (haveBox && haveStockOrigin && stockX > 0d && stockY > 0d) ? "DECLARED"
+                        : haveBox ? "cut-bbox+margin" : "NO PROGRAM (150x150 default)",
+                    cx, cy, sx, sy, bottom, top));
+
             viewport.Children.Add(new BoxVisual3D
             {
                 Center = new Point3D(cx, cy, bottom + h / 2d),
@@ -524,6 +553,17 @@ namespace CNC.Controls.Viewer
             hbot = stockZ > 0d ? -stockZ : Math.Min(bMin.Z, -1d);
             hbot = Math.Min(hbot, bMin.Z);                  // include any cut deeper than the stock thickness
             if (hbot >= htop) hbot = htop - 1d;
+
+            // Instrumentation only: the numbers the block is ACTUALLY built from, and which branch chose
+            // them - the one thing that separates "the stock was never declared" from "it was declared and
+            // something downstream ignored it".
+            if (DebugLog.Enabled)
+                DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "InitHeightmap branch={0} | x {1:0.##}..{2:0.##} y {3:0.##}..{4:0.##} ({5:0.##} x {6:0.##} mm) | z {7:0.##}..{8:0.##} | declared {9:0.##}x{10:0.##}x{11:0.##} origin={12} | cut x {13:0.##}..{14:0.##} y {15:0.##}..{16:0.##}",
+                    (haveStockOrigin && stockX > 0d && stockY > 0d) ? "DECLARED" : "centred-on-cut",
+                    x0, x1, y0, y1, x1 - x0, y1 - y0, hbot, htop,
+                    stockX, stockY, stockZ, haveStockOrigin,
+                    bMin.X, bMax.X, bMin.Y, bMax.Y));
 
             double w = Math.Max(x1 - x0, 1d), h = Math.Max(y1 - y0, 1d);
             const int maxCells = 320;                       // finer grid -> sharper carve (was 150)
