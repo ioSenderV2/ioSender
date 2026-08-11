@@ -145,14 +145,22 @@ namespace CNC.Core
             // its own answer too: atc.sum read back empty, so every macro reported Missing until the next poll.
             // False = "unknown", which every caller already handles (see the contract note above).
             if (ProgramInFlight(model))
+            {
+                if (DebugLog.Enabled)
+                    DebugLog.Write("fs", "Load: REFUSED - a program is in flight");
                 return false;
+            }
 
             // Load pumps the dispatcher (EventUtils.DoEvents) while waiting on the controller, so a refresh
             // queued meanwhile - tab activation, ATC provisioning - can re-enter and clear/rebuild the shared
             // DataTable mid-listing. That corrupted the parse state and cascaded into unhandled exceptions
             // (and a stack overflow via the modal error handler). Ignore re-entrant calls.
             if (_loading)
+            {
+                if (DebugLog.Enabled)
+                    DebugLog.Write("fs", "Load: REFUSED - re-entrant (a listing is already running)");
                 return false;
+            }
             _loading = true;
 
             try
@@ -176,6 +184,11 @@ namespace CNC.Core
                 var mounts = GetMounts(model);
                 Mounts = mounts;
 
+                if (DebugLog.Enabled)
+                    DebugLog.Write("fs", string.Format("Load: HasFS={0} HasSDCard={1} mountStatus={2} -> {3} mount(s) [{4}]",
+                        GrblInfo.HasFS, GrblInfo.HasSDCard, model.SDCardMountStatus, mounts.Count,
+                        string.Join(" | ", mounts.ConvertAll(m => m.Name + "@" + m.Path))));
+
                 if (mounts.Count > 0)
                 {
                     FreeSpace = GrblFilesystems.FreeSpaceSummary(mounts);
@@ -184,6 +197,9 @@ namespace CNC.Core
                     {
                         int before = data.Rows.Count;
                         ListMount(model, mount.Name, mount.Path, ViewAll);
+                        if (DebugLog.Enabled)
+                            DebugLog.Write("fs", string.Format("Load: mount {0}@{1} contributed {2} row(s)",
+                                mount.Name, mount.Path, data.Rows.Count - before));
                         if (data.Rows.Count == before)
                             // Empty filesystem: add a non-file placeholder so the mount stays visible and can be
                             // selected as an upload target. Marked via the (hidden, otherwise unused) Dir column so
@@ -227,11 +243,17 @@ namespace CNC.Core
                 // A worker exception must still set res, or the res==null pump below spins forever.
                 try { res = WaitFor.AckResponse<string>(
                     ct,
-                    response => { var fs = GrblFilesystems.ParseMountLine(response); if (fs != null) mounts.Add(fs); },
+                    response => {
+                        var fs = GrblFilesystems.ParseMountLine(response);
+                        if (DebugLog.Enabled)
+                            DebugLog.Write("fs", string.Format("$FI saw \"{0}\" -> {1}", response,
+                                fs == null ? "(not a mount line)" : fs.Name + "@" + fs.Path));
+                        if (fs != null) mounts.Add(fs);
+                    },
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
                     1500, () => Comms.com.WriteCommand("$FI")); }
-                catch { res = false; }
+                catch (Exception ex) { res = false; if (DebugLog.Enabled) DebugLog.Write("fs", "$FI threw: " + ex.Message); }
             }).Start();
 
             while (res == null)
@@ -265,11 +287,14 @@ namespace CNC.Core
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
                     2000, () => Comms.com.WriteCommand(ViewAll ? GrblConstants.CMD_SDCARD_DIR_ALL : GrblConstants.CMD_SDCARD_DIR)); }
-                catch { res = false; }
+                catch (Exception ex) { res = false; if (DebugLog.Enabled) DebugLog.Write("fs", "$F threw: " + ex.Message); }
             }).Start();
 
             while (res == null)
                 EventUtils.DoEvents();
+
+            if (DebugLog.Enabled)
+                DebugLog.Write("fs", string.Format("ListMount {0}@{1}: $F completed res={2}", location, path, res));
 
             model.Silent = false;
         }
@@ -373,12 +398,24 @@ namespace CNC.Core
                         owner = m.Path;
                 }
                 if (owner != curPath)
+                {
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("fs", string.Format("Process: SKIPPED \"{0}\" - owned by {1}, listing {2}", filename, owner, curPath));
                     return;
+                }
 
+                if (DebugLog.Enabled)
+                    DebugLog.Write("fs", string.Format("Process: ROW \"{0}\" size={1} loc={2} path={3}", filename, filesize, curLocation, curPath));
                 GrblSDCard.data.Rows.Add(new object[] { id++, "", filename, filesize, invalid, curLocation, curPath });
             }
             else if (data == "error:62" || data == "error:64")
+            {
+                if (DebugLog.Enabled)
+                    DebugLog.Write("fs", "Process: " + data + " -> SDCardMountStatus = Unmounted");
                 grbl.SDCardMountStatus = SDState.Unmounted;
+            }
+            else if (DebugLog.Enabled && data != "ok")
+                DebugLog.Write("fs", "Process: ignored \"" + data + "\"");
         }
     }
 }
