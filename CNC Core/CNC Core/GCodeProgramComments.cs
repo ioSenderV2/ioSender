@@ -28,6 +28,12 @@ namespace CNC.Core
     public struct GCodeStockInfo
     {
         public double X, Y, Z;
+        // Where the stock's MINIMUM corner sits in work coordinates, when the program says so
+        // (OX=/OY= on the STOCK comment). Fusion's own STOCK comment gives size only, and its origin
+        // could be anywhere on the block, so a consumer that guesses would place the stock wrongly for
+        // half its users - hence "did the program actually tell us" rather than a default of (0,0).
+        public double OX, OY;
+        public bool HasOrigin;
     }
 
     public static class GCodeProgramComments
@@ -38,8 +44,11 @@ namespace CNC.Core
 
         private static readonly Regex rxTool =
             new Regex(@"\(\s*TOOL\s+T=(\d+)\s+D=([0-9.]+)\s+TYPE=(\w+)(?:\s+A=([0-9.]+))?(?:\s+L=([0-9.]+))?", RegexOptions.IgnoreCase);
+        // OX/OY are OPTIONAL, so a Fusion post's plain (STOCK X= Y= Z=) still matches exactly as before.
+        // Signed, because the stock's minimum corner sits at negative work coordinates whenever the origin
+        // is anywhere but that corner.
         private static readonly Regex rxStock =
-            new Regex(@"\(\s*STOCK\s+X=([0-9.]+)\s+Y=([0-9.]+)\s+Z=([0-9.]+)", RegexOptions.IgnoreCase);
+            new Regex(@"\(\s*STOCK\s+X=([0-9.]+)\s+Y=([0-9.]+)\s+Z=([0-9.]+)(?:\s+OX=(-?[0-9.]+))?(?:\s+OY=(-?[0-9.]+))?", RegexOptions.IgnoreCase);
 
         private static readonly Dictionary<int, GCodeToolInfo> tools = new Dictionary<int, GCodeToolInfo>();
 
@@ -130,7 +139,20 @@ namespace CNC.Core
                 double.TryParse(ms.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double sx) &&
                 double.TryParse(ms.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double sy) &&
                 double.TryParse(ms.Groups[3].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double sz))
-                return new GCodeStockInfo { X = sx, Y = sy, Z = sz };
+            {
+                var info = new GCodeStockInfo { X = sx, Y = sy, Z = sz };
+                // Both or neither: half an origin places the block no better than none, and silently
+                // trusting one axis would be worse than falling back to the size-only behaviour.
+                if (ms.Groups[4].Success && ms.Groups[5].Success &&
+                    double.TryParse(ms.Groups[4].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double ox) &&
+                    double.TryParse(ms.Groups[5].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double oy))
+                {
+                    info.OX = ox;
+                    info.OY = oy;
+                    info.HasOrigin = true;
+                }
+                return info;
+            }
             return null;
         }
 

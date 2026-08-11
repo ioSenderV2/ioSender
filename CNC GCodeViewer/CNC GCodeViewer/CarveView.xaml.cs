@@ -45,6 +45,8 @@ namespace CNC.Controls.Viewer
         private int defaultToolShape = ShapeFlat;
         private double defaultToolAngle;
         private double stockX, stockY, stockZ;   // stock size from GCodeProgramComments.Stock; 0 = unknown
+        private double stockOX, stockOY;         // stock's minimum corner in work coords, when declared
+        private bool haveStockOrigin;            // false = size only (e.g. Fusion) -> centre it on the cut
 
         // current cutter geometry the carve uses (set per segment in playback, or the default for live motion)
         private double curR = 3d;
@@ -295,7 +297,17 @@ namespace CNC.Controls.Viewer
         {
             double margin = 6d, top, bottom, cx, cy, sx, sy;
 
-            if (haveBox)
+            if (haveBox && haveStockOrigin && stockX > 0d && stockY > 0d)
+            {
+                // Declared stock: draw the real board, in its real place. Same rule as InitHeightmap's.
+                top = Math.Max(bMax.Z, 0d);
+                bottom = Math.Min(bMin.Z, top - 1d);
+                sx = stockX;
+                sy = stockY;
+                cx = stockOX + stockX / 2d;
+                cy = stockOY + stockY / 2d;
+            }
+            else if (haveBox)
             {
                 top = Math.Max(bMax.Z, 0d);
                 bottom = Math.Min(bMin.Z, top - 1d);
@@ -438,6 +450,9 @@ namespace CNC.Controls.Viewer
             stockX = stock?.X ?? 0d;
             stockY = stock?.Y ?? 0d;
             stockZ = stock?.Z ?? 0d;
+            haveStockOrigin = stock?.HasOrigin ?? false;
+            stockOX = stock?.OX ?? 0d;
+            stockOY = stock?.OY ?? 0d;
 
             int lowest = int.MaxValue;
             foreach (var kv in CNC.Core.GCodeProgramComments.All)
@@ -480,11 +495,31 @@ namespace CNC.Controls.Viewer
             // Footprint: the real (STOCK X Y) when the program gives it (centred on the cut), else the toolpath
             // bbox + margin. Never smaller than the cut extents so the toolpath always stays on the stock.
             const double margin = 6d;
-            double cx = (bMin.X + bMax.X) / 2d, cy = (bMin.Y + bMax.Y) / 2d;
-            double sx = (bMax.X - bMin.X) + 2d * margin, sy = (bMax.Y - bMin.Y) + 2d * margin;
-            if (stockX > 0d) sx = Math.Max(sx, stockX);
-            if (stockY > 0d) sy = Math.Max(sy, stockY);
-            double x0 = cx - sx / 2d, x1 = cx + sx / 2d, y0 = cy - sy / 2d, y1 = cy + sy / 2d;
+            double x0, x1, y0, y1;
+
+            if (haveStockOrigin && stockX > 0d && stockY > 0d)
+            {
+                // The program said where the material actually is, so draw THAT rather than a block
+                // inferred from the cut. Centring on the toolpath put a correctly-sized board around
+                // whatever was being engraved instead of where the operator's stock sits - a 368x232
+                // board rendered as a block the size of the lettering on it.
+                x0 = stockOX; x1 = stockOX + stockX;
+                y0 = stockOY; y1 = stockOY + stockY;
+                // A cut reaching past a declared edge (an over-run, or stock mis-measured) still has to
+                // land ON the mesh - otherwise the toolpath floats beside the block with nothing to carve.
+                x0 = Math.Min(x0, bMin.X); x1 = Math.Max(x1, bMax.X);
+                y0 = Math.Min(y0, bMin.Y); y1 = Math.Max(y1, bMax.Y);
+            }
+            else
+            {
+                // Size-only (Fusion) or nothing declared: the origin could be any point on the block, so
+                // centring on the cut is the least-wrong guess available.
+                double cx = (bMin.X + bMax.X) / 2d, cy = (bMin.Y + bMax.Y) / 2d;
+                double sx = (bMax.X - bMin.X) + 2d * margin, sy = (bMax.Y - bMin.Y) + 2d * margin;
+                if (stockX > 0d) sx = Math.Max(sx, stockX);
+                if (stockY > 0d) sy = Math.Max(sy, stockY);
+                x0 = cx - sx / 2d; x1 = cx + sx / 2d; y0 = cy - sy / 2d; y1 = cy + sy / 2d;
+            }
             htop = 0d;                                       // stock top = work Z0 (the material top); rapids above don't cut
             hbot = stockZ > 0d ? -stockZ : Math.Min(bMin.Z, -1d);
             hbot = Math.Min(hbot, bMin.Z);                  // include any cut deeper than the stock thickness

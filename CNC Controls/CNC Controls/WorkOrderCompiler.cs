@@ -1400,6 +1400,23 @@ namespace CNC.Controls
             // established the origin on a different WCS.
             lines.Add(string.Format("(PREREQ, connected, homed, noalarm, tlo, EXPR, {0})", WorkOrderWcs()));
 
+            // Declare the stock, so anything reading the program knows what the material is rather than
+            // inferring it. The 3D view in particular was drawing the toolpath's own bounding box plus a
+            // margin and calling it the stock, which is why a 368x232 board showed up as a block the size
+            // of the lettering on it (reported 2026-08-10).
+            //
+            // Size comes from the Setup tab's Load Stock inputs - the same values the Work Order lays its
+            // toolpaths out against. OX/OY say where the stock's MINIMUM corner sits in work coordinates,
+            // which for a Work Order is the origin itself: AddToolpath centres a new toolpath at
+            // (Width/2, Height/2), so the stock spans 0..Width, 0..Height by construction. Stating it
+            // explicitly rather than letting consumers assume it keeps a Fusion program - whose origin can
+            // be anywhere on the block - reading exactly as it did before.
+            var stock = StartJobConfig.Section;
+            if (stock != null && stock.Width > 0d && stock.Height > 0d && stock.Thickness > 0d)
+                lines.Add(string.Format(CultureInfo.InvariantCulture,
+                    "(STOCK X={0:0.000} Y={1:0.000} Z={2:0.000} OX=0.000 OY=0.000)",
+                    stock.Width, stock.Height, stock.Thickness));
+
             // Needed both for the header note and to seed the spindle state below.
             int firstTool = FirstToolNumber(wo);
             bool skipFirst = wo.SkipFirstToolChange && firstTool != int.MinValue;
