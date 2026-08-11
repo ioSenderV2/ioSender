@@ -244,13 +244,15 @@ namespace CNC.Controls
                 string exe = SimulatorManager.AppDataSimulatorExePath();
                 prop.SimulatorExe = exe;
                 prop.SimulatorArgs = "-p " + prop.NetPort.ToString();
+                // Mirror the real machine's toolsetter/tool-change positions into the simulated world
+                // before it boots - the sim reads sim_setup.cfg once, at startup, so a simulator that is
+                // already running has to be restarted for a changed geometry to mean anything at all
+                // (see MachineOffsets).
+                if (MachineOffsets.WriteSimSetup(exe) && SimulatorManager.IsProcessRunningByExe(exe))
+                    SimulatorManager.StopSimulator(exe);
+
                 if (!SimulatorManager.IsProcessRunningByExe(exe))
-                {
-                    // Mirror the real machine's toolsetter/tool-change positions into the simulated world
-                    // before it boots - the sim reads sim_setup.cfg once, at startup (see MachineOffsets).
-                    MachineOffsets.WriteSimSetup(exe);
                     SimulatorManager.StartSimulator(exe, prop.SimulatorArgs, prop.AutoKillSimulator);
-                }
             }
             else if(prop.Com.Ports.Count > 0)
             {

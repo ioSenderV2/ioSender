@@ -135,25 +135,30 @@ namespace CNC.Controls
         /// Rewrite the simulator's sim_setup.cfg so its SIMULATED toolsetter and tool-change point sit
         /// where the real machine's are - the sim then derives G59.3/G30 from that at boot. Every other
         /// key in the file is preserved: stock and spoilboard are per-job, with no hardware truth to
-        /// mirror. Call BEFORE launching the simulator; the sim reads the file once, at startup.
+        /// mirror.
         /// </summary>
-        public static void WriteSimSetup(string simExePath)
+        /// <returns>
+        /// True when the file's contents actually CHANGED, which means any simulator already running
+        /// booted with the old geometry and has to be restarted to pick this up - the sim reads this
+        /// file once, at startup, and nothing re-reads it later.
+        /// </returns>
+        public static bool WriteSimSetup(string simExePath)
         {
             var offsets = Read();
             if (offsets.Count == 0 || string.IsNullOrEmpty(simExePath))
-                return;
+                return false;
 
             double[] ts, tc;
             offsets.TryGetValue("G59.3", out ts);
             offsets.TryGetValue("G30", out tc);
             if (ts == null && tc == null)
-                return;
+                return false;
 
             try
             {
                 string dir = Path.GetDirectoryName(simExePath);
                 if (string.IsNullOrEmpty(dir))
-                    return;
+                    return false;
                 string cfg = Path.Combine(dir, SimulatorManager.SimSetupName);
 
                 // Preserve every key we are not authoritative about (stock_*, spoilboard_z,
@@ -188,15 +193,22 @@ namespace CNC.Controls
                     sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "toolchange_y = {0:F3}", tc[1]));
                 }
 
-                File.WriteAllText(cfg, sb.ToString());
+                string wanted = sb.ToString();
+                bool changed = !File.Exists(cfg) || File.ReadAllText(cfg) != wanted;
+                if (changed)
+                    File.WriteAllText(cfg, wanted);
+
                 if (DebugLog.Enabled)
-                    DebugLog.Write("fs", string.Format("MachineOffsets: wrote {0} (toolsetter={1} toolchange={2})",
-                        cfg, ts == null ? "kept" : "mirrored", tc == null ? "kept" : "mirrored"));
+                    DebugLog.Write("fs", string.Format("MachineOffsets: {0} {1} (toolsetter={2} toolchange={3})",
+                        changed ? "wrote" : "already current -", cfg,
+                        ts == null ? "kept" : "mirrored", tc == null ? "kept" : "mirrored"));
+                return changed;
             }
             catch (Exception ex)
             {
                 if (DebugLog.Enabled)
                     DebugLog.Write("fs", "MachineOffsets: sim_setup.cfg write failed - " + ex.Message);
+                return false;
             }
         }
 

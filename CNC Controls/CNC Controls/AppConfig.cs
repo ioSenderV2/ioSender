@@ -2127,13 +2127,15 @@ namespace CNC.Controls
             if (!System.IO.File.Exists(exe))
                 return;
 
+            // Mirror the machine's geometry FIRST and unconditionally: the simulator derives G30/G59.3
+            // from this file at boot, so a running instance booted with whatever was there before and
+            // will never re-read it. If the geometry actually changed, restart so it takes effect -
+            // the simulator holds no state worth preserving across a connect.
+            if (MachineOffsets.WriteSimSetup(exe) && SimulatorManager.IsProcessRunningByExe(exe))
+                SimulatorManager.StopSimulator(exe);
+
             if (!SimulatorManager.IsProcessRunningByExe(exe))
-            {
-                // The simulator derives G30/G59.3 from this file at boot, so it has to be written before
-                // the launch, not after the connect - see MachineOffsets.
-                MachineOffsets.WriteSimSetup(exe);
                 SimulatorManager.StartSimulator(exe, Base.SimulatorArgs ?? string.Empty, true);
-            }
         }
 
         // Remember an IP address to default the Connect dialog's network tab to next time. Call once a
