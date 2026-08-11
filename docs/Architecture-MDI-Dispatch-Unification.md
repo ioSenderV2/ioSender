@@ -1,7 +1,42 @@
 # MDI dispatch unification — spec
 
-**Status:** proposed, not started. Written 2026-08-10 at the end of the split-screen/3D-view session,
-for a session of its own.
+**Status:** **BUILT 2026-08-11** (`7694c9d6` extraction, `70c9ce88` switchover) — compile-clean,
+**hardware-unverified**. The verification plan at the bottom is the outstanding work; nothing below it
+has been observed on a wire yet. Written 2026-08-10 at the end of the split-screen/3D-view session.
+
+## As built
+
+- **`CNC Core/CNC Core/WirePacer.cs`** — the primitive. Owns the `ReplyClassified` tap, one dispatch
+  thread, one ordered channel (replies / status reports / host-posted signals, now typed rather than
+  sentinel strings), and the in-flight + byte accounting. Clients answer `IClient` and decide only
+  what to send next.
+- **`StreamPump`** is its first client, behaviour-unchanged: the modal-reset prolog goes out through
+  a `prologue` seam (after the tap is live, before the first block dispatch — doing it after `Start`
+  would race the thread's initial fill), status reports still only flow while a `(WAITIDLE)` barrier
+  is armed (`pacer.ForwardStatus`), and `BlockingWrites` is owned by whichever pacer set it, since
+  two can be alive at once (a tool change dispatches MDI while the job pump is suspended).
+- **`CNC Core/CNC Core/MdiDispatcher.cs`** is the second client: one command outstanding at a time,
+  written with `WriteCommand`, dispatched on the pacer thread. It goes deaf when it owes nothing and
+  has nothing queued, so a streaming job's acks do not wake it.
+- **Deleted:** `Source.Commands` as the MDI queue, `StreamingState.SendMDI` (the enum member too — it
+  was only ever assigned to the engine's private field, never to `model.StreamingState`), the
+  synthetic `ResponseReceived("go")` kick, the `case StreamingState.SendMDI:` branch, and
+  `ReleaseFlushedJogMdi` (its rule moved into `MdiDispatcher.OnStatus`).
+- **The `fac78f6b` jog refusal at `ApplyCommand` is untouched** — still a guard, still refusing rather
+  than deferring, still reading `JogGate.Pending`. Step 5's "may become derivable from the primitive"
+  was not taken up: `JogGate` is hardware-proven and gates inputs the dispatcher never sees
+  (`JogController.Send`, the gamepad's own `$J` writes).
+
+Two things that changed on purpose, both worth watching for on hardware:
+
+1. **The MDI write is no longer synchronous with the caller.** It used to happen inside
+   `ExecuteCommand` via the `"go"` kick; it now happens on the pacer thread microseconds later. Any
+   caller mixing `ExecuteCommand(a)` with a direct `Comms.com.WriteCommand(b)` and depending on
+   a-before-b would be affected — an audit found only `Grbl.cs`'s `WaitFor(... () =>
+   ExecuteCommand(...))` helpers (which subscribe before sending, so they are safe) and
+   `ControllerMapper`/`JogController`, which bypass this path deliberately.
+2. **`ResponseReceived`'s Jog-state early return no longer gates MDI dispatch.** That return was how
+   a command sent during a jog could sit in the queue indefinitely.
 
 **Goal:** retire `JobRunner`'s private `SendMDI` pacing so there is ONE mechanism that puts a line on
 the wire and waits for its acknowledgement, rather than two that must each be taught the same
@@ -85,6 +120,8 @@ queueing — see the decision below.
 ---
 
 ## Migration steps
+
+*(All five done 2026-08-11 — kept as written for the record of what was intended.)*
 
 1. **Name the primitive.** Read `StreamPump`'s write/ack path and `JobRunner.cs:1856` side by side
    and write down the contract they should share, including: what counts as an ack, what happens to a
