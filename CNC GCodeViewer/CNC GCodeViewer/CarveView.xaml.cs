@@ -137,6 +137,17 @@ namespace CNC.Controls.Viewer
         {
             if (e.PropertyName == nameof(GrblViewModel.FileName) && IsVisible)
                 ScheduleBuild();
+            // The work offset is what places the machine envelope in work space, and a Setup/probe run
+            // changes it WHILE this view is open. Rebuilding only when the view became visible was enough
+            // while this lived in a TAB - returning to the tab re-showed it, which re-asked - but split
+            // screen keeps it permanently visible, so after a probe moved the origin nothing ever re-asked
+            // and the envelope kept its old placement while the stock and toolpath sat in the new frame.
+            // Reported 2026-08-10: "3D view ... is not even in the work envelope", right after a Setup run.
+            //
+            // Cheap to call on every notification: BuildScene's signature check already includes the
+            // offset, so an unchanged one returns early instead of re-adding the carve mesh.
+            else if (e.PropertyName == nameof(GrblViewModel.WorkPositionOffset) && IsVisible)
+                ScheduleBuild();
         }
 
         // The controller settings/offsets that size + place the envelope and the loaded program may arrive after
