@@ -58,6 +58,8 @@ namespace CNC.Controls
         // The coordinate systems worth mirroring. G28/G30/G59.3 are machine reference points; G54-G59.2
         // are work offsets, replayed straight into the simulator's parameters (they carry no simulated
         // geometry with them, so G10 L2 is the whole job).
+        private const string HomedKey = "HOMED";
+
         private static readonly string[] References = { "G30", "G59.3" };
         private static readonly string[] WorkOffsets = { "G54", "G55", "G56", "G57", "G58", "G59", "G59.1", "G59.2" };
 
@@ -65,9 +67,9 @@ namespace CNC.Controls
         /// Snapshot the connected REAL machine's offsets. No-op on a simulator connection - mirroring a
         /// simulator's own offsets back over the hardware truth is exactly the drift this exists to stop.
         /// </summary>
-        public static void CaptureFromMachine()
+        public static void CaptureFromMachine(GrblViewModel model)
         {
-            if (AppConfig.Settings.Base.StartSimulator || !GrblWorkParameters.IsLoaded)
+            if (model == null || AppConfig.Settings.Base.StartSimulator || !GrblWorkParameters.IsLoaded)
                 return;
 
             var lines = new List<string>();
@@ -78,6 +80,10 @@ namespace CNC.Controls
 
             if (lines.Count == 0)
                 return;
+
+            // Whether the machine is homed is part of its state too - the simulator is brought up the same
+            // way (see SimulatorArgs).
+            lines.Add(HomedKey + "=" + (model.HomedState == HomedState.Homed ? "1" : "0"));
 
             try
             {
@@ -210,6 +216,59 @@ namespace CNC.Controls
                     DebugLog.Write("fs", "MachineOffsets: sim_setup.cfg write failed - " + ex.Message);
                 return false;
             }
+        }
+
+        /// <summary>
+        /// The simulator's launch arguments, with "-homed" appended when the real machine was homed - the
+        /// sim then comes up in that state with no homing cycle at all (no motion, no seconds of silence
+        /// while grblHAL ignores everything, which is what makes connect-time queries time out).
+        /// </summary>
+        /// <remarks>
+        /// Gated on the binary actually understanding the option, by looking for the literal string in the
+        /// exe. This is not defensive habit: the simulator's argument parser answers an option it does not
+        /// know by printing usage and EXITING, so passing -homed to an older build would stop the simulator
+        /// from starting at all. The matched-sim binaries are downloaded from CI and can be any age, so the
+        /// capability has to be observed rather than assumed - and this self-heals the moment a build that
+        /// supports it lands, with no flag to remember to turn on.
+        /// </remarks>
+        public static string SimulatorArgs(string simExePath, string args)
+        {
+            args = args ?? string.Empty;
+
+            double[] homed;
+            if (!Read().TryGetValue(HomedKey, out homed) || homed[0] < 0.5)
+                return args;
+
+            if (!SupportsOption(simExePath, "-homed"))
+            {
+                if (DebugLog.Enabled)
+                    DebugLog.Write("fs", "MachineOffsets: the machine is homed but this simulator build has no -homed option; it will need a homing cycle");
+                return args;
+            }
+
+            return (args.Trim() + " -homed").Trim();
+        }
+
+        private static bool SupportsOption(string exePath, string option)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
+                    return false;
+                // The option strings live in the usage text compiled into the binary.
+                byte[] needle = System.Text.Encoding.ASCII.GetBytes(option);
+                byte[] hay = File.ReadAllBytes(exePath);
+                for (int i = 0; i <= hay.Length - needle.Length; i++)
+                {
+                    int j = 0;
+                    while (j < needle.Length && hay[i + j] == needle[j])
+                        j++;
+                    if (j == needle.Length)
+                        return true;
+                }
+            }
+            catch { }
+            return false;
         }
 
         /// <summary>

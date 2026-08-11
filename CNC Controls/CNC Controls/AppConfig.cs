@@ -2135,7 +2135,7 @@ namespace CNC.Controls
                 SimulatorManager.StopSimulator(exe);
 
             if (!SimulatorManager.IsProcessRunningByExe(exe))
-                SimulatorManager.StartSimulator(exe, Base.SimulatorArgs ?? string.Empty, true);
+                SimulatorManager.StartSimulator(exe, MachineOffsets.SimulatorArgs(exe, Base.SimulatorArgs), true);
         }
 
         // Remember an IP address to default the Connect dialog's network tab to next time. Call once a

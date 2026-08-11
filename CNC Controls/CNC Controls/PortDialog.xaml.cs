@@ -252,7 +252,7 @@ namespace CNC.Controls
                     SimulatorManager.StopSimulator(exe);
 
                 if (!SimulatorManager.IsProcessRunningByExe(exe))
-                    SimulatorManager.StartSimulator(exe, prop.SimulatorArgs, prop.AutoKillSimulator);
+                    SimulatorManager.StartSimulator(exe, MachineOffsets.SimulatorArgs(exe, prop.SimulatorArgs), prop.AutoKillSimulator);
             }
             else if(prop.Com.Ports.Count > 0)
             {
