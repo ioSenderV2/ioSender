@@ -91,20 +91,33 @@ namespace CNC.Controls.Viewer
         public CarveView()
         {
             InitializeComponent();
+            // Loaded is NOT a reliable moment to find the DataContext. Hosted in a TabItem it was, because
+            // the tab realises its content only when selected, by which time the context has propagated.
+            // Split screen builds this into a ContentControl in code, where Loaded can fire BEFORE the
+            // context arrives - so model stayed null, nothing ever subscribed to FileName, and the scene
+            // only rebuilt on visibility changes. It sat on the no-program 150x150 default through a
+            // Generate (traced 2026-08-10: "loaded=False ... file=''" with the program plainly on screen).
+            DataContextChanged += (s, e) => { AttachModel(); ScheduleBuild(); };
         }
 
         private void CarveView_Loaded(object sender, RoutedEventArgs e)
         {
-            if (model == null && DataContext is GrblViewModel m)
-            {
-                model = m;
-                wpos = model.WorkPosition;
-                if (wpos != null)
-                    wpos.PropertyChanged += Wpos_PropertyChanged;
-                model.PropertyChanged += Model_PropertyChanged;
-            }
+            AttachModel();
             viewport.SizeChanged += (s, ev) => FrameIfNeeded();   // frame once the viewport has a render size
             ScheduleBuild();
+        }
+
+        // Idempotent: whichever of Loaded/DataContextChanged wins the race does the wiring, the other is a
+        // no-op. Both have to try, because neither is guaranteed to be the one that has a model.
+        private void AttachModel()
+        {
+            if (model != null || !(DataContext is GrblViewModel m))
+                return;
+            model = m;
+            wpos = model.WorkPosition;
+            if (wpos != null)
+                wpos.PropertyChanged += Wpos_PropertyChanged;
+            model.PropertyChanged += Model_PropertyChanged;
         }
 
         // Build the scene on a fresh dispatcher cycle. BuildToolpath runs GCodeEmulator.Execute, which pumps the
@@ -201,12 +214,24 @@ namespace CNC.Controls.Viewer
         {
             int cnt = GCode.File.Tokens?.Count ?? 0;
             string name = model?.FileName ?? string.Empty;
+            // The stock belongs in the signature too, or editing it in Setup leaves the old block on
+            // screen: the program is unchanged, so nothing else here would differ.
+            var st = CNC.Core.GCodeProgramComments.Stock;
+            var sec = StartJobConfig.Section;
+            string stockSig = st != null
+                ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "d{0:F2},{1:F2},{2:F2},{3},{4:F2},{5:F2}",
+                                st.Value.X, st.Value.Y, st.Value.Z, st.Value.HasOrigin, st.Value.OX, st.Value.OY)
+                : sec != null
+                    ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "s{0:F2},{1:F2},{2:F2}",
+                                    sec.Width, sec.Height, sec.Thickness)
+                    : "-";
             return string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "{0}|{1}|{2:F3},{3:F3},{4:F3},{5:F3},{6:F3},{7:F3}",
+                "{0}|{1}|{2:F3},{3:F3},{4:F3},{5:F3},{6:F3},{7:F3}|{8}",
                 cnt, name,
                 EnvMin(0) - Wco(0), EnvMax(0) - Wco(0),
                 EnvMin(1) - Wco(1), EnvMax(1) - Wco(1),
-                EnvMin(2) - Wco(2), EnvMax(2) - Wco(2));
+                EnvMin(2) - Wco(2), EnvMax(2) - Wco(2),
+                stockSig);
         }
 
         private void BuildScene()
@@ -482,6 +507,28 @@ namespace CNC.Controls.Viewer
             haveStockOrigin = stock?.HasOrigin ?? false;
             stockOX = stock?.OX ?? 0d;
             stockOY = stock?.OY ?? 0d;
+
+            // Nothing declared? Fall back to the Setup tab's stock. It describes the board physically on
+            // the table, which for anything generated here is the same board the program was laid out
+            // against - and it beats the alternative, which is inventing a block from the toolpath's own
+            // bounding box. Same origin convention as a Work Order: Setup's corner probe puts work (0,0)
+            // at the stock's minimum corner.
+            //
+            // The program's own declaration still WINS when it has one, and that ordering matters: a
+            // posted file (Fusion) may have been made for entirely different material from whatever is
+            // clamped down now, so its own statement about itself is the better authority.
+            if (stock == null)
+            {
+                var sec = StartJobConfig.Section;
+                if (sec != null && sec.Width > 0d && sec.Height > 0d)
+                {
+                    stockX = sec.Width;
+                    stockY = sec.Height;
+                    stockZ = sec.Thickness;
+                    stockOX = stockOY = 0d;
+                    haveStockOrigin = true;
+                }
+            }
 
             int lowest = int.MaxValue;
             foreach (var kv in CNC.Core.GCodeProgramComments.All)
