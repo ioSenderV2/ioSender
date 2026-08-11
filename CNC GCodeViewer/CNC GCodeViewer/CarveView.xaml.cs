@@ -579,12 +579,16 @@ namespace CNC.Controls.Viewer
                 // inferred from the cut. Centring on the toolpath put a correctly-sized board around
                 // whatever was being engraved instead of where the operator's stock sits - a 368x232
                 // board rendered as a block the size of the lettering on it.
+                // EXACTLY the declared board - no union with the toolpath's bounding box. That union was
+                // meant to keep an over-running cut on the mesh, but the box is grown by Grow() from
+                // rapids as well as cuts (AddSeg), so a program opening with "G53 G0 X.. Y.. Z0" - which
+                // every Work Order does - dragged a corner of the stock out to a MACHINE coordinate and
+                // rendered the board with a huge slab attached. It was never a cut-extent signal.
+                //
+                // Nothing is lost by dropping it: material outside the declared stock does not exist, and
+                // a cut that leaves the board simply carves nothing (the heightmap indices clamp).
                 x0 = stockOX; x1 = stockOX + stockX;
                 y0 = stockOY; y1 = stockOY + stockY;
-                // A cut reaching past a declared edge (an over-run, or stock mis-measured) still has to
-                // land ON the mesh - otherwise the toolpath floats beside the block with nothing to carve.
-                x0 = Math.Min(x0, bMin.X); x1 = Math.Max(x1, bMax.X);
-                y0 = Math.Min(y0, bMin.Y); y1 = Math.Max(y1, bMax.Y);
             }
             else
             {
