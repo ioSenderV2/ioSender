@@ -2128,7 +2128,12 @@ namespace CNC.Controls
                 return;
 
             if (!SimulatorManager.IsProcessRunningByExe(exe))
+            {
+                // The simulator derives G30/G59.3 from this file at boot, so it has to be written before
+                // the launch, not after the connect - see MachineOffsets.
+                MachineOffsets.WriteSimSetup(exe);
                 SimulatorManager.StartSimulator(exe, Base.SimulatorArgs ?? string.Empty, true);
+            }
         }
 
         // Remember an IP address to default the Connect dialog's network tab to next time. Call once a

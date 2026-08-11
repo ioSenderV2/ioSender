@@ -780,6 +780,12 @@ namespace GCode_Sender
             AppConfig.Settings.CaptureConnectedIp();
             MainWindow.ui.TryMigrateToNetwork();
 
+            // The real machine is the truth: snapshot its reference points while they are in front of us,
+            // and stamp the captured ones onto a simulator every time we connect to one. Exactly one of
+            // these does anything per connection - see MachineOffsets.
+            MachineOffsets.CaptureFromMachine();
+            MachineOffsets.ApplyToSimulator(model);
+
             GrblCommand.ToolChange = GrblInfo.ManualToolChange ? "M61Q{0}" : (GrblInfo.HasATC ? "T{0}M6" : "T{0}");
 
             showProgramLimits();

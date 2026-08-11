@@ -440,6 +440,7 @@
     </Compile>
     <Compile Include="UIUtils.cs" />
     <Compile Include="UIViewModel.cs" />
+    <Compile Include="MachineOffsets.cs" />
     <Compile Include="Widget.cs" />
     <Compile Include="WindowFocusReturn.cs" />
     <Compile Include="MachinePositionFlyout.xaml.cs">
