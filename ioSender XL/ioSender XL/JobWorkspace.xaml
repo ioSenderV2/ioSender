@@ -11,6 +11,29 @@
          Extracted from JobView (Phase 2a). The tabs are built in code from the layout tree's Grbl/"center"
          slot (Phase 2b step 4) - see RegisterCenter()/BuildCenter() in the code-behind. The three controls
          are independent: GCodeListControl/RenderControl read the static GCode.File, ConsoleControl uses the
-         inherited GrblViewModel DataContext. -->
-    <TabControl x:Name="tabGCode" TabStripPlacement="Bottom"/>
+         inherited GrblViewModel DataContext.
+
+         TWO presentations of the same components, only one alive at a time (see Build()):
+           tabGCode  - the bottom tab strip, one panel visible at a time. The default.
+           splitRoot - split screen (Settings > User Interface > General): the program view and the 3D view
+                       side by side with a draggable splitter. The console is not built here at all; the run
+                       strip's MDI button opens the real console window, which is where it was going anyway.
+         Only the chosen one is populated, so split screen never builds a second 3D view. -->
+    <Grid>
+        <TabControl x:Name="tabGCode" TabStripPlacement="Bottom"/>
+        <Grid x:Name="splitRoot" Visibility="Collapsed">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="splitLeftCol" Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition x:Name="splitRightCol" Width="*"/>
+            </Grid.ColumnDefinitions>
+            <ContentControl x:Name="splitProgram" Grid.Column="0"/>
+            <GridSplitter x:Uid="spl_jobSplit" x:Name="jobSplitter" Grid.Column="1" Width="5"
+                          HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                          ResizeBehavior="PreviousAndNext" ResizeDirection="Columns"
+                          Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}"
+                          ToolTip="Drag to divide the space between the program view and the 3D view."/>
+            <ContentControl x:Name="split3D" Grid.Column="2"/>
+        </Grid>
+    </Grid>
 </UserControl>

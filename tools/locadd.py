@@ -31,6 +31,7 @@ TARGETS = [
     ('ioSender XL/ioSender XL/HeightMapView.xaml', 'ioSender'),
     ('ioSender XL/ioSender XL/StartJobView.xaml', 'ioSender'),
     ('ioSender XL/ioSender XL/JobView.xaml', 'ioSender'),
+    ('ioSender XL/ioSender XL/JobWorkspace.xaml', 'ioSender'),
     ('ioSender XL/ioSender XL/ProgramPanel.xaml', 'ioSender'),
     ('ioSender XL/ioSender XL/MainWindow.xaml', 'ioSender'),
     ('ioSender XL/ioSender XL/MirrorWindow.xaml', 'ioSender'),

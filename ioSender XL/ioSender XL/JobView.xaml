@@ -30,6 +30,8 @@
         <system:String x:Uid="str_msgConnected" x:Key="MsgConnected">Connected: {0}</system:String>
         <system:String x:Uid="str_msgNotConnected" x:Key="MsgNotConnected">Not connected: {0} did not complete the handshake.</system:String>
         <cnccontrols:BoolToVisibleConverter x:Key="IsVisibleConverter" />
+        <!-- Inverse of the above: split screen ON collapses rhGrid, so the binding needs the negation. -->
+        <cnccontrols:NotBoolToVisibleConverter x:Key="IsNotVisibleConverter" />
     </UserControl.Resources>
     <DockPanel Background="Transparent" MouseDown="outside_MouseDown" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal">
@@ -66,7 +68,13 @@
                  Run controls (JobControl) now live in the fixed main-window bottom bar (Phase 2c). -->
             <local:JobWorkspace x:Name="workspace" Grid.Column="1"/>
 
-            <Grid x:Name="rhGrid" Grid.Column="2">
+            <!-- Split screen (Settings > User Interface > General) hands this whole region - jog pad and the
+                 Feed/Spindle/Outline panel columns - to the program/3D split. No ColumnSpan juggling needed:
+                 the column is Auto, so collapsing the content takes its width to zero and the "*" workspace
+                 column absorbs it, exactly as joggerRow's Auto row already does for the pad on its own.
+                 The right-edge flyouts are NOT part of this - they live on the main window, not this tab. -->
+            <Grid x:Name="rhGrid" Grid.Column="2"
+                  Visibility="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.ShowJobSplitView, Converter={StaticResource IsNotVisibleConverter}}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>

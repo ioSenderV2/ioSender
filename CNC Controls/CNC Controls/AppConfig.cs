@@ -313,6 +313,8 @@ namespace CNC.Controls
         private bool _useBuffering = false, _keepMdiFocus = true, _filterOkResponse = false, _saveWindowSize = false, _autoCompress = false, _send_comments = false, _addLinenumbers = false;
         private bool _showJogTargetButtons = false;
         private bool _showJobJogPad = true;
+        private bool _showJobSplitView = false;
+        private double _jobSplitRatio = 0.5d;
         private bool _preferNetwork = true;
         private double _uiScale = 1d;
         private bool _autoSaveSettings = false, _promptOnSave = false, _safeGotoZ = true;
@@ -423,6 +425,20 @@ namespace CNC.Controls
         // operators, and the pad is the single largest thing competing with the program view for width.
         // Notifies, so the checkbox takes effect immediately rather than on the layout editor's usual restart.
         public bool ShowJobJogPad { get { return _showJobJogPad; } set { if (_showJobJogPad != value) { _showJobJogPad = value; OnPropertyChanged(); } } }
+        // Job tab split screen: the program view and the 3D view side by side with a splitter, instead of
+        // the bottom tab strip that switches between them. The left panel column stays; everything else on
+        // the tab - the jog pad and the Feed/Spindle/Outline panel columns - gives up its space to the
+        // split, since the point is to see the toolpath and the code at once. The right-edge flyouts are
+        // unaffected: they belong to the main window, not to this tab.
+        //
+        // The Console tab goes with the tab strip, and loses nothing by it - the run strip's MDI button
+        // already opens the real console window (MainWindow.OpenConsoleWindow), independently of the tab.
+        //
+        // Notifies, so the checkbox takes effect immediately rather than on restart.
+        public bool ShowJobSplitView { get { return _showJobSplitView; } set { if (_showJobSplitView != value) { _showJobSplitView = value; OnPropertyChanged(); } } }
+        // Where the splitter sits, as the program view's share of the split (0..1). Persisted so a layout
+        // the operator has dragged to suit their screen survives a restart, like every other placement here.
+        public double JobSplitRatio { get { return _jobSplitRatio < 0.1d || _jobSplitRatio > 0.9d ? 0.5d : _jobSplitRatio; } set { _jobSplitRatio = value; } }
         public bool UseBuffering { get { return _useBuffering; } set { _useBuffering = value; OnPropertyChanged(); } }
         public bool KeepWindowSize { get { return _saveWindowSize; } set { if (_saveWindowSize != value) { _saveWindowSize = value; OnPropertyChanged(); } } }
         public double WindowWidth { get; set; } = 925;
