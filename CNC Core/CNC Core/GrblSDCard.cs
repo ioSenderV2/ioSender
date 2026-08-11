@@ -167,10 +167,6 @@ namespace CNC.Core
             {
                 grbl = model;
 
-                data.Clear();
-                FreeSpace = string.Empty;
-                id = 0;
-
                 // No point talking to the controller if the link is down or reconnecting - this
                 // also avoids serial I/O exceptions when the SD tab is opened after a disconnect.
                 // The user-facing message is set by the caller (SDCardView.Activate).
@@ -181,7 +177,26 @@ namespace CNC.Core
                 // be shown together with a Location column and per-FS free space. Builds that do not
                 // implement $FI (or that report nothing mounted) return no [FS:...] lines; in that case
                 // fall back to the original single-filesystem listing so behaviour is unchanged.
-                var mounts = GetMounts(model);
+                bool answered;
+                var mounts = GetMounts(model, out answered);
+
+                // A query the controller never answered says NOTHING about what is mounted, and this
+                // method's whole contract is that false means "unknown" (see the header). Rendering a
+                // timeout as an empty filesystem is what made the ATC macros look uninstalled every time
+                // a listing landed during a homing cycle - grblHAL is silent for its entire duration.
+                // Bail BEFORE clearing, so whatever was last read stays on screen instead of being
+                // replaced by a confident, wrong "no files".
+                if (!answered)
+                {
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("fs", "Load: UNKNOWN - $FI was not answered (controller busy?); keeping the previous listing");
+                    model.Message = "Filesystem listing skipped - the controller did not answer (busy?). Reopen to retry.";
+                    return false;
+                }
+
+                data.Clear();
+                FreeSpace = string.Empty;
+                id = 0;
                 Mounts = mounts;
 
                 if (DebugLog.Enabled)
@@ -196,11 +211,13 @@ namespace CNC.Core
                     foreach (var mount in mounts)
                     {
                         int before = data.Rows.Count;
-                        ListMount(model, mount.Name, mount.Path, ViewAll);
+                        bool listed = ListMount(model, mount.Name, mount.Path, ViewAll);
                         if (DebugLog.Enabled)
-                            DebugLog.Write("fs", string.Format("Load: mount {0}@{1} contributed {2} row(s)",
-                                mount.Name, mount.Path, data.Rows.Count - before));
-                        if (data.Rows.Count == before)
+                            DebugLog.Write("fs", string.Format("Load: mount {0}@{1} contributed {2} row(s), answered={3}",
+                                mount.Name, mount.Path, data.Rows.Count - before, listed));
+                        // Only claim a filesystem is empty when the controller actually said so. An
+                        // unanswered $F leaves the mount out entirely rather than labelling it "(no files)".
+                        if (data.Rows.Count == before && listed)
                             // Empty filesystem: add a non-file placeholder so the mount stays visible and can be
                             // selected as an upload target. Marked via the (hidden, otherwise unused) Dir column so
                             // run/delete skip it (see SDCardView), and Upload targets its mount path.
@@ -229,7 +246,12 @@ namespace CNC.Core
 
         // Enumerate mounted filesystems via $FI. Empty list => $FI unsupported or nothing mounted
         // (error:65), which steers Load() to the legacy single-filesystem path.
-        private static List<FsMount> GetMounts(GrblViewModel model)
+        // answered: the controller REPLIED to $FI (with or without any [FS:...] lines). False means the
+        // query timed out, which is NOT the same fact as "this controller has no filesystems" - and the
+        // difference matters enormously, because the caller renders one of them as "no files". grblHAL
+        // goes completely silent for the duration of a homing cycle, so this times out routinely on a
+        // connect that homes; observed 2026-08-11, and it is why the ATC macros kept "disappearing".
+        private static List<FsMount> GetMounts(GrblViewModel model, out bool answered)
         {
             var mounts = new List<FsMount>();
             bool? res = null;
@@ -261,12 +283,15 @@ namespace CNC.Core
 
             model.Silent = false;
 
+            answered = res == true;
             return mounts;
         }
 
         // List one filesystem by changing to its mount path ($CWD) and issuing $F / $F+. Each file
         // is tagged with its Location/Path so run/delete/download can target the right filesystem.
-        private static void ListMount(GrblViewModel model, string location, string path, bool ViewAll)
+        // Returns whether the controller ANSWERED - a timeout here means "no files" is unknown for this
+        // mount, not established (same distinction as GetMounts; see its comment).
+        private static bool ListMount(GrblViewModel model, string location, string path, bool ViewAll)
         {
             model.Silent = true;
             Grbl.WaitForResponse("$CWD=" + (path.Length > 1 ? path.TrimEnd('/') : path));
@@ -297,6 +322,7 @@ namespace CNC.Core
                 DebugLog.Write("fs", string.Format("ListMount {0}@{1}: $F completed res={2}", location, path, res));
 
             model.Silent = false;
+            return res == true;
         }
 
         // Original single-filesystem listing: mount the SD card if needed, then $F the current FS.
