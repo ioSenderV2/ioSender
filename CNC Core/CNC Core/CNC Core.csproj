@@ -129,6 +129,7 @@
     <Compile Include="LibStrings.cs" />
     <Compile Include="MacroRunner.cs" />
     <Compile Include="JobRunner.cs" />
+    <Compile Include="MdiDispatcher.cs" />
     <Compile Include="StreamPump.cs" />
     <Compile Include="WirePacer.cs" />
     <Compile Include="Machine.cs" />

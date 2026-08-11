@@ -100,6 +100,13 @@ namespace CNC.Core
         private BlockingCollection<Item> channel;
         private CancellationTokenSource cts;
         private volatile bool aborted;
+        // Bumped by every Start. A pacer thread tears down ONLY its own generation: an Abort()/Start()
+        // pair can return before the previous thread has noticed the cancellation, and that thread's
+        // finally would otherwise unsubscribe the NEW run's reply tap (same handler, same instance) and
+        // clear its IsActive - leaving a live pacer that never sees another ack. Clients reuse one
+        // instance across runs (StreamPump across jobs, MdiDispatcher across reconnects), so this is
+        // reachable, not theoretical.
+        private int generation;
 
         // ---- cross-thread flags ----
         /// <summary>Drop incoming replies (a tool change hands the wire to another dispatcher).</summary>
@@ -130,6 +137,9 @@ namespace CNC.Core
         /// </param>
         public void Start(int serialSize, IClient client, bool blockingWrites, System.Action prologue = null)
         {
+            if (IsActive)
+                Abort();            // never two live pacer threads on one instance - see 'generation'
+
             this.client = client;
             this.serialSize = serialSize;
 
@@ -160,7 +170,8 @@ namespace CNC.Core
             if (prologue != null)
                 prologue();
 
-            thread = new Thread(Run) { IsBackground = true, Priority = ThreadPriority.AboveNormal, Name = "WirePacer:" + name };
+            int gen = ++generation;
+            thread = new Thread(() => Run(gen)) { IsBackground = true, Priority = ThreadPriority.AboveNormal, Name = "WirePacer:" + name };
             thread.Start();
         }
 
@@ -213,7 +224,7 @@ namespace CNC.Core
                 try { channel.Add(new Item(kind, text)); } catch { }
         }
 
-        private void Run()
+        private void Run(int gen)
         {
             try
             {
@@ -224,7 +235,10 @@ namespace CNC.Core
                     Item item;
                     try { item = channel.Take(cts.Token); }
                     catch (OperationCanceledException) { break; }
-                    if (aborted)
+                    // gen: a later Start has taken over, and 'aborted' has already been reset to false
+                    // for it - so this thread must stop delivering callbacks on that check alone. Both
+                    // threads share the client's accounting, and only one of them may drive it.
+                    if (aborted || gen != generation)
                         break;
 
                     switch (item.Kind)
@@ -249,13 +263,18 @@ namespace CNC.Core
             }
             finally
             {
-                if (link != null)
+                // Only if no later Start has taken over (see 'generation'). Abort() has already dropped
+                // the tap for the run being torn down, so a stale thread has nothing left to clean up.
+                if (gen == generation)
                 {
-                    link.ReplyClassified -= OnReplyClassified;
-                    if (ownsBlockingWrites)
-                        link.BlockingWrites = false;
+                    if (link != null)
+                    {
+                        link.ReplyClassified -= OnReplyClassified;
+                        if (ownsBlockingWrites)
+                            link.BlockingWrites = false;
+                    }
+                    IsActive = false;
                 }
-                IsActive = false;
             }
         }
 

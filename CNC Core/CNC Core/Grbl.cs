@@ -72,7 +72,9 @@ namespace CNC.Core
         NoFile = 0,
         Idle,
         Send,
-        SendMDI,
+        // SendMDI removed 2026-08-11: it was the busy flag of JobRunner's private MDI pacing, which
+        // MdiDispatcher replaced (docs/Architecture-MDI-Dispatch-Unification.md). It was never assigned
+        // to model.StreamingState - only to the engine's own field - so no UI ever observed it.
         Home,
         Halted,
         FeedHold,
