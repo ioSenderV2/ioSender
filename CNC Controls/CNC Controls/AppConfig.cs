@@ -1,4 +1,4 @@
-﻿/*
+/*
  * AppConfig.cs - part of CNC Controls library
  *
  * v0.47 / 2026-02-11 / Io Engineering (Terje Io)
@@ -803,7 +803,7 @@ namespace CNC.Controls
                     Base.Tabs.Remove(component);
             }
 
-            Save(CNC.Core.Resources.IniFile);
+            Save();
         }
 
         // Persist a drag-reorder of the top-level tab bar. presentOrder is the new left-to-right order of the
@@ -819,7 +819,7 @@ namespace CNC.Controls
                 ApplyOrder(tabsSlot.Items, n => n.Component, order);
             if (Base?.Tabs != null && Base.Tabs.Count > 0)
                 ApplyOrder(Base.Tabs, s => s, order);
-            Save(CNC.Core.Resources.IniFile);
+            Save();
         }
 
         // Persist a drag-reorder of a nested container slot (e.g. the Tools sub-tabs, container "Tools" slot
@@ -834,7 +834,7 @@ namespace CNC.Controls
             if (slot == null)
                 return;
             ApplyOrder(slot.Items, n => n.Component, presentOrder.ToList());
-            Save(CNC.Core.Resources.IniFile);
+            Save();
         }
 
         // Reorder the present items of a list to match presentOrder, leaving every non-present item pinned to its
@@ -2024,7 +2024,22 @@ namespace CNC.Controls
                 _overlayPersist = true;
             }
 
-            if (Load(CNC.Core.Resources.IniFile))
+            bool loaded = Load(CNC.Core.Resources.IniFile);
+
+            // A TRANSIENT overlay (-overlay) must not be able to become permanent, and merely not flagging a
+            // save is not enough: dozens of call sites call Save() during a normal session (window placement,
+            // a connect, a macro run), and each one writes the whole in-memory state - overlay included.
+            // Proven the hard way 2026-08-12: one -overlay run persisted its layout AND, because
+            // TabOrder.Apply then pruned the tabs slot back to the flat Config.Tabs, deleted a component out
+            // of the profile entirely. So point this session's writes at a side file instead; the real
+            // profile is then untouchable for the run, which is what "try this out" has to mean.
+            if (loaded && !string.IsNullOrEmpty(_overlayPath) && !_overlayPersist)
+            {
+                configfile = CNC.Core.Resources.IniFile + ".overlay-session";
+                CNC.Core.DebugLog.Write("config", "-overlay is transient: this session's saves go to " + configfile);
+            }
+
+            if (loaded)
             {
                 // Snapshot the pre-session config once at startup, before any in-session edits, so
                 // Load()'s crash recovery and the user's own Backups folder both have a known-good copy.
@@ -2039,6 +2054,8 @@ namespace CNC.Controls
                     // it aside before overwriting so the user's settings are recoverable.
                     BackupStartupSnapshot(CNC.Core.Resources.IniFile);
 
+                    // Explicit path, not Save(): the load FAILED, so configfile was never set and the
+                    // no-argument overload would silently write nothing and report false.
                     if (!Save(CNC.Core.Resources.IniFile))
                     {
                         AppDialogs.Show(LibStrings.FindResource("CreateConfigFail"), appname);
@@ -2153,6 +2170,13 @@ namespace CNC.Controls
                 // never be deleted out of existence by a flat list that predates it.
                 EnforceMenuPlacement();
                 DeduplicateTopLevelPlacements();
+
+                // The final placement, after every fixup has had its say. Cheap, and the one record of what
+                // the tree actually says before MainWindow builds from it - a component that vanishes between
+                // the config file and the tab bar is otherwise invisible to diagnose.
+                CNC.Core.DebugLog.Write("config", "layout tabs: [" + string.Join(", ",
+                    layoutSection.Root.Slot(LayoutKeys.SlotTabs)?.Items.Select(n => n.Component) ?? Enumerable.Empty<string>())
+                    + "]  (flat Tabs: [" + string.Join(", ", Base.Tabs) + "])");
             }
 
             // The load migrated the on-disk format (legacy v1 -> sectioned v2) or imported a legacy
@@ -2160,7 +2184,7 @@ namespace CNC.Controls
             // previous file is preserved as .bak by the atomic Save (recoverable on a downgrade).
             if (_migratedFormat)
             {
-                Save(CNC.Core.Resources.IniFile);
+                Save();
                 _migratedFormat = false;
                 DeleteFoldedInFiles();   // their data is now in App.config; drop the redundant standalone files
             }
@@ -2251,7 +2275,7 @@ namespace CNC.Controls
                     PersistSimulatorChoice(portsel);
                     setPort(port, string.Empty);
                     OpenStreamFor(model, dispatcher);
-                    Save(CNC.Core.Resources.IniFile);
+                    Save();
                 }
             }
 
@@ -2360,7 +2384,7 @@ namespace CNC.Controls
             if (!string.IsNullOrWhiteSpace(ip) && ip != Base.NetworkHost)
             {
                 Base.NetworkHost = ip;
-                Save(CNC.Core.Resources.IniFile);
+                Save();
             }
         }
 
@@ -2389,7 +2413,7 @@ namespace CNC.Controls
             PersistSimulatorChoice(portsel);
             setPort(port, string.Empty);
             OpenStreamFor(model, dispatcher);
-            Save(CNC.Core.Resources.IniFile);
+            Save();
 
             return InitConnectedController(appname, model, 0);
         }
@@ -2401,7 +2425,7 @@ namespace CNC.Controls
             Base.StartSimulator = false;
             setPort(target, string.Empty);
             OpenStreamFor(model, dispatcher);
-            Save(CNC.Core.Resources.IniFile);
+            Save();
 
             return InitConnectedController(appname, model, 0);
         }

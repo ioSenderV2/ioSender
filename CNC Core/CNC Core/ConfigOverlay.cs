@@ -72,7 +72,16 @@ namespace CNC.Core
         public static readonly string[] UiLayoutSections = { "Layout", "TabOrder" };
 
         // Core child elements that belong to the UI arrangement rather than to the machine.
-        public static readonly string[] UiLayoutCoreElements = { "Tabs", "HiddenViews" };
+        //
+        // These are NOT optional extras. Config.Tabs is a SECOND authority over the tab bar: on every load
+        // AppConfig calls TabOrder.Apply(layoutTree, Base.Tabs), which rebuilds the tabs slot to contain
+        // exactly that flat list and silently deletes any node the list does not name. A Layout-only overlay
+        // therefore appears to apply (the tree really does change) and is then undone before the tabs are
+        // built - observed 2026-08-12, an added tab vanished between ReadDocument and BuildTabs.
+        //
+        // Note the element names: Tabs/HiddenViews are [XmlIgnore] List<string>; what is actually persisted
+        // are the comma-joined TabsKeys/HiddenViewsKeys strings, and those are what an overlay must carry.
+        public static readonly string[] UiLayoutCoreElements = { "TabsKeys", "HiddenViewsKeys" };
 
         // True if the document looks like something Apply can consume: a v2 <AppConfig> root with at
         // least one keyed <section>. (A legacy v1 <Config> document has no sections to layer.)

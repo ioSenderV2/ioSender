@@ -3135,7 +3135,13 @@ namespace GCode_Sender
                     var comp = ComponentRegistry.Get(node.Component);
                     var compCtl = comp?.Create?.Invoke();
                     if (compCtl == null)
-                        continue;   // unknown/foreign component key - skip (e.g. a tab not in this build)
+                    {
+                        // Unknown/foreign component key (e.g. a tab not in this build). Silent until now,
+                        // which made a placement that simply never appeared impossible to tell apart from
+                        // one that was never in the tree.
+                        CNC.Core.DebugLog.Write("config", "BuildTabs: no view or component registered for \"" + node.Component + "\" - not built");
+                        continue;
+                    }
                     (compCtl as ICNCView)?.Setup(UIViewModel, AppConfig.Settings);
                     tabMode.Items.Add(new TabItem {
                         Content = compCtl,
