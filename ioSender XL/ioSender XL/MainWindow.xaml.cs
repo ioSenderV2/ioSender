@@ -452,11 +452,23 @@ namespace GCode_Sender
                 return;
             }
 
-            // The message strip this used to flash is gone from the run strip (2026-08-10). A
-            // message that nothing displays is a message lost, so arriving text now OPENS the log
-            // window instead - and refreshes it if it is already up. Popping unasked, it dismisses
-            // itself again after MessageLogAutoCloseDelay unless the operator touches it.
-            ShowMessageLog(autoPopped: true);
+            // The message strip this used to flash is gone from the run strip (2026-08-10), so arriving
+            // text opens the log window instead - a message that nothing displays is a message lost.
+            //
+            // But only for something worth interrupting over. Popping a window in front of the operator
+            // is the strongest notification this app has, and spending it on "<name> ready - press Start
+            // to run" - a sentence the green Run button already says, posted every time a program becomes
+            // ready - made it noise. Errors and alarms still pop. Everything else is recorded in
+            // GrblViewModel.MessageLog exactly as before and is one Status click away, so nothing is lost;
+            // it just stops taking the screen.
+            //
+            // Deliberately NOT ShowMessageLog(autoPopped: false) for the quiet case: that means "the
+            // operator opened this", which CANCELS a pending auto-close (see ArmMessageLogAutoClose), so a
+            // routine message arriving behind an error window would strand it on screen indefinitely.
+            if (isError)
+                ShowMessageLog(autoPopped: true);
+            else
+                RefreshMessageLogText();
         }
 
         // ---- -testserver: make the window permanently non-activatable (see the constructor comment) ----
@@ -2278,7 +2290,18 @@ namespace GCode_Sender
         // not sit there covering the UI until someone dismisses it. It closes itself after this long.
         // A window the operator opened from the Status button is NOT a notification and never self-closes,
         // and an auto-popped one stops being a notification the moment they interact with it.
-        private static readonly TimeSpan MessageLogAutoCloseDelay = TimeSpan.FromSeconds(10);
+        //
+        // Read fresh on every arm rather than captured once, so changing it in Settings takes effect on
+        // the next message instead of at the next launch. Clamped: below a second nobody can read it, and
+        // past a minute it has stopped being a notification and become a window that will not go away.
+        private static TimeSpan MessageLogAutoCloseDelay
+        {
+            get
+            {
+                int seconds = AppConfig.Settings.Base.StatusWindowAutoCloseSeconds;
+                return TimeSpan.FromSeconds(Math.Min(Math.Max(seconds, 1), 60));
+            }
+        }
         private DispatcherTimer messageLogAutoClose;
         private bool messageLogAutoPopped;
 
@@ -2316,6 +2339,24 @@ namespace GCode_Sender
         private void ViewStatus_Click(object sender, RoutedEventArgs e)
         {
             ShowMessageLog(autoPopped: false);
+        }
+
+        /// <summary>
+        /// Update the log window's text if it happens to be open, and do nothing at all if it is not.
+        /// The quiet counterpart to ShowMessageLog: a routine message keeps an already-open window
+        /// current without opening one, and without touching the auto-close countdown either way.
+        /// </summary>
+        private void RefreshMessageLogText()
+        {
+            if (messageLogWindow == null || messageLogText == null)
+                return;
+
+            var log = (DataContext as GrblViewModel)?.MessageLog;
+            if (log == null)
+                return;
+
+            messageLogText.Text = string.Join(Environment.NewLine, log);
+            messageLogText.ScrollToEnd();
         }
 
         /// <summary>
@@ -2422,7 +2463,7 @@ namespace GCode_Sender
 
             if (messageLogAutoClose == null)
             {
-                messageLogAutoClose = new DispatcherTimer { Interval = MessageLogAutoCloseDelay };
+                messageLogAutoClose = new DispatcherTimer();
                 messageLogAutoClose.Tick += (s, e) =>
                 {
                     messageLogAutoClose.Stop();
@@ -2432,8 +2473,10 @@ namespace GCode_Sender
             }
 
             // Restart rather than let it run on, so the message that JUST arrived gets the full delay
-            // instead of inheriting the tail of the previous one's.
+            // instead of inheriting the tail of the previous one's. The interval is set here, not at
+            // construction, so a change in Settings applies to the very next message.
             messageLogAutoClose.Stop();
+            messageLogAutoClose.Interval = MessageLogAutoCloseDelay;
             messageLogAutoClose.Start();
         }
 
