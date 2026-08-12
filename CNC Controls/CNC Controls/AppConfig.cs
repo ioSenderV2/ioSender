@@ -314,6 +314,7 @@ namespace CNC.Controls
         private bool _showJogTargetButtons = false;
         private bool _showJobJogPad = true;
         private bool _showJobSplitView = false;
+        private int _statusWindowAutoCloseSeconds = 10;
         private double _jobSplitRatio = 0.5d;
         private bool _preferNetwork = true;
         private double _uiScale = 1d;
@@ -486,6 +487,16 @@ namespace CNC.Controls
         public double StatusWindowTop { get; set; } = double.NaN;
         public double StatusWindowWidth { get; set; } = double.NaN;
         public double StatusWindowHeight { get; set; } = double.NaN;
+        // How long an AUTO-POPPED status window waits before dismissing itself. Only errors and alarms
+        // pop it now, so this is how long an error stays in front of you. Ten seconds is a comfortable
+        // read; three is enough to notice one and get on with it. Nothing is lost by shortening it -
+        // every message stays in the log behind the Status button regardless. Clamped where it is used,
+        // and read fresh on each message, so a change here applies immediately rather than on restart.
+        public int StatusWindowAutoCloseSeconds
+        {
+            get { return _statusWindowAutoCloseSeconds; }
+            set { if (_statusWindowAutoCloseSeconds != value) { _statusWindowAutoCloseSeconds = value; OnPropertyChanged(); } }
+        }
         // Keyboard shortcuts for switching main-page tabs and Settings sub-tabs, keyed by a stable tab id
         // (e.g. "Tab.Job", "Tab.Settings.Grbl"). Empty by default - no tab has a shortcut out of the box.
         // Edited in the Key Mappings editor; dispatched at the main-window level like the console shortcut.

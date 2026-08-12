@@ -24,6 +24,12 @@
                 <TextBlock Text="{Binding Path=UiScale, StringFormat={}{0:P0}}" VerticalAlignment="Center" Margin="8,0,0,0" Width="40"/>
             </StackPanel>
 
+            <StackPanel Orientation="Horizontal" Margin="5,8,0,0">
+                <TextBlock x:Uid="lbl_statusAutoClose" Text="Dismiss pop-up status window after" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip="How long the status window stays up when it opens by itself to show an error or alarm. Only errors and alarms open it - other messages are recorded quietly - and every message stays in the log behind the Status button, so a shorter time here loses nothing. A window you opened yourself never closes on its own."/>
+                <Slider x:Uid="sld_statusAutoClose" x:Name="sliderStatusAutoClose" Width="160" Minimum="1" Maximum="60" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Path=StatusWindowAutoCloseSeconds, Mode=TwoWay}" VerticalAlignment="Center"/>
+                <TextBlock x:Uid="lbl_statusAutoCloseValue" Text="{Binding Path=StatusWindowAutoCloseSeconds, StringFormat={}{0} s}" VerticalAlignment="Center" Margin="8,0,0,0" Width="40"/>
+            </StackPanel>
+
             <Separator Margin="5,10,5,6"/>
             <CheckBox x:Uid="lbl_autoSaveSettings" Content="Auto-save settings on exit" Margin="5,0,0,0" IsChecked="{Binding Path=AutoSaveSettings, Mode=TwoWay}" ToolTip="Save app settings automatically when leaving Settings or closing, instead of using the Save settings button. Does not affect grbl ($) settings - those have their own option on the Application page."/>
             <CheckBox x:Uid="lbl_promptOnSave" Content="Prompt before auto-saving" Margin="25,4,0,0" IsChecked="{Binding Path=PromptOnSave, Mode=TwoWay}" IsEnabled="{Binding Path=AutoSaveSettings}" ToolTip="Show a confirm/discard list of changed settings before auto-saving."/>
