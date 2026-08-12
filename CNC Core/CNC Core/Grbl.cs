@@ -1136,11 +1136,31 @@ namespace CNC.Core
             return Grbl.GrblViewModel != null && Get(Grbl.GrblViewModel);
         }
 
+        // The status report THIS handshake matched, captured as it arrives (see OnStartup below).
+        //
+        // It cannot be read back off Comms.com.Reply afterwards: that field is assigned on the comms READ
+        // THREAD for every line the controller sends (TelnetStream.ReadComplete and its siblings), so it
+        // holds whatever arrived LAST, not what any WaitFor matched. Startup used to return it, and the few
+        // statements between "the loop saw a <...>" and "return" were enough for the app's own follow-up
+        // $G/$# acks to overwrite it with "ok".
+        //
+        // Restart() then tested response.StartsWith("<"), found "ok", and told the operator "Unexpected
+        // response received from controller: ok" about a controller that had just answered a perfect status
+        // report - and returned NoResponse, which skips InitSystem, which is why $I was never sent and every
+        // capability read as absent. One race, both bugs. Captured on the wire 2026-08-12 06:16:
+        //
+        //   06:16:21.767  < <Idle|MPos:742.589,-820.001,0.000|...|FW:grblHAL>   the match
+        //   06:16:22.211  < ok                                                   $G's ack, overwrites Reply
+        //   06:16:22.239  < ok                                                   $#'s ack
+        //   06:16:44.119  Restart() -> NoResponse
+        private static string startupReport;
+
         public static string Startup(GrblViewModel model)
         {
             bool? res = null;
             int retries = 10;
 
+            startupReport = string.Empty;
             PollGrbl.Suspend();
             CancellationToken cancellationToken = new CancellationToken();
 
@@ -1161,7 +1181,9 @@ namespace CNC.Core
                 while (res == null)
                     EventUtils.DoEvents();
 
-                if (Comms.com.Reply.StartsWith("<"))
+                // What WE matched, not what happened to arrive last - a status report from the poller or an
+                // "ok" from someone else's command must neither end this loop nor prolong it.
+                if (!string.IsNullOrEmpty(startupReport))
                     retries = 0;
             }
 
@@ -1188,7 +1210,21 @@ namespace CNC.Core
 
             PollGrbl.Resume();
 
-            return Comms.com.Reply;
+            // Loud when it would have mattered: this is the exact condition that produced the false
+            // "Unexpected response received from controller: ok" dialog, and reading it off a log beats
+            // reproducing a thread race. Fall back to Comms.com.Reply only when nothing matched at all -
+            // there the last line received IS the best evidence of what the controller is saying.
+            if (DebugLog.Enabled)
+            {
+                if (string.IsNullOrEmpty(startupReport))
+                    DebugLog.Write("connect", string.Format("Startup: no status report matched in {0} attempts - reporting the last line received: '{1}'",
+                        10, Comms.com.Reply));
+                else if (Comms.com.Reply != startupReport)
+                    DebugLog.Write("connect", string.Format("Startup: matched '{0}', but the last line received is now '{1}' - returning the match (this is the race that used to fail the connect)",
+                        startupReport, Comms.com.Reply));
+            }
+
+            return string.IsNullOrEmpty(startupReport) ? Comms.com.Reply : startupReport;
         }
 
         private static void DetectNumAxes(string rt_report)
@@ -1215,13 +1251,19 @@ namespace CNC.Core
         private static void OnStartup(string data)
         {
             if ((ExtendedProtocol = data.StartsWith("<")))
+            {
+                startupReport = data;   // hold onto it HERE - Comms.com.Reply will not keep it
                 DetectNumAxes(data);
+            }
         }
 
         private static void OnLegacyStartup(string data)
         {
             if (data.StartsWith("<"))
+            {
+                startupReport = data;
                 DetectNumAxes(data);
+            }
         }
 
         // Extract "drv:<branch>@<sha>" from the raw build stamp (see touch_build_stamp.py's ref() format).
