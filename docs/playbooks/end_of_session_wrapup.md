@@ -44,17 +44,30 @@ always `/clear`.
    the last capture is this session — so don't skip it, and don't run it twice (use `-Amend` if you
    captured early and kept working). No separate `build-session-index.ps1` step any more.
 
-## Ordering that matters (steps 5 → 6): put the summary BEFORE the capture, in the SAME message
+## Ordering that matters (steps 5 → 6): the wrap-up is TWO turns
 
-The capture reads the session transcript from disk. Claude Code flushes the assistant message's **text**
-to the transcript **before** it runs a tool call in that same message — so any text written *earlier in the
-message than the capture call* is already on disk and gets captured. Therefore:
+> ⚠️ **CORRECTED 2026-08-08 — this supersedes the same-message flow described below, which lost the
+> summary TWICE.** Mid-turn prose (text emitted *between* tool calls in one turn) is **not reliably
+> persisted** to the transcript `.jsonl`. Two separate summary attempts written mid-turn — prose, then
+> the capture call in the same turn — both vanished; the transcript kept the surrounding `tool_use`
+> entries but no text block, verified by parsing the raw `.jsonl` both times. Short mid-turn status
+> lines sometimes survive; long prose did not. **Only the TURN-FINAL message is guaranteed captured.**
 
-- **Write the full end-of-session summary as prose first, then make the capture the LAST action of the
-  same message.** The summary lands in *this* session's log, not the next run's. (Verified 2026-07-08 with a
-  marker-phrase test.)
-- The old flow ran the capture and *then* wrote the summary as trailing text — which pushed the summary to
-  the following run. Don't do that.
+So:
+
+1. **Turn A** ends with the session summary as its **final message — no tool calls after it.** Tell the
+   user plainly that the capture still has to run, and that anything they send will trigger it.
+2. **Turn B** (the user says anything) runs the capture with **`-Amend`**, which folds Turn A's summary
+   into the session just written. **Then VERIFY** — grep the produced HTML for a phrase from the summary
+   before reporting success. Never report "captured" from the script's exit code alone; that is exactly
+   how this incident chained two false claims, including wrongly "correcting" the user, who had it right.
+
+The original reasoning still holds and is why `-Amend` works at all: the capture reads the transcript from
+disk, and Claude Code flushes an assistant message's **text** before running a tool call in that same
+message — so text written earlier *in the message* than the capture call is already on disk. What the
+2026-08-08 incident showed is that this holds for the message's **final** text block, not for prose
+sandwiched between tool calls. Never run the capture first and write the summary as trailing text — that
+pushed the summary into the following run, which is the original bug this ordering fixed (2026-07-08).
 
 ## Ready command (step 3.5)
 
