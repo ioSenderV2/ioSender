@@ -1484,9 +1484,15 @@ namespace GCode_Sender
 
         private void Generate_Click(object sender, RoutedEventArgs e)
         {
+            // Entry and every refusal are logged: Generate returning without a program is what makes a
+            // Generate-and-Run end in silence, and from the outside that is indistinguishable from a
+            // button that did nothing.
+            DebugLog.Write("run", string.Format("Generate_Click: enter - unattended={0}", unattended));
+
             var p = ActiveProbe();
             if (p == null)
             {
+                DebugLog.Write("run", "Generate_Click: STOPPED - no active probe selected");
                 AppDialogs.Show(CNC.Controls.LibStrings.FindResource("HmSelectProbe"),
                     "Setup", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
@@ -1497,6 +1503,8 @@ namespace GCode_Sender
             var fx = SelectedFixture;
             if (fx == null || !fx.Implemented || !fx.PositionValidated)
             {
+                DebugLog.Write("run", string.Format("Generate_Click: STOPPED - fixture unusable (selected={0} implemented={1} validated={2})",
+                    fx?.Name ?? "(none)", fx?.Implemented, fx?.PositionValidated));
                 AppDialogs.Show("Select a fixture with a supported type and a validated position first (Machine Setup > Fixture definitions > Test position).",
                     "Setup", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
@@ -1515,7 +1523,10 @@ namespace GCode_Sender
                 {
                     if (AppDialogs.Show("G28 is not set. Jog to the position you want to probe the spoilboard Z from - clear of the stock in X/Y, within ~10mm above the spoilboard in Z - then click OK to set G28 there. Cancel aborts.",
                             "Setup", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
+                    {
+                        DebugLog.Write("run", "Generate_Click: STOPPED - operator cancelled the G28 prompt");
                         return;
+                    }
                     // Step 7: Run is asynchronous now (the old engine's deferred start meant the $# re-read
                     // below happened to slip out BEFORE the stream; an immediate start would collide it
                     // mid-stream instead - the fs-listing/error:9 class of trap). So set G28, then re-enter
@@ -1528,6 +1539,10 @@ namespace GCode_Sender
                             if (jobFinished)
                                 Dispatcher.BeginInvoke(new System.Action(() => Generate_Click(sender, e)));
                         });
+                    // Deliberately returns with NO program: Generate re-enters from that run's terminal.
+                    // Harmless alone, but a Generate-and-Run caller sees only "no program" and stops - one
+                    // of the ways this whole flow can end without a word.
+                    DebugLog.Write("run", "Generate_Click: DEFERRED - setting G28 first, re-entering Generate when that run ends");
                     return;
                 }
 
@@ -1537,6 +1552,7 @@ namespace GCode_Sender
                 string unreachable = MacroProcessor.StoredPositionUnreachable("G28");
                 if (unreachable != null)
                 {
+                    DebugLog.Write("run", "Generate_Click: STOPPED - G28 unreachable: " + unreachable);
                     AppDialogs.Show(unreachable, "Setup", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                     return;
                 }
@@ -1747,13 +1763,24 @@ namespace GCode_Sender
 
         private void Run_Click(object sender, RoutedEventArgs e)
         {
+            DebugLog.Write("run", string.Format("Run_Click: enter - unattended={0} program={1} chars",
+                unattended, program?.Length ?? 0));
+
             if (model == null)
+            {
+                DebugLog.Write("run", "Run_Click: STOPPED - no model (view not bound)");
                 return;
+            }
 
             if (string.IsNullOrWhiteSpace(program))
                 Generate_Click(sender, e);
             if (string.IsNullOrWhiteSpace(program))
+            {
+                DebugLog.Write("run", "Run_Click: STOPPED - still no program after Generate");
+                if (string.IsNullOrEmpty(model.Message))
+                    model.Message = "Setup has no program to run - Generate first.";
                 return;
+            }
 
             measureRun = chkMeasure.IsChecked == true;
             ResetResults();
@@ -1816,9 +1843,22 @@ namespace GCode_Sender
             unattended = true;
             try
             {
+                DebugLog.Write("run", "GenerateAndRun: generating...");
                 Generate_Click(null, null);
-                if (!string.IsNullOrWhiteSpace(program))
-                    Run_Click(null, null);
+
+                if (string.IsNullOrWhiteSpace(program))
+                {
+                    // Generate produced nothing, so there is nothing to run. Whatever refused inside
+                    // Generate_Click has usually said so - but this path used to end here in silence,
+                    // which from the operator's side is a Run button that did nothing at all.
+                    DebugLog.Write("run", "GenerateAndRun: STOPPED - Generate produced no program, Run not attempted");
+                    if (model != null && string.IsNullOrEmpty(model.Message))
+                        model.Message = "Setup did not generate a program - nothing to run.";
+                    return;
+                }
+
+                DebugLog.Write("run", string.Format("GenerateAndRun: generated {0} chars, running", program.Length));
+                Run_Click(null, null);
             }
             finally
             {
