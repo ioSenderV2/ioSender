@@ -385,8 +385,15 @@ namespace CNC.Controls
             if (string.IsNullOrEmpty(name))
                 name = "Macro";
 
+            // Every exit from this method is logged. A run that declines to start is indistinguishable
+            // from one that never was asked to, unless it says which gate stopped it - and 2026-08-12 a
+            // Generate-and-Run stopped somewhere in here with nothing said at all.
+            DebugLog.Write("run", string.Format("Run: '{0}' confirm={1} unattended={2} delay={3}ms lines={4}",
+                name, confirm, unattended, startDelayMs, code.Split('\n').Length));
+
             if (StartLoadedJob == null)
             {
+                DebugLog.Write("run", "Run: REFUSED - no streamer wired (StartLoadedJob == null)");
                 // No streamer wired - refuse rather than flood (Feed Hold / Stop would not work).
                 UserPrompt.Show("Cannot run this program safely: the job streamer is not available, so motion would be sent without flow control and Feed Hold / Stop would be unresponsive.",
                     "ioSender", PromptButtons.OK, PromptIcon.Error);
@@ -402,6 +409,8 @@ namespace CNC.Controls
             if (model.IsJobRunning || JobTimer.IsRunning || grblState == GrblStates.Run || grblState == GrblStates.Hold ||
                 grblState == GrblStates.Jog || grblState == GrblStates.Tool || grblState == GrblStates.Door)
             {
+                DebugLog.Write("run", string.Format("Run: REFUSED - machine busy (state={0} IsJobRunning={1} JobTimer={2})",
+                    grblState, model.IsJobRunning, JobTimer.IsRunning));
                 UserPrompt.Show(string.Format("Cannot run macro \"{0}\": the machine is busy (a job is running, held or jogging). Let it finish or stop it first.", name),
                     "ioSender", PromptButtons.OK, PromptIcon.Warning);
                 return false;
@@ -425,6 +434,7 @@ namespace CNC.Controls
                 foreach (var l in lines)
                     if (l.IndexOf("O<", StringComparison.OrdinalIgnoreCase) >= 0 || l.IndexOf('#') >= 0)
                     {
+                        DebugLog.Write("run", string.Format("Run: REFUSED - EXPR not reported and the program needs it (first offending line: {0})", l.Trim()));
                         UserPrompt.Show("This macro uses O-word/parameter (#) syntax, which needs the controller to support NGC expressions (EXPR). This controller does not report that support, so ioSender cannot run it.",
                             "ioSender", PromptButtons.OK, PromptIcon.Error);
                         return false;
@@ -457,7 +467,10 @@ namespace CNC.Controls
             if (confirm && !unattended && MacroRunner.CollectPromptFields(lines).Count == 0 &&
                 UserPrompt.Show(string.Format("Run {0} macro?", name), "ioSender",
                     PromptButtons.YesNo, PromptIcon.Question) != PromptResult.Yes)
+            {
+                DebugLog.Write("run", "Run: declined - operator answered No to the run confirmation");
                 return false;
+            }
 
             // Make the macro the loaded job, previous job pushed aside. Program_FileChanged clears
             // IsDryRunMode by design on every load - re-arm it (Work Order's Generate idiom): the
@@ -541,7 +554,13 @@ namespace CNC.Controls
                     EventUtils.DoEvents();
             }
 
+            DebugLog.Write("run", string.Format("Run: calling StartLoadedJob(unattended={0}) - loaded '{1}', {2} block(s)",
+                unattended, model.FileName, GCode.File.Data?.Count ?? -1));
+
             StartLoadedJob(unattended);
+
+            DebugLog.Write("run", string.Format("Run: StartLoadedJob returned - started={0} StreamingState={1} GrblState={2}",
+                started, model.StreamingState, model.GrblState.State));
 
             // JobRunner.Run's own up-front gates (PREREQ unmet, the field dialog's Cancel) return without
             // starting anything - no terminal will ever fire the watcher, so detect it here: no Send seen

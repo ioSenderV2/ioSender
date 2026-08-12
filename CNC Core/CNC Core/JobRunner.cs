@@ -677,11 +677,20 @@ namespace CNC.Core
             bool macroRun = macroRunPending, unattendedRun = unattendedRunPending;
             macroRunPending = unattendedRunPending = false;
 
+            // Entry and every early return below are logged. This method has a dozen ways to decline
+            // without starting anything, several of them correct and silent by design - which leaves an
+            // operator whose Cycle Start "did nothing" with no way to find out which one it was.
+            DebugLog.Write("run", string.Format("JobRunner.Run: fromBlock={0} honorActive={1} macroRun={2} unattended={3} state={4} loaded='{5}'",
+                fromBlock, honorActiveProgram, macroRun, unattendedRun, grblState.State, model.FileName));
+
             // Host work first - switching the connection to the simulator when "Simulate" was armed. That
             // whole step is client business (it launches the simulator and repaints the run button), so it
             // lives in RegisterActiveProgramPolicy below; false means it could not prepare and the run is off.
             if (!PrepareForRun())
+            {
+                DebugLog.Write("run", "JobRunner.Run: STOPPED - PrepareForRun() refused (host could not prepare, e.g. Simulate switch)");
                 return;
+            }
 
             // A Generate-first tool tab is focused and hasn't built its program yet: the button reads
             // "Generate" (see UpdateRunButtonLabel) - pressing it only generates, it does NOT also run. A
@@ -690,7 +699,10 @@ namespace CNC.Core
             // Which program is "active", and whether it still needs generating, is client policy - it lives in
             // RegisterActiveProgramPolicy below. The gates stay here because they are streaming state.
             if (honorActiveProgram && grblState.State == GrblStates.Idle && TryGenerateActiveProgram())
+            {
+                DebugLog.Write("run", "JobRunner.Run: STOPPED - a Generate-first tab generated instead of running (this press only generates)");
                 return;
+            }
 
             // The dropdown's "Check Run" only arms the intent (see checkModeArmed's own comment) - this is
             // where it actually takes effect, right before the run it was meant to gate would otherwise start.
@@ -735,6 +747,7 @@ namespace CNC.Core
             }
             else if (Source.IsLoaded)
             {
+                DebugLog.Write("run", "JobRunner.Run: branch = loaded job");
                 model.Message = model.RunTime = string.Empty;
                 Source.StatusDirty = true;   // a run is about to mark block Sent status; let ClearStatus know there's something to clear
                 if(job.ToolChanged)
@@ -778,13 +791,18 @@ namespace CNC.Core
                     {
                         var unmet = MacroRunner.EvaluatePrereqLines(model,
                             Source.Data.Where(b => b.Directive == "PREREQ").Select(b => (string)b.Data));
+                        DebugLog.Write("run", string.Format("JobRunner: PREREQ evaluated - {0}",
+                            unmet.Count == 0 ? "all met" : "UNMET: " + string.Join(" | ", unmet)));
                         if (unmet.Count > 0)
                         {
+                            DebugLog.Write("run", "JobRunner: REFUSED - prerequisites unmet, nothing started");
                             UserPrompt.Show(string.Format("Cannot start this program:\r\n\r\n• {0}", string.Join("\r\n• ", unmet)),
                                 "ioSender", PromptButtons.OK, PromptIcon.Warning);
                             return;
                         }
                     }
+                    else
+                        DebugLog.Write("run", "JobRunner: no PREREQ rows in this program");
 
                     // (PROMPT ...) field collection for a loaded program (Step 4b) - one combined dialog
                     // before any motion, exactly as MacroRunner.Run does for macros, through the same
@@ -883,6 +901,9 @@ namespace CNC.Core
                     }
 
                     Comms.com.PurgeQueue();
+                    DebugLog.Write("run", string.Format("JobRunner.Run: STARTING - '{0}', {1} block(s), dryRun={2}, checkMode={3}",
+                        model.FileName, Source.Data?.Count ?? -1, model.IsDryRunMode, model.GrblState.State == GrblStates.Check));
+
                     JobTimer.Start();
                     streamingHandler.Call(StreamingState.Send, false);
                     if ((job.IsChecking = model.GrblState.State == GrblStates.Check))

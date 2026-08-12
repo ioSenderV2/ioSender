@@ -1782,7 +1782,10 @@ namespace GCode_Sender
             // inside Run pops the borrowed program back when the run reaches its true terminal.
             MacroProcessor.SwitchToTab?.Invoke(ViewType.GRBL);
 
-            MacroProcessor.Run(model, "Setup " + (SelectedFixture?.Name ?? string.Empty), program, true, unattended,
+            // The return value was discarded here, so a refused run - a gate, a cancelled confirmation,
+            // prerequisites unmet - left the operator on the Job tab watching nothing happen with no
+            // explanation offered. Reported below.
+            bool runStarted = MacroProcessor.Run(model, "Setup " + (SelectedFixture?.Name ?? string.Empty), program, true, unattended,
                 onDone: jobFinished =>
                 {
                     if (jobFinished && wantHeightMap)
@@ -1791,6 +1794,15 @@ namespace GCode_Sender
                 // Three seconds between the tab switch and the first motion: enough to refocus on the
                 // view you were just moved to, and to see the toolpath before a probe cycle begins.
                 startDelayMs: 3000);
+
+            if (!runStarted)
+            {
+                DebugLog.Write("run", "StartJobView: MacroProcessor.Run returned false - the run was refused");
+                // The refusing gate has usually shown its own dialog (prerequisites, busy, EXPR). This is
+                // the backstop for the ones that decline quietly, so the Job tab never just sits there.
+                if (string.IsNullOrEmpty(model.Message))
+                    model.Message = "Setup did not start - see the status log for the reason.";
+            }
         }
 
         // Backs the "Generate and Run" mode-dropdown entry (see MacroProcessor.SupportsGenerateAndRun) -
