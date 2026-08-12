@@ -316,6 +316,11 @@ namespace CNC.Controls.Viewer
 
             viewport.Children.Clear();
             viewport.Children.Add(new DefaultLights());
+            // Cleared on every rebuild; whichever stock path runs below puts it back up if it has nothing
+            // to draw. (Not cleared on the short-circuit return above - that scene is unchanged, message
+            // included.)
+            if (txtNoStock != null)
+                txtNoStock.Visibility = Visibility.Collapsed;
 
             // machine envelope shifted into work coordinates
             double xmin = EnvMin(0) - Wco(0), xmax = EnvMax(0) - Wco(0);
@@ -379,10 +384,32 @@ namespace CNC.Controls.Viewer
             viewport.ZoomExtents(0);
         }
 
+        // Say so, rather than draw a board nobody described. Called from the two places that used to invent
+        // one (a 150x150x19 block at the origin, or a 19 mm thickness under a real footprint).
+        private void NoStockInfo(string why)
+        {
+            if (txtNoStock != null)
+                txtNoStock.Visibility = Visibility.Visible;
+            if (DebugLog.Enabled)
+                DebugLog.Write("carve", "no stock block drawn - " + why);
+        }
+
         // The stock block: the program's XY bounding box plus a margin, from the deepest cut up to work Z0.
         private void AddStock()
         {
             double margin = 6d, top, bottom, cx, cy, sx, sy;
+
+            // Two independent facts, and the block needs BOTH: where the board is (declared, or inferred
+            // from the program) and how thick it is (declared, or the depth of a real cut). Missing either,
+            // there is nothing honest to draw - the stand-in block this replaces was a size the operator
+            // never gave and could not tell apart from one they did.
+            bool haveFootprint = (haveStockOrigin && stockX > 0d && stockY > 0d) || haveBox;
+            bool haveThickness = stockZ > 0d || haveCutZ;
+            if (!haveFootprint || !haveThickness)
+            {
+                NoStockInfo(string.Format("footprint={0} thickness={1}", haveFootprint, haveThickness));
+                return;
+            }
 
             if (haveStockOrigin && stockX > 0d && stockY > 0d)
             {
@@ -392,7 +419,7 @@ namespace CNC.Controls.Viewer
                 // showed after a run finished: a placeholder easily mistaken for the real stock being
                 // wrong. The board is on the table whether or not a program is open.
                 top = 0d;
-                bottom = stockZ > 0d ? -stockZ : -19d;
+                bottom = stockZ > 0d ? -stockZ : cutMinZ;   // one of the two is known - see the guard above
                 if (haveBox)
                     top = Math.Max(bMax.Z, 0d);
                 if (haveCutZ)
@@ -402,29 +429,25 @@ namespace CNC.Controls.Viewer
                 cx = stockOX + stockX / 2d;
                 cy = stockOY + stockY / 2d;
             }
-            else if (haveBox)
+            else
             {
+                // No declared board, but a program is loaded (the guard above required one or the other):
+                // its own extents are the only statement about the material that exists.
                 top = Math.Max(bMax.Z, 0d);
-                bottom = Math.Min(bMin.Z, top - 1d);
+                bottom = Math.Min(stockZ > 0d ? -stockZ : cutMinZ, top - 1d);
                 sx = (bMax.X - bMin.X) + 2d * margin;
                 sy = (bMax.Y - bMin.Y) + 2d * margin;
                 cx = (bMin.X + bMax.X) / 2d;
                 cy = (bMin.Y + bMax.Y) / 2d;
             }
-            else
-            {
-                top = 0d; bottom = -19d; sx = sy = 150d; cx = cy = 0d;
-            }
 
             double h = Math.Max(top - bottom, 1d);
 
-            // Instrumentation only. The no-program fallback here is a 150x150 block at the origin, which
-            // is easy to mistake for a wrongly-sized stock - so the log says outright which branch drew it.
+            // Instrumentation only - which branch drew it, and off what numbers.
             if (DebugLog.Enabled)
                 DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
                     "AddStock branch={0} | centre {1:0.##},{2:0.##} size {3:0.##} x {4:0.##} mm | z {5:0.##}..{6:0.##} | declared Z={7:0.##} cutMinZ={8}",
-                    (haveBox && haveStockOrigin && stockX > 0d && stockY > 0d) ? "DECLARED"
-                        : haveBox ? "cut-bbox+margin" : "NO PROGRAM (150x150 default)",
+                    (haveStockOrigin && stockX > 0d && stockY > 0d) ? "DECLARED" : "cut-bbox+margin",
                     cx, cy, sx, sy, bottom, top, stockZ,
                     haveCutZ ? cutMinZ.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : "none"));
 
@@ -489,7 +512,14 @@ namespace CNC.Controls.Viewer
                                 break;
                             case Commands.G1:
                                 AddSeg(a.Start.ToMedia3D(), a.End.ToMedia3D(), false, curRad, curShp, curAng, cut, rapid);
-                                GrowCut(a.Start.ToMedia3D(), a.End.ToMedia3D());
+                                // NOT every G1 that arrives here is a cut. The emulator reports a G38.x probe
+                                // as a G1 (it draws like one), and a G53 move is in the MACHINE frame, not the
+                                // work frame the stock lives in. Neither removes material: a Setup program,
+                                // whose deepest motion is a toolsetter probe at Z-83 in G91, was drawing a
+                                // 6.35 mm board as an 83 mm slab. Observed in the carve log, cutMinZ=-83
+                                // against declared 6.35, 2026-08-12.
+                                if (!a.IsProbe && !a.IsInMachineCoord)
+                                    GrowCut(a.Start.ToMedia3D(), a.End.ToMedia3D());
                                 break;
                             case Commands.G2:
                             case Commands.G3:
@@ -631,6 +661,15 @@ namespace CNC.Controls.Viewer
             if (!haveBox)
                 return;
 
+            // How thick is the board? Nothing declared it, and no cutting move went below Z0 to imply it -
+            // this program is all rapids and probes. Leave carveVisual null so BuildScene falls through to
+            // AddStock, which says "No stock size information" instead of inventing a 19 mm slab.
+            if (stockZ <= 0d && !haveCutZ)
+            {
+                NoStockInfo("no declared thickness, and no cutting move to infer one from");
+                return;
+            }
+
             // Footprint: the real (STOCK X Y) when the program gives it (centred on the cut), else the toolpath
             // bbox + margin. Never smaller than the cut extents so the toolpath always stays on the stock.
             const double margin = 6d;
@@ -670,7 +709,7 @@ namespace CNC.Controls.Viewer
             // rapids, probe approaches and expanded G28/G30 parks, none of which remove material. That is
             // what drew a 6.35 mm board as an ~80 mm slab on a Setup job, whose deepest motion is a
             // toolsetter probe. A program with no cutting moves at all leaves the declared thickness alone.
-            hbot = stockZ > 0d ? -stockZ : (haveCutZ ? Math.Min(cutMinZ, -1d) : -19d);
+            hbot = stockZ > 0d ? -stockZ : Math.Min(cutMinZ, -1d);   // one of the two is known - see the guard at the top
             if (haveCutZ)
                 hbot = Math.Min(hbot, cutMinZ);
             if (hbot >= htop) hbot = htop - 1d;

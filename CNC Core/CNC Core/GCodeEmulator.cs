@@ -53,6 +53,12 @@ namespace CNC.Core
         public double Rotation;
         public bool IsRetract;
         public bool IsSpindleSynced;
+        // This action started life as a G38.x PROBE. It is reported as a Commands.G1 linear move (see the
+        // G38 arm below, under 'translate') because for drawing a path a probe IS a feed move - but a probe
+        // removes no material, and a consumer reasoning about CUTS cannot tell the two apart from the token
+        // alone. The 3D view's stock block did exactly that and drew a 6.35 mm board ~80 mm thick, taking a
+        // toolsetter probe for a cut that deep.
+        public bool IsProbe;
         public bool IsScaled;
         public Point3D ScaleFactors;
         public bool IsInMachineCoord;
@@ -146,7 +152,7 @@ namespace CNC.Core
 
                 action.IsInMachineCoord = false;
                 action.Token = token;
-                action.IsRetract = action.IsSpindleSynced = false;
+                action.IsRetract = action.IsSpindleSynced = action.IsProbe = false;
 
                 if (token.Command == Commands.FlowControl)
                 {
@@ -437,6 +443,7 @@ namespace CNC.Core
                             var motion = token as GCLinearMotion;
                             setEndP(motion.Values, motion.AxisFlags);
                             action.Token = new GCLinearMotion(Commands.G1, token.LineNumber, machinePos.Array, motion.AxisFlags, token.BlockDelete);
+                            action.IsProbe = true;   // it draws like a feed move, but it cuts nothing - see RunAction.IsProbe
                         }
                         break;
 
