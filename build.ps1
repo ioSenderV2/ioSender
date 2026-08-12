@@ -90,6 +90,19 @@
     so the run really is what a new install gets - right for default-matching screenshots, and
     for arranging a layout by doing it rather than describing it. Implies -Launch.
 
+.PARAMETER AdoptDefault
+    With -DefaultConfig (which it implies): when you quit, write what the session produced straight
+    over the repo's ioSender XL\ioSender XL\Default-App.config instead of just parking it. Two things
+    that a plain copy gets wrong are handled - the XML comments ioSender drops (it composes the
+    document from scratch on save) are read back out of the existing template and re-injected, and the
+    UTF-8 BOM + CRLF it writes are normalised to the repo's BOM-less LF. The template is a tracked
+    file, so the printed diff is the review and 'git checkout' is the undo.
+
+.EXAMPLE
+    .\build.ps1 -adopt-default -forgetnetwork -message="Arrange the default layout"
+    Launch a first-run-clean ioSender, arrange the layout, quit - and the shipped default template is
+    updated, with a diff --stat to show what moved.
+
 .EXAMPLE
     .\build.ps1 -Clean -Launch
     Wipe every project's bin\/obj\ first, then build and launch - use after a build fails
@@ -125,6 +138,10 @@ param(
     # -forgetnetwork); -DefaultConfig works too, and the alias keeps the variable readable in here.
     [Alias('default-config')]
     [switch]$DefaultConfig,
+    # Adopt the session's result straight into the repo's Default-App.config instead of parking it.
+    # Implies -DefaultConfig.
+    [Alias('adopt-default')]
+    [switch]$AdoptDefault,
     # Target name in docs\manual\img for the screenshot taken during a -DefaultConfig session.
     [string]$Shot,
     # Any trailing tokens are forwarded verbatim to the launched ioSender.exe, e.g.
@@ -196,6 +213,60 @@ $liveCfg    = Join-Path $userCfgDir 'App.config'
 $stashedCfg = Join-Path $userCfgDir 'App.config.mine'            # yours, parked for the session
 $sessionCfg = Join-Path $userCfgDir 'App.config.default-session' # what the session produced
 
+$templateCfg = Join-Path $root 'ioSender XL\ioSender XL\Default-App.config'
+
+# Adopt a session's config as the shipped template (-AdoptDefault). Two things stand between the file
+# ioSender writes and the file the repo wants, and both are silent if you just copy it:
+#
+#   1. The XML COMMENTS. ioSender composes the document from scratch on every save (ConfigStore.
+#      WriteDocument), so it cannot preserve a comment it never read. They are read back out of the
+#      EXISTING template here rather than hardcoded in this script - edit a comment in the template and
+#      the next adoption keeps your edit. Each is anchored to the line that follows it (e.g.
+#      '<section key="CustomTools">'), which is unique by construction; an anchor that has disappeared
+#      is reported, never silently dropped.
+#   2. ENCODING. ioSender writes UTF-8 WITH a BOM and CRLF; the repo is BOM-less LF (.gitattributes
+#      'eol=lf'). Copy it raw and every line reads as changed, which buries whatever really changed.
+function Convert-SessionConfigToTemplate {
+    param([string]$SessionPath, [string]$TemplatePath)
+
+    # ReadAllText detects and strips a BOM; normalise CRLF here so the whole comparison below is LF.
+    $text = [System.IO.File]::ReadAllText($SessionPath) -replace "`r`n", "`n"
+    $lines = [System.Collections.Generic.List[string]]($text -split "`n")
+
+    $blocks = @()
+    if (Test-Path $TemplatePath) {
+        $tmplLines = ([System.IO.File]::ReadAllText($TemplatePath) -replace "`r`n", "`n") -split "`n"
+        for ($i = 0; $i -lt $tmplLines.Count; $i++) {
+            if ($tmplLines[$i] -notmatch '<!--') { continue }
+            $start = $i
+            while ($i -lt $tmplLines.Count -and $tmplLines[$i] -notmatch '-->') { $i++ }
+            $end = [Math]::Min($i, $tmplLines.Count - 1)
+            # Anchor: the next line with content. Comments are re-inserted BEFORE it.
+            $j = $end + 1
+            while ($j -lt $tmplLines.Count -and -not $tmplLines[$j].Trim()) { $j++ }
+            if ($j -ge $tmplLines.Count) { continue }
+            $blocks += [pscustomobject]@{ Anchor = $tmplLines[$j].Trim(); Lines = @($tmplLines[$start..$end]) }
+        }
+    }
+
+    # Bottom-up: inserting shifts every later index, and the anchors are found by value anyway, but
+    # re-finding after each insert keeps this correct regardless of order.
+    $missed = @()
+    foreach ($b in $blocks) {
+        $at = -1
+        for ($k = 0; $k -lt $lines.Count; $k++) {
+            if ($lines[$k].Trim() -eq $b.Anchor) { $at = $k; break }
+        }
+        if ($at -lt 0) { $missed += $b.Anchor; continue }
+        $lines.InsertRange($at, [string[]]$b.Lines)
+    }
+
+    $out = ($lines -join "`n")
+    [System.IO.File]::WriteAllText($TemplatePath, $out, (New-Object System.Text.UTF8Encoding($false)))
+
+    [pscustomobject]@{ Adopted = $blocks.Count - $missed.Count; Missed = $missed }
+}
+
 function Stop-IoSenderAndWait {
     # A running instance rewrites App.config as it exits, so a swap has to wait for the process to
     # be GONE, not merely signalled - otherwise its dying write lands on the file we just moved in.
@@ -217,6 +288,8 @@ function Get-NewestScreenshotTime {
 
 if ($Shot -and $Scratch) { throw "-Shot runs the app; -Scratch is a verify-only build. Pass one." }
 if ($Shot) { $shotBaseline = Get-NewestScreenshotTime }
+
+if ($AdoptDefault) { $DefaultConfig = $true }   # adopting the result presupposes producing one
 
 if ($DefaultConfig) {
     if ($Scratch) { throw "-DefaultConfig runs the app; -Scratch is a verify-only build. Pass one." }
@@ -422,6 +495,24 @@ finally {
         Move-Item $stashedCfg $liveCfg -Force
         Write-Host "==> Your App.config is back." -ForegroundColor Green
         if (Test-Path $sessionCfg) { Write-Host "==> The session's config: $sessionCfg" -ForegroundColor Cyan }
+
+        # -AdoptDefault: write it over the shipped template, comments and encoding restored. Deliberately
+        # AFTER the scrub and the restore, so a failure here can never cost the real settings. The result
+        # is a tracked file, so the diff is the review and 'git checkout' is the undo.
+        if ($AdoptDefault -and (Test-Path $sessionCfg)) {
+            try {
+                $r = Convert-SessionConfigToTemplate -SessionPath $sessionCfg -TemplatePath $templateCfg
+                Write-Host "==> Adopted into Default-App.config ($($r.Adopted) comment block(s) re-injected)." -ForegroundColor Green
+                foreach ($m in $r.Missed) {
+                    Write-Host "==> Comment DROPPED - no line matching '$m' in the new config. Re-add it by hand." -ForegroundColor Yellow
+                }
+                & git -C $root --no-pager diff --stat -- 'ioSender XL/ioSender XL/Default-App.config'
+                Write-Host "==> Review with: git diff -- 'ioSender XL/ioSender XL/Default-App.config'" -ForegroundColor Cyan
+            }
+            catch {
+                Write-Host "==> Adoption FAILED ($($_.Exception.Message)) - the template is untouched; the session config is still at $sessionCfg." -ForegroundColor Red
+            }
+        }
     }
 
     # Outside the restore block on purpose: -Shot works with or without -DefaultConfig, and files
