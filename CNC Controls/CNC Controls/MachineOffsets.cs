@@ -107,6 +107,38 @@ namespace CNC.Controls
                                     code, cs.X, cs.Y, cs.Z));
         }
 
+        /// <summary>
+        /// The captured HOMED flag. Read on its own rather than out of <see cref="Read"/>'s map: every
+        /// other key in the file is a coordinate TRIPLE, and that parser (correctly) drops any line
+        /// without three comma-separated numbers. HOMED is a single value, so it was being discarded on
+        /// every read - SimulatorArgs never saw the key, and -homed was therefore never passed to any
+        /// simulator, on any machine. Confirmed 2026-08-11 by reading the running simulator's actual
+        /// command line ("-p 23", no -homed) while the file on disk plainly said HOMED=1.
+        /// </summary>
+        private static bool ReadHomedFlag()
+        {
+            try
+            {
+                string path = StorePath();
+                if (!File.Exists(path))
+                    return false;
+
+                foreach (string raw in File.ReadAllLines(path))
+                {
+                    string line = raw.Trim();
+                    int eq = line.IndexOf('=');
+                    if (eq <= 0 || !string.Equals(line.Substring(0, eq).Trim(), HomedKey, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    double v;
+                    if (double.TryParse(line.Substring(eq + 1).Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out v))
+                        return v > 0.5;
+                }
+            }
+            catch { }
+            return false;
+        }
+
         /// <summary>The captured offsets, empty when hardware has never been connected.</summary>
         private static Dictionary<string, double[]> Read()
         {
@@ -235,8 +267,7 @@ namespace CNC.Controls
         {
             args = args ?? string.Empty;
 
-            double[] homed;
-            if (!Read().TryGetValue(HomedKey, out homed) || homed[0] < 0.5)
+            if (!ReadHomedFlag())
                 return args;
 
             if (!SupportsOption(simExePath, "-homed"))
