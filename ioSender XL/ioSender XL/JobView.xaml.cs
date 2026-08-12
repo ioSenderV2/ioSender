@@ -617,7 +617,15 @@ namespace GCode_Sender
                     // alternative to guessing capabilities is not guessing them optimistically - assuming
                     // EXPR is present would stream o-word flow control to a controller that may not take it,
                     // which wedges grblHAL outright. Reconnecting is the recovery, and it works.
-                    if (restartResult == Controller.RestartResult.Ok && !GrblInfo.IsLoaded)
+                    // Deliberately NOT gated on RestartResult.Ok. The condition that matters is "the link is
+                    // open but the capabilities were never read", and NoResponse reaches that state too -
+                    // it reports "did not complete the handshake" and then leaves the connection up anyway,
+                    // which is the state observed 2026-08-12 at 01:12: jogging refused with "enable soft
+                    // limits ($20=1) first" because every setting read as zero out of an empty GrblInfo,
+                    // while the status line claimed not connected. Guarding only the Ok branch missed the
+                    // very path that produced the report.
+                    if ((restartResult == Controller.RestartResult.Ok || restartResult == Controller.RestartResult.NoResponse) &&
+                        Comms.com != null && Comms.com.IsOpen && !GrblInfo.IsLoaded)
                     {
                         if (DebugLog.Enabled)
                             DebugLog.Write("connect", "connected but $I never loaded - offering disconnect or check-mode");
