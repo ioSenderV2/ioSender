@@ -104,36 +104,46 @@ namespace CNC.Controls
 
     public static class DefaultLayout
     {
-        // The canonical layout - also the "reset to default" source. Shows how the pieces nest:
-        // MainWindow.tabs -> [ Grbl(center: Program/3D/Console), ..., Tools(tools: 7 tools), MachineSetup ].
+        // The canonical layout - also the "reset to default" source. MUST stay in step with the Layout
+        // section of Default-App.config (what a fresh install is seeded with) AND with its TabsKeys: a
+        // fresh install that disagreed with "Reset to default" would be its own bug, and Config.Tabs is a
+        // second authority that prunes this tree on every load (TabOrder.Apply).
+        //
+        // 2026-08-12: back to the FULL tab bar as it stood before the 2026-08-03 cutback, by request - the
+        // compressed three-tab arrangement ships as a config OVERLAY you can apply instead (see
+        // ConfigOverlay.cs), which is the right way round: an existing install keeps its saved Layout for
+        // ever, so a crowded default that can be slimmed down beats a slim default nobody can opt out of.
+        // The one thing NOT restored is the Tools CONTAINER tab - the Tools menu replaced it and stays.
         public static LayoutNode Build()
         {
             return new LayoutNode(LayoutKeys.Root,
-                // The main bar carries only what is used WHILE A JOB RUNS (2026-08-03). Everything else
-                // moved to the menus - but this is a default, not a rule: all three slots are drop
-                // targets in Settings > Main Page, so anything here can be dragged back to the tabs.
-                // Start Job then Job: the flow is Start Job (set origin / TLO / measure) then Job (run).
+                // Order is the pre-cutback bar (449c3b19^), minus the retired Tools container. Start Job
+                // then Job: the flow is Start Job (set origin / TLO / measure) then Job (run). All three
+                // slots are drop targets in Settings > Main Page, so any of this can be moved.
                 new LayoutSlot(LayoutKeys.SlotTabs,
+                    new LayoutNode(LayoutKeys.Settings),
+                    new LayoutNode(LayoutKeys.FeedsAndSpeeds),
                     new LayoutNode(LayoutKeys.StartJob),
                     new LayoutNode(LayoutKeys.Grbl,
                         new LayoutSlot(LayoutKeys.SlotCenter, new[] { LayoutKeys.Program, LayoutKeys.Toolpath3D, LayoutKeys.Console })),
+                    new LayoutNode(LayoutKeys.Offsets),
+                    new LayoutNode(LayoutKeys.SDCard),
                     new LayoutNode(LayoutKeys.WorkOrder),
-                    new LayoutNode(LayoutKeys.Offsets)),
-
-                new LayoutSlot(LayoutKeys.SlotMenuFile,
                     new LayoutNode(LayoutKeys.MachineSetup),
-                    new LayoutNode(LayoutKeys.Settings)),
+                    new LayoutNode(LayoutKeys.LatheWizards)),
+
+                // Empty, not absent: EnforceMenuPlacement returns early when a menu slot is MISSING (it
+                // reads that as "not migrated yet" and leaves the arrangement to the one-shot migration),
+                // so the slot has to exist for the invariants to run at all.
+                new LayoutSlot(LayoutKeys.SlotMenuFile),
 
                 // The Tools CONTAINER is gone: its three hardware-gated tools are listed directly here,
-                // one menu entry each, instead of being sub-tabs of a wrapper tab.
-                // Work Order is a TAB (above), not a menu entry: File > Load/New Work Order still work,
-                // they just select the tab rather than opening a window - see ShowWorkOrder().
+                // one menu entry each, instead of being sub-tabs of a wrapper tab. Probing and Height Map
+                // stay here too - they came off the default bar on 2026-07-26 (Start Job's Dynamic mode
+                // folds their functionality in), so restoring the old bar does not bring them back.
                 new LayoutSlot(LayoutKeys.SlotMenuTools,
-                    new LayoutNode(LayoutKeys.SDCard),
-                    new LayoutNode(LayoutKeys.FeedsAndSpeeds),
                     new LayoutNode(LayoutKeys.Probing),
                     new LayoutNode(LayoutKeys.HeightMap),
-                    new LayoutNode(LayoutKeys.LatheWizards),
                     new LayoutNode(LayoutKeys.ToolTable),
                     new LayoutNode(LayoutKeys.Trinamic),
                     new LayoutNode(LayoutKeys.PID)));
