@@ -67,6 +67,17 @@ namespace CNC.Controls.Viewer
         private Point3D bMin, bMax;     // program bounding box (work coords)
         private bool haveBox;
 
+        // The deepest Z reached by an actual CUTTING move - G1/G2/G3 and nothing else. The bounding box
+        // above cannot answer this: Grow() takes every segment the emulator produces, so a rapid, a probe
+        // approach, a "G53 G0 ... Z0" preamble or an expanded G28/G30 park all drag bMin.Z down with them.
+        // That is the same contamination the XY footprint already had to stop trusting (see InitHeightmap's
+        // "EXACTLY the declared board" comment) - it was never a cut-extent signal in Z either. A Setup or
+        // probing program has no cutting moves at all, so nothing is allowed to argue with the declared
+        // stock thickness: a 6.35 mm board was being drawn ~80 mm thick because the toolsetter probe and
+        // the move to stock origin were counted as if they had cut that deep. Reported 2026-08-12.
+        private double cutMinZ;
+        private bool haveCutZ;
+
         // ---- playback ----
         private int segIdx;
         private double segPos;          // distance travelled into the current segment
@@ -201,7 +212,7 @@ namespace CNC.Controls.Viewer
             hmap = null;
             haveLast = false;
             dirtyCells.Clear();
-            haveBox = false;
+            haveBox = haveCutZ = false;
             segs.Clear();
             // The signature is built from the program, which has just emptied, so this would rebuild
             // anyway - but only once something asks. Ask now, so the stale carve cannot be seen in the
@@ -383,10 +394,9 @@ namespace CNC.Controls.Viewer
                 top = 0d;
                 bottom = stockZ > 0d ? -stockZ : -19d;
                 if (haveBox)
-                {
                     top = Math.Max(bMax.Z, 0d);
-                    bottom = Math.Min(bottom, bMin.Z);   // a through-cut goes deeper than the stock
-                }
+                if (haveCutZ)
+                    bottom = Math.Min(bottom, cutMinZ);   // a through-CUT goes deeper than the stock - see InitHeightmap
                 sx = stockX;
                 sy = stockY;
                 cx = stockOX + stockX / 2d;
@@ -412,10 +422,11 @@ namespace CNC.Controls.Viewer
             // is easy to mistake for a wrongly-sized stock - so the log says outright which branch drew it.
             if (DebugLog.Enabled)
                 DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                    "AddStock branch={0} | centre {1:0.##},{2:0.##} size {3:0.##} x {4:0.##} mm | z {5:0.##}..{6:0.##}",
+                    "AddStock branch={0} | centre {1:0.##},{2:0.##} size {3:0.##} x {4:0.##} mm | z {5:0.##}..{6:0.##} | declared Z={7:0.##} cutMinZ={8}",
                     (haveBox && haveStockOrigin && stockX > 0d && stockY > 0d) ? "DECLARED"
                         : haveBox ? "cut-bbox+margin" : "NO PROGRAM (150x150 default)",
-                    cx, cy, sx, sy, bottom, top));
+                    cx, cy, sx, sy, bottom, top, stockZ,
+                    haveCutZ ? cutMinZ.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : "none"));
 
             viewport.Children.Add(new BoxVisual3D
             {
@@ -440,7 +451,7 @@ namespace CNC.Controls.Viewer
                 builtCount = cnt;
                 builtName = name;
                 segs.Clear();
-                haveBox = false;
+                haveBox = haveCutZ = false;
                 StopPlayback();
 
                 var cut = new Point3DCollection();
@@ -478,6 +489,7 @@ namespace CNC.Controls.Viewer
                                 break;
                             case Commands.G1:
                                 AddSeg(a.Start.ToMedia3D(), a.End.ToMedia3D(), false, curRad, curShp, curAng, cut, rapid);
+                                GrowCut(a.Start.ToMedia3D(), a.End.ToMedia3D());
                                 break;
                             case Commands.G2:
                             case Commands.G3:
@@ -486,6 +498,7 @@ namespace CNC.Controls.Viewer
                                 foreach (var q in pts)
                                 {
                                     AddSeg(p.ToMedia3D(), q.ToMedia3D(), false, curRad, curShp, curAng, cut, rapid);
+                                    GrowCut(p.ToMedia3D(), q.ToMedia3D());
                                     p = q;
                                 }
                                 break;
@@ -582,6 +595,15 @@ namespace CNC.Controls.Viewer
                 }
         }
 
+        // Record a cutting move's depth - called ONLY from the G1/G2/G3 arms of BuildToolpath's switch, never
+        // from the default arm (probes, retracts, emulator-expanded parks) and never for a rapid.
+        private void GrowCut(Point3D a, Point3D b)
+        {
+            double z = Math.Min(a.Z, b.Z);
+            cutMinZ = haveCutZ ? Math.Min(cutMinZ, z) : z;
+            haveCutZ = true;
+        }
+
         // Cut moves define the part footprint; rapids (often above the stock at safe Z) don't grow the stock.
         private void Grow(Point3D p)
         {
@@ -642,8 +664,15 @@ namespace CNC.Controls.Viewer
                 x0 = cx - sx / 2d; x1 = cx + sx / 2d; y0 = cy - sy / 2d; y1 = cy + sy / 2d;
             }
             htop = 0d;                                       // stock top = work Z0 (the material top); rapids above don't cut
-            hbot = stockZ > 0d ? -stockZ : Math.Min(bMin.Z, -1d);
-            hbot = Math.Min(hbot, bMin.Z);                  // include any cut deeper than the stock thickness
+            // The declared thickness is the board, full stop. Only a real CUT is allowed to argue with it -
+            // a through-cut genuinely does go deeper than the stock, and the mesh has to reach that far or
+            // the trail runs off the bottom of the block. cutMinZ, not bMin.Z: the bounding box counts
+            // rapids, probe approaches and expanded G28/G30 parks, none of which remove material. That is
+            // what drew a 6.35 mm board as an ~80 mm slab on a Setup job, whose deepest motion is a
+            // toolsetter probe. A program with no cutting moves at all leaves the declared thickness alone.
+            hbot = stockZ > 0d ? -stockZ : (haveCutZ ? Math.Min(cutMinZ, -1d) : -19d);
+            if (haveCutZ)
+                hbot = Math.Min(hbot, cutMinZ);
             if (hbot >= htop) hbot = htop - 1d;
 
             // Instrumentation only: the numbers the block is ACTUALLY built from, and which branch chose
@@ -651,11 +680,16 @@ namespace CNC.Controls.Viewer
             // something downstream ignored it".
             if (DebugLog.Enabled)
                 DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                    "InitHeightmap branch={0} | x {1:0.##}..{2:0.##} y {3:0.##}..{4:0.##} ({5:0.##} x {6:0.##} mm) | z {7:0.##}..{8:0.##} | declared {9:0.##}x{10:0.##}x{11:0.##} origin={12} | cut x {13:0.##}..{14:0.##} y {15:0.##}..{16:0.##}",
+                    "InitHeightmap branch={0} | x {1:0.##}..{2:0.##} y {3:0.##}..{4:0.##} ({5:0.##} x {6:0.##} mm) | z {7:0.##}..{8:0.##} | declared {9:0.##}x{10:0.##}x{11:0.##} origin={12} | cut x {13:0.##}..{14:0.##} y {15:0.##}..{16:0.##} | cutMinZ={17} boxMinZ={18:0.##}",
                     (haveStockOrigin && stockX > 0d && stockY > 0d) ? "DECLARED" : "centred-on-cut",
                     x0, x1, y0, y1, x1 - x0, y1 - y0, hbot, htop,
                     stockX, stockY, stockZ, haveStockOrigin,
-                    bMin.X, bMax.X, bMin.Y, bMax.Y));
+                    bMin.X, bMax.X, bMin.Y, bMax.Y,
+                    // The pair that decides the thickness: what the CUTS reached, against what the whole
+                    // bounding box reached. "none" means no G1/G2/G3 in the program at all - a Setup or
+                    // probing job - and the declared thickness stands untouched.
+                    haveCutZ ? cutMinZ.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : "none",
+                    bMin.Z));
 
             double w = Math.Max(x1 - x0, 1d), h = Math.Max(y1 - y0, 1d);
             const int maxCells = 320;                       // finer grid -> sharper carve (was 150)
