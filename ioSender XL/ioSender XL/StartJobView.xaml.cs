@@ -1801,6 +1801,15 @@ namespace GCode_Sender
             // comment for why this can't just be a start/stop bool around the call.
             _activeRunner = this;
 
+            // Capture EVERYTHING this run needs before the tab switch below. Switching away calls
+            // Activate(false) on this view, which clears `program` synchronously - so reading it after the
+            // switch hands the runner an empty string, and Run's own "nothing to do" early-out then
+            // reported SUCCESS while loading nothing at all. That is exactly what happened when the switch
+            // was first added: the Job tab came up, empty, with no error anywhere. WorkOrderView.Generate
+            // has carried a comment about this same trap for months; I walked into it regardless.
+            string toRun = program;
+            string runName = "Setup " + (SelectedFixture?.Name ?? string.Empty);
+
             // Watch it run on the Job tab. MacroProcessor.Run already loads the program into GCode.File
             // (Push + LoadText, the same borrow-and-restore Work Order uses), so the 3D view and block
             // list are populated either way - what was missing was simply being TAKEN there. The run
@@ -1812,7 +1821,7 @@ namespace GCode_Sender
             // The return value was discarded here, so a refused run - a gate, a cancelled confirmation,
             // prerequisites unmet - left the operator on the Job tab watching nothing happen with no
             // explanation offered. Reported below.
-            bool runStarted = MacroProcessor.Run(model, "Setup " + (SelectedFixture?.Name ?? string.Empty), program, true, unattended,
+            bool runStarted = MacroProcessor.Run(model, runName, toRun, true, unattended,
                 onDone: jobFinished =>
                 {
                     if (jobFinished && wantHeightMap)

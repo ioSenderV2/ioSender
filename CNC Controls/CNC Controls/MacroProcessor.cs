@@ -379,8 +379,16 @@ namespace CNC.Controls
         /// </param>
         public static bool Run(GrblViewModel model, string name, string code, bool confirm = false, bool unattended = false, System.Action<bool> onDone = null, int startDelayMs = 0)
         {
+            // Returning TRUE here said "ran fine" for doing nothing at all, and that is precisely how an
+            // empty program went unnoticed: a caller whose `program` field had been cleared by a tab switch
+            // got success, no log, no load, and a Job tab that came up blank with no error anywhere.
+            // Nothing to run is not a successful run.
             if (model == null || string.IsNullOrEmpty(code))
-                return true;
+            {
+                DebugLog.Write("run", string.Format("Run: REFUSED - nothing to run (model={0}, code={1} chars)",
+                    model == null ? "null" : "ok", code?.Length ?? 0));
+                return false;
+            }
 
             if (string.IsNullOrEmpty(name))
                 name = "Macro";
