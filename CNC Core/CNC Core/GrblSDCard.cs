@@ -297,18 +297,21 @@ namespace CNC.Core
             new Thread(() =>
             {
                 // A worker exception must still set res, or the res==null pump below spins forever.
-                try { res = WaitFor.AckResponse<string>(
-                    ct,
-                    response => {
-                        var fs = GrblFilesystems.ParseMountLine(response);
-                        if (DebugLog.Enabled)
-                            DebugLog.Write("fs", string.Format("$FI saw \"{0}\" -> {1}", response,
-                                fs == null ? "(not a mount line)" : fs.Name + "@" + fs.Path));
-                        if (fs != null) mounts.Add(fs);
-                    },
-                    a => model.OnResponseReceived += a,
-                    a => model.OnResponseReceived -= a,
-                    1500, () => Comms.com.WriteCommand("$FI")); }
+                try
+                {
+                    res = WaitFor.AckOrErrorResponse<string>(
+                        ct,
+                        response => {
+                            var fs = GrblFilesystems.ParseMountLine(response);
+                            if (DebugLog.Enabled)
+                                DebugLog.Write("fs", string.Format("$FI saw \"{0}\" -> {1}", response,
+                                    fs == null ? "(not a mount line)" : fs.Name + "@" + fs.Path));
+                            if (fs != null) mounts.Add(fs);
+                        },
+                        a => model.OnResponseReceived += a,
+                        a => model.OnResponseReceived -= a,
+                        1500, () => Comms.com.WriteCommand("$FI")) == WaitFor.AckOutcome.Ok;
+                }
                 catch (Exception ex) { res = false; if (DebugLog.Enabled) DebugLog.Write("fs", "$FI threw: " + ex.Message); }
             }).Start();
 
@@ -316,6 +319,19 @@ namespace CNC.Core
                 EventUtils.DoEvents();
 
             model.Silent = false;
+
+            // One mount, listed once. A controller that reports the same filesystem twice used to get it
+            // enumerated twice - double the $CWD/$F traffic on the wire the g-code shares, and a phantom
+            // second mount whose listing could collide with a running job. grblHAL's own simulator did
+            // exactly this (mounted littlefs twice, fixed simulator-side), but the cost of believing a
+            // duplicate is high enough that it is not worth trusting the controller to never repeat one.
+            int seen = mounts.Count;
+            mounts = mounts
+                .GroupBy(m => (m.Name ?? string.Empty) + "@" + (m.Path ?? string.Empty), StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+            if (DebugLog.Enabled && mounts.Count != seen)
+                DebugLog.Write("fs", string.Format("$FI reported {0} mount(s), {1} distinct - ignoring the duplicate(s)", seen, mounts.Count));
 
             answered = res == true;
             return mounts;
@@ -331,6 +347,7 @@ namespace CNC.Core
             Grbl.WaitForResponse("$CWD=" + (path.Length > 1 ? path.TrimEnd('/') : path));
 
             bool? res = null;
+            var outcome = WaitFor.AckOutcome.Timeout;
             var ct = new CancellationToken();
 
             Comms.com.PurgeQueue();
@@ -340,12 +357,19 @@ namespace CNC.Core
             new Thread(() =>
             {
                 // A worker exception must still set res, or the res==null pump below spins forever.
-                try { res = WaitFor.AckResponse<string>(
-                    ct,
-                    response => Process(response),
-                    a => model.OnResponseReceived += a,
-                    a => model.OnResponseReceived -= a,
-                    2000, () => Comms.com.WriteCommand(ViewAll ? GrblConstants.CMD_SDCARD_DIR_ALL : GrblConstants.CMD_SDCARD_DIR)); }
+                // An "error:N" answer ends the wait immediately (see AckOrErrorResponse) and counts as
+                // NOT answered - the listing may be partial, and a partial listing reported as complete
+                // is how present macros come to be called missing.
+                try
+                {
+                    outcome = WaitFor.AckOrErrorResponse<string>(
+                        ct,
+                        response => Process(response),
+                        a => model.OnResponseReceived += a,
+                        a => model.OnResponseReceived -= a,
+                        2000, () => Comms.com.WriteCommand(ViewAll ? GrblConstants.CMD_SDCARD_DIR_ALL : GrblConstants.CMD_SDCARD_DIR));
+                    res = outcome == WaitFor.AckOutcome.Ok;
+                }
                 catch (Exception ex) { res = false; if (DebugLog.Enabled) DebugLog.Write("fs", "$F threw: " + ex.Message); }
             }).Start();
 
@@ -353,7 +377,7 @@ namespace CNC.Core
                 EventUtils.DoEvents();
 
             if (DebugLog.Enabled)
-                DebugLog.Write("fs", string.Format("ListMount {0}@{1}: $F completed res={2}", location, path, res));
+                DebugLog.Write("fs", string.Format("ListMount {0}@{1}: $F completed res={2} ({3})", location, path, res, outcome));
 
             model.Silent = false;
             return res == true;

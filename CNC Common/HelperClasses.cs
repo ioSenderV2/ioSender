@@ -327,6 +327,57 @@ namespace CNC.Core
             }
         }
 
+        /// <summary>How an <see cref="AckOrErrorResponse"/> wait ended.</summary>
+        public enum AckOutcome
+        {
+            Timeout,   //!< Nothing arrived for the whole timeout - the controller said nothing.
+            Ok,        //!< The controller acknowledged.
+            Error      //!< The controller answered "error:N" - an ANSWER, but not a success.
+        }
+
+        /// <summary>
+        /// As <see cref="AckResponse"/>, but an "error:N" also ENDS the wait instead of being handled and
+        /// then ignored. AckResponse returns only on the literal "ok", so a command the controller answers
+        /// with an error waits out its entire timeout - and because that timeout is applied per MESSAGE
+        /// rather than to the wait as a whole, any traffic at all (status polls arrive several times a
+        /// second) keeps resetting it. The wait then ends only after a full quiet gap, which can be far
+        /// longer than the nominal timeout: a $F answered with error:62 was observed taking 36 seconds
+        /// against a stated 2000 ms, and was reported to the caller as "the controller did not answer" -
+        /// a materially different and more alarming fact than "it answered with an error".
+        ///
+        /// Deliberately reports Error separately from Ok rather than folding it into "answered". An error
+        /// can arrive before the reply is complete, so treating it as success would turn a partial read
+        /// into a confident empty one - which is exactly how the ATC macros came to be reported missing
+        /// when they were present. Callers should treat Error as "unknown", same as Timeout; the point of
+        /// this overload is to reach that conclusion immediately instead of after tens of seconds.
+        /// </summary>
+        public static AckOutcome AckOrErrorResponse<TEvent>(this CancellationToken token, Action<TEvent> handler, Action<Action<TEvent>> subscribe, Action<Action<TEvent>> unsubscribe, int msTimeout, System.Action initializer = null)
+        {
+            var q = new BlockingCollection<TEvent>();
+            Action<TEvent> add = item => { try { q.TryAdd(item); } catch (ObjectDisposedException) { } };
+            subscribe(add);
+            try
+            {
+                initializer?.Invoke();
+                TEvent eventResult;
+                while (q.TryTake(out eventResult, msTimeout, token))
+                {
+                    handler?.Invoke(eventResult);
+                    string line = (object)eventResult as string;
+                    if (line == "ok")
+                        return AckOutcome.Ok;
+                    if (line != null && line.StartsWith("error:", StringComparison.OrdinalIgnoreCase))
+                        return AckOutcome.Error;
+                }
+                return AckOutcome.Timeout;
+            }
+            finally
+            {
+                unsubscribe(add);
+                q.Dispose();
+            }
+        }
+
         public static bool AckResponse<TEvent>(this CancellationToken token, Action<TEvent> handler, Action<Action<TEvent>> subscribe, Action<Action<TEvent>> unsubscribe, int msTimeout, System.Action initializer = null)
         {
             var q = new BlockingCollection<TEvent>();
