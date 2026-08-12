@@ -194,6 +194,22 @@ namespace CNC.Core
                     return false;
                 }
 
+                // The entry check above is not enough on its own. Every wait in here pumps the dispatcher
+                // (EventUtils.DoEvents), which deliberately keeps the UI alive - so the operator can press
+                // Run WHILE this listing is in flight, and the guard that legitimately passed on entry is
+                // by then stale. Observed 2026-08-11 on the simulator: the listing began at 19:16:39 with
+                // nothing streaming, the job started at 19:16:45.779, and this method's next $F went out at
+                // 19:16:46.096 into the live stream - tearing the $# reply mid-line and consuming seven of
+                // the job's "ok" acks. The stream then waited forever at Ln:40 for acks that no longer
+                // existed, on a link that stayed perfectly healthy. So re-check before every further
+                // command, not just once. Bail BEFORE clearing, so the previous listing stays on screen.
+                if (ProgramInFlight(model))
+                {
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("fs", "Load: ABANDONED - a program started while $FI was in flight; keeping the previous listing");
+                    return false;
+                }
+
                 data.Clear();
                 FreeSpace = string.Empty;
                 id = 0;
@@ -210,6 +226,16 @@ namespace CNC.Core
 
                     foreach (var mount in mounts)
                     {
+                        // Re-checked per mount: ListMount pumps while awaiting each answer, so a job can
+                        // start between one mount and the next. This is the exact edge that fired - the
+                        // collision was the SECOND mount's $CWD/$F going out after Run was pressed.
+                        if (ProgramInFlight(model))
+                        {
+                            if (DebugLog.Enabled)
+                                DebugLog.Write("fs", "Load: ABANDONED mid-listing - a program started; the table is incomplete, so this returns UNKNOWN");
+                            return false;
+                        }
+
                         int before = data.Rows.Count;
                         bool listed = ListMount(model, mount.Name, mount.Path, ViewAll);
                         if (DebugLog.Enabled)
@@ -228,9 +254,17 @@ namespace CNC.Core
                     // not found) when the root filesystem isn't mounted - e.g. SD enabled but no card inserted, with
                     // littlefs at /littlefs - so only use "/" when a mount actually lives there.
                     string cwd = mounts.Exists(m => m.Path == "/") ? "/" : mounts[0].Path;
-                    model.Silent = true;
-                    Grbl.WaitForResponse("$CWD=" + (cwd.Length > 1 ? cwd.TrimEnd('/') : cwd));
-                    model.Silent = false;
+                    // Tidy-up, but still a command on the shared wire - and the last mount's listing pumped
+                    // on the way here. Skipping it only leaves the working directory where the listing left
+                    // it, which is harmless; issuing it mid-stream is not.
+                    if (!ProgramInFlight(model))
+                    {
+                        model.Silent = true;
+                        Grbl.WaitForResponse("$CWD=" + (cwd.Length > 1 ? cwd.TrimEnd('/') : cwd));
+                        model.Silent = false;
+                    }
+                    else if (DebugLog.Enabled)
+                        DebugLog.Write("fs", "Load: skipped the $CWD restore - a program started while listing");
                 }
                 else
                     LegacyLoad(model, ViewAll);
