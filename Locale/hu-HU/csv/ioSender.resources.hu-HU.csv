@@ -235,3 +235,9 @@ ioSender.g.en-US.resources:mainwindow.baml,lbl_stripMist:System.Windows.Framewor
 ioSender.g.en-US.resources:jobview.baml,str_msgConnected:System.String.$Content,None,True,True,,Connected: {0}
 ioSender.g.en-US.resources:jobview.baml,str_msgNotConnected:System.String.$Content,None,True,True,,Not connected: {0} did not complete the handshake.
 ioSender.g.en-US.resources:jobworkspace.baml,spl_jobSplit:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Drag to divide the space between the program view and the 3D view.
+ioSender.g.en-US.resources:mainwindow.baml,mnu_applyConfigOverlay:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Apply configuration _overlay...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_applyConfigOverlay:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Layer a configuration fragment (.ioconfig) onto this profile - for example to adopt a new screen layout - without disturbing your machine settings, profiles or macros. ioSender restarts to apply it, and it can be undone."
+ioSender.g.en-US.resources:mainwindow.baml,mnu_exportConfigOverlay:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,E_xport configuration overlay...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_exportConfigOverlay:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Save this profile's screen layout as a .ioconfig fragment that someone else can apply to their own installation. Machine identity (port, network host, machine) is never included."
+ioSender.g.en-US.resources:mainwindow.baml,mnu_undoConfigOverlay:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Undo configuration overlay
+ioSender.g.en-US.resources:mainwindow.baml,mnu_undoConfigOverlay:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Restore the configuration as it was immediately before the last overlay was applied. ioSender restarts.
