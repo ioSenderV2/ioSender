@@ -923,13 +923,20 @@ namespace CNC.Core
             }
         }
 
-        // Sets Message flagged as an error/alarm (see IsMessageError) - the two real error sources
+        // Sets Message flagged as an error/alarm (see IsMessageError) - the controller's own error sources
         // (SetGrblError, the Alarm-state transition) go through this instead of a plain Message assignment.
         // Sets IsMessageError BEFORE raising Message's PropertyChanged (mirrors the Message setter's own
         // dedupe, deliberately NOT routed through it - that setter resets IsMessageError to false as its
         // first action, which would clobber the flag if set afterward) so a subscriber reacting to the
         // Message change (MainWindow's FlashMessage) already sees the correct flag, not a stale false.
-        private void SetErrorMessage(string message)
+        //
+        // PUBLIC (2026-08-12) because "the controller reported an error" is not the only thing an operator
+        // has to be told. A command the UI REFUSES to send - "home the machine first" - is exactly as
+        // actionable, and since the run strip lost its message line (2026-08-10) only a flagged message is
+        // displayed at all: FlashMessage pops the log window for those and merely refreshes it for the
+        // rest. A refusal written as a plain Message therefore goes into a log nobody has open, and the
+        // button that refused looks broken. If you decline to act, say so through here.
+        public void SetErrorMessage(string message)
         {
             IsMessageError = true;
             if (_message != message)

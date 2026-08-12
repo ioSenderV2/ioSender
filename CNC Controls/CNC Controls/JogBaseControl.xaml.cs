@@ -691,23 +691,23 @@ namespace CNC.Controls
                 return;
 
             if (model.HomedState != HomedState.Homed) {
-                model.Message = "Go to centre: home the machine first.";
+                model.SetErrorMessage("Go to centre: home the machine first.");
                 return;
             }
 
             if (model.IsJobRunning ||
                  !(model.GrblState.State == GrblStates.Idle || model.GrblState.State == GrblStates.Jog || model.GrblState.State == GrblStates.Tool)) {
-                model.Message = "Go to centre: the machine must be idle.";
+                model.SetErrorMessage("Go to centre: the machine must be idle.");
                 return;
             }
 
             if (GrblInfo.MaxTravel.X <= 0d || GrblInfo.MaxTravel.Y <= 0d || GrblInfo.MaxTravel.Z <= 0d) {
-                model.Message = "Go to centre: set max travel ($130-$132) first.";
+                model.SetErrorMessage("Go to centre: set max travel ($130-$132) first.");
                 return;
             }
 
             if (GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1) {
-                model.Message = "Go to centre: enable soft limits ($20=1) first.";
+                model.SetErrorMessage("Go to centre: enable soft limits ($20=1) first.");
                 return;
             }
 
@@ -747,23 +747,23 @@ namespace CNC.Controls
                 return;
 
             if (model.HomedState != HomedState.Homed) {
-                model.Message = "Go to corner: home the machine first.";
+                model.SetErrorMessage("Go to corner: home the machine first.");
                 return;
             }
 
             if (model.IsJobRunning ||
                  !(model.GrblState.State == GrblStates.Idle || model.GrblState.State == GrblStates.Jog || model.GrblState.State == GrblStates.Tool)) {
-                model.Message = "Go to corner: the machine must be idle.";
+                model.SetErrorMessage("Go to corner: the machine must be idle.");
                 return;
             }
 
             if (GrblInfo.MaxTravel.X <= 0d || GrblInfo.MaxTravel.Y <= 0d || GrblInfo.MaxTravel.Z <= 0d) {
-                model.Message = "Go to corner: set max travel ($130-$132) first.";
+                model.SetErrorMessage("Go to corner: set max travel ($130-$132) first.");
                 return;
             }
 
             if (GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1) {
-                model.Message = "Go to corner: enable soft limits ($20=1) first.";
+                model.SetErrorMessage("Go to corner: enable soft limits ($20=1) first.");
                 return;
             }
 
