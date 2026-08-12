@@ -117,10 +117,12 @@ namespace CNC.Controls
             if (Topmost)
                 WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-            // Network is the default transport: open on the Network tab unless an existing serial/simulator
-            // target below selects another. Most grblHAL controllers are networked, and the Scan button lives
-            // here - so a first-time / no-target connect lands where discovery is.
-            tab.SelectedItem = tabNetwork;
+            // Serial is the default transport (2026-08-12, was Network): open on the Serial tab unless an
+            // existing network/simulator target below selects another. A first-time connect is far more
+            // likely to be a USB cable already plugged in than a controller to go discovering for, and the
+            // Network tab's Scan button is one click away for the machines that are on the network.
+            // Matches Config.PreferNetwork's default, which is now also off.
+            tab.SelectedItem = tabSerial;
 
             // Default the network tab's host to the last successfully-connected IP (falls back to the mDNS
             // name set in PortProperties). If the saved target itself is a network one, parsenet below

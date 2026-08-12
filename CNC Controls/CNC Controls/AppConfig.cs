@@ -316,7 +316,11 @@ namespace CNC.Controls
         private bool _showJobSplitView = false;
         private int _statusWindowAutoCloseSeconds = 10;
         private double _jobSplitRatio = 0.5d;
-        private bool _preferNetwork = true;
+        // Serial is the default transport (2026-08-12). Off means a serial/USB link is left alone; a user
+        // who wants the automatic hand-off to network turns it on in Settings. Kept in step with
+        // Default-App.config's own PreferNetwork - a config that predates the element falls back to THIS
+        // value, so the two disagreeing would give old and new profiles different behaviour.
+        private bool _preferNetwork = false;
         private double _uiScale = 1d;
         private bool _autoSaveSettings = false, _promptOnSave = false, _safeGotoZ = true;
         private bool _autoSaveGrblSettings = false, _promptOnGrblSave = false;
