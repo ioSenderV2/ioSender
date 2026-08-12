@@ -57,10 +57,27 @@ So:
 
 1. **Turn A** ends with the session summary as its **final message — no tool calls after it.** Tell the
    user plainly that the capture still has to run, and that anything they send will trigger it.
-2. **Turn B** (the user says anything) runs the capture with **`-Amend`**, which folds Turn A's summary
-   into the session just written. **Then VERIFY** — grep the produced HTML for a phrase from the summary
-   before reporting success. Never report "captured" from the script's exit code alone; that is exactly
-   how this incident chained two false claims, including wrongly "correcting" the user, who had it right.
+2. **Turn B** (the user says anything) runs the capture as the **LAST ACTION OF THE TURN, and writes
+   nothing after it.**
+
+> 🔴 **Why nothing after it (user, 2026-08-12) — this is the orphan bug's actual cause.** The stray
+> 1-2 turn fragments the capture keeps having to fold backwards are **just the messages written after
+> the capture ran**: a verification report, a sign-off, a "captured N turns" note. They land between
+> the end of one session and the start of the next and belong to neither.
+> *"When you do the capture don't do anything else, don't send any more output to the messages. I will
+> see when it's done and do the `/clear` at that point."*
+> Say everything beforehand — the summary in turn A, any commentary before the tool call. The user
+> reads the tool result themselves.
+>
+> **Consequence for the verify step:** "grep the HTML before reporting success" cannot be done as prose
+> afterwards without recreating the bug. Never report "captured" from an exit code alone either — that
+> chained two false claims once, including wrongly "correcting" the user, who had it right. The way out
+> is to **build the check into `convo-sessions.ps1`** (does the final turn's text appear in the HTML?)
+> so the script itself answers it. Until then: verify in the *next* session, not after the run.
+>
+> Use **`-Amend`** only when a capture already ran for THIS sitting and turns need folding into it;
+> `-Amend` extends the most recent session, so on a first capture it would wrongly extend the previous
+> one.
 
 The original reasoning still holds and is why `-Amend` works at all: the capture reads the transcript from
 disk, and Claude Code flushes an assistant message's **text** before running a tool call in that same
