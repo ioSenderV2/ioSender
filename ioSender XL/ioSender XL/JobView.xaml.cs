@@ -58,6 +58,12 @@ namespace GCode_Sender
     {
         private bool? initOK = null;
         private bool isBooted = false, isCameraClaimed = false, holdActivated = false;
+
+        // Set when the operator chooses to stay on a connection whose capabilities ($I) never loaded.
+        // While true the controller is held in check mode - parsed, acknowledged, never executed - so a
+        // connection ioSender cannot reason about can still be inspected but can never move the machine.
+        // Cleared only by a connect that actually reads $I.
+        private bool lockedInCheckMode = false;
         private GrblViewModel model;
         private bool jogConfigHooked = false;
 
@@ -411,6 +417,21 @@ namespace GCode_Sender
             if (sender is GrblViewModel) switch (e.PropertyName)
                 {
                 case nameof(GrblViewModel.GrblState):
+                    // Enforce the check-mode lock taken when the operator chose to stay on a connection
+                    // whose capabilities never loaded. Entering check mode once is not a safety guarantee -
+                    // a soft reset, a stray $C, or the controller's own restart all clear it, and the
+                    // machine would then be free to move on a connection ioSender cannot reason about.
+                    // Re-assert it whenever the controller settles anywhere else. Cleared only by a
+                    // reconnect that actually reads $I (see InitSystem / PrepareForReconnect).
+                    if (lockedInCheckMode && Controller != null && !Controller.ResetPending &&
+                        sender is GrblViewModel cm && !cm.IsCheckMode &&
+                        cm.GrblState.State != GrblStates.Unknown && cm.GrblState.State != GrblStates.Alarm)
+                    {
+                        if (DebugLog.Enabled)
+                            DebugLog.Write("connect", string.Format("check-mode lock: state went to {0}, re-asserting $C", cm.GrblState.State));
+                        Comms.com.WriteCommand(GrblConstants.CMD_CHECK);
+                    }
+
                     if (Controller != null && !Controller.ResetPending)
                     {
                         if (isBooted && initOK == false && (sender as GrblViewModel).GrblState.State != GrblStates.Alarm)
@@ -599,12 +620,36 @@ namespace GCode_Sender
                     if (restartResult == Controller.RestartResult.Ok && !GrblInfo.IsLoaded)
                     {
                         if (DebugLog.Enabled)
-                            DebugLog.Write("connect", "REFUSED - connected but $I never loaded; disconnecting");
-                        MainWindow.ui.DisconnectAfterFailedHandshake();
-                        AppDialogs.Show("Could not read this controller's capabilities ($I), so ioSender has disconnected.\r\n\r\n" +
-                                        "Nothing is wrong with the controller - the query went unanswered during connect. Connect again.",
-                                        "ioSender - connect failed", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                        model.Message = "Connect failed - the controller's capabilities ($I) could not be read. Connect again.";
+                            DebugLog.Write("connect", "connected but $I never loaded - offering disconnect or check-mode");
+
+                        bool disconnect = AppDialogs.Show(
+                            "Could not read this controller's capabilities ($I).\r\n\r\n" +
+                            "Nothing is wrong with the controller - the query went unanswered during connect, and " +
+                            "connecting again normally fixes it. Until then ioSender cannot tell what this " +
+                            "controller supports, so every capability reads as absent.\r\n\r\n" +
+                            "Reconnect now, or stay connected in CHECK MODE to look around? In check mode g-code is " +
+                            "parsed but never executed - the machine cannot move until you reconnect.",
+                            "ioSender - capabilities not read", MessageBoxButton.YesNo, MessageBoxImage.Exclamation) == MessageBoxResult.Yes;
+
+                        if (disconnect)
+                        {
+                            if (DebugLog.Enabled)
+                                DebugLog.Write("connect", "REFUSED - disconnecting at operator's choice");
+                            MainWindow.ui.DisconnectAfterFailedHandshake();
+                            model.Message = "Connect failed - the controller's capabilities ($I) could not be read. Connect again.";
+                        }
+                        else
+                        {
+                            // Staying connected is only safe if nothing can MOVE. Check mode is the
+                            // controller's own guarantee of that - it parses and acknowledges but never
+                            // executes motion - and it is enforced below rather than merely entered, because
+                            // an unenforced safety mode is one stray toggle away from not being one.
+                            Comms.com.WriteCommand(GrblConstants.CMD_CHECK);
+                            lockedInCheckMode = true;
+                            if (DebugLog.Enabled)
+                                DebugLog.Write("connect", "DEGRADED - staying connected, locking check mode until reconnect");
+                            model.Message = "Capabilities ($I) unread - LOCKED IN CHECK MODE, no motion. Reconnect to restore normal operation.";
+                        }
                     }
                     else if (!string.IsNullOrEmpty(Controller.Message))
                         model.Message = Controller.Message;
@@ -796,6 +841,17 @@ namespace GCode_Sender
                         DebugLog.Write("connect", string.Format("InitSystem: $I unanswered, retrying ({0} left)", timeout));
                     Thread.Sleep(500);
                 }
+                // $I answered, so this connection can be reasoned about again - release any check-mode
+                // lock a previous degraded connect took. This is the ONLY thing that clears it.
+                if (lockedInCheckMode)
+                {
+                    lockedInCheckMode = false;
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("connect", "check-mode lock RELEASED - $I loaded on this connect");
+                    if (model.IsCheckMode)
+                        Comms.com.WriteCommand(GrblConstants.CMD_CHECK);   // toggle back out
+                }
+
                 GrblAlarms.Get();
                 GrblErrors.Get();
                 GrblSettings.Load();
