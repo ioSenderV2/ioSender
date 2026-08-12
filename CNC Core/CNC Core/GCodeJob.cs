@@ -464,6 +464,10 @@ namespace CNC.Core
                 bool isComment = false;
                 uint ln;
 
+                // Kept for the diagnostics below: `block` is reassigned as it is trimmed, renumbered and
+                // rewritten, so by the time anything goes wrong it no longer says what the program said.
+                string sourceBlock = block;
+
                 block = block.Trim();
 
                 // O-word flow (O<name> CALL/IF/WHILE/...) and #-expression lines are evaluated by the CONTROLLER,
@@ -524,10 +528,25 @@ namespace CNC.Core
                         AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, false, false));
                     }
                 }
+                else if (DebugLog.Enabled)
+                    // A line the program contained and the machine will never see. Neither branch above
+                    // adds it, nothing throws, and nothing is reported - so the block simply is not there,
+                    // and the first sign of it is the machine doing the wrong thing several lines later.
+                    // Confirmed on real hardware twice now: "$TLR" in 2026-07-27, and on 2026-08-11 a
+                    // Setup run lost "G59.3" (so the toolsetter moves ran in G54 and probed the work
+                    // origin instead of the puck) along with all three "G65 P5 Q<n>" probe-input selects.
+                    // Silence is the actual defect here; this at least makes it audible.
+                    DebugLog.Write("gcode", string.Format(
+                        "AddBlock: DISCARDED (parsed={0} passThrough={1} isComment={2}) >>{3}<<",
+                        parsed, passThrough, isComment, sourceBlock));
             }
-            catch //(Exception e)
+            catch (Exception e)
             {
-                // 
+                // Was an empty catch. A block lost to an exception vanished exactly as silently as one
+                // lost to the branch above - same symptom, different cause, and no way to tell which.
+                if (DebugLog.Enabled)
+                    DebugLog.Write("gcode", string.Format("AddBlock: THREW ({0}: {1}) >>{2}<<",
+                        e.GetType().Name, e.Message, block));
             }
 
             if (action == Action.End)
