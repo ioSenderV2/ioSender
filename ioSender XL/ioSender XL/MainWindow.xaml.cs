@@ -2010,12 +2010,15 @@ namespace GCode_Sender
         }
 
         /// <summary>
-        /// Drop a connection that came up without readable capabilities (see JobView's own comment).
-        /// Same teardown as the menu's Disconnect - this exists only so that path can reach it.
+        /// Re-run the connection after a handshake that came up without readable capabilities (see
+        /// JobView's own comment). Deliberately the SAME path as the Connect menu - drop the link, offer
+        /// the target, re-run the handshake - rather than a private reconnect of its own: that path is
+        /// proven, and it is the one that re-activates the GRBL view so $I is actually asked for again.
+        /// Must be invoked once the failing connect has unwound, not from inside it.
         /// </summary>
-        internal void DisconnectAfterFailedHandshake()
+        internal void ReconnectAfterFailedHandshake()
         {
-            Disconnect();
+            connectMenuItem_Click(null, null);
         }
 
         private void Disconnect()

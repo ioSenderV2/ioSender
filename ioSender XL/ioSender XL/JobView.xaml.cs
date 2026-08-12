@@ -642,9 +642,18 @@ namespace GCode_Sender
                         if (disconnect)
                         {
                             if (DebugLog.Enabled)
-                                DebugLog.Write("connect", "REFUSED - disconnecting at operator's choice");
-                            MainWindow.ui.DisconnectAfterFailedHandshake();
-                            model.Message = "Connect failed - the controller's capabilities ($I) could not be read. Connect again.";
+                                DebugLog.Write("connect", "reconnecting at operator's choice");
+                            model.Message = "Capabilities ($I) could not be read - reconnecting...";
+                            // Actually reconnect, because that is what the prompt offers. Dropping the link
+                            // and leaving the operator at "not connected" is not what "Reconnect now" says,
+                            // and it was not what happened when they picked it.
+                            //
+                            // Deferred rather than called here: this runs inside the connect attempt that
+                            // just failed, and re-entering the connect path from within it would nest the
+                            // handshake inside itself. ApplicationIdle lets this one finish unwinding first -
+                            // the same reason InitSystem is re-invoked that way above.
+                            Dispatcher.BeginInvoke(new System.Action(() => MainWindow.ui.ReconnectAfterFailedHandshake()),
+                                                   DispatcherPriority.ApplicationIdle);
                         }
                         else
                         {
