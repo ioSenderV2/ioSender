@@ -784,6 +784,19 @@ namespace GCode_Sender
                 AppConfig.LastLoadWarnings = null;
             }
 
+            // Confirm an overlay actually landed, naming the sections it changed. Without this the operator
+            // restarts into a screen that looks different and has only the layout itself as evidence - and an
+            // overlay that silently applied NOTHING (wrong file) would look identical to one that worked.
+            if (AppConfig.LastOverlayApplied?.Count > 0)
+            {
+                AppDialogs.Show(this,
+                    (string.IsNullOrEmpty(AppConfig.LastOverlayName) ? "A configuration overlay" : "\"" + AppConfig.LastOverlayName + "\"")
+                    + " has been applied. It changed:\n\n    " + string.Join("\n    ", AppConfig.LastOverlayApplied)
+                    + "\n\nHelp > Support > Undo configuration overlay puts your previous configuration back.",
+                    "Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Information);
+                AppConfig.LastOverlayApplied = new List<string>();
+            }
+
             // Lathe Wizards is never added to the tab bar at all while lathe mode is off (SetTabPresent
             // proactively omits it, rather than adding-then-pruning like other IAvailabilityGated views) -
             // so StretchTabControl.PruneUnavailable never sees it to report it. Note it explicitly here so
@@ -1345,6 +1358,155 @@ namespace GCode_Sender
                 AppDialogs.Show(ex.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
             }
         }
+
+        #region Configuration overlays (Help > Support)
+
+        // See ConfigOverlay.cs for the format and AppConfig's "Config overlays" region for why applying is
+        // staged-then-restart rather than written live. Everything here is presentation: pick a file, say
+        // exactly which sections it will change, hand it to AppConfig, relaunch.
+
+        // Only offer Undo when there is actually a pre-overlay backup to go back to - a disabled item is a
+        // truthful "nothing to undo", where a live one that then reports failure is not.
+        private void menuSupport_SubmenuOpened(object sender, RoutedEventArgs e)
+        {
+            menuUndoConfigOverlay.IsEnabled = AppConfig.CanUndoOverlay;
+        }
+
+        private void applyConfigOverlay_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Apply configuration overlay",
+                Filter = "Configuration overlay|*" + ConfigOverlay.FileExtension + ";*.config|All files|*.*",
+                DefaultExt = ConfigOverlay.FileExtension,
+                CheckFileExists = true
+            };
+            if (dlg.ShowDialog(this) != true)
+                return;
+
+            List<ConfigOverlayEntry> sections;
+            string name;
+            try
+            {
+                var doc = System.Xml.Linq.XDocument.Load(dlg.FileName);
+                sections = ConfigOverlay.Describe(doc);
+                name = ConfigOverlay.NameOf(doc);
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show(this, "That file could not be read as a configuration overlay:\n\n" + ex.Message,
+                                "Apply Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            if (sections.Count == 0)
+            {
+                AppDialogs.Show(this,
+                    "That file contains no configuration sections, so there is nothing to apply.\n\n"
+                    + "An overlay is a trimmed App.config: an <AppConfig> document holding just the "
+                    + "<section> entries it means to change.",
+                    "Apply Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            // Name the sections outright. "Apply this overlay?" tells the operator nothing about what it is
+            // about to change in a config that holds their machine, fixtures, probes and macros.
+            string what = string.Join("\n", sections.Select(s => "    " + (s.Merge ? s.Key + "  (merged into your existing values)" : s.Key)));
+            if (AppDialogs.Show(this,
+                    (string.IsNullOrEmpty(name) ? "This overlay" : "\"" + name + "\"")
+                    + " will change these parts of your configuration:\n\n" + what
+                    + "\n\nEverything else is left exactly as it is. Your current configuration is backed up first, "
+                    + "and \"Undo configuration overlay\" puts it back.\n\nioSender will restart. Apply it?",
+                    "Apply Configuration Overlay", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            // Save first: the backup StageOverlay takes is a copy of the file on disk, so anything changed
+            // this session and not yet written would be silently missing from what Undo restores.
+            AppConfig.Settings.Save();
+
+            if (!AppConfig.StageOverlay(dlg.FileName))
+            {
+                AppDialogs.Show(this, "The overlay could not be staged - see the debug log for the reason. Nothing has been changed.",
+                                "Apply Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            GrblConfigView.DoRestart();
+        }
+
+        private void undoConfigOverlay_Click(object sender, RoutedEventArgs e)
+        {
+            if (!AppConfig.CanUndoOverlay)
+            {
+                AppDialogs.Show(this, "There is no pre-overlay configuration to go back to.",
+                                "Undo Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (AppDialogs.Show(this,
+                    "Restore your configuration as it was immediately before the last overlay was applied?\n\n"
+                    + "Any settings changed since then are lost. ioSender will restart.",
+                    "Undo Configuration Overlay", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+
+            if (!AppConfig.StageOverlayUndo())
+            {
+                AppDialogs.Show(this, "The backup could not be staged for restore - see the debug log. Nothing has been changed.",
+                                "Undo Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            GrblConfigView.DoRestart();
+        }
+
+        private void exportConfigOverlay_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = "Export configuration overlay",
+                FileName = "layout" + ConfigOverlay.FileExtension,
+                Filter = "Configuration overlay|*" + ConfigOverlay.FileExtension,
+                DefaultExt = ConfigOverlay.FileExtension,
+                AddExtension = true
+            };
+            if (dlg.ShowDialog(this) != true)
+                return;
+
+            try
+            {
+                // Export reads the file, not the in-memory Config, so it produces exactly the section XML the
+                // overlay merge works on - one representation, no second serializer to disagree with it. Save
+                // first so the file actually reflects this session.
+                AppConfig.Settings.Save();
+
+                var source = System.Xml.Linq.XDocument.Load(CNC.Core.Resources.IniFile);
+                var overlay = ConfigOverlay.ExtractUiLayout(source, System.IO.Path.GetFileNameWithoutExtension(dlg.FileName));
+                var applied = ConfigOverlay.Describe(overlay);
+
+                if (applied.Count == 0)
+                {
+                    AppDialogs.Show(this, "This configuration has no screen-layout sections to export.",
+                                    "Export Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    return;
+                }
+
+                overlay.Save(dlg.FileName);
+
+                AppDialogs.Show(this,
+                    "Saved a configuration overlay containing:\n\n"
+                    + string.Join("\n", applied.Select(s => "    " + (s.Merge ? s.Key + "  (merge)" : s.Key)))
+                    + "\n\nApplying it elsewhere adopts this screen layout and changes nothing else. "
+                    + "The connection port, network host and machine are deliberately not included.",
+                    "Export Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show(this, "The overlay could not be written:\n\n" + ex.Message,
+                                "Export Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+            }
+        }
+
+        #endregion
 
         // Fusion's per-user AddIns folder - created by Fusion itself on first run, regardless of whether any
         // add-ins are installed yet, so its existence is a simple, good-enough "is Fusion 360 installed for

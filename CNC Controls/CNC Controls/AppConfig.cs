@@ -1032,6 +1032,159 @@ namespace CNC.Controls
             }
         }
 
+        #region Config overlays (layer a config fragment onto this profile)
+
+        // See ConfigOverlay.cs for the format and why it exists. The three file names below all live in
+        // the per-user config folder alongside App.config.
+        //
+        // Applying is STAGED, never done to the live file: dozens of call sites throughout the app call
+        // AppConfig.Settings.Save() at will, so anything written to App.config while the app is running is
+        // liable to be overwritten by the in-memory state moments later. Instead "Apply" drops the fragment
+        // next to the config and restarts; the merge happens in TryLoad below, at the one point where the
+        // document on disk is authoritative and nothing has read it yet. That also makes the command-line
+        // -overlay flag and the menu command literally the same code path.
+
+        private const string PendingOverlayName = "pending-overlay.ioconfig";
+        private const string PendingRestoreName = "pending-restore.config";
+        private const string PreOverlayBackupName = "pre-overlay-App.config";
+
+        private static string ConfigDirFile(string name)
+        {
+            string dir = CNC.Core.Resources.ConfigPath;
+            if (string.IsNullOrEmpty(dir))
+                dir = AppDomain.CurrentDomain.BaseDirectory;
+            return Path.Combine(dir, name);
+        }
+
+        public static string PendingOverlayPath { get { return ConfigDirFile(PendingOverlayName); } }
+        public static string PendingRestorePath { get { return ConfigDirFile(PendingRestoreName); } }
+
+        // The profile as it was immediately before the last overlay was staged - what "Undo" restores.
+        public static string PreOverlayBackupPath { get { return ConfigDirFile(PreOverlayBackupName); } }
+        public static bool CanUndoOverlay { get { try { return File.Exists(PreOverlayBackupPath); } catch { return false; } } }
+
+        // Overlay file to layer on the next load: the -overlay command-line argument (transient - applied
+        // in memory, never written back) or a staged pending file (persistent - consumed and saved).
+        private static string _overlayPath;
+        private static bool _overlayPersist;
+
+        // Section keys the last load actually applied from an overlay, for the post-restart notice and the
+        // log. Empty when no overlay was layered - "nothing applied" must be distinguishable from "applied".
+        public static List<string> LastOverlayApplied = new List<string>();
+        public static string LastOverlayName;
+
+        /// <summary>
+        /// Stage <paramref name="sourceFile"/> to be layered onto this profile on the next launch, taking a
+        /// pre-overlay backup of the current config first. Returns false (with nothing staged) if the file
+        /// cannot be copied. The caller saves + restarts.
+        /// </summary>
+        public static bool StageOverlay(string sourceFile)
+        {
+            try
+            {
+                if (!File.Exists(sourceFile))
+                    return false;
+
+                // Backup FIRST and from the live file - this is the copy Undo restores, so it has to be the
+                // profile as it stands before the overlay, not after.
+                if (File.Exists(CNC.Core.Resources.IniFile))
+                    File.Copy(CNC.Core.Resources.IniFile, PreOverlayBackupPath, true);
+
+                File.Copy(sourceFile, PendingOverlayPath, true);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                CNC.Core.DebugLog.Write("config", "StageOverlay failed - " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Stage the pre-overlay backup to be restored wholesale on the next launch (the Undo path). Same
+        /// staging reason as above: the running instance must not write App.config.
+        /// </summary>
+        public static bool StageOverlayUndo()
+        {
+            try
+            {
+                if (!File.Exists(PreOverlayBackupPath))
+                    return false;
+                File.Copy(PreOverlayBackupPath, PendingRestorePath, true);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                CNC.Core.DebugLog.Write("config", "StageOverlayUndo failed - " + ex.Message);
+                return false;
+            }
+        }
+
+        // Consume a staged restore: swap the backup over App.config before anything reads it. Runs at
+        // startup, before Load(), so the restored file is simply the config this session loads.
+        private static void ConsumePendingRestore()
+        {
+            try
+            {
+                if (!File.Exists(PendingRestorePath))
+                    return;
+
+                File.Copy(PendingRestorePath, CNC.Core.Resources.IniFile, true);
+                File.Delete(PendingRestorePath);
+                try { File.Delete(PreOverlayBackupPath); } catch { }   // consumed - one level of undo, not a stack
+                try { File.Delete(PendingOverlayPath); } catch { }     // an unconsumed overlay must not re-apply
+                CNC.Core.DebugLog.Write("config", "config restored from pre-overlay backup");
+            }
+            catch (Exception ex)
+            {
+                CNC.Core.DebugLog.Write("config", "ConsumePendingRestore failed - " + ex.Message);
+            }
+        }
+
+        // Layer the pending/-overlay fragment onto the just-parsed config document. Returns true if the
+        // document changed (the caller then flags a save so the merge becomes part of the profile).
+        private bool ApplyPendingOverlay(XDocument doc)
+        {
+            if (string.IsNullOrEmpty(_overlayPath))
+                return false;
+
+            List<string> applied;
+            string name = null;
+            try
+            {
+                var overlay = XDocument.Load(_overlayPath);
+                name = CNC.Core.ConfigOverlay.NameOf(overlay);
+                applied = CNC.Core.ConfigOverlay.Apply(doc, overlay);
+            }
+            catch (Exception ex)
+            {
+                CNC.Core.DebugLog.Write("config", "overlay " + _overlayPath + " could not be read - " + ex.Message);
+                applied = new List<string>();
+            }
+
+            LastOverlayApplied = applied;
+            LastOverlayName = name;
+            CNC.Core.DebugLog.Write("config", string.Format("overlay {0}: {1} section(s) applied [{2}]",
+                                    Path.GetFileName(_overlayPath), applied.Count, string.Join(", ", applied)));
+
+            return applied.Count > 0;
+        }
+
+        // Delete a staged overlay only once the load it was layered into actually SUCCEEDED - consuming it
+        // at merge time would throw it away if the parse then failed and Load() fell back to a backup copy.
+        // Consumed even when it applied nothing: a fragment that does not match (wrong file, or a profile
+        // still in the legacy v1 format) would otherwise be retried identically on every launch forever.
+        private static void ConsumeStagedOverlay()
+        {
+            if (string.IsNullOrEmpty(_overlayPath) || !_overlayPersist)
+                return;
+
+            try { File.Delete(_overlayPath); } catch { }
+            _overlayPath = null;
+        }
+
+        #endregion
+
         public bool Load(string filename)
         {
             // Try the live config first. If it is missing, 0 bytes, or otherwise unreadable - an
@@ -1127,6 +1280,14 @@ namespace CNC.Controls
                     }
                     else
                     {
+                        // Layer any pending config overlay onto the document BEFORE it is read: the merge is
+                        // pure XML (see ConfigOverlay), so every section - including keys this build does not
+                        // own - is covered without the sections' owners knowing overlays exist. A persisted
+                        // overlay flags a migrate-save so it becomes part of the profile rather than being
+                        // re-applied from the fragment on every launch.
+                        if (ApplyPendingOverlay(doc) && _overlayPersist)
+                            _migratedFormat = true;
+
                         // v2 (<AppConfig>): the Core section rebuilds Base, the nested sections fill it
                         // in, unowned sections are preserved, and absent sections may import a legacy file.
                         ConfigStore.ReadDocument(doc);
@@ -1154,6 +1315,8 @@ namespace CNC.Controls
                             Base.Macros.Remove(macro);
 
                     ApplyOneTimeFixups();
+
+                    ConsumeStagedOverlay();
 
                     ok = true;
                 }
@@ -1822,6 +1985,15 @@ namespace CNC.Controls
                         _forgetNetwork = _selectPort = true;
                         break;
 
+                    // Layer a config fragment onto this profile for THIS RUN only - nothing is written back,
+                    // so a relaunch without the flag returns to the saved profile untouched. The persistent
+                    // equivalent is Help > Support > Apply configuration overlay, which stages the same file
+                    // and goes through the same merge (see the Config overlays region).
+                    case "-overlay":
+                        _overlayPath = GetArg(args, p++);
+                        _overlayPersist = false;
+                        break;
+
                     case "-islegacy":
                         CNC.Core.GrblInfo.IsLegacyController = true;
                         break;
@@ -1840,6 +2012,17 @@ namespace CNC.Controls
                             FileName = args[p - 1];
                         break;
                 }
+
+            // Config overlays, both consumed here at the last moment before the config is read (-configpath
+            // above may have just moved the folder they live in). A staged restore swaps the whole file back;
+            // a staged overlay is layered by TryLoad and persisted. An explicit -overlay wins and stays
+            // transient - a fragment being tried out must not silently become the profile.
+            ConsumePendingRestore();
+            if (string.IsNullOrEmpty(_overlayPath) && File.Exists(PendingOverlayPath))
+            {
+                _overlayPath = PendingOverlayPath;
+                _overlayPersist = true;
+            }
 
             if (Load(CNC.Core.Resources.IniFile))
             {

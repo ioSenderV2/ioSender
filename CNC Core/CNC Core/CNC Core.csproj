@@ -110,6 +110,7 @@
     <Compile Include="GrblSDCard.cs" />
     <Compile Include="IProgramSource.cs" />
     <Compile Include="Comms.cs" />
+    <Compile Include="ConfigOverlay.cs" />
     <Compile Include="ConfigStore.cs" />
     <Compile Include="BulkObservableCollection.cs" />
     <Compile Include="FeedsSpeedsExport.cs" />
