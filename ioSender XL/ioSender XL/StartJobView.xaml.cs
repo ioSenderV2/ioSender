@@ -785,8 +785,17 @@ namespace GCode_Sender
         {
             // Re-gate Generate live: entering/leaving Alarm should enable/disable it without waiting for the
             // fixture selection to change (see UpdateFixtureWarning).
+            //
+            // RefreshCapabilities, not UpdateFixtureWarning alone: the capability warnings depend on $I, which
+            // is parsed AFTER connect, so they have to be recomputed when the controller answers. That is what
+            // RefreshCapabilities' own comment has always said happens "on connect (see Model_PropertyChanged)"
+            // - but this handler only ever refreshed the fixture warning, so it never did. The EXPR warning was
+            // therefore computed once on Activate and frozen: a controller connected later, or reconnected
+            // after a handshake that missed $I, kept being told its firmware lacks expression support while the
+            // tab happily generated and ran the program. Observed 2026-08-12 - the warning outlived the
+            // reconnect that fixed it. A comment describing a refresh is not a refresh.
             if (e.PropertyName == nameof(GrblViewModel.GrblState))
-                UpdateFixtureWarning();
+                RefreshCapabilities();
 
             if (e.PropertyName != nameof(GrblViewModel.Message))
                 return;
