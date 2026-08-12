@@ -377,7 +377,17 @@ namespace CNC.Controls
         /// another tab first (see StartJobView's Run) - landing on the Job tab to find motion already
         /// under way is not the same as being shown what is about to run.
         /// </param>
-        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false, bool unattended = false, System.Action<bool> onDone = null, int startDelayMs = 0)
+        /// <param name="alreadyPushed">
+        /// The caller has ALREADY pushed the loaded job aside and made this program the loaded one - a tab
+        /// whose Generate hands the program to the Job tab so the operator can look at it before pressing
+        /// Run (StartJobView since 2026-08-12; WorkOrderView.Generate does the same thing without coming
+        /// through here). Suppresses only the Push, never the LoadText: the text loaded at Generate time is
+        /// the raw build, and the comment sanitizing above happens HERE - reloading in place is what puts
+        /// the sanitized text on the wire. Exactly one push is then outstanding, so the watcher's pop and
+        /// the not-started pop below stay balanced. Pushing a second slot instead stacked snapshots and
+        /// doubled watchers when Work Order hit this same shape (observed live 2026-08-08).
+        /// </param>
+        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false, bool unattended = false, System.Action<bool> onDone = null, int startDelayMs = 0, bool alreadyPushed = false)
         {
             // Returning TRUE here said "ran fine" for doing nothing at all, and that is precisely how an
             // empty program went unnoticed: a caller whose `program` field had been cleared by a tab switch
@@ -396,8 +406,8 @@ namespace CNC.Controls
             // Every exit from this method is logged. A run that declines to start is indistinguishable
             // from one that never was asked to, unless it says which gate stopped it - and 2026-08-12 a
             // Generate-and-Run stopped somewhere in here with nothing said at all.
-            DebugLog.Write("run", string.Format("Run: '{0}' confirm={1} unattended={2} delay={3}ms lines={4}",
-                name, confirm, unattended, startDelayMs, code.Split('\n').Length));
+            DebugLog.Write("run", string.Format("Run: '{0}' confirm={1} unattended={2} delay={3}ms alreadyPushed={4} lines={5}",
+                name, confirm, unattended, startDelayMs, alreadyPushed, code.Split('\n').Length));
 
             if (StartLoadedJob == null)
             {
@@ -486,7 +496,19 @@ namespace CNC.Controls
             // only - the pump still applies exactly that; the Z-shift preamble is skipped for macro
             // runs, see JobRunner.ArmMacroRun).
             bool dryRunArmed = model.IsDryRunMode;
-            GCode.File.Push();
+            // Don't push a SECOND slot when the caller already made this program the loaded job at Generate
+            // time (see alreadyPushed) - the LoadText below replaces it in place, and its own pushed
+            // snapshot is the one the watcher pops. Gated on the loaded job actually still being ours, not
+            // on the caller's word alone: if something else was loaded in between, skipping the push would
+            // load over THAT file with nothing left to restore it. Pushing is the safe direction.
+            if (alreadyPushed && model.FileName == name)
+                DebugLog.Write("run", string.Format("Run: '{0}' is already the loaded job - reloading in place, not pushing a second slot", name));
+            else
+            {
+                if (alreadyPushed)
+                    DebugLog.Write("run", string.Format("Run: caller reported '{0}' already pushed, but the loaded job is '{1}' - pushing anyway", name, model.FileName));
+                GCode.File.Push();
+            }
             GCode.File.LoadText(name, code);
             model.IsDryRunMode = dryRunArmed;
 

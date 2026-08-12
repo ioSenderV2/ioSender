@@ -194,6 +194,35 @@ namespace GCode_Sender
         }
         private string program = string.Empty;   // last generated probe program (run via the macro path)
 
+        // --- Generate-time handoff to the Job tab (2026-08-12, Work Order's shape) ---------------------
+        // Generate makes the program the loaded job and takes the operator to the Job tab to look at it
+        // BEFORE anything moves; Run (the run bar, still Setup's - see below) then streams it. This
+        // replaces switching tabs at the moment motion starts, which the operator described as the
+        // rougher half of the two.
+        //
+        // Where this DIFFERS from Work Order: Work Order hands off completely - its program is the loaded
+        // job and the Job tab's ordinary Cycle Start runs it. Setup cannot do that, because everything
+        // that makes its probe program safe to stream lives in MacroProcessor.Run (the EXPR refusal, the
+        // comment sanitizing, the macro-arm that skips the dry-run Z-shift preamble, the borrow/pop
+        // watcher, DiscardGenerated, and the onDone continuation that runs the height map). So Setup stays
+        // the ACTIVE PROGRAM owner across its own deactivation: the run bar keeps reading "Run", and
+        // pressing it still lands in Run_Click -> MacroProcessor.Run exactly as before.
+        //
+        // handedToJobTab: this tab is off-screen but still owns the run bar (set by Generate, cleared when
+        // the operator comes back or the program is dropped). It is what tells Activate(false) that this
+        // particular deactivation is OUR handoff and not a real tab-leave.
+        private bool handedToJobTab;
+        // programBorrowed/loadedProgramName: we pushed the previous job aside and loaded ours under this
+        // name. Paired the same way WorkOrderView pairs runEndWatcherArmed with a FileName test - the flag
+        // alone is never trusted, since MacroProcessor.Run's watcher may have popped already.
+        private bool programBorrowed;
+        private string loadedProgramName;
+        // The run bar is ours while the tab is focused OR while we've handed off to the Job tab. Every
+        // write to the shared MacroProcessor statics is gated on this rather than isActiveTab alone -
+        // otherwise a discard after the handoff (the run finishing, an input edit) would leave the bar
+        // reading "Run" with no program behind it.
+        private bool OwnsRunBar { get { return isActiveTab || handedToJobTab; } }
+
         // This is now THE Setup screen - one instance, one shared config section (StartJobConfig.Section) -
         // there is no more separate Odd Jobs "Setup" sub-tab instance to distinguish from (job-flow
         // unification, 2026-07-31: Setup is one shared, persistent fact regardless of what program you're
@@ -669,19 +698,121 @@ namespace GCode_Sender
         // Drop the generated program; Cycle Start (which runs the active program) rebuilds it via Run_Click.
         // Also registered as MacroProcessor.DiscardGenerated (see Activate) - called there too, right after a
         // clean run finishes, so the Run bar reverts to "Generate" for the next job rather than re-running
-        // a stale program. Only touch the shared static while THIS tab is actually the focused one (see
-        // isActiveTab's own comment) - an input change firing after the tab was left, or a discard call that
-        // raced a tab switch, must not stomp whichever OTHER Generate-capable tab is now active.
+        // a stale program. Only touch the shared static while the run bar is actually OURS (see OwnsRunBar -
+        // focused, or handed off to the Job tab at Generate) - an input change firing after the tab was left
+        // for good, or a discard call that raced a tab switch, must not stomp whichever OTHER
+        // Generate-capable tab is now active.
         private void InvalidateProgram()
         {
             program = string.Empty;
-            if (isActiveTab)
+            ReleaseBorrowedProgram();
+            if (OwnsRunBar)
                 MacroProcessor.IsProgramGenerated = false;
             // The Run bar reverting to "Generate" (above) isn't enough on its own - the overlay's own
             // ProgramView was still showing the now-stale g-code text (Activate(false), leaving the tab
             // entirely, was the only path that ever disconnected it). Confirmed on real hardware: editing an
             // input after Generate correctly flipped the button back, but the displayed program never changed.
             programView?.Disconnect();
+        }
+
+        // Generate's tail: make the program the loaded job and take the operator to the Job tab to look at
+        // it, with the run bar still pointing back here. Called AFTER the MacroProcessor registration in
+        // Generate_Click - the tab switch runs Activate(false) synchronously (WPF tab selection is not
+        // deferred), so anything written after it would be writing to a tab that has already deactivated.
+        private void HandOffToJobTab(string name)
+        {
+            // No tab seam wired (headless/degenerate host): stay exactly as before - the program lives in
+            // this tab's own preview and Run does the switching, if anything switches at all.
+            if (model == null || string.IsNullOrWhiteSpace(program) || MacroProcessor.SwitchToTab == null)
+                return;
+
+            // Capture BEFORE the switch. handedToJobTab now stops Activate(false) from clearing `program`,
+            // but reading a field back across that synchronous switch is precisely the trap that shipped a
+            // blank Job tab on 2026-08-11 (0c457451): read it once, here, and hand the local along.
+            string toLoad = program;
+            // Program_FileChanged clears IsDryRunMode by design on every load - re-arm it around LoadText
+            // (Work Order's Generate idiom, and what MacroProcessor.Run does for the same reason).
+            bool dryRunArmed = model.IsDryRunMode;
+
+            handedToJobTab = true;   // set FIRST: Activate(false) reads it to know this is our own handoff
+            MacroProcessor.SwitchToTab(ViewType.GRBL);   // the Job tab
+
+            // Don't push a SECOND slot over our own still-loaded program - a previous Generate the operator
+            // looked at and never ran. LoadText replaces it in place. This is WorkOrderView.Generate's
+            // guard, carried over with the incident behind it: pushing again stacked snapshots and doubled
+            // watchers ("Push: depth now 2", observed live 2026-08-08).
+            if (!(programBorrowed && model.FileName == loadedProgramName))
+                CNC.Controls.GCode.File.Push();
+            CNC.Controls.GCode.File.LoadText(name, toLoad);
+            programBorrowed = true;
+            loadedProgramName = name;
+            model.IsDryRunMode = dryRunArmed;
+
+            DebugLog.Write("run", string.Format("StartJobView: Generate handed '{0}' ({1} chars) to the Job tab - waiting for Run",
+                name, toLoad.Length));
+        }
+
+        // Hand the previous job back. Everything that DROPS the generated program without running it - an
+        // input edit, leaving this tab for somewhere other than the Job tab - has to do this, or the pushed
+        // snapshot is stranded and the Job tab keeps showing a program nothing will ever run.
+        //
+        // The LOADED JOB is the test, never the flag on its own: after a real run MacroProcessor.Run's own
+        // watcher has already popped by the time it calls DiscardGenerated, so this correctly does nothing.
+        // (One case is not covered, the same one Work Order accepts: generate, then wander off to a third
+        // tab from the Job tab. This view's Activate(false) already ran, so nothing here fires and the slot
+        // is left unconsumed. The alternative - popping a program out from under a run someone may be
+        // about to start - is worse.)
+        private void ReleaseBorrowedProgram()
+        {
+            if (!programBorrowed)
+                return;
+            if (model != null && model.IsJobRunning)
+                return;   // a run owns the pop while it is in flight - leave the bookkeeping to its watcher
+            programBorrowed = false;
+            if (model != null && model.FileName == loadedProgramName)
+            {
+                DebugLog.Write("run", string.Format("StartJobView: dropping '{0}' without running it - popping the previous job back", loadedProgramName));
+                CNC.Controls.GCode.File.Pop();
+            }
+            loadedProgramName = null;
+        }
+
+        // The handoff is over (the run reached its terminal, finished or stopped): stop owning the run bar
+        // so the Job tab goes back to being about the Job tab's own program. This is the teardown
+        // Activate(false) deliberately skipped - deferring it to here is the entire point of OwnsRunBar.
+        private void EndHandoff()
+        {
+            if (!handedToJobTab)
+                return;
+            handedToJobTab = false;
+            if (!isActiveTab)
+                // keepProgram: a CLEAN finish has already dropped it (the watcher calls DiscardGenerated
+                // before this), so the only program still standing here is one whose run was stopped,
+                // halted or alarmed - and MacroProcessor.Run's deliberate polarity is that those stay, so
+                // the operator can come back to Setup and re-run the same program rather than rebuild it.
+                ReleaseRunBar(keepProgram: true);
+        }
+
+        // The shared MacroProcessor registration this tab holds while it owns the run bar. Factored out of
+        // Activate(false) because the handoff defers it (see EndHandoff) rather than skipping it forever.
+        private void ReleaseRunBar(bool keepProgram = false)
+        {
+            MacroProcessor.ActiveRun = null;
+            MacroProcessor.SupportsGenerateMode = false;
+            MacroProcessor.ActiveGenerate = null;
+            MacroProcessor.DiscardGenerated = null;
+            MacroProcessor.SupportsGenerateAndRun = false;
+            MacroProcessor.ActiveGenerateAndRun = null;
+            // Discard the generated program on tab-leave too (not just after a run finishes - see
+            // InvalidateProgram's own comment) - so the tab is always back at "Generate" next time it's
+            // focused. Not routed through InvalidateProgram() itself: its OwnsRunBar guard would block the
+            // MacroProcessor.IsProgramGenerated write, since ownership has just been given up - but this IS
+            // the moment that write belongs.
+            MacroProcessor.IsProgramGenerated = false;
+            if (!keepProgram)
+                program = string.Empty;
+            ReleaseBorrowedProgram();
+            programView?.Disconnect();                     // active program follows the focused tab
         }
 
         private void DrawingHost_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -699,6 +830,10 @@ namespace GCode_Sender
             isActiveTab = activate;
             if (activate)
             {
+                // Back in front - the run bar is ours the ordinary way again, so the deferred teardown
+                // (EndHandoff) has nothing left to defer. Any program handed to the Job tab stays loaded
+                // there; only dropping it releases it (ReleaseBorrowedProgram).
+                handedToJobTab = false;
                 if (model == null)
                     model = DataContext as GrblViewModel;
                 if (!loaded) { LoadInputs(); loaded = true; }   // restore the last estimate/options
@@ -743,19 +878,19 @@ namespace GCode_Sender
             else
             {
                 SaveInputs();
-                MacroProcessor.ActiveRun = null;
-                MacroProcessor.SupportsGenerateMode = false;
-                MacroProcessor.ActiveGenerate = null;
-                MacroProcessor.DiscardGenerated = null;
-                MacroProcessor.SupportsGenerateAndRun = false;
-                MacroProcessor.ActiveGenerateAndRun = null;
-                // Discard the generated program on tab-leave too (not just after a run finishes - see
-                // InvalidateProgram's own comment) - so the tab is always back at "Generate" next time it's
-                // focused. Not routed through InvalidateProgram() itself: its isActiveTab guard would block
-                // the MacroProcessor.IsProgramGenerated write here, since isActiveTab was already set false
-                // at the top of this same Activate() call - but this IS the moment that write belongs.
-                program = string.Empty;
-                programView?.Disconnect();                     // active program follows the focused tab
+                if (handedToJobTab)
+                {
+                    // This deactivation is OUR OWN handoff (Generate just moved the operator to the Job tab
+                    // to look at the program it loaded there), not a real tab-leave. Releasing the run bar
+                    // here would land them on the Job tab holding a Setup program with no way to start it
+                    // as a Setup run - no confirm, no EXPR gate, no macro-arm, no height-map continuation.
+                    // The teardown below is deferred to the run's terminal instead (EndHandoff).
+                    // The preview overlay still goes: the Job tab's own docked list is the display now.
+                    programView?.Disconnect();
+                    DebugLog.Write("run", "StartJobView: deactivating for the Generate handoff - keeping the run bar");
+                }
+                else
+                    ReleaseRunBar();
                 // Stay subscribed when deactivated: keep parsing the (PRINT PC OUT / LS_X/Y) result messages so
                 // the corners populate and the results popup is raised even if the tab is left mid-run. The
                 // handler only reacts to our own messages, so it's a no-op otherwise.
@@ -1668,9 +1803,14 @@ namespace GCode_Sender
             MacroProcessor.ActiveRun = () => Run_Click(null, null);
             // Start Job owns its ProgramView; the overlay hosts it and it titles itself
             MacroProcessor.PublishGenerated("Setup " + fx.Name, program, EnsureProgramView, () => programView);
-            // Flips the Run bar from "Generate" to "Run" (see isActiveTab's own comment on why this is gated).
-            if (isActiveTab)
+            // Flips the Run bar from "Generate" to "Run" (see OwnsRunBar's own comment on why this is gated).
+            if (OwnsRunBar)
                 MacroProcessor.IsProgramGenerated = true;
+
+            // ...and hand it to the Job tab to be looked at. LAST, because the tab switch inside deactivates
+            // this view synchronously - every line above would otherwise be running against a tab that has
+            // already been told it is no longer showing.
+            HandOffToJobTab("Setup " + fx.Name);
         }
 
         // Persisted as the "StartJob" section of App.config (folded in from StartJob.xml); the DTO + holder
@@ -1772,8 +1912,15 @@ namespace GCode_Sender
                 return;
             }
 
+            // Generating from inside Run is one continuous action, and it hands off to the Job tab on its
+            // way through (HandOffToJobTab) - so this run arrives there in the same breath as the operator
+            // does, and still owes them the look-before-it-moves beat. Same for "Generate and Run".
+            bool generatedInThisRun = false;
             if (string.IsNullOrWhiteSpace(program))
+            {
                 Generate_Click(sender, e);
+                generatedInThisRun = true;
+            }
             if (string.IsNullOrWhiteSpace(program))
             {
                 DebugLog.Write("run", "Run_Click: STOPPED - still no program after Generate");
@@ -1802,21 +1949,40 @@ namespace GCode_Sender
             _activeRunner = this;
 
             // Capture EVERYTHING this run needs before the tab switch below. Switching away calls
-            // Activate(false) on this view, which clears `program` synchronously - so reading it after the
-            // switch hands the runner an empty string, and Run's own "nothing to do" early-out then
-            // reported SUCCESS while loading nothing at all. That is exactly what happened when the switch
-            // was first added: the Job tab came up, empty, with no error anywhere. WorkOrderView.Generate
-            // has carried a comment about this same trap for months; I walked into it regardless.
+            // Activate(false) on this view SYNCHRONOUSLY, and that used to clear `program` - reading it
+            // after the switch handed the runner an empty string, and Run's own "nothing to do" early-out
+            // then reported SUCCESS while loading nothing at all: the Job tab came up empty with no error
+            // anywhere (2026-08-11, 0c457451). The handoff (handedToJobTab) now keeps the field alive
+            // across our own switch, so this is belt-and-braces rather than load-bearing - but the field
+            // is still cleared on a genuine tab-leave, and reading state back across a synchronous
+            // deactivation is the habit that caused it. Capture first, read the locals.
             string toRun = program;
             string runName = "Setup " + (SelectedFixture?.Name ?? string.Empty);
 
-            // Watch it run on the Job tab. MacroProcessor.Run already loads the program into GCode.File
-            // (Push + LoadText, the same borrow-and-restore Work Order uses), so the 3D view and block
-            // list are populated either way - what was missing was simply being TAKEN there. The run
-            // control is fixed at the bottom of the window, so nothing about driving the run changes;
-            // this only decides which view is in front of the operator while it happens. The watcher
-            // inside Run pops the borrowed program back when the run reaches its true terminal.
-            MacroProcessor.SwitchToTab?.Invoke(ViewType.GRBL);
+            // Normally the operator is already ON the Job tab looking at this program: Generate put it
+            // there and took them with it (HandOffToJobTab), which is the smoother half of the two - the
+            // program is on screen before anything moves, and Run is pressed against what they can see.
+            // The switch here is now only for the paths that skipped that handoff: Run pressed after
+            // coming back to this tab, or a host with no tab seam. Ownership is taken the same way either
+            // way, so the run bar keeps pointing here until the run's terminal (EndHandoff).
+            bool switchedHere = false;
+            if (!handedToJobTab && MacroProcessor.SwitchToTab != null)
+            {
+                handedToJobTab = true;
+                MacroProcessor.SwitchToTab(ViewType.GRBL);
+                switchedHere = true;
+            }
+
+            // Three seconds between arriving on the Job tab and the first motion: enough to refocus on the
+            // view you were just moved to, and to see the toolpath before a probe cycle begins. Zero when
+            // Generate did the handoff earlier and the operator has been looking at the program since -
+            // they pressed Run against what is on screen, and a countdown there is just a delay.
+            int startDelay = switchedHere || generatedInThisRun || unattended ? 3000 : 0;
+
+            // Read AFTER any switch above (which can release the borrow): whether OUR program is still the
+            // loaded job is what decides if Run pushes another slot. MacroProcessor.Run re-checks the same
+            // thing rather than taking this on trust.
+            bool alreadyLoaded = programBorrowed && model.FileName == runName;
 
             // The return value was discarded here, so a refused run - a gate, a cancelled confirmation,
             // prerequisites unmet - left the operator on the Job tab watching nothing happen with no
@@ -1824,12 +1990,13 @@ namespace GCode_Sender
             bool runStarted = MacroProcessor.Run(model, runName, toRun, true, unattended,
                 onDone: jobFinished =>
                 {
+                    // Terminal, clean or not: the Job tab is about the Job tab's own program again.
+                    EndHandoff();
                     if (jobFinished && wantHeightMap)
                         Dispatcher.BeginInvoke(new System.Action(RunHeightMapPass));
                 },
-                // Three seconds between the tab switch and the first motion: enough to refocus on the
-                // view you were just moved to, and to see the toolpath before a probe cycle begins.
-                startDelayMs: 3000);
+                startDelayMs: startDelay,
+                alreadyPushed: alreadyLoaded);
 
             if (!runStarted)
             {
