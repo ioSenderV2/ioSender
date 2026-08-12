@@ -60,6 +60,11 @@ namespace CNC.Controls
         // geometry with them, so G10 L2 is the whole job).
         private const string HomedKey = "HOMED";
 
+        // Written once, above the mirrored positions. Matched exactly on read so a previous copy is
+        // dropped rather than accumulating - see WriteSimSetup.
+        private const string SimSetupBanner =
+            "# positions below mirror the real machine (MachineOffsets) - edits here are overwritten on connect";
+
         private static readonly string[] References = { "G30", "G59.3" };
         private static readonly string[] WorkOffsets = { "G54", "G55", "G56", "G57", "G58", "G59", "G59.1", "G59.2" };
 
@@ -203,6 +208,7 @@ namespace CNC.Controls
                 // toolsetter_height, resolution_mm, description) - only the two positions we have
                 // hardware truth for are replaced.
                 var kept = new List<string>();
+                var present = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var replaced = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 if (ts != null) { replaced.Add("toolsetter_x"); replaced.Add("toolsetter_y"); }
                 if (tc != null) { replaced.Add("toolchange_x"); replaced.Add("toolchange_y"); }
@@ -210,16 +216,40 @@ namespace CNC.Controls
                 if (File.Exists(cfg))
                     foreach (string raw in File.ReadAllLines(cfg))
                     {
+                        // Drop any previous banner. It carries no '=', so it used to fall through the key
+                        // test and be KEPT - and then a fresh one was appended below, adding one comment
+                        // line per connect, forever. Worse than untidy: the file therefore differed every
+                        // single time, so "changed" was always true and the simulator was killed and
+                        // relaunched on EVERY connect.
+                        if (raw.Trim() == SimSetupBanner)
+                            continue;
+
                         int eq = raw.IndexOf('=');
                         string key = eq > 0 ? raw.Substring(0, eq).Trim() : string.Empty;
+                        if (key.Length > 0)
+                            present.Add(key);
                         if (!replaced.Contains(key))
                             kept.Add(raw);
                     }
 
+                // Seed a Z world if the file has never had one. Every unset key defaults to 0 in the
+                // simulator, which puts the spoilboard AND the toolsetter puck surface (spoilboard_z +
+                // toolsetter_height) at Z0 - the very top of travel. Probing the puck then triggers at
+                // ~0 and the Setup program's "G91 G0 Z2" retract targets +2, outside the envelope:
+                // Alarm 2, after a run that otherwise looked healthy. G28's Z (spoilboard_z + 4) sits
+                // above the ceiling for the same reason.
+                //
+                // Unlike the positions below these are simulated-world geometry with no hardware truth
+                // to mirror, so they are seeded ONCE and then left alone - edit them freely.
+                if (!present.Contains("spoilboard_z"))
+                    kept.Add("spoilboard_z = -100.000");
+                if (!present.Contains("toolsetter_height"))
+                    kept.Add("toolsetter_height = 50.000");
+
                 var sb = new System.Text.StringBuilder();
                 foreach (string line in kept)
                     sb.AppendLine(line);
-                sb.AppendLine("# positions below mirror the real machine (MachineOffsets) - edits here are overwritten on connect");
+                sb.AppendLine(SimSetupBanner);
                 if (ts != null)
                 {
                     sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "toolsetter_x = {0:F3}", ts[0]));
