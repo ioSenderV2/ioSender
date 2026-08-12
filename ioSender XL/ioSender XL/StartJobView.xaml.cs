@@ -1773,12 +1773,24 @@ namespace GCode_Sender
             // result-parsing rights for THIS instance before kicking it off - see _activeRunner's own field
             // comment for why this can't just be a start/stop bool around the call.
             _activeRunner = this;
+
+            // Watch it run on the Job tab. MacroProcessor.Run already loads the program into GCode.File
+            // (Push + LoadText, the same borrow-and-restore Work Order uses), so the 3D view and block
+            // list are populated either way - what was missing was simply being TAKEN there. The run
+            // control is fixed at the bottom of the window, so nothing about driving the run changes;
+            // this only decides which view is in front of the operator while it happens. The watcher
+            // inside Run pops the borrowed program back when the run reaches its true terminal.
+            MacroProcessor.SwitchToTab?.Invoke(ViewType.GRBL);
+
             MacroProcessor.Run(model, "Setup " + (SelectedFixture?.Name ?? string.Empty), program, true, unattended,
                 onDone: jobFinished =>
                 {
                     if (jobFinished && wantHeightMap)
                         Dispatcher.BeginInvoke(new System.Action(RunHeightMapPass));
-                });
+                },
+                // Three seconds between the tab switch and the first motion: enough to refocus on the
+                // view you were just moved to, and to see the toolpath before a probe cycle begins.
+                startDelayMs: 3000);
         }
 
         // Backs the "Generate and Run" mode-dropdown entry (see MacroProcessor.SupportsGenerateAndRun) -

@@ -372,7 +372,12 @@ namespace CNC.Controls
         /// <param name="onDone">Invoked on the UI thread at the run's true terminal, after the previous
         /// job is restored. The argument is true only for a genuine program end (JobFinished) - false for
         /// a Stop/alarm recovery. Not invoked when Run returns false (nothing started).</param>
-        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false, bool unattended = false, System.Action<bool> onDone = null)
+        /// <param name="startDelayMs">
+        /// Pause between loading the program and starting it. For callers that hand the operator off to
+        /// another tab first (see StartJobView's Run) - landing on the Job tab to find motion already
+        /// under way is not the same as being shown what is about to run.
+        /// </param>
+        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false, bool unattended = false, System.Action<bool> onDone = null, int startDelayMs = 0)
         {
             if (model == null || string.IsNullOrEmpty(code))
                 return true;
@@ -522,6 +527,19 @@ namespace CNC.Controls
                 onDone?.Invoke(jobFinished);
             };
             model.PropertyChanged += handler;
+
+            // Give the operator a beat before motion when the caller has just moved them to another tab.
+            // The program is already loaded and drawn by this point, so the pause is spent looking at the
+            // toolpath that is about to be run rather than at an empty view - and it is the difference
+            // between arriving on the Job tab and finding a probe cycle already under way. Pumped rather
+            // than slept: the load, the 3D view and the block list all still need the UI thread.
+            if (startDelayMs > 0)
+            {
+                model.Message = string.Format("{0} loaded - starting in {1} s...", name, (startDelayMs + 999) / 1000);
+                var until = DateTime.Now.AddMilliseconds(startDelayMs);
+                while (DateTime.Now < until)
+                    EventUtils.DoEvents();
+            }
 
             StartLoadedJob(unattended);
 
