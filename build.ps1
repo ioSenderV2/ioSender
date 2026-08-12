@@ -90,7 +90,7 @@
     so the run really is what a new install gets - right for default-matching screenshots, and
     for arranging a layout by doing it rather than describing it. Implies -Launch.
 
-.PARAMETER AdoptDefault
+.PARAMETER AdoptConfig
     With -DefaultConfig (which it implies): when you quit, write what the session produced straight
     over the repo's ioSender XL\ioSender XL\Default-App.config instead of just parking it. Two things
     that a plain copy gets wrong are handled - the XML comments ioSender drops (it composes the
@@ -99,9 +99,22 @@
     file, so the printed diff is the review and 'git checkout' is the undo.
 
 .EXAMPLE
-    .\build.ps1 -adopt-default -forgetnetwork -message="Arrange the default layout"
+    .\build.ps1 -adoptConfig -forgetnetwork -message="Arrange the default layout"
     Launch a first-run-clean ioSender, arrange the layout, quit - and the shipped default template is
     updated, with a diff --stat to show what moved.
+
+.PARAMETER ReviewConfig
+    Look at the shipped Default-App.config as the app renders it, after a rebuild. A throwaway folder
+    is wiped and seeded with the template, and ioSender is pointed at it with -configpath, so the run
+    reads AND writes there - your own %AppData%\ioSender\App.config is never stashed, moved or touched,
+    and there is no session to end (quit whenever). -forgetnetwork is added automatically: the template
+    carries no connection target, but PreferNetwork would otherwise upgrade the link and connect to the
+    real machine. Implies -Launch; cannot be combined with -DefaultConfig/-adoptConfig, which are the
+    editing side of the same loop.
+
+.EXAMPLE
+    .\build.ps1 -reviewConfig
+    Rebuild and see exactly what a fresh install gets. The pair to -adoptConfig: adopt, then review.
 
 .EXAMPLE
     .\build.ps1 -Clean -Launch
@@ -140,8 +153,12 @@ param(
     [switch]$DefaultConfig,
     # Adopt the session's result straight into the repo's Default-App.config instead of parking it.
     # Implies -DefaultConfig.
-    [Alias('adopt-default')]
-    [switch]$AdoptDefault,
+    [Alias('adopt-config')]
+    [switch]$AdoptConfig,
+    # Launch on a throwaway copy of the SHIPPED template, to look at what -adoptConfig produced.
+    # Implies -Launch; never touches your own config (see the -configpath seeding below).
+    [Alias('review-config')]
+    [switch]$ReviewConfig,
     # Target name in docs\manual\img for the screenshot taken during a -DefaultConfig session.
     [string]$Shot,
     # Any trailing tokens are forwarded verbatim to the launched ioSender.exe, e.g.
@@ -215,7 +232,7 @@ $sessionCfg = Join-Path $userCfgDir 'App.config.default-session' # what the sess
 
 $templateCfg = Join-Path $root 'ioSender XL\ioSender XL\Default-App.config'
 
-# Adopt a session's config as the shipped template (-AdoptDefault). Two things stand between the file
+# Adopt a session's config as the shipped template (-AdoptConfig). Two things stand between the file
 # ioSender writes and the file the repo wants, and both are silent if you just copy it:
 #
 #   1. The XML COMMENTS. ioSender composes the document from scratch on every save (ConfigStore.
@@ -289,7 +306,31 @@ function Get-NewestScreenshotTime {
 if ($Shot -and $Scratch) { throw "-Shot runs the app; -Scratch is a verify-only build. Pass one." }
 if ($Shot) { $shotBaseline = Get-NewestScreenshotTime }
 
-if ($AdoptDefault) { $DefaultConfig = $true }   # adopting the result presupposes producing one
+if ($AdoptConfig) { $DefaultConfig = $true }   # adopting the result presupposes producing one
+
+# -ReviewConfig: seed a throwaway config folder from the SHIPPED template and point ioSender at it with
+# -configpath. Deliberately NOT a -DefaultConfig session: that one stashes the real App.config and has to
+# put it back, which is a risk worth taking to EDIT the default but pointless just to LOOK at it. Here the
+# real config is never moved at all, so there is nothing to restore and nothing to lose if this dies.
+$reviewCfgDir = Join-Path $env:TEMP 'ioSender-default-review'
+if ($ReviewConfig) {
+    if ($DefaultConfig) { throw "-ReviewConfig looks at the template; -DefaultConfig/-adoptConfig edit it. Pass one." }
+    if ($Scratch)       { throw "-ReviewConfig runs the app; -Scratch is a verify-only build. Pass one." }
+    if (-not (Test-Path $templateCfg)) { throw "No template to review: $templateCfg" }
+
+    $Launch = $true
+    New-Item -ItemType Directory -Force -Path $reviewCfgDir | Out-Null
+    # Wipe first: a leftover App.config from a previous review would be loaded INSTEAD of the template
+    # (ioSender only seeds when none is present), so the run would quietly show you the last review's
+    # edits and call them the default.
+    Get-ChildItem $reviewCfgDir -File -ErrorAction SilentlyContinue | Remove-Item -Force
+    Copy-Item $templateCfg (Join-Path $reviewCfgDir 'App.config') -Force
+
+    if ($AppArgs -notcontains '-forgetnetwork') { $AppArgs += '-forgetnetwork' }
+    $AppArgs += '-configpath'
+    $AppArgs += $reviewCfgDir
+    Write-Host "==> Reviewing the shipped template on a throwaway config: $reviewCfgDir" -ForegroundColor Cyan
+}
 
 if ($DefaultConfig) {
     if ($Scratch) { throw "-DefaultConfig runs the app; -Scratch is a verify-only build. Pass one." }
@@ -496,10 +537,10 @@ finally {
         Write-Host "==> Your App.config is back." -ForegroundColor Green
         if (Test-Path $sessionCfg) { Write-Host "==> The session's config: $sessionCfg" -ForegroundColor Cyan }
 
-        # -AdoptDefault: write it over the shipped template, comments and encoding restored. Deliberately
+        # -AdoptConfig: write it over the shipped template, comments and encoding restored. Deliberately
         # AFTER the scrub and the restore, so a failure here can never cost the real settings. The result
         # is a tracked file, so the diff is the review and 'git checkout' is the undo.
-        if ($AdoptDefault -and (Test-Path $sessionCfg)) {
+        if ($AdoptConfig -and (Test-Path $sessionCfg)) {
             try {
                 $r = Convert-SessionConfigToTemplate -SessionPath $sessionCfg -TemplatePath $templateCfg
                 Write-Host "==> Adopted into Default-App.config ($($r.Adopted) comment block(s) re-injected)." -ForegroundColor Green
