@@ -154,7 +154,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>233 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>246 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -170,6 +170,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Demo-video capture aids (<code>-demomarker</code>) &mdash; an opt-in timestamped marker log (<code>SESSION_START</code> / <code>RUN_START</code> / <code>RUN_END</code> / <code>TIMELAPSE_ON</code>/<code>OFF</code>) plus a run-bar <em>Timelapse</em> toggle, so a video compositor can sync the app screen-recording to the machine-camera footage and time-compress the long cuts; hidden and near-free when off</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr67">67</a></td></tr>
 <tr><td>OBS auto-record bridge &amp; tool-change cut markers &mdash; with <code>-demomarker</code>, ioSender drives OBS Studio over obs-websocket (auto Start/Stop recording on program load / end, so a shoot needs no manual Record button); <code>RUN_START</code>/<code>RUN_END</code> now bracket the actual cutting, with a tool change emitting <code>RUN_END</code>&hellip;<code>RUN_START</code> around the M6. Plus <code>build.ps1</code> forwards trailing flags to the launched app</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr68">68</a></td></tr>
 <tr><td>Per-Monitor&nbsp;V2 DPI awareness &mdash; the app reads the <em>live</em> per-monitor DPI (like Edge / VS&nbsp;Code) instead of a system-DPI value cached at logon, so it renders at the correct scale regardless of resolution / scale changes and is no longer thrown off by a stale DPI cache; adds <code>-debuglog=dpi</code> diagnostics</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr69">69</a></td></tr>
+<tr><td>The connect handshake no longer fails a healthy controller, and refuses to carry on blind if it does.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr235">235</a></td></tr>
+<tr><td>The UI pump no longer spins unbounded, which twice reached the 32-bit ceiling and killed the app.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr245">245</a></td></tr>
 </table>
 
 <h3>Jogging &amp; main page</h3>
@@ -195,6 +197,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>A message history window, opened from the status line, that also pops itself when a message arrives</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr221">221</a></td></tr>
 <tr><td>Feed Hold and Stop now outrank controller traffic instead of queueing behind it</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr225">225</a></td></tr>
 <tr><td>A jog cancelled before the controller parsed it left jogging dead until restart</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr228">228</a></td></tr>
+<tr><td>Commands sent during an in-flight jog no longer come back as a string of error:9.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr241">241</a></td></tr>
 </table>
 
 <h3>Machine setup &amp; settings</h3>
@@ -240,6 +243,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>SD Card, Probing, Height Map and Lathe Tools were listed in the Tools menu but greyed out and unclickable; the two that could be opened then crashed on the way in.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr215">215</a></td></tr>
 <tr><td>Park positions checked against the envelope, work origins stored in the right frame, Validate corrected</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr226">226</a></td></tr>
 <tr><td>Probe prompts name the probe and tip, and the corner probe has one code path</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr231">231</a></td></tr>
+<tr><td>Reference points, homed state and the work envelope are mirrored from the real machine onto the simulator.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr242">242</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -307,6 +311,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Engrave text on a Work Order with a single-stroke font and a V-bit</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr222">222</a></td></tr>
 <tr><td>Any installed font, carved to depth-varying passes from its true outlines</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr223">223</a></td></tr>
 <tr><td>Tick Text on a line, circle, oval, square or rectangle and text is fitted inside it</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr224">224</a></td></tr>
+<tr><td>Generate loads the program and takes you to the Job tab, so Run is pressed against what is on screen.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr236">236</a></td></tr>
+<tr><td>V-carving a script font compiles in seconds instead of minutes.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr239">239</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -321,6 +327,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Machine Setup's macro-provisioning gate no longer false-trips when a realtime status report interleaves with the checksum read.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr175">175</a></td></tr>
 <tr><td>Dead time between Setup steps removed, corner retreats cut from 20mm to 5mm, and the ATC macro update no longer wedges the app until it is restarted.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr207">207</a></td></tr>
 <tr><td>Silence is no longer read as a dead link during homing or a firmware upload</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr227">227</a></td></tr>
+<tr><td>A listing that times out is no longer reported as a controller with no files on it.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr243">243</a></td></tr>
+<tr><td>A command answered with an error stops the wait immediately instead of running to timeout.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr244">244</a></td></tr>
 </table>
 
 <h3>Program view &amp; G-code</h3>
@@ -347,6 +355,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>On the Job screen with nothing loaded, the program list's Data column was a sliver with its own heading clipped; it now fills the list.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr217">217</a></td></tr>
 <tr><td>A 220k-line load went from 32s to under 3s, and the console no longer freezes the app</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr229">229</a></td></tr>
 <tr><td>Compile progress and timing, plus an estimated run time for any loaded program</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr230">230</a></td></tr>
+<tr><td>A block ioSender could not parse is now sent verbatim instead of being silently discarded.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr234">234</a></td></tr>
+<tr><td>The board is drawn at its declared size, and says so plainly when nothing declares one.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr237">237</a></td></tr>
+<tr><td>Show the program listing and the 3D view side by side on the Job tab.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr238">238</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -363,6 +374,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>OBS Control panel + F7-F12 hotkeys start/stop the 2 Tapo RTSP cameras and the app screen-capture source individually, filing each take into a named subfolder.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr142">142</a></td></tr>
 <tr><td>Works through the UI feedback Phil Barrett sent after his first sessions with V2.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr190">190</a></td></tr>
 <tr><td>One Top Level Tabs group holds every tab-strip and menu destination; a key reaches its target wherever it currently lives, menu commands can be bound too, and the menu shows the key.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr212">212</a></td></tr>
+<tr><td>Typed commands and streamed programs now share one dispatch path and one pacer.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr240">240</a></td></tr>
 </table>
 
 <h3>Polish, onboarding &amp; docs</h3>
@@ -422,6 +434,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>The machine engine is separated from the desktop UI and compiles as a plain .NET 8 library</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr218">218</a></td></tr>
 <tr><td>A crash log that survives the crash, and three crashes on startup and connect</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr232">232</a></td></tr>
 <tr><td>Fifteen small corrections across windows, offsets, the program list and Work Orders</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr233">233</a></td></tr>
+<tr><td>The pop-up status window stays for a chosen time, takes the screen only for errors, and returns focus on close.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr246">246</a></td></tr>
 </table>
 </div>
 
@@ -696,7 +709,20 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">231</td><td><a href="#pr231">Probing and Setup: say what to fit, and stop parking over the spoilboard</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">19</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+319</span> <span class="del">-303</span></td></tr>
 <tr><td class="n">232</td><td><a href="#pr232">Fix batch: crashes, startup, and the connect path</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+236</span> <span class="del">-45</span></td></tr>
 <tr><td class="n">233</td><td><a href="#pr233">Fix batch: windows, dialogs and small corrections</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">39</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+864</span> <span class="del">-136</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (233 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">2266</span> <span class="del">30</span> <span class="add">+239</span><br><span class="k">Lines:</span> <span class="add">+98560</span> <span class="del">-24206</span></td></tr>
+<tr><td class="n">234</td><td><a href="#pr234">SAFETY: unparseable blocks were silently dropped from the program</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+75</span> <span class="del">-16</span></td></tr>
+<tr><td class="n">235</td><td><a href="#pr235">Connect: the false unexpected-response dialog, and the empty capability set</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+195</span> <span class="del">-19</span></td></tr>
+<tr><td class="n">236</td><td><a href="#pr236">Setup hands the program to the Job tab at Generate</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+373</span> <span class="del">-45</span></td></tr>
+<tr><td class="n">237</td><td><a href="#pr237">3D view: the stock block tells the truth</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">15</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+419</span> <span class="del">-56</span></td></tr>
+<tr><td class="n">238</td><td><a href="#pr238">Job tab: optional split screen</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">19</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+177</span> <span class="del">-6</span></td></tr>
+<tr><td class="n">239</td><td><a href="#pr239">V-carve Generate: 144 s down to 19.6 s, byte-identical output</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+190</span> <span class="del">-42</span></td></tr>
+<tr><td class="n">240</td><td><a href="#pr240">MDI dispatch unified with the streaming pump</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+941</span> <span class="del">-359</span></td></tr>
+<tr><td class="n">241</td><td><a href="#pr241">Jogging: g-code is refused while a jog is outstanding</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+61</span> <span class="del">-1</span></td></tr>
+<tr><td class="n">242</td><td><a href="#pr242">The simulator comes up as the machine actually is</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+431</span> <span class="del">-26</span></td></tr>
+<tr><td class="n">243</td><td><a href="#pr243">Controller filesystem: an unanswered query is unknown, not empty</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+183</span> <span class="del">-26</span></td></tr>
+<tr><td class="n">244</td><td><a href="#pr244">An error is an answer: no more waiting 36 seconds for an ok that never comes</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+94</span> <span class="del">-19</span></td></tr>
+<tr><td class="n">245</td><td><a href="#pr245">The app stops running out of memory during long macro runs</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+18</span> <span class="del">-0</span></td></tr>
+<tr><td class="n">246</td><td><a href="#pr246">Status pop-up: chosen dwell time, errors only, and focus handed back</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+208</span> <span class="del">-34</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (246 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">2335</span> <span class="del">30</span> <span class="add">+246</span><br><span class="k">Lines:</span> <span class="add">+101925</span> <span class="del">-24855</span></td></tr>
 </table>
 </div>
 
@@ -4778,6 +4804,161 @@ filesystem is never enumerated mid-stream, which produced a hard error that kill
 clear an error message; loading a file containing #-expressions failed.</li>
 <li><strong>The Rewind button is removed</strong> &mdash; the mechanism is kept, the button was a trap.</li>
 </ul></div>
+</div>
+<!-- ===== #234 ===== -->
+<div class="pr">
+<h2 id="pr234"><span class="badge">#234</span>SAFETY: a parser gap deleted lines from the program and crashed the machine</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeJob.cs</td><td class="num add">75</td><td class="num del">16</td></tr>
+</table>
+<div class="desc"><p>Loading a program decided what the controller receives by asking whether <strong>ioSender's own parser</strong> understood each line. Anything it could not model, outside a short list of blessed exceptions, was discarded - no error, no log, nothing on the wire. A Setup run lost four lines, one of them a <strong>G59.3</strong> coordinate-system change. The <strong>G0 Z0</strong> that followed then ran in G54, where Z0 was the work origin rather than the toolsetter's top of travel: a 128 mm rapid straight down into the touch plate.</p><ul><li><strong>The default is inverted.</strong> A block the parser cannot make sense of is now streamed verbatim. The controller is the authority on valid g-code - a line it rejects returns an error the sender already surfaces and the run stops, which is loud and attributable. A line silently omitted is a different program from the one the operator approved, and it fails as motion.</li><li><strong>One exception, and it is not stylistic.</strong> The realtime characters <strong>!</strong>, <strong>~</strong> and <strong>?</strong> are acted on by grblHAL the instant they appear anywhere in the stream. Passing those through would turn a stray character in a file into a feed hold mid-cut or an unexpected cycle start. They stay out, and are logged when dropped.</li><li><strong>Nothing is discarded in silence any more.</strong> Every block that fails to parse, and every block lost to an exception, is written to the g-code debug channel.</li><li><strong>Parsing is for the preview, not for transmission.</strong> The parser exists to draw the 3D view and compute the bounding box. A gap in the drawing code has no business editing the program.</li></ul><p class="foot">Verified on the simulator: the toolsetter is probed at G59.3 and the corner at the fence, in that order - before the fix both probes went to the fence. Hardware-verified the same day on a full Setup plus work-order run.</p></div>
+</div>
+<!-- ===== #235 ===== -->
+<div class="pr">
+<h2 id="pr235"><span class="badge">#235</span>A connection whose capabilities were never read</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">125</td><td class="num del">12</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">44</td><td class="num del">2</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">16</td><td class="num del">4</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">10</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>On some startups ioSender announced <strong>Unexpected response received from controller: ok</strong> and offered to exit - about a controller that had just answered a perfect status report. The same fault, on the runs where no dialog appeared, left the sender believing the firmware had no capabilities at all.</p><ul><li><strong>The root cause: the handshake read the wrong line.</strong> It returned the comms layer's last-received line rather than the response its own wait had matched. That field is assigned on the read thread for every line the controller sends, so the app's own follow-up acks overwrote the status report with <strong>ok</strong> in the few statements before it was read back. The handshake now keeps what it matched.</li><li><strong>Which is also why <strong>$I</strong> was never sent.</strong> A failed handshake skips the rest of initialisation, so the capability query never ran and GrblInfo stayed empty - and empty does not read as unknown anywhere, it reads as every capability ABSENT. That is how a controller reporting NGC expression support was told it lacked it, with expressions, ATC, probing and the filesystem all quietly refusing.</li><li><strong>Fail closed if it ever happens again.</strong> A connection whose capabilities were not read is now refused outright rather than carried on blind. Choosing to stay holds the machine in check mode - parsed and acknowledged, never executed - until a connect actually reads them, and the lock is re-asserted if a reset clears it.</li><li><strong>Reconnect now actually reconnects,</strong> and the capability warnings are recomputed when the controller answers instead of being frozen at the moment a tab was first shown.</li></ul><p class="foot">Root-caused from a captured wire log rather than inference; verified across five restarts over both the network and the simulator with no recurrence.</p></div>
+</div>
+<!-- ===== #236 ===== -->
+<div class="pr">
+<h2 id="pr236"><span class="badge">#236</span>Setup hands the program to the Job tab at Generate</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">279</td><td class="num del">39</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">73</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/JobRunner.cs</td><td class="num add">21</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Setup used to switch to the Job tab at the moment the run started, so the program appeared at the same instant the machine began moving. It now follows the Work Order shape: <strong>Generate</strong> makes the program the loaded job and takes the operator there to look at it, and <strong>Run</strong> streams it from where they already are.</p><ul><li><strong>Setup keeps the run bar across the switch.</strong> Everything that makes a probing program safe to stream - the expression-support refusal, comment sanitising, the macro arming that skips the dry-run Z shift, the borrow-and-restore of the previous job, and the height-map pass that follows a clean run - lives on the Setup run path, so ownership is retained rather than handed over.</li><li><strong>The previous job is borrowed exactly once.</strong> Loading at Generate and running afterwards would otherwise push a second snapshot onto the stack and double the watchers; the run now reloads in place instead. A program that is generated and then dropped without ever running hands the previous job back.</li><li><strong>A run that declines to start says why.</strong> Prerequisites unmet, a cancelled confirmation, a busy machine - each previously left the operator watching a Job tab where nothing happened. Every refusal is now reported and logged.</li></ul><p class="foot">Verified on hardware: Generate lands on the Job tab with the program drawn, and the run streams unchanged.</p></div>
+</div>
+<!-- ===== #237 ===== -->
+<div class="pr">
+<h2 id="pr237"><span class="badge">#237</span>3D view: the stock block tells the truth</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC GCodeViewer/CNC GCodeViewer/CarveView.xaml.cs</td><td class="num add">300</td><td class="num del">49</td></tr>
+<tr><td class="mono">CNC GCodeViewer/CNC GCodeViewer/IToolpathView.cs</td><td class="num add">36</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeProgramComments.cs</td><td class="num add">24</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderCompiler.cs</td><td class="num add">17</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobWorkspace.xaml.cs</td><td class="num add">9</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeEmulator.cs</td><td class="num add">8</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml.cs</td><td class="num add">8</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC GCodeViewer/CNC GCodeViewer/CarveView.xaml</td><td class="num add">6</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC GCodeViewer/CNC GCodeViewer/RenderControl.xaml.cs</td><td class="num add">4</td><td class="num del">1</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">7</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>A 6.35 mm board was drawn about 80 mm thick. The declared stock size was being read correctly - it simply was not what decided the block, which took the lower of the declared thickness and the program's bounding box. That box grows from every move the program makes.</p><ul><li><strong>Only a cut may be deeper than the board.</strong> The bounding box counts rapids, the machine-coordinate preamble every work order opens with, and expanded park moves - none of which remove material. The block now takes its depth from cutting moves alone, so a through-cut still pokes out the bottom and nothing else does.</li><li><strong>A probe is not a cut.</strong> Probing moves are reported as feed moves because that is how they draw, which meant a Setup program - whose deepest motion is a toolsetter probe - was drawing an 83 mm slab. They are now marked as probes and excluded.</li><li><strong>No invented boards.</strong> Where the size was unknown the view used to draw a 150x150 stand-in, or a 19 mm thickness under a real footprint - a size nobody supplied and indistinguishable on screen from one that was declared. It now says <strong>No stock size information</strong> and draws nothing.</li><li><strong>The declared board is drawn where it actually is,</strong> from the program's own stock comment or, failing that, from the Setup tab - and the work order compile cache notices when that size changes.</li><li><strong>The carve clears when the program does,</strong> through an interface that cannot silently miss it, so a finished job never leaves a carved surface for the next one to preview onto.</li></ul></div>
+</div>
+<!-- ===== #238 ===== -->
+<div class="pr">
+<h2 id="pr238"><span class="badge">#238</span>Job tab: optional split screen</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobWorkspace.xaml.cs</td><td class="num add">105</td><td class="num del">3</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobWorkspace.xaml</td><td class="num add">25</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">16</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml</td><td class="num add">9</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/UiGeneralConfigControl.xaml</td><td class="num add">1</td><td class="num">0</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales, 2 files each)</td><td class="num add">21</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The Job tab can now show the program listing and the 3D view at the same time rather than one at a time, with a draggable splitter between them. Off by default; turned on in Settings, and the split position is remembered.</p></div>
+</div>
+<!-- ===== #239 ===== -->
+<div class="pr">
+<h2 id="pr239"><span class="badge">#239</span>V-carve Generate: 144 s down to 19.6 s, byte-identical output</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/VCarve.cs</td><td class="num add">162</td><td class="num del">42</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderCompiler.cs</td><td class="num add">28</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Generating a v-carved script font took over two minutes. The distance field it is built on was quadratic per ring and single-threaded.</p><ul><li><strong>Measured, not guessed.</strong> Both initial theories about where the time went were wrong; the cell loop was split into its two calls and timed, and the answer was neither of them.</li><li><strong>The output is byte-identical.</strong> This is purely a speed change - the generated program is unchanged, which is the property that was checked before accepting it.</li></ul></div>
+</div>
+<!-- ===== #240 ===== -->
+<div class="pr">
+<h2 id="pr240"><span class="badge">#240</span>MDI dispatch unified with the streaming pump</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/WirePacer.cs</td><td class="num add">361</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/MdiDispatcher.cs</td><td class="num add">216</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/StreamPump.cs</td><td class="num add">137</td><td class="num del">221</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/JobRunner.cs</td><td class="num add">23</td><td class="num del">127</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">3</td><td class="num del">1</td></tr>
+<tr><td class="mono">docs/Architecture-MDI-Dispatch-Unification.md</td><td class="num add">201</td><td class="num del">2</td></tr>
+</table>
+<div class="desc"><p>Typed MDI commands went out through their own send path, with their own flow control, alongside the streaming pump that runs programs. The pacing logic is now a shared primitive and the separate MDI send path is gone.</p><ul><li><strong>Two behaviour changes are deliberate.</strong> Both are recorded in the architecture note that ships with this change, along with the wire-level checks used to accept it.</li><li><strong>Probing is the caller that matters,</strong> since it drives the machine from typed commands; its behaviour was verified on the wire rather than by reading.</li></ul></div>
+</div>
+<!-- ===== #241 ===== -->
+<div class="pr">
+<h2 id="pr241"><span class="badge">#241</span>Jogging: g-code is refused while a jog is outstanding</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">36</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/JogGate.cs</td><td class="num add">25</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>A g-code command issued while a jog was still in flight was rejected by the controller with <strong>error:9</strong>, once per command, with nothing on screen to explain why. Such commands are now held off until the jog completes rather than sent to be refused.</p></div>
+</div>
+<!-- ===== #242 ===== -->
+<div class="pr">
+<h2 id="pr242"><span class="badge">#242</span>The simulator comes up as the machine actually is</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineOffsets.cs</td><td class="num add">379</td><td class="num del">13</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SimulatorManager.cs</td><td class="num add">19</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">13</td><td class="num del">6</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml.cs</td><td class="num add">13</td><td class="num del">6</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">7</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>Rehearsing a job on the simulator only proves something if the simulated machine resembles the real one. The real machine's reference points are now captured whenever it is connected, and stamped onto the simulator whenever one is - exactly one of those happens per connection.</p><ul><li><strong>It boots homed when the machine is,</strong> so the work envelope and soft limits behave as they do on iron rather than refusing motion from an unhomed state.</li><li><strong>The geometry is written before the running check,</strong> and the simulator is restarted for it, so a mirrored change actually takes effect instead of landing in a config the running instance already read.</li><li><strong>One banner per launch.</strong> The simulator setup file was accumulating a fresh banner on every connect.</li></ul></div>
+</div>
+<!-- ===== #243 ===== -->
+<div class="pr">
+<h2 id="pr243"><span class="badge">#243</span>Controller filesystem: an unanswered query is unknown, not empty</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblSDCard.cs</td><td class="num add">114</td><td class="num del">17</td></tr>
+<tr><td class="mono">tools/gen-sim-macros.py</td><td class="num add">69</td><td class="num del">9</td></tr>
+</table>
+<div class="desc"><p>A filesystem listing that went unanswered - because the controller was busy homing, for instance - came back as an empty result, and empty was then reported as fact: <strong>no ATC macros found</strong> on a controller that had them. Three separate places made that same substitution.</p><ul><li><strong>Unknown is now distinct from empty,</strong> and reported as such, so a timed-out query no longer becomes a confident negative.</li><li><strong>A listing already in flight keeps checking whether a job has started,</strong> rather than deciding once on entry - listing the filesystem mid-stream collides with the running job and returns error:9.</li><li><strong>Generated macros match the file byte for byte,</strong> so what is compared against the controller is what was actually written.</li></ul></div>
+</div>
+<!-- ===== #244 ===== -->
+<div class="pr">
+<h2 id="pr244"><span class="badge">#244</span>An error is an answer: no more waiting 36 seconds for an ok that never comes</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Common/HelperClasses.cs</td><td class="num add">51</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblSDCard.cs</td><td class="num add">43</td><td class="num del">19</td></tr>
+</table>
+<div class="desc"><p>The wait for a controller acknowledgement returned only on a literal <strong>ok</strong>. An <strong>error</strong> reply - which is just as final an answer - was ignored, and because the timeout was measured per message rather than per command, ordinary status polling reset it indefinitely. One such wait held for 36 seconds against a controller that had already answered.</p><ul><li><strong>An error now completes the wait,</strong> and is reported as the outcome.</li><li><strong>The timeout bounds the whole command,</strong> so unrelated traffic cannot extend it.</li></ul></div>
+</div>
+<!-- ===== #245 ===== -->
+<div class="pr">
+<h2 id="pr245"><span class="badge">#245</span>The app stops running out of memory during long macro runs</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/UiPump.cs</td><td class="num add">18</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Several long-running operations keep the UI responsive by pumping messages in a tight loop while they wait. Unbounded, that loop allocates fast enough to reach the 32-bit address-space ceiling - the app died at around 3.2 GB more than once. The pump now yields between passes, which bounds the allocation rate without changing responsiveness.</p><p class="foot">Not yet soak-tested over a multi-hour session.</p></div>
+</div>
+<!-- ===== #246 ===== -->
+<div class="pr">
+<h2 id="pr246"><span class="badge">#246</span>Status pop-up: chosen dwell time, errors only, and focus handed back</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WindowFocusReturn.cs</td><td class="num add">115</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">51</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">11</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ViewHostWindow.xaml.cs</td><td class="num add">6</td><td class="num del">26</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/UiGeneralConfigControl.xaml</td><td class="num add">6</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/App.xaml.cs</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">14</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Three corrections to windows that appear over the main one.</p><ul><li><strong>The pop-up status window's dwell time is a setting,</strong> rather than a fixed interval that was too short for some operators and too long for others.</li><li><strong>Only errors take the screen.</strong> Routine messages no longer raise the window over whatever is being worked on.</li><li><strong>Every pop-up hands focus back to ioSender when it closes,</strong> so the keyboard does not end up pointed at a window that is no longer there.</li></ul></div>
 </div>
 </section>
 
