@@ -552,12 +552,17 @@ namespace GCode_Sender
 
                     Controller.RestartResult restartResult = Controller.Restart();
 
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("connect", string.Format("Restart() -> {0}  (isBooted={1})", restartResult, isBooted));
+
                     switch (restartResult)
                     {
                         case Controller.RestartResult.Ok:
                             if (!isBooted)
                                 Dispatcher.BeginInvoke(new System.Action(() => OnBooted()), DispatcherPriority.ApplicationIdle);
                             initOK = InitSystem();
+                            if (DebugLog.Enabled)
+                                DebugLog.Write("connect", string.Format("InitSystem() -> {0}, GrblInfo.IsLoaded={1}", initOK, GrblInfo.IsLoaded));
                             break;
 
                         case Controller.RestartResult.Close:
@@ -579,7 +584,29 @@ namespace GCode_Sender
                     // InitSystem() - Ok alone only means the controller answered. NoResponse used to fall through
                     // this switch unannounced (the GrblInfo.IsLoaded reconnect branches all blank the response
                     // rather than raising a dialog), and silence there is the worst of the three outcomes.
-                    if (!string.IsNullOrEmpty(Controller.Message))
+                    // A connection whose capabilities were never read is worse than no connection. GrblInfo
+                    // empty does not read as "unknown" anywhere downstream - it reads as every capability
+                    // ABSENT, so expressions, ATC, probing and the filesystem all quietly refuse, each with
+                    // its own confident message about what this controller does not support. Observed
+                    // 2026-08-12 on both hardware and the simulator: "$I" was never sent, and the Setup tab
+                    // insisted the firmware lacked NGC expressions while that same firmware reported EXPR.
+                    //
+                    // So refuse the connection outright rather than carrying on blind, and deliberately
+                    // WITHOUT a "continue anyway" button: there is nothing useful to continue into, and the
+                    // alternative to guessing capabilities is not guessing them optimistically - assuming
+                    // EXPR is present would stream o-word flow control to a controller that may not take it,
+                    // which wedges grblHAL outright. Reconnecting is the recovery, and it works.
+                    if (restartResult == Controller.RestartResult.Ok && !GrblInfo.IsLoaded)
+                    {
+                        if (DebugLog.Enabled)
+                            DebugLog.Write("connect", "REFUSED - connected but $I never loaded; disconnecting");
+                        MainWindow.ui.DisconnectAfterFailedHandshake();
+                        AppDialogs.Show("Could not read this controller's capabilities ($I), so ioSender has disconnected.\r\n\r\n" +
+                                        "Nothing is wrong with the controller - the query went unanswered during connect. Connect again.",
+                                        "ioSender - connect failed", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                        model.Message = "Connect failed - the controller's capabilities ($I) could not be read. Connect again.";
+                    }
+                    else if (!string.IsNullOrEmpty(Controller.Message))
                         model.Message = Controller.Message;
                     else if (restartResult == Controller.RestartResult.Ok && initOK == true)
                         model.Message = string.Format((string)FindResource("MsgConnected"), AppConfig.Settings.Base.PortParams);
@@ -741,8 +768,17 @@ namespace GCode_Sender
             initOK = true;
             int timeout = 5;
 
-            if (isBooted && model.GrblState.State == GrblStates.Home)
+            // The shortcut for "already up, controller is mid-homing" must not also skip the one thing
+            // this method exists for. Without the IsLoaded test it returns SUCCESS having never sent $I,
+            // leaving GrblInfo empty - and an empty GrblInfo does not read as "unknown", it reads as
+            // every capability ABSENT: no expressions, no ATC, no probes, no filesystem. That is how a
+            // controller which reports EXPR perfectly well was told it lacks expression support.
+            if (isBooted && model.GrblState.State == GrblStates.Home && GrblInfo.IsLoaded)
                 return true;
+
+            if (DebugLog.Enabled)
+                DebugLog.Write("connect", string.Format("InitSystem: enter - isBooted={0} state={1} GrblInfo.IsLoaded={2}",
+                    isBooted, model.GrblState.State, GrblInfo.IsLoaded));
 
             using (new UIUtils.WaitCursor())
             {
@@ -751,9 +787,13 @@ namespace GCode_Sender
                 {
                     if(--timeout == 0)
                     {
+                        if (DebugLog.Enabled)
+                            DebugLog.Write("connect", "InitSystem: FAILED - $I went unanswered after 5 attempts");
                         model.Message = (string)FindResource("MsgNoResponse");
                         return false;
                     }
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("connect", string.Format("InitSystem: $I unanswered, retrying ({0} left)", timeout));
                     Thread.Sleep(500);
                 }
                 GrblAlarms.Get();

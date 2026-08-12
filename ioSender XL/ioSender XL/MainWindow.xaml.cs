@@ -2009,6 +2009,15 @@ namespace GCode_Sender
             UpdateSimulatorTint();
         }
 
+        /// <summary>
+        /// Drop a connection that came up without readable capabilities (see JobView's own comment).
+        /// Same teardown as the menu's Disconnect - this exists only so that path can reach it.
+        /// </summary>
+        internal void DisconnectAfterFailedHandshake()
+        {
+            Disconnect();
+        }
+
         private void Disconnect()
         {
             if (Comms.com == null || !Comms.com.IsOpen)
