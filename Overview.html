@@ -154,7 +154,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>257 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>259 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -173,6 +173,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>The connect handshake no longer fails a healthy controller, and refuses to carry on blind if it does.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr235">235</a></td></tr>
 <tr><td>The UI pump no longer spins unbounded, which twice reached the 32-bit ceiling and killed the app.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr245">245</a></td></tr>
 <tr><td>A controller wait whose worker threw would spin for ever &mdash; responsive, and completely ignoring you. Forty of them now end.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr253">253</a></td></tr>
+<tr><td>A controller that stopped answering could freeze the sender for the rest of the session; a settings write that was never acknowledged reported success anyway. Both fixed.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr258">258</a></td></tr>
 </table>
 
 <h3>Jogging &amp; main page</h3>
@@ -321,6 +322,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Tick Text on a line, circle, oval, square or rectangle and text is fitted inside it</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr224">224</a></td></tr>
 <tr><td>Generate loads the program and takes you to the Job tab, so Run is pressed against what is on screen.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr236">236</a></td></tr>
 <tr><td>V-carving a script font compiles in seconds instead of minutes.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr239">239</a></td></tr>
+<tr><td>Tick Corner reliefs on a square or rectangular toolpath and its pocket gets a dogbone in each inside corner, so a square-cornered part drops in instead of fouling on the radius a round cutter leaves.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr259">259</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -744,7 +746,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">255</td><td><a href="#pr255">F12 opens the MDI console; Esc dismisses it, as everywhere else</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">14</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+124</span> <span class="del">-112</span></td></tr>
 <tr><td class="n">256</td><td><a href="#pr256">Console search now highlights every match</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+218</span> <span class="del">-1</span></td></tr>
 <tr><td class="n">257</td><td><a href="#pr257">Settings search points at the match on the page, not just at the page</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+321</span> <span class="del">-39</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (257 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">2393</span> <span class="del">30</span> <span class="add">+249</span><br><span class="k">Lines:</span> <span class="add">+103843</span> <span class="del">-25345</span></td></tr>
+<tr><td class="n">258</td><td><a href="#pr258">Bounded controller ack waits; an unanswered settings write reports instead of hanging</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">8</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+153</span> <span class="del">-89</span></td></tr>
+<tr><td class="n">259</td><td><a href="#pr259">Corner reliefs (dogbones) on square and rectangular pockets</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+108</span> <span class="del">-6</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (259 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">2413</span> <span class="del">30</span> <span class="add">+249</span><br><span class="k">Lines:</span> <span class="add">+104104</span> <span class="del">-25440</span></td></tr>
 </table>
 </div>
 
@@ -5114,6 +5118,36 @@ clear an error message; loading a file containing #-expressions failed.</li>
 <tr><td class="mono">CNC Controls/CNC Controls/ElementHighlightAdorner.cs</td><td class="num add">125</td><td class="num del">20</td></tr>
 </table>
 <div class="desc"><p>Searching the settings list narrowed it to the right pages and stopped there. Opening one of them left you to find the word yourself &mdash; and the search also matches tooltip text, so a page could be a genuine hit with the word nowhere on screen at all. The tree explained that in words; explaining is not pointing.</p><ul><li><strong>Choosing a page now marks every control on it that matched</strong> and scrolls the first into view. Captions, group headers, text boxes, checkbox and button labels, and tooltips all count.</li><li><strong>A tooltip-only hit is drawn dashed</strong> rather than solid, so you can tell at a glance that the reason is hidden and the control is worth hovering &mdash; instead of a highlight that looks simply wrong. Tooltip text itself is left exactly as written.</li><li><strong>It scrolls to a hit you can read.</strong> If a page has both kinds, the visible one wins the scroll; landing on an invisible match while the word sits in plain sight further down is the same confusion in smaller form.</li><li><strong>A page that matched but could not be marked says so in the log</strong> rather than showing nothing, which would be indistinguishable from the bug this fixes.</li></ul><p>The <code>$</code>-setting search on the controller settings page is untouched; it already highlighted its matches.</p><p class="foot">Marks are drawn over the page rather than by restyling it, so no settings panel had to be touched, and none can lose the highlight to a background of its own.</p></div>
+</div>
+<!-- ===== #258 ===== -->
+<div class="pr">
+<h2 id="pr258"><span class="badge">#258</span>Controller ack waits are bounded &mdash; and a settings write that never got an answer now says so</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/Comms.cs</td><td class="num add">55</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/SerialStream.cs</td><td class="num add">16</td><td class="num del">21</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/TelnetStream.cs</td><td class="num add">19</td><td class="num del">17</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/WebsocketStream.cs</td><td class="num add">19</td><td class="num del">18</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/EltimaStream.cs</td><td class="num add">16</td><td class="num del">21</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">15</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/PIDLogView.xaml.cs</td><td class="num add">11</td><td class="num del">1</td></tr>
+<tr><td class="mono">tools/delta-probe/Program.cs</td><td class="num add">2</td><td class="num del">4</td></tr>
+</table>
+<div class="desc"><p>Each of the four connection types (serial, Telnet, websocket, Eltima) waited for the controller to acknowledge a command by spinning on a state flag with no clock on it. If the answer never came the wait never ended, and since it ran on the UI thread the sender froze until it was killed and restarted. Two of those loops span with no message pump and no sleep at all, so on a Telnet or websocket link the same operation froze the window solid and saturated a CPU core, where the serial and Eltima paths merely waited &mdash; the same action behaving differently depending on how the machine was connected.</p><ul><li><strong>Every ack wait is now capped</strong> at five seconds and pumps the UI on all four connection types. The cap sits deliberately above the shorter per-operation timeouts already in use, so it acts only as a last resort for a wait that would otherwise never end &mdash; not as a limit on a controller that is merely slow. Nothing that legitimately goes quiet for minutes, such as a homing cycle or a file upload, waits on it.</li><li><strong>A settings write that gets no answer is now reported as an error</strong> and the setting stays pending. Previously the code read back a shared "last reply" value that still held some earlier exchange's response, and reported <em>that</em> as the outcome &mdash; so a setting the controller may never have accepted was marked written and taken as the new baseline. This was unreachable while the wait was unbounded, because it hung rather than reaching the check.</li><li><strong>The PID log plot</strong> gives up cleanly instead of parsing a half-collected report.</li><li>Eight of the eighteen wait loops had no callers at all and were removed rather than repaired.</li></ul><p class="foot">The unbounded waits had been a known hazard for some time; an earlier fix capped two of them in the file-upload path and another reduced what the spinning cost, but neither addressed the loops that could never end.</p></div>
+</div>
+<!-- ===== #259 ===== -->
+<div class="pr">
+<h2 id="pr259"><span class="badge">#259</span>Corner reliefs &mdash; cut a pocket a square part will actually seat in</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OddJobsGeometry.cs</td><td class="num add">38</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderCompiler.cs</td><td class="num add">22</td><td class="num del">5</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml.cs</td><td class="num add">18</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderModel.cs</td><td class="num add">10</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml</td><td class="num add">6</td><td class="num">0</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">14</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>A round cutter cannot leave a square inside corner. Pocket a 50&nbsp;&times;&nbsp;30 recess for a 50&nbsp;&times;&nbsp;30 inlay and the part will not seat: each corner carries a radius equal to the cutter's, and the square corners of the part foul on it. The usual answer is a relief cut &mdash; a dogbone &mdash; that removes the material the corner needs, and it is now a checkbox.</p><ul><li><strong>Corner reliefs</strong> appears on Square and Rect toolpaths (nothing else has corners). Ticked, the wall pass pokes out along each corner's diagonal until the cutter's circle passes through the true corner point, then comes straight back and carries on. Each wall gets a small round nick just under a third of the cutter radius deep &mdash; that is the trade, and it is why the box is off by default.</li><li><strong>The relief is sized by the cutter, not the shape</strong>, so the same rectangle roughed with a quarter-inch bit and finished with an eighth gets the right relief in each case.</li><li><strong>It lands on whichever pass leaves the final wall.</strong> Where a Side finish is present the pocket stands down and the finish pass cuts the reliefs, so a wall still holding stock for finishing is not cut away early.</li><li><strong>Contour is untouched.</strong> It is the external operation, cutting a part free rather than a recess into one; its corners are convex, a round cutter already reproduces them exactly, and there is nothing there to relieve.</li></ul><p class="foot">Verified on a cut pocket, not only in the preview.</p></div>
 </div>
 </section>
 
