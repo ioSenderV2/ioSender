@@ -761,7 +761,7 @@ namespace CNC.Controls
             { "Spindle override", "Real-time override of spindle speed." },
             { "Coolant & aux", "Toggle coolant outputs and the auxiliary fan." },
             { "Zeroing", "Set the work-coordinate zero for an axis (or all axes)." },
-            { "Program", "Program-level toggles (optional stop, single block, probe state) and the console window." },
+            { "Program", "Program-level toggles (optional stop, single block, probe state), the console window, and the run strip's MDI and Status buttons." },
             { "Probing", "Start or stop probing and toggle the probe-connected state." },
             { "3D view", "Control the 3D tool-path viewer." },
             { TopLevelGroup, "Everything on the top-level tab strip and in the menus, in one list. A key reaches its target wherever that target currently lives - as a tab or as a menu entry - so moving something in Settings > Top-level tabs never costs it its shortcut. All unbound by default; a menu command that is greyed out does nothing." },

@@ -53,6 +53,13 @@ namespace CNC.Controls
             new ActionInfo { Id = "ObsAppStart",  Label = "OBS: App/screen capture - Start recording", DefaultKey = Key.F7,  DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
             new ActionInfo { Id = "ObsAppStop",   Label = "OBS: App/screen capture - Stop recording",  DefaultKey = Key.F8,  DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
 
+            // Run-strip buttons as bindable actions ("Program" group - KeyMapEditor.Categorize routes an
+            // ActionKeyBinder row by the Group named here). Unbound by default for the same reason as the
+            // menu commands below. The handlers live in MainWindow and press the very button they name, so
+            // there is one implementation of each and the key cannot drift from the button.
+            new ActionInfo { Id = "Program.Mdi",    Label = "MDI (open console for input)", Group = "Program", Description = "Press the run strip's MDI button: open the console with the caret in its input box, ready to type. Never hides it - Esc closes it." },
+            new ActionInfo { Id = "Program.Status", Label = "Status (message history)",     Group = "Program", Description = "Press the run strip's Status button: show the status message history since launch." },
+
             // Main-menu commands. All unbound by default (DefaultKey = None) - these are conveniences, and
             // grabbing keys for them uninvited would collide with whatever the operator already uses. The
             // handlers live in MainWindow, which registers each one against the SAME menu item it drives and

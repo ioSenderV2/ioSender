@@ -3508,6 +3508,27 @@ namespace GCode_Sender
             registerMenuAction("Menu.RollBack", menuRollbackVersion, () => rollbackVersion_Click(null, null));
             registerMenuAction("Menu.OpenDataFolder", menuOpenConfigFolder, () => openConfigFolderMenuItem_Click(null, null));
             registerMenuAction("Menu.About", menuAbout, () => aboutMenuItem_Click(null, null));
+
+            // Run-strip buttons ("Program" group). Same contract as the menu commands: press the actual
+            // button's own handler rather than reimplementing it, and refuse while that button is disabled
+            // so a key can never do what a click currently cannot.
+            registerButtonAction("Program.Mdi", btnMdiConsole, () => MdiConsole_Click(null, null));
+            registerButtonAction("Program.Status", btnViewStatus, () => ViewStatus_Click(null, null));
+        }
+
+        // The button counterpart of registerMenuAction. These live on the run strip rather than in the menu
+        // bar, so there is no menuMain gate to consult - the button's own IsEnabled is the whole condition,
+        // and it stays live mid-job (unlike the menu, which disables wholesale while a job runs: reaching
+        // the MDI console and the message history is exactly what you want DURING a run).
+        private void registerButtonAction(string id, System.Windows.Controls.Button button, System.Action invoke)
+        {
+            ActionKeyBinder.Register(id, k =>
+            {
+                if (button == null || !button.IsEnabled)
+                    return false;
+                invoke();
+                return true;
+            });
         }
 
         // Refuse the shortcut whenever the menu bar is disabled (menuMain's IsEnabled is bound to
