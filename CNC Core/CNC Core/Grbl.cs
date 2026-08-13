@@ -3177,6 +3177,55 @@ namespace CNC.Core
                 handler(null, EventArgs.Empty);
         }
 
+        /// <summary>
+        /// Record a "$n=value" the controller has just accepted from OUTSIDE the settings UI - the MDI, the
+        /// console, a macro. Those never go through Save() or a $$ reload, so before this nothing here knew
+        /// the machine had changed: the cached value stayed at whatever the last $$ said, for the rest of the
+        /// session, and every consumer of it was quietly wrong.
+        ///
+        /// Observed 2026-08-12: "$132=120" typed at the MDI, acked ok, and Machine Setup went on showing 152
+        /// - correctly, because that IS what this collection still held. GrblInfo.MaxTravel is derived from
+        /// here too, so the jog envelope clamp was working from the old number as well.
+        ///
+        /// Called from the MDI dispatcher's ack path, which is the one place that sees both the command and
+        /// its reply. Only an "ok" counts - a rejected write changed nothing.
+        /// </summary>
+        public static void NoteExternalWrite(string command, string reply)
+        {
+            if (string.IsNullOrWhiteSpace(command) || reply == null ||
+                 !reply.Trim().Equals("ok", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var m = System.Text.RegularExpressions.Regex.Match(command.Trim(), @"^\$(\d+)\s*=\s*(\S.*?)\s*$");
+            if (!m.Success)
+                return;   // a query ("$132"), a jog, a command - not a setting write
+
+            int id;
+            if (!int.TryParse(m.Groups[1].Value, out id))
+                return;
+            string value = m.Groups[2].Value;
+
+            // The ack arrives on the pacer thread; these are view models with UI-affine notifications, and
+            // GrblInfo re-derivation touches the view model. Post, never Send - a context Send can run
+            // inline (see UiContext), and this is called from inside reply handling.
+            UiContext.Post(() =>
+            {
+                var detail = Settings.FirstOrDefault(s => s.Id == id);
+                if (detail == null || detail.Value == value)
+                    return;
+
+                detail.Value = value;
+                detail.SetLoadedBaseline();   // the controller holds this now - not a pending local edit
+
+                // Re-derive the cached projections (MaxTravel, homing direction, step resolution). The jog
+                // clamp and the 3D machine frame read those, not the collection.
+                if (Grbl.GrblViewModel != null)
+                    GrblInfo.OnSettingsLoaded(Grbl.GrblViewModel);
+
+                RaiseSettingsReloaded();
+            });
+        }
+
         public static GrblSettingDetails Get(GrblSetting key)
         {
             return Settings.Where(x => x.Id == ((int)key)).FirstOrDefault();

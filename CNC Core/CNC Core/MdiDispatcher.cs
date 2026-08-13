@@ -118,6 +118,11 @@ namespace CNC.Core
             if (DebugLog.Enabled)
                 DebugLog.Write("jobrunner", string.Format("MDI ACKED \"{0}\" -> {1} after {2:F0}ms", done.Text, reply, done.AgeMs));
 
+            // A "$n=value" typed at the MDI changes the machine without going anywhere near the settings UI,
+            // so nothing refreshed the cached copy - this is the one place that sees the command and its
+            // reply together. No-op for everything that is not an accepted setting write.
+            GrblSettings.NoteExternalWrite(done.Text, reply);
+
             DispatchNext();
         }
 
