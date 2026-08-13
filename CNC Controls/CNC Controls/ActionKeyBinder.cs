@@ -57,7 +57,12 @@ namespace CNC.Controls
             // ActionKeyBinder row by the Group named here). Unbound by default for the same reason as the
             // menu commands below. The handlers live in MainWindow and press the very button they name, so
             // there is one implementation of each and the key cannot drift from the button.
-            new ActionInfo { Id = "Program.Mdi",    Label = "MDI (open console for input)", Group = "Program", Description = "Press the run strip's MDI button: open the console with the caret in its input box, ready to type. Never hides it - Esc closes it." },
+            // F12 by default - the key the retired "Toggle console window" action used, pointed at the
+            // console's replacement. An upgrading profile has no Program.Mdi row yet, so SeedDefaults gives it
+            // F12 and the key keeps reaching the console; it now OPENS it (Esc dismisses, as everywhere else)
+            // instead of toggling. A profile that has already bound this action keeps whatever it chose -
+            // SeedDefaults only seeds an Id that is entirely absent.
+            new ActionInfo { Id = "Program.Mdi",    Label = "MDI (open console for input)", DefaultKey = Key.F12, Group = "Program", Description = "Press the run strip's MDI button: open the console with the caret in its input box, ready to type. Never hides it - Esc closes it." },
             new ActionInfo { Id = "Program.Status", Label = "Status (message history)",     Group = "Program", Description = "Press the run strip's Status button: show the status message history since launch." },
 
             // Main-menu commands. All unbound by default (DefaultKey = None) - these are conveniences, and

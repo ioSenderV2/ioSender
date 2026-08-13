@@ -63,14 +63,16 @@ namespace CNC.Controls
         ///
         /// It used to happen for free, because Esc WAS the global console toggle - so when that moved to F12
         /// (2026-08-03, Esc being swallowed app-wide was costing it its real job) this window lost its close
-        /// key and needed its own handler.
+        /// key and needed its own handler. Esc is now the ONLY way to dismiss from the keyboard: the toggle
+        /// was retired 2026-08-13 and F12 defaults to the MDI action, which opens the console but never hides
+        /// it. That is the point - every other floating window here dismisses on Esc, and this one now agrees.
         ///
         /// Deliberately the BUBBLING KeyDown, not PreviewKeyDown: preview tunnels from the root down, so it
         /// would beat the command box's own Esc-clears-the-line binding. Bubbling means the input gets first
         /// refusal and this only runs when nothing else wanted the key.
         ///
-        /// Hide(), not Close(): matches the F12 toggle and the window's X (see Window_Closing), both of which
-        /// keep the instance and its scrollback alive.
+        /// Hide(), not Close(): matches the window's X (see Window_Closing), which also keeps the instance and
+        /// its scrollback alive.
         /// </summary>
         protected override void OnKeyDown(System.Windows.Input.KeyEventArgs e)
         {
