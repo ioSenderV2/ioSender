@@ -350,6 +350,7 @@ namespace CNC.Controls
                 Text = tp.Text, CapHeight = tp.CapHeight,
                 FontFamily = tp.FontFamily, FontBold = tp.FontBold, FontItalic = tp.FontItalic,
                 HasText = tp.HasText, TextHAlign = tp.TextHAlign, TextVAlign = tp.TextVAlign,
+                CornerReliefs = tp.CornerReliefs,
                 Pattern = tp.Pattern,
                 Columns = tp.Columns, RowSpacing = tp.RowSpacing, ColumnSpacing = tp.ColumnSpacing, Rows = tp.Rows,
                 PatternCount = tp.PatternCount, PatternRadius = tp.PatternRadius,
@@ -840,6 +841,11 @@ namespace CNC.Controls
             Show(fldLength, isLine);
             // The baseline angle is the same field a Line uses - degrees from +X - so Text just shows it too.
             Show(fldAngle, isLine || isText);
+            // Corner reliefs need corners: Square/Rect only. A circle or oval has none, a Line and Text
+            // have no interior at all.
+            bool canRelieveCorners = tp.Geometry == WorkOrderGeometryKind.Square || tp.Geometry == WorkOrderGeometryKind.Rect;
+            Show(pnlCornerReliefsRow, canRelieveCorners);
+            chkCornerReliefs.IsChecked = tp.CornerReliefs;
             Show(pnlHasTextRow, canShapeText);
             chkHasText.IsChecked = tp.HasText;
             Show(pnlTextRow, showText);
@@ -1098,6 +1104,18 @@ namespace CNC.Controls
 
             // The op list changed shape, and the text fields' visibility follows the checkbox.
             RebuildTree(tp);
+            OnWorkOrderChanged();
+        }
+
+        // Corner reliefs on/off. Unlike shape text this adds no operation - it only changes the wall path
+        // the existing Pocket/Side finish already cut, so committing the flag and redrawing is all of it.
+        private void chkCornerReliefs_Click(object sender, RoutedEventArgs e)
+        {
+            var tp = selectedToolpath;
+            if (loadingFields || tp == null)
+                return;
+
+            tp.CornerReliefs = chkCornerReliefs.IsChecked == true;
             OnWorkOrderChanged();
         }
 

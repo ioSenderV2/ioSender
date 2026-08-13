@@ -202,6 +202,16 @@ namespace CNC.Controls
         public WorkOrderTextHAlign TextHAlign = WorkOrderTextHAlign.Center;
         public WorkOrderTextVAlign TextVAlign = WorkOrderTextVAlign.Center;
 
+        // Corner reliefs ("dogbones") - Square/Rect only. A round cutter leaves a radiused inside corner,
+        // so a square-cornered part will not seat in the pocket it was cut for. Ticking this pokes the
+        // cutter out along each corner's diagonal far enough that its circle passes through the true
+        // corner point, clearing the material a square peg needs. Costs a visible round nick in both
+        // walls at each corner - that is the trade, and it is why this is opt-in rather than always on.
+        // Only concave corners can be relieved, so this is read by the INTERNAL wall passes (Pocket,
+        // Side finish) and ignored by Contour, whose corners are convex and already cut exactly.
+        // See OddJobsGeometry.RectPoints' dogboneReach for the geometry.
+        public bool CornerReliefs = false;
+
         /// <summary>True when this toolpath's text is drawable at all (its own Text kind, or shape text).</summary>
         public bool UsesText { get { return Geometry == WorkOrderGeometryKind.Text || (HasText && WorkOrderRules.SupportsShapeText(Geometry)); } }
 

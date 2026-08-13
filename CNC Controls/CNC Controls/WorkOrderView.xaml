@@ -127,6 +127,12 @@
                              fitted INSIDE the shape (WorkOrderTextFit). They sit after the dimensions because
                              for a shape the text is an addition to it; the Text kind hides the dimensions, so
                              its layout reads the same as ever. -->
+                        <!-- Square/Rect only: a round cutter cannot leave a square inside corner, so a
+                             square part will not seat in the pocket cut for it. See WorkOrderToolpath.CornerReliefs. -->
+                        <StackPanel x:Name="pnlCornerReliefsRow" Orientation="Horizontal" Margin="154,2,0,2">
+                            <CheckBox x:Uid="chk_wocornerreliefs" x:Name="chkCornerReliefs" Content="Corner reliefs" VerticalAlignment="Center" Click="chkCornerReliefs_Click"
+                                      ToolTip="Cut a dogbone relief into each inside corner so a square-cornered part actually seats in the pocket. The cutter pokes out along each corner's diagonal until its circle reaches the true corner, leaving a small round nick in both walls. Applies to the pocket and side finish walls; a contour's corners are already cut exactly and are left alone."/>
+                        </StackPanel>
                         <StackPanel x:Name="pnlHasTextRow" Orientation="Horizontal" Margin="154,2,0,2">
                             <CheckBox x:Uid="chk_wohastext" x:Name="chkHasText" Content="Text" VerticalAlignment="Center" Click="chkHasText_Click"
                                       ToolTip="Engrave text fitted inside this shape. The shape itself still cuts exactly as before - ticking this adds a V-bit Engrave operation that cuts the text. Leave Cap height 0 to size the text to the largest that fits."/>

@@ -120,8 +120,18 @@ namespace CNC.Controls
         // The nominal outline of a toolpath's geometry centered on (cx,cy) - a pattern instance position, which
         // for an unpatterned toolpath is just its own X/Y - offset inward by `inset` (a tool-center offset).
         // Closed shapes come back closed (last point == first); a Line comes back open.
-        private static List<double[]> Outline(WorkOrderToolpath tp, double cx, double cy, double inset)
+        // reliefToolRadius > 0 asks for corner reliefs on a Square/Rect that has them ticked - pass the
+        // cutter radius from an INTERNAL wall pass (Pocket, Side finish) and 0 everywhere else. It is a
+        // parameter rather than something read off `tp` because the relief is sized by the CUTTER, which
+        // belongs to the operation: the same rectangle roughed with a 1/4" and finished with a 1/8" wants
+        // two different reliefs. Contour passes 0 - its corners are convex (see IsInternalFeature) and a
+        // round cutter already reproduces them exactly, so there is nothing there to relieve.
+        private static List<double[]> Outline(WorkOrderToolpath tp, double cx, double cy, double inset, double reliefToolRadius = 0d)
         {
+            double reach = tp.CornerReliefs && reliefToolRadius > 0d
+                            ? OddJobsGeometry.DogboneReachFor(reliefToolRadius, inset)
+                            : 0d;
+
             switch (tp.Geometry)
             {
                 case WorkOrderGeometryKind.Line:
@@ -138,9 +148,9 @@ namespace CNC.Controls
                 case WorkOrderGeometryKind.Oval:
                     return OddJobsGeometry.EllipsePoints(cx, cy, Math.Max(0.1d, tp.Width / 2d - inset), Math.Max(0.1d, tp.Depth / 2d - inset), CircleSegments);
                 case WorkOrderGeometryKind.Square:
-                    return OddJobsGeometry.RectPoints(cx, cy, Math.Max(0.1d, tp.Size / 2d - inset), Math.Max(0.1d, tp.Size / 2d - inset), SegmentMm);
+                    return OddJobsGeometry.RectPoints(cx, cy, Math.Max(0.1d, tp.Size / 2d - inset), Math.Max(0.1d, tp.Size / 2d - inset), SegmentMm, reach);
                 default:
-                    return OddJobsGeometry.RectPoints(cx, cy, Math.Max(0.1d, tp.Width / 2d - inset), Math.Max(0.1d, tp.Depth / 2d - inset), SegmentMm);
+                    return OddJobsGeometry.RectPoints(cx, cy, Math.Max(0.1d, tp.Width / 2d - inset), Math.Max(0.1d, tp.Depth / 2d - inset), SegmentMm, reach);
             }
         }
 
@@ -440,7 +450,11 @@ namespace CNC.Controls
         {
             var lines = new List<string>();
             double wallLeave = WallLeave(tp);
-            var wall = OrderForDirection(Outline(tp, cx, cy, op.BitDiameter / 2d + wallLeave), tp, op);
+            // Corner reliefs go on the pass that leaves the FINAL wall. When wallLeave > 0 a Side finish
+            // follows and owns the wall, so relieving here would cut away the very stock that pass was
+            // left to take - the reliefs are emitted there instead.
+            var wall = OrderForDirection(Outline(tp, cx, cy, op.BitDiameter / 2d + wallLeave,
+                                                wallLeave > 0d ? 0d : op.BitDiameter / 2d), tp, op);
             var rings = ClearingRings(tp, cx, cy, op.BitDiameter, wallLeave, op.Stepover)
                 .Select(r => OrderForDirection(r, tp, op)).ToList();
             var depths = PassDepths(RoughDepth(tp, op), op.DepthOfCut);
@@ -928,7 +942,10 @@ namespace CNC.Controls
         {
             var lines = new List<string>();
             var rough = WorkOrderRules.RoughingOp(tp);
-            var path = OrderForDirection(Outline(tp, cx, cy, tp.IsClosed ? op.BitDiameter / 2d : 0d), tp, op);
+            // This pass leaves the final wall, so it is the one that carries the corner reliefs (see
+            // BuildPocket, which stands down whenever a Side finish is present to do it).
+            var path = OrderForDirection(Outline(tp, cx, cy, tp.IsClosed ? op.BitDiameter / 2d : 0d,
+                                                 tp.IsClosed ? op.BitDiameter / 2d : 0d), tp, op);
             var depths = PassDepths(rough != null ? RoughDepth(tp, rough) : op.TotalDepth, rough?.DepthOfCut ?? 2d);
 
             double previousZ = 0d;
