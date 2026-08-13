@@ -39,15 +39,23 @@ namespace CNC.Controls
         // as a wrong result - you have to hover to discover why it is lit at all. Dashes say "the reason is
         // hidden here, hover me" without changing the tooltip itself.
         //
-        // The GAP widens with UiScale, and that is not the same as "it already scales". UiScale is a
-        // LayoutTransform over the main window's visual tree, and this adorner is inside that tree, so stroke,
-        // dash and gap are ALREADY multiplied together - the ratio between them never changed, which is
-        // exactly the problem. As the stroke thickens at high zoom the anti-aliased ends of each dash bleed
-        // across a proportionally-constant gap and the outline closes up into a near-solid line. Keeping it
-        // legibly dashed needs the gap to grow FASTER than the stroke, so the multiplier itself scales.
+        // TWO things made the gap look nearly closed, and neither was UiScale. An earlier attempt scaled the
+        // gap by UiScale and changed NOTHING, because UiScale is the app's own zoom and sits at 1.0 unless the
+        // operator has zoomed - a high-DPI SCREEN is a Windows display setting, which WPF already accounts for
+        // in DIP. Multiplying by 1.0 is not a fix. Recorded so it is not tried a third time.
         //
-        // DashStyle lengths are multiples of PEN THICKNESS, not device pixels - which is why this is a change
-        // to the multiplier rather than to a pixel size.
+        //  1. Pen.DashCap defaults to PenLineCap.SQUARE, which extends every dash by thickness/2 at BOTH ends.
+        //     At 1.5 thickness that is 1.5 DIP added to each dash, taken straight out of the gap - a nominal
+        //     3 DIP gap rendered as about 1.5. Flat caps give the gap back.
+        //  2. The pattern was simply small in absolute terms.
+        //
+        // So the pattern is stated in DIP here and converted to what DashStyle actually wants, which is
+        // multiples of PEN THICKNESS - the units mismatch is what made the original numbers so easy to
+        // misjudge. UiScale still multiplies, which is right if the operator zooms (the adorner is inside the
+        // scaled tree, so this makes the gap grow faster than the stroke), but it is not what fixed this.
+        private const double DashDip = 4d;
+        private const double GapDip = 5d;
+
         private static Pen cachedTooltipPen;
         private static double cachedScale = double.NaN;
 
@@ -59,7 +67,8 @@ namespace CNC.Controls
             cachedScale = scale;
             cachedTooltipPen = FreezePen(new Pen(OutlineBrush, Thickness)
             {
-                DashStyle = new DashStyle(new double[] { 3d, 2d * scale }, 0d)
+                DashCap = PenLineCap.Flat,   // see 1. above - Square silently eats half the gap
+                DashStyle = new DashStyle(new double[] { DashDip / Thickness, GapDip * scale / Thickness }, 0d)
             });
             return cachedTooltipPen;
         }
