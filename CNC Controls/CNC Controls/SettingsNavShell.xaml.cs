@@ -402,20 +402,28 @@ namespace CNC.Controls
                 if (root == null)
                     return;
 
-                FrameworkElement first = null;
-                foreach (var el in MatchingElements(root, searchQuery))
+                FrameworkElement firstVisible = null, firstTooltip = null;
+                foreach (var hit in MatchingElements(root, searchQuery))
                 {
-                    var layer = AdornerLayer.GetAdornerLayer(el);
+                    var layer = AdornerLayer.GetAdornerLayer(hit.Element);
                     if (layer == null)
                         continue;
-                    var a = new ElementHighlightAdorner(el);
+                    var a = new ElementHighlightAdorner(hit.Element, hit.TooltipOnly);
                     layer.Add(a);
                     pageHighlights.Add(new KeyValuePair<AdornerLayer, ElementHighlightAdorner>(layer, a));
-                    if (first == null)
-                        first = el;
+
+                    if (hit.TooltipOnly)
+                    {
+                        if (firstTooltip == null)
+                            firstTooltip = hit.Element;
+                    }
+                    else if (firstVisible == null)
+                        firstVisible = hit.Element;
                 }
 
-                first?.BringIntoView();
+                // Prefer scrolling to a hit you can actually READ. Landing on a tooltip-only hit when the page
+                // also contains the word in plain sight is the same confusion in smaller form.
+                (firstVisible ?? firstTooltip)?.BringIntoView();
 
                 if (pageHighlights.Count == 0)
                     CNC.Core.DebugLog.Write("ui", "settings search: \"" + searchQuery +
@@ -427,14 +435,20 @@ namespace CNC.Controls
         // "text": the thing being pointed at is what the user can READ, which is these five. A container is
         // skipped when a descendant of it also matches, so a hit marks the label or box itself rather than
         // drawing a box round half the page.
-        private static IEnumerable<FrameworkElement> MatchingElements(DependencyObject root, string q)
+        private struct PageHit
         {
-            var hits = new List<FrameworkElement>();
+            public FrameworkElement Element;
+            public bool TooltipOnly;    // the query is in the tooltip, nowhere the eye can see
+        }
+
+        private static IEnumerable<PageHit> MatchingElements(DependencyObject root, string q)
+        {
+            var hits = new List<PageHit>();
             Walk(root, q, hits);
             return hits;
         }
 
-        private static void Walk(DependencyObject node, string q, List<FrameworkElement> hits)
+        private static void Walk(DependencyObject node, string q, List<PageHit> hits)
         {
             int count = VisualTreeHelper.GetChildrenCount(node);
             for (int i = 0; i < count; i++)
@@ -447,33 +461,42 @@ namespace CNC.Controls
                     continue;                    // something inside already matched - don't box the container too
 
                 var el = child as FrameworkElement;
-                if (el != null && el.IsVisible && Matches(child, q))
-                    hits.Add(el);
+                if (el == null || !el.IsVisible)
+                    continue;
+
+                var kind = Classify(child, q);
+                if (kind != MatchKind.None)
+                    hits.Add(new PageHit { Element = el, TooltipOnly = kind == MatchKind.TooltipOnly });
             }
         }
 
-        private static bool Matches(DependencyObject d, string q)
+        private enum MatchKind { None, Text, TooltipOnly }
+
+        // Visible text is tested BEFORE the tooltip, and the two are reported apart rather than OR'd
+        // together: a control whose tooltip matches but whose caption does not has to be drawn differently,
+        // or its highlight looks like a wrong result until you happen to hover it.
+        private static MatchKind Classify(DependencyObject d, string q)
         {
             if (Contains((d as TextBlock)?.Text, q))
-                return true;
+                return MatchKind.Text;
             if (Contains((d as TextBox)?.Text, q))
-                return true;
+                return MatchKind.Text;
             if (Contains((d as GroupBox)?.Header as string, q))
-                return true;
+                return MatchKind.Text;
 
             // CheckBox / RadioButton / Button / Label all carry their caption as Content. Only a string
             // counts: a Content that is itself a control has already been walked as a child.
             var cc = d as ContentControl;
             if (cc != null && Contains(cc.Content as string, q))
-                return true;
+                return MatchKind.Text;
 
             // Tooltip hits matter most of all - that text IS on the page, but only on hover, so it is the
             // one kind of match the eye can never locate unaided.
             var fe = d as FrameworkElement;
             if (fe != null && Contains(ToolTipText(fe.ToolTip), q))
-                return true;
+                return MatchKind.TooltipOnly;
 
-            return false;
+            return MatchKind.None;
         }
 
         private static string ToolTipText(object tip)

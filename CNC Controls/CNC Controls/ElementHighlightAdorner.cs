@@ -24,13 +24,29 @@ namespace CNC.Controls
         // Same palette as the console's find highlighting, so "this is a search hit" looks the same
         // wherever it appears.
         private static readonly Brush Fill = Freeze(new SolidColorBrush(Color.FromArgb(0x55, 0xFF, 0xE0, 0x4A)));
-        private static readonly Pen Outline = FreezePen(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(0xEE, 0xD8, 0x5A, 0x00))), 1.5d));
+        private static readonly Brush OutlineBrush = Freeze(new SolidColorBrush(Color.FromArgb(0xEE, 0xD8, 0x5A, 0x00)));
+        private static readonly Pen Outline = FreezePen(new Pen(OutlineBrush, 1.5d));
+
+        // A DASHED outline means the match is not in anything you can see: it is in this control's tooltip.
+        // Without the distinction a tooltip hit marks a row with no matching text anywhere on it, which reads
+        // as a wrong result - you have to hover to discover why it is lit at all. Dashes say "the reason is
+        // hidden here, hover me" without changing the tooltip itself.
+        private static readonly Pen TooltipOutline = FreezePen(new Pen(OutlineBrush, 1.5d)
+        {
+            DashStyle = new DashStyle(new double[] { 3d, 2d }, 0d)
+        });
+
+        private readonly bool tooltipOnly;
 
         private static Brush Freeze(Brush b) { b.Freeze(); return b; }
         private static Pen FreezePen(Pen p) { p.Freeze(); return p; }
 
-        public ElementHighlightAdorner(UIElement adornedElement) : base(adornedElement)
+        /// <param name="tooltipOnly">
+        /// True when the query was found only in the element's tooltip, not in any text it displays.
+        /// </param>
+        public ElementHighlightAdorner(UIElement adornedElement, bool tooltipOnly = false) : base(adornedElement)
         {
+            this.tooltipOnly = tooltipOnly;
             IsHitTestVisible = false;   // the control underneath must stay clickable
         }
 
@@ -43,7 +59,7 @@ namespace CNC.Controls
             // Bleed slightly outside the control: a checkbox or label sized tight to its text reads better
             // with the mark sitting just proud of it than with the outline clipping the glyphs.
             var r = new Rect(-2d, -1d, size.Width + 4d, size.Height + 2d);
-            dc.DrawRoundedRectangle(Fill, Outline, r, 3d, 3d);
+            dc.DrawRoundedRectangle(Fill, tooltipOnly ? TooltipOutline : Outline, r, 3d, 3d);
         }
     }
 }
