@@ -59,7 +59,7 @@ CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,dgr_sdcard:System.Windows.Fra
 CNC.Controls.WPF.g.en-US.resources:about.baml,dlg_about:System.Windows.Window.Title,Title,True,True,,About
 CNC.Controls.WPF.g.en-US.resources:portdialog.baml,dlg_connection:System.Windows.Window.Title,Title,True,True,,Sender connection
 CNC.Controls.WPF.g.en-US.resources:macroeditor.baml,dlg_macroEditor:System.Windows.Window.Title,Title,True,True,,Macro Editor
-CNC.Controls.WPF.g.en-US.resources:consolewindow.baml,dlg_senderConsole:System.Windows.Window.Title,Title,True,True,,Sender Console
+CNC.Controls.WPF.g.en-US.resources:consolewindow.baml,dlg_senderConsole:System.Windows.Window.Title,Title,True,True,,MDI Console
 CNC.Controls.WPF.g.en-US.resources:portdialog.baml,dlg_title:System.Windows.Window.Title,Title,True,True,,Sender connection
 CNC.Controls.WPF.g.en-US.resources:gcoderotatedialog.baml,fld_angle:CNC.Controls.NumericField.Label,None,True,True,,Angle:
 CNC.Controls.WPF.g.en-US.resources:gcoderotatedialog.baml,fld_angle:CNC.Controls.NumericField.Unit,None,True,True,,degrees
