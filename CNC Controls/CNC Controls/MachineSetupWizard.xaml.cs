@@ -115,6 +115,16 @@ namespace CNC.Controls
         private GrblViewModel model = null;
         private bool _subscribed = false;
         private bool _restoringSelection = false;   // suppress persisting while we drive the dropdowns in code
+
+        // True while LoadCurrentSettings/BuildAxes are driving the fields from the controller, so the
+        // PropertyChanged storm they cause is not mistaken for the operator typing.
+        private bool _loading = false;
+        // True once the operator has actually changed something on this page. The refresh below refuses to
+        // discard their work, and this is the only trustworthy test for that: Changes.Count is NOT, because a
+        // stale table makes Changes non-empty all by itself - which is exactly the state we need to refresh
+        // out of.
+        private bool _userEdited = false;
+        private bool _settingsHookAttached = false;
         private Window _fwInfoWindow = null;
         private FirmwareUpdateManager.ReleaseInfo _pendingFwRelease = null;
         private string _lastFirmwareKey = null;   // GrblInfo.Version+"|"+DriverSha as last shown - see Model_PropertyChanged
@@ -526,10 +536,20 @@ namespace CNC.Controls
                 if (cbxManufacturer.SelectedItem == null)
                     RestoreOrDefaultMachine();
 
+                // Same reason as Reload's: everything above drove the fields from the controller / the saved
+                // machine pick, none of it is the operator editing. Clear it here so the page starts each
+                // activation genuinely "unedited" and the refresh below stays armed.
+                _userEdited = false;
+
                 if (!_subscribed && model != null)
                 {
                     model.PropertyChanged += Model_PropertyChanged;
                     _subscribed = true;
+                }
+                if (!_settingsHookAttached)
+                {
+                    GrblSettings.SettingsReloaded += OnSettingsReloaded;
+                    _settingsHookAttached = true;
                 }
                 UpdateLimitState();
                 UpdateApplyState();
@@ -555,6 +575,13 @@ namespace CNC.Controls
                 {
                     model.PropertyChanged -= Model_PropertyChanged;
                     _subscribed = false;
+                }
+                if (_settingsHookAttached)
+                {
+                    // A static event holds a strong reference to this view - unsubscribing is what stops a
+                    // menu-hosted instance being kept alive (and refreshed) after the operator has left it.
+                    GrblSettings.SettingsReloaded -= OnSettingsReloaded;
+                    _settingsHookAttached = false;
                 }
                 if (_fwInfoWindow != null)
                     _fwInfoWindow.Close();
@@ -668,6 +695,43 @@ namespace CNC.Controls
         }
 
         private void LoadCurrentSettings()
+        {
+            _loading = true;
+            try { LoadCurrentSettingsCore(); }
+            finally { _loading = false; _userEdited = false; }   // fields now mirror the controller again
+        }
+
+        // Re-read the controller's settings into the page when they change underneath it - the wizard used to
+        // read them once per activation and then show that snapshot for as long as it stayed open, so a $130
+        // written from the MDI (or by any other view) left a table claiming the old envelope. Cosmetic it is
+        // not: Apply diffs the on-screen values against the LIVE settings, so the stale number comes back as a
+        // pending change and gets written to the machine.
+        //
+        // Refuses to run over the operator's own edits - their typing is not something an event from the
+        // controller may discard. In that case the page keeps what they typed and the pending-change list
+        // (which compares against live values) still shows them the truth before anything is written.
+        private void OnSettingsReloaded(object sender, EventArgs e)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke((System.Action)(() => OnSettingsReloaded(sender, e)));
+                return;
+            }
+
+            // _settingsHookAttached doubles as "the view is active" - it is subscribed on activate and
+            // dropped on deactivate - and still matters after the CheckAccess hop, which can land after the
+            // operator has left the page.
+            if (!_settingsHookAttached || _userEdited)
+                return;
+
+            BuildAxes();
+            LoadCurrentSettings();
+            BuildReview();
+            UpdateApplyState();
+            RefreshStepColors();
+        }
+
+        private void LoadCurrentSettingsCore()
         {
             // The travel field shows physical travel, which is the stored soft-limit travel plus the pull-off
             // clearance reserved at each end (see BuildTargets). $22 is a bit-field on grblHAL (bit0 enable,
@@ -994,6 +1058,9 @@ namespace CNC.Controls
         // Apply only when there is something to write.
         private void OnSetupChanged(object sender, PropertyChangedEventArgs e)
         {
+            if (!_loading)
+                _userEdited = true;   // a real edit, not us filling the fields from the controller
+
             if (e.PropertyName == nameof(AxisSetup.HomeAtMin))
                 UpdateHomeCornerText();   // keep the home-corner picture in sync when a checkbox is toggled
             UpdateApplyState();
@@ -1037,6 +1104,10 @@ namespace CNC.Controls
             RestoreOrDefaultMachine();
             Changes.Clear();
             txtStatus.Text = "Reloaded from controller.";
+            // LAST, after the machine re-apply: re-selecting the dropdowns drives the fields and so trips the
+            // edit flag. Leaving it set would quietly disable the settings-reloaded refresh for the rest of
+            // the session - the page would go stale again and nothing would say so.
+            _userEdited = false;
             UpdateApplyState();
         }
 

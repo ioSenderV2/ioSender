@@ -3159,6 +3159,24 @@ namespace CNC.Core
         public static bool IsLoaded { get { return Settings.Count > 0; } }
         public static bool ReportProbeCoordinates { get; private set; }
 
+        // Raised after the settings collection has been (re)read from the controller, or written back to it -
+        // i.e. whenever "what the controller holds" has changed underneath anything that took a copy.
+        //
+        // Added 2026-08-12 for the Machine Setup wizard, which read $130-$132 once on activation and then
+        // showed those numbers indefinitely. That is not merely cosmetic there: its Apply diffs the on-screen
+        // values against the LIVE settings, so a stale table turns into a pending change that writes the old
+        // value back - a travel envelope corrected from the MDI was one Apply away from being un-corrected.
+        //
+        // Fires on whatever thread completed the load; subscribers that touch UI must marshal.
+        public static event EventHandler SettingsReloaded;
+
+        private static void RaiseSettingsReloaded()
+        {
+            var handler = SettingsReloaded;
+            if (handler != null)
+                handler(null, EventArgs.Empty);
+        }
+
         public static GrblSettingDetails Get(GrblSetting key)
         {
             return Settings.Where(x => x.Id == ((int)key)).FirstOrDefault();
@@ -3365,6 +3383,7 @@ namespace CNC.Core
                 ReportProbeCoordinates = true;
 
             GrblInfo.OnSettingsLoaded(model);
+            RaiseSettingsReloaded();
 
             return IsLoaded;
         }
@@ -3420,6 +3439,11 @@ namespace CNC.Core
                 // Wizard) instead of the values read at connect.
                 if (Grbl.GrblViewModel != null)
                     GrblInfo.OnSettingsLoaded(Grbl.GrblViewModel);
+
+                // Also on the WRITE path, not just the read: this is where the wizard's own Apply lands, and
+                // where any other view that saves a setting lands. Anything holding a copy is out of date the
+                // moment this returns, whoever did the writing.
+                RaiseSettingsReloaded();
             }
 
             return ok;
