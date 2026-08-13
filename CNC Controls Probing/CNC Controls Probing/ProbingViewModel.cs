@@ -174,7 +174,7 @@ namespace CNC.Controls.Probing
         {
             bool? res = null;
 
-            var t = new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                 cancellationToken,
@@ -182,10 +182,7 @@ namespace CNC.Controls.Probing
                 a => Grbl.OnResponseReceived += a,
                 a => Grbl.OnResponseReceived -= a,
                 5000, () => Grbl.ExecuteCommand(command));
-            }); t.Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             return res == true;
         }
@@ -201,7 +198,7 @@ namespace CNC.Controls.Probing
 
                 Comms.com.PurgeQueue();
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -209,16 +206,13 @@ namespace CNC.Controls.Probing
                     a => Grbl.OnResponseReceived += a,
                     a => Grbl.OnResponseReceived -= a,
                     1000, () => Grbl.ExecuteCommand(command));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
             }
 
             res = null;
 
             // Wait for real-time report to arrive
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.SingleEvent<string>(
                 cancellationToken,
@@ -226,10 +220,7 @@ namespace CNC.Controls.Probing
                 a => Grbl.OnRealtimeStatusProcessed += a,
                 a => Grbl.OnRealtimeStatusProcessed -= a,
                 1100);
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             if (Grbl.GrblState.State == GrblStates.Alarm)
                 res = null;
@@ -244,7 +235,7 @@ namespace CNC.Controls.Probing
 
                 while (res == null)
                 {
-                    new Thread(() =>
+                    EventUtils.RunPumped(() =>
                     {
                         res = WaitFor.SingleEvent<string>(
                         cancellationToken,
@@ -252,10 +243,7 @@ namespace CNC.Controls.Probing
                         a => Grbl.OnResponseReceived += a,
                         a => Grbl.OnResponseReceived -= a,
                         5000);
-                    }).Start();
-
-                    while (res == null)
-                        EventUtils.DoEvents();
+                    });
 
                     if (timer.Elapsed.Seconds > 120)
                         break;
@@ -281,23 +269,24 @@ namespace CNC.Controls.Probing
         {
             bool? res = null;
 
-            // Wait for WCO update to get current work offsets
+            // Wait for WCO update to get current work offsets.
+            //
+            // The wait is INSIDE the poller check now - the same unconditional hang Grbl.WaitForWcoUpdate
+            // had (this is its copy). With the poller disabled no thread was started, nothing could assign
+            // res, and this pumped the UI for ever. A WCO update only arrives because something polls for
+            // one, so with the poller off report "no update" rather than never returning.
+            if (!Grbl.Poller.IsEnabled)
+                return false;
 
-            if (Grbl.Poller.IsEnabled)
+            EventUtils.RunPumped(() =>
             {
-                new Thread(() =>
-                {
-                    res = WaitFor.SingleEvent<string>(
-                    cancellationToken,
-                    null,
-                    a => Grbl.OnWCOUpdated += a,
-                    a => Grbl.OnWCOUpdated -= a,
-                    AppConfig.Settings.Base.PollInterval * 35);
-                }).Start();
-            }
-
-            while (res == null)
-                EventUtils.DoEvents();
+                res = WaitFor.SingleEvent<string>(
+                cancellationToken,
+                null,
+                a => Grbl.OnWCOUpdated += a,
+                a => Grbl.OnWCOUpdated -= a,
+                AppConfig.Settings.Base.PollInterval * 35);
+            });
 
             return res == true;
         }
@@ -316,7 +305,7 @@ namespace CNC.Controls.Probing
 
             isCancelled = false;
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                 cancellationToken,
@@ -324,10 +313,7 @@ namespace CNC.Controls.Probing
                 a => Grbl.OnResponseReceived += a,
                 a => Grbl.OnResponseReceived -= a,
                 1000, () => Grbl.ExecuteCommand(command));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             if (res == true) {
 
@@ -335,7 +321,7 @@ namespace CNC.Controls.Probing
                 {
                     res = null;
 
-                    new Thread(() =>
+                    EventUtils.RunPumped(() =>
                     {
                         res = WaitFor.SingleEvent<string>(
                         cancellationToken,
@@ -343,10 +329,7 @@ namespace CNC.Controls.Probing
                         a => Grbl.OnRealtimeStatusProcessed += a,
                         a => Grbl.OnRealtimeStatusProcessed -= a,
                         400, () => Comms.com.WriteByte(GrblLegacy.ConvertRTCommand(GrblConstants.CMD_STATUS_REPORT)));
-                    }).Start();
-
-                    while (res == null)
-                        EventUtils.DoEvents();
+                    });
 
                     wait = res != true;
                     running |= Grbl.GrblState.State == GrblStates.Run;

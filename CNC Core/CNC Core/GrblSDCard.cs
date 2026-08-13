@@ -396,7 +396,7 @@ namespace CNC.Core
             {
                 Comms.com.PurgeQueue();
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                         cancellationToken,
@@ -404,10 +404,7 @@ namespace CNC.Core
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         1500, () => Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_MOUNT));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
             }
 
             if (!GrblInfo.HasSDCard || grbl.SDCardMountStatus == SDState.Mounted || grbl.SDCardMountStatus == SDState.Detected)
@@ -417,7 +414,7 @@ namespace CNC.Core
                 res = null;
                 model.Silent = true;
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                 res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -425,10 +422,7 @@ namespace CNC.Core
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
                     2000, () => Comms.com.WriteCommand(ViewAll ? GrblConstants.CMD_SDCARD_DIR_ALL : GrblConstants.CMD_SDCARD_DIR));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 model.Silent = false;
             }

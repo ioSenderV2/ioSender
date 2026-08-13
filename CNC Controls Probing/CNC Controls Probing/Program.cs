@@ -187,7 +187,7 @@ namespace CNC.Controls.Probing
                 probeAsserted = probeConnected = true;
 
                 // Timeout wait for skipping first report as this may have probe asserted true
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.SingleEvent<string>(
                     cancellationToken,
@@ -195,14 +195,11 @@ namespace CNC.Controls.Probing
                     a => Grbl.OnGrblReset += a,
                     a => Grbl.OnGrblReset -= a,
                     AppConfig.Settings.Base.PollInterval * 2 + 50);
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 res = null;
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.SingleEvent<string>(
                     cancellationToken,
@@ -210,10 +207,7 @@ namespace CNC.Controls.Probing
                     a => Grbl.OnResponseReceived += a,
                     a => Grbl.OnResponseReceived -= a,
                     AppConfig.Settings.Base.PollInterval * 5);
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
             }
             else
             {
@@ -248,7 +242,7 @@ namespace CNC.Controls.Probing
             // Clear error status if set
             if (Grbl.GrblError != 0)
             {
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -256,16 +250,13 @@ namespace CNC.Controls.Probing
                     a => Grbl.OnResponseReceived += a,
                     a => Grbl.OnResponseReceived -= a,
                     1000, () => Grbl.ExecuteCommand(""));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 res = null;
             }
 
             // Get a status report in order to establish current machine position
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.SingleEvent<string>(
                 cancellationToken,
@@ -273,10 +264,7 @@ namespace CNC.Controls.Probing
                 a => Grbl.OnResponseReceived += a,
                 a => Grbl.OnResponseReceived -= a,
                 AppConfig.Settings.Base.PollInterval * 5, () => Comms.com.WriteByte(GrblInfo.IsGrblHAL ? GrblConstants.CMD_STATUS_REPORT_ALL : GrblLegacy.ConvertRTCommand(GrblConstants.CMD_STATUS_REPORT)));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             Grbl.Poller.SetState(AppConfig.Settings.Base.PollInterval);
 

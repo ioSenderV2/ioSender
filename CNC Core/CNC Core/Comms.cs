@@ -275,5 +275,49 @@ namespace CNC.Core
             if (pump != null)
                 pump();
         }
+
+        /// <summary>
+        /// Run <paramref name="work"/> on a background thread while pumping the host's UI, returning once
+        /// it has finished.
+        ///
+        /// This replaces the idiom this codebase repeats ~40 times:
+        ///
+        ///     new Thread(() => { res = WaitFor.AckResponse(...); }).Start();
+        ///     while (res == null)
+        ///         EventUtils.DoEvents();
+        ///
+        /// which has no way to end if the worker never assigns its result. An exception thrown inside the
+        /// thread body dies on that thread - unobserved, no crash log, nothing sets the flag - and the UI
+        /// pumps for ever. The app looks alive and completely ignores you, which is much harder to
+        /// diagnose than a crash. Here the worker's exception is captured and rethrown on the CALLER's
+        /// thread with its original stack intact, so the failure surfaces where the caller can handle it.
+        ///
+        /// Deliberately NO timeout. Every caller is waiting on a controller that legitimately goes silent
+        /// for minutes at a time - grblHAL says nothing for a whole homing cycle, a YModem upload runs
+        /// long - and the operations already carry their own per-message timeouts. A backstop short enough
+        /// to be useful would abort work that was merely slow, which is a worse failure than the one being
+        /// fixed. This closes the loop that could never end, not the reply that is only late.
+        /// </summary>
+        public static void RunPumped(System.Action work)
+        {
+            if (work == null)
+                return;
+
+            System.Exception failure = null;
+            bool done = false;
+
+            new System.Threading.Thread(() =>
+            {
+                try { work(); }
+                catch (System.Exception e) { failure = e; }
+                finally { System.Threading.Volatile.Write(ref done, true); }
+            }) { IsBackground = true }.Start();
+
+            while (!System.Threading.Volatile.Read(ref done))
+                DoEvents();
+
+            if (failure != null)
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+        }
     }
 }

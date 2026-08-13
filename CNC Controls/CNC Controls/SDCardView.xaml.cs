@@ -316,7 +316,7 @@ namespace CNC.Controls
 
                     GCode.File.AddBlock((string)currentFile["Name"], CNC.Core.Action.New);
 
-                    new Thread(() =>
+                    EventUtils.RunPumped(() =>
                     {
                         res = WaitFor.AckResponse<string>(
                             cancellationToken,
@@ -324,10 +324,7 @@ namespace CNC.Controls
                             a => model.OnResponseReceived += a,
                             a => model.OnResponseReceived -= a,
                             400, () => Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_DUMP + TargetName(currentFile)));
-                    }) { IsBackground = true }.Start();
-
-                    while (res == null)
-                        EventUtils.DoEvents();
+                    });
                 }
                 finally
                 {
@@ -398,7 +395,7 @@ namespace CNC.Controls
                 {
                     model.Message = string.Format((string)FindResource("Downloading"), (string)row["Name"]);
 
-                    new Thread(() =>
+                    EventUtils.RunPumped(() =>
                     {
                         res = WaitFor.AckResponse<string>(
                             ct,
@@ -409,10 +406,7 @@ namespace CNC.Controls
                             a => model.OnResponseReceived += a,
                             a => model.OnResponseReceived -= a,
                             400, () => Comms.com.WriteCommand(GrblConstants.CMD_SDCARD_DUMP + TargetName(row)));
-                    }) { IsBackground = true }.Start();
-
-                    while (res == null)
-                        EventUtils.DoEvents();
+                    });
                 }
                 finally
                 {

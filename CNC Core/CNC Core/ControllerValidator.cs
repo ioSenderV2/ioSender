@@ -397,17 +397,14 @@ namespace CNC.Core
             while (!predicate(model.GrblState.State) && sw.ElapsedMilliseconds < msTimeout)
             {
                 bool? res = null;
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.SingleEvent<string>(
                         token, null,
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         Math.Min(500, msTimeout));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
             }
 
             return predicate(model.GrblState.State);

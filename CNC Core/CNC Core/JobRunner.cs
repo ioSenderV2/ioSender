@@ -915,7 +915,7 @@ namespace CNC.Core
                     CancellationToken cancellationToken = new CancellationToken();
 
                     // Wait a bit for unlikely event before starting...
-                    new Thread(() =>
+                    EventUtils.RunPumped(() =>
                     {
                         res = WaitFor.SingleEvent<string>(
                         cancellationToken,
@@ -923,10 +923,7 @@ namespace CNC.Core
                         a => model.OnGrblReset += a,
                         a => model.OnGrblReset -= a,
                        250);
-                    }).Start();
-
-                    while (res == null)
-                        EventUtils.DoEvents();
+                    });
 
                     // The send/ack flow control always runs on the dedicated background thread (StreamPump) so
                     // UI load can never stall motion - including Check mode ($C), which used to fall back to

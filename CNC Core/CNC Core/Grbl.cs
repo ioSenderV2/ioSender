@@ -146,7 +146,7 @@ namespace CNC.Core
             if (GrblViewModel.ResponseLogVerbose && !GrblViewModel.Silent)
                 GrblViewModel.ResponseLog.Add(command);
 
-            var t = new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                 cancellationToken,
@@ -154,10 +154,7 @@ namespace CNC.Core
                 a => GrblViewModel.OnResponseReceived += a,
                 a => GrblViewModel.OnResponseReceived -= a,
                 5000, () => GrblViewModel.ExecuteCommand(command));
-            }); t.Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             return res == true;
         }
@@ -176,7 +173,7 @@ namespace CNC.Core
             if (GrblViewModel.ResponseLogVerbose && !GrblViewModel.Silent)
                 GrblViewModel.ResponseLog.Add(command);
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                 cancellationToken,
@@ -184,17 +181,14 @@ namespace CNC.Core
                 a => GrblViewModel.OnResponseReceived += a,
                 a => GrblViewModel.OnResponseReceived -= a,
                 1000, () => GrblViewModel.ExecuteCommand(command));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             if (res == true)
                 res = null;
 
             while (res == null)
             {
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.SingleEvent<string>(
                     cancellationToken,
@@ -202,10 +196,7 @@ namespace CNC.Core
                     a => GrblViewModel.OnResponseReceived += a,
                     a => GrblViewModel.OnResponseReceived -= a,
                     5000);
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 if (GrblViewModel.GrblState.State != GrblStates.Idle)
                     res = null;
@@ -222,23 +213,25 @@ namespace CNC.Core
             if (GrblViewModel == null)
                 return false;
 
-            // Wait for WCO update to get current work offsets
+            // Wait for WCO update to get current work offsets.
+            //
+            // The wait is INSIDE the poller check now. It used to sit outside it, so with the poller
+            // disabled no thread was ever started, nothing could ever assign res, and this pumped the UI
+            // for ever - an unconditional hang that, unlike the rest of this family, needed no exception
+            // to trigger it. A WCO update only arrives because something is polling for one, so with the
+            // poller off there is nothing to wait for: report "no update" rather than never returning.
+            if (!GrblViewModel.Poller.IsEnabled)
+                return false;
 
-            if (GrblViewModel.Poller.IsEnabled)
+            EventUtils.RunPumped(() =>
             {
-                new Thread(() =>
-                {
-                    res = WaitFor.SingleEvent<string>(
-                    cancellationToken,
-                    null,
-                    a => GrblViewModel.OnWCOUpdated += a,
-                    a => GrblViewModel.OnWCOUpdated -= a,
-                    5000);
-                }).Start();
-            }
-
-            while (res == null)
-                EventUtils.DoEvents();
+                res = WaitFor.SingleEvent<string>(
+                cancellationToken,
+                null,
+                a => GrblViewModel.OnWCOUpdated += a,
+                a => GrblViewModel.OnWCOUpdated -= a,
+                5000);
+            });
 
             return res == true;
         }
@@ -1026,7 +1019,7 @@ namespace CNC.Core
             target = SyncTarget.Capture();
             dataReceived += Process;
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -1034,10 +1027,7 @@ namespace CNC.Core
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
                     1000, () => Comms.com.WriteCommand(getExtended ? GrblConstants.CMD_GETINFO_EXTENDED : GrblConstants.CMD_GETINFO));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             dataReceived -= Process;
 
@@ -1168,7 +1158,7 @@ namespace CNC.Core
             {
                 res = null;
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.SingleEvent<string>(
                     cancellationToken,
@@ -1176,10 +1166,7 @@ namespace CNC.Core
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
                     250, () => Comms.com.WriteByte(GrblConstants.CMD_STATUS_REPORT_ALL));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 // What WE matched, not what happened to arrive last - a status report from the poller or an
                 // "ok" from someone else's command must neither end this loop nor prolong it.
@@ -1192,7 +1179,7 @@ namespace CNC.Core
                 res = null;
                 Comms.com.PurgeQueue();
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.SingleEvent<string>(
                     cancellationToken,
@@ -1200,10 +1187,7 @@ namespace CNC.Core
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
                     1500, () => Comms.com.WriteByte((byte)GrblConstants.CMD_STATUS_REPORT_LEGACY[0]));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
             }
             else if (!GrblInfo.IsLegacyController)
                 IsGrblHAL = model.Firmware == "grblHAL";
@@ -1568,7 +1552,7 @@ namespace CNC.Core
 
             PollGrbl.Suspend();
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -1576,10 +1560,7 @@ namespace CNC.Core
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
                     400, () => Comms.com.WriteCommand(GrblConstants.CMD_GETPARSERSTATE));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             PollGrbl.Resume();
 
@@ -1944,7 +1925,7 @@ namespace CNC.Core
 
             PollGrbl.Suspend();
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -1955,10 +1936,7 @@ namespace CNC.Core
                     // [HOME:..] is one of the LAST lines - too short a timeout truncates it and HomedMask never gets
                     // set. 1500 ms is ample on USB/serial and harmless when the report returns quickly.
                     1500, () => Comms.com.WriteCommand(GrblConstants.CMD_GETNGCPARAMETERS));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             PollGrbl.Resume();
 
@@ -2288,7 +2266,7 @@ namespace CNC.Core
                 PollGrbl.Suspend();
                 CancellationToken cancellationToken = new CancellationToken();
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                         cancellationToken,
@@ -2296,10 +2274,7 @@ namespace CNC.Core
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         400, () => Comms.com.WriteCommand(GrblConstants.CMD_GETSPINDLES));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 PollGrbl.Resume();
                 dataReceived -= process;
@@ -2364,7 +2339,7 @@ namespace CNC.Core
                 PollGrbl.Suspend();
                 CancellationToken cancellationToken = new CancellationToken();
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                         cancellationToken,
@@ -2372,10 +2347,7 @@ namespace CNC.Core
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         1000, () => Comms.com.WriteCommand(GrblConstants.CMD_GETERRORCODES));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 PollGrbl.Resume();
             }
@@ -2485,7 +2457,7 @@ namespace CNC.Core
                 PollGrbl.Suspend();
                 CancellationToken cancellationToken = new CancellationToken();
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                         cancellationToken,
@@ -2493,10 +2465,7 @@ namespace CNC.Core
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         1000, () => Comms.com.WriteCommand(GrblConstants.CMD_GETALARMCODES));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 PollGrbl.Resume();
             }
@@ -2638,7 +2607,7 @@ namespace CNC.Core
                 PollGrbl.Suspend();
                 CancellationToken cancellationToken = new CancellationToken();
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                         cancellationToken,
@@ -2646,10 +2615,7 @@ namespace CNC.Core
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         400, () => Comms.com.WriteCommand(GrblConstants.CMD_GETSETTINGSGROUPS));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 PollGrbl.Resume();
             }
@@ -2738,7 +2704,7 @@ namespace CNC.Core
             PollGrbl.Suspend();
             CancellationToken cancellationToken = new CancellationToken();
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -2746,10 +2712,7 @@ namespace CNC.Core
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
                     400, () => Comms.com.WriteCommand(GrblConstants.CMD_GETSTARTUPLINES));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             PollGrbl.Resume();
 
@@ -2966,7 +2929,7 @@ namespace CNC.Core
                         PollGrbl.Suspend();
                         Grbl.GrblViewModel.Silent = true;
 
-                        new Thread(() =>
+                        EventUtils.RunPumped(() =>
                         {
                             res = WaitFor.AckResponse<string>(
                                 cancellationToken,
@@ -2974,10 +2937,7 @@ namespace CNC.Core
                                 a => Grbl.GrblViewModel.OnResponseReceived += a,
                                 a => Grbl.GrblViewModel.OnResponseReceived -= a,
                                 400, () => Comms.com.WriteCommand("$SED=" + Id.ToString()));
-                        }).Start();
-
-                        while (res == null)
-                            EventUtils.DoEvents();
+                        });
 
                         if (_description == null)
                             _description = String.Empty;
@@ -3311,7 +3271,7 @@ namespace CNC.Core
 
             if ((load = Settings.Count == 0 || needMeta) && GrblInfo.HasEnums)
             {
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                         cancellationToken,
@@ -3319,10 +3279,7 @@ namespace CNC.Core
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         1000, () => Comms.com.WriteCommand(GrblConstants.CMD_GETSETTINGSDETAILS));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 GrblSettingGroups.Get(model);
             }
@@ -3334,7 +3291,7 @@ namespace CNC.Core
             res = null;
             responses.Clear();
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -3342,10 +3299,7 @@ namespace CNC.Core
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
                     1000, () => Comms.com.WriteCommand(getExtended ? GrblConstants.CMD_GETSETTINGS_ALL : GrblConstants.CMD_GETSETTINGS));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             model.Silent = false;
             PollGrbl.Resume();

@@ -2517,7 +2517,7 @@ namespace CNC.Controls
 
                 // Wait 400ms to see if a MPG is polling Grbl...
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     MPGactive = WaitFor.SingleEvent<string>(
                     cancellationToken,
@@ -2525,16 +2525,13 @@ namespace CNC.Controls
                     a => model.OnRealtimeStatusProcessed += a,
                     a => model.OnRealtimeStatusProcessed -= a,
                     500);
-                }).Start();
-
-                while (MPGactive == null)
-                    EventUtils.DoEvents();
+                });
 
                 if (MPGactive == true)
                 {
                     MPGactive = null;
 
-                    new Thread(() =>
+                    EventUtils.RunPumped(() =>
                     {
                         MPGactive = WaitFor.SingleEvent<string>(
                         cancellationToken,
@@ -2542,10 +2539,7 @@ namespace CNC.Controls
                         a => model.OnRealtimeStatusProcessed += a,
                         a => model.OnRealtimeStatusProcessed -= a,
                         500, () => Comms.com.WriteByte(GrblConstants.CMD_STATUS_REPORT_ALL));
-                    }).Start();
-
-                    while (MPGactive == null)
-                        EventUtils.DoEvents();
+                    });
 
                     if (MPGactive == true)
                     {
@@ -2727,7 +2721,7 @@ namespace CNC.Controls
                                         bool? res = null;
                                         CancellationToken cancellationToken = new CancellationToken();
 
-                                        new Thread(() =>
+                                        EventUtils.RunPumped(() =>
                                         {
                                             res = WaitFor.SingleEvent<string>(
                                                 cancellationToken,
@@ -2735,10 +2729,7 @@ namespace CNC.Controls
                                                 a => model.OnGrblReset += a,
                                                 a => model.OnGrblReset -= a,
                                                 200, () => Comms.com.WriteByte(GrblConstants.CMD_STATUS_REPORT));
-                                        }).Start();
-
-                                        while (res == null)
-                                            EventUtils.DoEvents();
+                                        });
 
                                         if (!(exit = !model.Signals.Value.HasFlag(Signals.SafetyDoor)))
                                         {
@@ -2809,7 +2800,7 @@ namespace CNC.Controls
             bool? res = null;
             CancellationToken cancellationToken = new CancellationToken();
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.SingleEvent<string>(
                     cancellationToken,
@@ -2817,10 +2808,7 @@ namespace CNC.Controls
                     a => model.OnGrblReset += a,
                     a => model.OnGrblReset -= a,
                     AppConfig.Settings.Base.ResetDelay, () => Comms.com.WriteByte(GrblConstants.CMD_RESET));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             return !ResetPending;
         }

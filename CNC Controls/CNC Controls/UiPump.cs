@@ -47,6 +47,12 @@ namespace CNC.Controls
         // milliseconds at best, and the UI is still pumped far faster than a human or a status report can
         // notice. Fixing it here rather than at the call sites deliberately - there are dozens of these
         // loops, and the next one written will get the fix for free.
+        //
+        // That fixed the COST of the spin, not its unboundedness: a worker that threw before assigning its
+        // result left the loop with nothing that could ever end it. The worker-backed callers now go
+        // through EventUtils.RunPumped, which owns the thread and rethrows its exception on the caller.
+        // What still calls DoEvents directly are the loops with no worker to own - the stream transports
+        // waiting on Comms.com.CommandState - and a handful that are already time-bounded.
         private static void DoEvents()
         {
             DispatcherFrame frame = new DispatcherFrame();

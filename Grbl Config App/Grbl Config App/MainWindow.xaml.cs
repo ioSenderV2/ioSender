@@ -218,7 +218,7 @@ namespace Grbl_Config_App
 
             model.Silent = true;
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                         cancellationToken,
@@ -226,10 +226,7 @@ namespace Grbl_Config_App
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         400, () => Comms.com.WriteCommand(cmd));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
             return settings.Count > 0;
         }

@@ -275,7 +275,7 @@ namespace CNC.Controls
             retval = string.Empty;
             error = null;
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -283,10 +283,7 @@ namespace CNC.Controls
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
                     400, () => Comms.com.WriteCommand(scmd));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             if (retval != string.Empty)
             {
@@ -403,7 +400,7 @@ namespace CNC.Controls
                 res = null;
                 retval = string.Empty;
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                         cancellationToken,
@@ -411,10 +408,7 @@ namespace CNC.Controls
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         400, () => Comms.com.WriteCommand(cmd));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 if (retval != string.Empty)
                 {
