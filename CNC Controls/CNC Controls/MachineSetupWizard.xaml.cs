@@ -566,6 +566,22 @@ namespace CNC.Controls
                 // switch finished - explaining why the tab looked selected-but-frozen and never recovered on
                 // its own (a mid-layout-pass exception doesn't reliably self-heal the visual tree).
                 Dispatcher.BeginInvoke((System.Action)RefreshMacroStatus, System.Windows.Threading.DispatcherPriority.Background);
+
+                // Ask the controller what it actually holds, rather than trusting the cached copy. Everything
+                // else here only learns about a change ioSender itself saw go out; a setting altered by a
+                // pendant, another sender, a controller-side macro, or any session not running this build
+                // leaves the cache confidently wrong with nothing on the wire to say so. Opening this page is
+                // the right moment to ask - it is the page whose numbers get written back to the machine, and
+                // a $$ is one cheap round trip.
+                //
+                // Real case: $130/$131 diverged from 860/846 to 889/889 during a window with no ioSender
+                // session at all, and this page went on offering 889 as a pending change afterwards.
+                //
+                // DEFERRED at Background priority for exactly the reason RefreshMacroStatus above is: this
+                // runs during the tab-switch's own layout pass, and Load() pumps the dispatcher waiting for
+                // the controller's reply - doing that mid-layout throws and leaves the tab frozen.
+                Dispatcher.BeginInvoke((System.Action)ReloadSettingsFromController, System.Windows.Threading.DispatcherPriority.Background);
+
                 UpdateSimulatorStepVisibility();
                 RefreshFirmwareVersion();
             }
@@ -710,6 +726,33 @@ namespace CNC.Controls
         // Refuses to run over the operator's own edits - their typing is not something an event from the
         // controller may discard. In that case the page keeps what they typed and the pending-change list
         // (which compares against live values) still shows them the truth before anything is written.
+        // Re-read $$ on page open (see the call site in Activate for why). Refuses in the three cases where
+        // asking would cost more than the staleness it prevents:
+        //
+        //   - not connected: nothing to ask, and Load() would just fail.
+        //   - a job is running: a $$ is ~100 lines of reply competing with the stream for the link.
+        //   - unsaved setting edits exist anywhere (the grbl settings page shares this collection): a reload
+        //     overwrites values from the controller, which would silently discard someone's typing on
+        //     ANOTHER page. GrblConfigControl.ReloadSettings pairs Load() with ClearPendingEdits precisely
+        //     because that is a deliberate, operator-initiated discard - this one is not.
+        //
+        // Load() raises SettingsReloaded on success, so the page refresh happens through the same path as
+        // every other change; there is nothing to repopulate here.
+        private void ReloadSettingsFromController()
+        {
+            if (!_settingsHookAttached)
+                return;                                   // left the page during the deferral
+            if (Comms.com == null || !Comms.com.IsOpen)
+                return;
+            if (model != null && model.IsJobRunning)
+                return;
+            if (GrblSettings.HasChanges())
+                return;
+
+            try { GrblSettings.Load(); }
+            catch (Exception ex) { CNC.Core.DebugLog.Write("config", "Machine Setup: $$ refresh failed - " + ex.Message); }
+        }
+
         private void OnSettingsReloaded(object sender, EventArgs e)
         {
             if (!Dispatcher.CheckAccess())
