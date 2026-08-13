@@ -837,9 +837,9 @@ CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_consolePrev:System.Wi
 CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_consolePrev:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Previous match (F4)
 CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_consoleNext:System.Windows.Controls.ContentControl.Content,Button,True,True,,▼
 CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_consoleNext:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Next match (F3)
-CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,lbl_consoleFont:System.Windows.Controls.TextBlock.Text,Text,True,True,,Font
-CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_fontSmaller:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Smaller console text
-CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_fontLarger:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Larger console text
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,lbl_consoleFont:System.Windows.Controls.TextBlock.Text,Text,True,True,,Log
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_fontSmaller:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Smaller console log text
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_fontLarger:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Larger console log text
 CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,txt_mdiInput:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Enter a command (MDI). Paste multiple lines to send them all on Enter. Up/Down recalls history, Esc clears."
 CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,txt_consoleOutput:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Right-click for Clear all / Clear up to here / Save. The log keeps every line until cleared (in memory only - not written to disk).
 CNC.Controls.WPF.g.en-US.resources:fileactioncontrol.baml,btn_openFile:System.Windows.Controls.ContentControl.Content,Button,True,True,,Resources\open.png
@@ -1840,3 +1840,6 @@ CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_showJobSplitV
 CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_showJobSplitView:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Puts the program view and the 3D view side by side with a draggable splitter, instead of the tab strip that switches between them. The left panel column stays; the jog pad and the Feed/Spindle/Outline columns give up their space to the split. The console moves to the run strip's MDI button, which opens it in its own window."
 CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_statusAutoClose:System.Windows.Controls.TextBlock.Text,Text,True,True,,Dismiss pop-up status window after
 CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_statusAutoClose:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"How long the status window stays up when it opens by itself to show an error or alarm. Only errors and alarms open it - other messages are recorded quietly - and every message stays in the log behind the Status button, so a shorter time here loses nothing. A window you opened yourself never closes on its own."
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,lbl_mdiFont:System.Windows.Controls.TextBlock.Text,Text,True,True,,MDI
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_mdiFontSmaller:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Smaller MDI input text
+CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_mdiFontLarger:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Larger MDI input text
