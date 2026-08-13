@@ -969,9 +969,11 @@ namespace GCode_Sender
                 openConsole();
 
             hookWindowKeyHandlers();
-            // Jog keys, for every window in the application including dialogs opened later - registered
-            // once, here, so there is nothing to remember to wire up when a new dialog is added.
-            CNC.Controls.GlobalJogKeys.Hook();
+            // Jog keys AND keyboard shortcuts, for every window in the application including dialogs opened
+            // later - registered once, here, so there is nothing to remember to wire up when a new dialog is
+            // added. Register the shortcut dispatcher before hooking, so no window can see a key first.
+            CNC.Controls.GlobalKeys.ShortcutDispatcher = dispatchGlobalShortcut;
+            CNC.Controls.GlobalKeys.Hook();
             registerTabShortcuts();
 
             // UI-zoom shortcuts (assignable in Keyboard & Controller, "UI zoom" group) - seed real defaults
@@ -3744,31 +3746,31 @@ namespace GCode_Sender
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            // Kept as a fallback for keys that reach this window without going through the class handler.
+            // GlobalKeys normally gets there first and marks the event handled, in which case this instance
+            // handler is not called at all.
+            if (!e.Handled)
+                e.Handled = dispatchGlobalShortcut(e);
+        }
+
+        // Every keyboard shortcut this window owns, in priority order. Registered with
+        // GlobalKeys.ShortcutDispatcher so it runs for EVERY window in the application - these used to be
+        // dispatched only from this window's own PreviewKeyDown, so a shortcut worked on the top-level tabs
+        // and nowhere else: not while Machine Setup or Fixture Definition held the keyboard. Jog keys had
+        // the same disease and are fixed the same way; see CNC.Controls.GlobalKeys.
+        //
+        // Each dispatcher below carries its own "don't steal a text-producing key from a text box" guard, so
+        // a Ctrl+Alt shortcut still fires while the caret is in a field and an unmodified one does not.
+        private bool dispatchGlobalShortcut(KeyEventArgs e)
+        {
             // F1 - context help: open the user manual at the page for whatever view is current.
             if (e.Key == Key.F1 && Keyboard.Modifiers == ModifierKeys.None)
             {
                 ManualHelp.Open(UIViewModel?.CurrentView?.ViewType ?? ViewType.Startup);
-                e.Handled = true;
-                return;
+                return true;
             }
 
-            if (dispatchTabShortcut(e))
-            {
-                e.Handled = true;
-                return;
-            }
-
-            if (ActionKeyBinder.Dispatch(e))
-            {
-                e.Handled = true;
-                return;
-            }
-
-            // Jog keys are NOT forwarded from here any more. This block used to do it, but only when
-            // `CurrentView is JobView` - so keyboard jogging was dead on every other tab, and dead again
-            // whenever a dialog owned the keyboard, Machine Setup and Fixture Definition included. It is now
-            // a class handler on Window (CNC.Controls.GlobalJogKeys) that fires for every window in the app,
-            // so a jog key jogs unless you are typing. See that file for why it is done there and not here.
+            return dispatchTabShortcut(e) || ActionKeyBinder.Dispatch(e);
         }
 
         private void MainWindow_PreviewKeyUp(object sender, KeyEventArgs e)

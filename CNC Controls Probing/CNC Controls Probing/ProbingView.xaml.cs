@@ -431,7 +431,7 @@ namespace CNC.Controls.Probing
 
         #endregion
 
-        // Bail when GlobalJogKeys (class handler on Window) has already dispatched this key - assigning
+        // Bail when GlobalKeys (class handler on Window) has already dispatched this key - assigning
         // e.Handled unconditionally here would hand the same key to ProcessKeypress twice.
         protected override void OnPreviewKeyDown(KeyEventArgs e)
         {

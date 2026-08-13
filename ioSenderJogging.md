@@ -68,7 +68,7 @@ own configuration:
   selection**. Gated by the master switch **`KeyboardEnable`** (`IsJoggingEnabled`, default on) and by
   **one rule: a jog key jogs unless you are typing.**
 
-  Dispatch is a class handler on `Window` (`CNC.Controls.GlobalJogKeys`), so it fires for **every window
+  Dispatch is a class handler on `Window` (`CNC.Controls.GlobalKeys`), so it fires for **every window
   in the application** — every tab, and every dialog including Machine Setup and Fixture Definition,
   which is where lining something up by eye actually happens. Suppressed only when keyboard focus is in
   an input field: a text box, password box, combo, list/selector, slider or open menu — controls where

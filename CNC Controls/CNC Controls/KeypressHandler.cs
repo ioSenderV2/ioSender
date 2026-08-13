@@ -537,7 +537,12 @@ namespace CNC.Controls
                     JogCancel();
             }
 
-            if (!isJogging && allowJog && Comms.com.OutCount != 0)
+            // Hold off starting a NEW jog while the out-queue is still draining - but only for an actual jog
+            // key. This used to swallow EVERY key whenever OutCount was non-zero, so any keyboard shortcut
+            // pressed while the controller had anything queued was silently eaten. It went unnoticed while
+            // this method was reachable from only three views; once GlobalKeys routed every window
+            // through it, it ate shortcuts application-wide.
+            if (!isJogging && allowJog && Comms.com.OutCount != 0 && jogKeys.Any(p => p.Key == e.Key && p.Command != string.Empty))
                 return true;
 
             AllowJog = allowJog;
