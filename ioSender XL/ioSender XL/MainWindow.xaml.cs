@@ -969,6 +969,9 @@ namespace GCode_Sender
                 openConsole();
 
             hookWindowKeyHandlers();
+            // Jog keys, for every window in the application including dialogs opened later - registered
+            // once, here, so there is nothing to remember to wire up when a new dialog is added.
+            CNC.Controls.GlobalJogKeys.Hook();
             registerTabShortcuts();
 
             // UI-zoom shortcuts (assignable in Keyboard & Controller, "UI zoom" group) - seed real defaults
@@ -3761,14 +3764,11 @@ namespace GCode_Sender
                 return;
             }
 
-            // Keep keyboard jogging alive on the Job page even when focus has drifted out of the Job view
-            // (a flyout, side panel or the menu). The Job view only sees keys through its own OnPreviewKeyDown,
-            // which requires focus inside its tree; this window-level preview always fires, so forward jog keys
-            // when the Job view is the current view but is not focused. Skip if focus is in any text input
-            // (typing) - the Job view's own handler covers the focused case, including its MDI/DRO gates.
-            if (UIViewModel?.CurrentView is JobView jobView && !jobView.IsKeyboardFocusWithin
-                 && !(Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase))
-                e.Handled = jobView.ProcessKeyPreview(e);
+            // Jog keys are NOT forwarded from here any more. This block used to do it, but only when
+            // `CurrentView is JobView` - so keyboard jogging was dead on every other tab, and dead again
+            // whenever a dialog owned the keyboard, Machine Setup and Fixture Definition included. It is now
+            // a class handler on Window (CNC.Controls.GlobalJogKeys) that fires for every window in the app,
+            // so a jog key jogs unless you are typing. See that file for why it is done there and not here.
         }
 
         private void MainWindow_PreviewKeyUp(object sender, KeyEventArgs e)

@@ -125,6 +125,7 @@
     <Compile Include="ToolsView.xaml.cs">
       <DependentUpon>ToolsView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="GlobalJogKeys.cs" />
     <Compile Include="OddJobsGeometry.cs" />
     <Compile Include="OddJobsStockCanvas.cs" />
     <Compile Include="WorkOrderModel.cs" />

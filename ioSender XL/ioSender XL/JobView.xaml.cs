@@ -1029,8 +1029,15 @@ namespace GCode_Sender
                 Focus();
         }
 
+        // GlobalJogKeys (a class handler on Window) sees every key before this does and dispatches jog keys
+        // for the whole application. Both overrides below used to assign e.Handled unconditionally, which
+        // would hand the SAME key to ProcessKeypress a second time - a double jog command. Bail out when it
+        // has already been dealt with.
         protected override void OnPreviewKeyDown(KeyEventArgs e)
         {
+            if (e.Handled)
+                return;
+
             if (!(e.Handled = ProcessKeyPreview(e)))
             {
                 if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
@@ -1041,6 +1048,9 @@ namespace GCode_Sender
         }
         protected override void OnPreviewKeyUp(KeyEventArgs e)
         {
+            if (e.Handled)
+                return;
+
             if (!(e.Handled = ProcessKeyPreview(e)))
                 base.OnPreviewKeyDown(e);
         }
