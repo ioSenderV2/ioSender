@@ -224,6 +224,7 @@
     <Compile Include="KeypressHandler.cs" />
     <Compile Include="ShortcutKey.cs" />
     <Compile Include="SearchHighlightAdorner.cs" />
+    <Compile Include="ElementHighlightAdorner.cs" />
     <Compile Include="KeyMapEditor.xaml.cs">
       <DependentUpon>KeyMapEditor.xaml</DependentUpon>
     </Compile>
