@@ -900,13 +900,34 @@ namespace CNC.Controls
             var lines = new List<string>();
             double depth = TrueDepth(op);
             double step = op.BoreStepDown > 0d ? op.BoreStepDown : 1d;
+            double bitR = op.BitDiameter / 2d;
             var radii = BoreRadii(op);
 
             for (int i = 0; i < radii.Count; i++)
             {
                 double r = radii[i];
+
+                // A feed word on a G2/G3 governs the PROGRAMMED path - the tool CENTRE - but the cutting
+                // edge rides out at (r + bitR) and so travels (r + bitR)/r times as far per revolution.
+                // On a bore whose diameter approaches the cutter's that ratio is big: a 5mm hole with a
+                // 3.175mm cutter is 2.7x. The feed was being emitted uncorrected, so a value entered as
+                // "what the cutter should see" arrived at the edge multiplied by it - overloading the tool
+                // precisely where it is thinnest, and worst on exactly the small tapping-size bores where a
+                // 1/8" cutter is most fragile. Correcting it here makes op.Feed mean the one thing an
+                // operator can reason about: the speed of the CUTTING EDGE through the material.
+                //
+                // Per radius, not once: a multi-pass bore's inner helix (r == bitR, ratio 2) and its
+                // outermost (r >> bitR, ratio approaching 1) need different corrections.
+                //
+                // No floor is applied. As r shrinks the centre feed does approach zero, and that is correct
+                // rather than pathological - the circle is shrinking with it, so the TIME per revolution
+                // stays sane.
+                double arcFeed = r > 1e-6 && r + bitR > 1e-6 ? op.Feed * r / (r + bitR) : op.Feed;
+
                 if (radii.Count > 1)
                     lines.Add(string.Format("(helix {0} of {1} at radius {2})", i + 1, radii.Count, F(r)));
+                if (r > 1e-6)
+                    lines.Add(string.Format("(bore helix: centre feed {0} so the cutting edge cuts at {1})", F(arcFeed), F(op.Feed)));
 
                 lines.Add("G0 Z" + F(SafeZ()));
                 lines.Add("G0 X" + F(cx + r) + " Y" + F(cy));
@@ -928,9 +949,11 @@ namespace CNC.Controls
                     while (z < depth - 1e-6)
                     {
                         z = Math.Min(z + step, depth);
-                        lines.Add(arc + " X" + F(cx + r) + " Y" + F(cy) + " I" + F(-r) + " J0 Z" + F(-z) + " F" + F(op.Feed));
+                        lines.Add(arc + " X" + F(cx + r) + " Y" + F(cy) + " I" + F(-r) + " J0 Z" + F(-z) + " F" + F(arcFeed));
                     }
-                    lines.Add(arc + " X" + F(cx + r) + " Y" + F(cy) + " I" + F(-r) + " J0 F" + F(op.Feed));
+                    // The finishing lap - same circle, no Z - takes the same correction: it is the same
+                    // radius, so its edge outruns its centre by the same ratio.
+                    lines.Add(arc + " X" + F(cx + r) + " Y" + F(cy) + " I" + F(-r) + " J0 F" + F(arcFeed));
                 }
             }
             return lines;
