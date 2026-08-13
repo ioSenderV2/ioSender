@@ -798,11 +798,20 @@ namespace CNC.Controls
             double maxTravel = GrblInfo.MaxTravel.Values[axis];
 
             if (GrblInfo.ForceSetOrigin) {
+                // Clearance at BOTH ends. It used to clamp the home end to exactly 0 - the limit switch
+                // itself, with no set-back at all - and only held the far end off. Confirmed on the machine
+                // 2026-08-12 ($22=9, so this branch): a go-to-corner emitted "$J=G53G21Z0F4570", i.e. drive
+                // Z hard to the top limit. It happened to be a no-op that time because Z was already home,
+                // but from any other height that is a jog into the switch. The far end was right (X869 of
+                // $130=889), which is why only this end had gone unnoticed.
+                //
+                // It also silently skewed the centre: (max+min)/2 with min pinned at 0 put "centre" half a
+                // clearance off the true middle. With the set-back symmetric, the midpoint is correct again.
                 if (!GrblInfo.HomingDirection.HasFlag(GrblInfo.AxisIndexToFlag(axis))) {
-                    if (pos > 0d) pos = 0d;
+                    if (pos > -clearance) pos = -clearance;                                  // 0 .. -maxTravel
                     else if (pos < -maxTravel + clearance) pos = -maxTravel + clearance;
                 } else {
-                    if (pos < 0d) pos = 0d;
+                    if (pos < clearance) pos = clearance;                                    // 0 .. +maxTravel
                     else if (pos > maxTravel - clearance) pos = maxTravel - clearance;
                 }
             } else {
