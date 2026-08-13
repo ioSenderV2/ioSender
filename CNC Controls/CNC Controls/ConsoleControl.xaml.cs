@@ -287,10 +287,16 @@ namespace CNC.Controls
             }
         }
 
-        // ---- Console text size (persisted in Config.ConsoleFontSize; the scrollback binds to it) ----
+        // ---- Text sizes. Two independent settings, two steppers: the scrollback (Config.ConsoleFontSize)
+        //      and the MDI input line (Config.ConsoleInputFontSize). They were one value with the input
+        //      hardcoded at 11; the input is what you type g-code into and read back before pressing Enter,
+        //      so it gets its own size and its own buttons rather than following the log's. ----
 
         private void FontSmaller_Click(object sender, RoutedEventArgs e) { AdjustFont(-1d); }
         private void FontLarger_Click(object sender, RoutedEventArgs e) { AdjustFont(1d); }
+
+        private void InputFontSmaller_Click(object sender, RoutedEventArgs e) { AdjustInputFont(-1d); }
+        private void InputFontLarger_Click(object sender, RoutedEventArgs e) { AdjustInputFont(1d); }
 
         private void AdjustFont(double delta)
         {
@@ -298,6 +304,15 @@ namespace CNC.Controls
             if (b == null)
                 return;
             b.ConsoleFontSize = b.ConsoleFontSize + delta;   // clamped 6-32 in the setter
+            AppConfig.Settings.Save();
+        }
+
+        private void AdjustInputFont(double delta)
+        {
+            var b = AppConfig.Settings.Base;
+            if (b == null)
+                return;
+            b.ConsoleInputFontSize = b.ConsoleInputFontSize + delta;   // clamped 8-48 in the setter
             AppConfig.Settings.Save();
         }
 

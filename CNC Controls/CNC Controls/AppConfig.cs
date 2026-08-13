@@ -462,18 +462,20 @@ namespace CNC.Controls
         public bool ConsoleFilterRT { get; set; } = false;
         public bool ConsoleShowRTAll { get; set; } = false;
         public bool ConsoleWindowOpen { get; set; } = false;
-        // F12, NOT Esc (changed 2026-08-03). The console toggle is dispatched from MainWindow's
-        // PreviewKeyDown, which tunnels from the root before any control sees the key - so binding it to Esc
-        // took Esc away from its actual job everywhere inside the main window: cancelling an edit, closing a
-        // popup, backing out of anything. A shortcut that is worth having is not worth that.
-        // ConsoleShortcutEscMigrated moves already-saved profiles off the old default.
-        public string ConsoleShortcut { get; set; } = "F12";
-        // One-shot: see ConsoleShortcut above. Flagged rather than unconditional so someone who genuinely
-        // wants Esc can set it back and keep it.
-        public bool ConsoleShortcutEscMigrated { get; set; } = false;
-        // Point size for the console scrollback + command prompt. Notifies so the console updates live.
+        // ConsoleShortcut / ConsoleShortcutEscMigrated were removed 2026-08-13 along with the "Toggle
+        // console window" action - the run strip's MDI button is bindable now (ActionKeyBinder
+        // "Program.Mdi"), which is the same destination by a route that does not need its own config key
+        // or its own store. A saved profile may still carry both elements; XmlSerializer ignores elements
+        // it has no property for, so they are harmless and disappear on the next save.
+        // Point size for the console scrollback. Notifies so the console updates live.
         private double _consoleFontSize = 10d;
         public double ConsoleFontSize { get { return _consoleFontSize; } set { if (_consoleFontSize != value) { _consoleFontSize = Math.Max(6d, Math.Min(32d, value)); OnPropertyChanged(); } } }
+        // Point size for the MDI input line, sized SEPARATELY from the scrollback above it (2026-08-13).
+        // The scrollback is a log you skim; this is the line you type g-code into and have to read back before
+        // pressing Enter, so it defaults to roughly double and has its own A-/A+ pair. Upper clamp is higher
+        // than the scrollback's for the same reason.
+        private double _consoleInputFontSize = 22d;
+        public double ConsoleInputFontSize { get { return _consoleInputFontSize; } set { if (_consoleInputFontSize != value) { _consoleInputFontSize = Math.Max(8d, Math.Min(48d, value)); OnPropertyChanged(); } } }
         // Last machine picked in the Machine Setup Wizard ("Manufacturer|Product|Model"), restored next run.
         public string LastMachine { get; set; } = string.Empty;
         // One-shot "have they seen it" flag for the Feeds & Speeds tab's Intro sub-tab (FeedsAndSpeedsView) -
@@ -931,11 +933,6 @@ namespace CNC.Controls
         }
 
         public static AppConfig Settings { get { return settings.Value; } }
-
-        // Raised when the console toggle shortcut is changed in the Key Mappings editor so the
-        // main window(s) can re-register it without a restart.
-        public static event System.Action ConsoleShortcutChanged;
-        public static void NotifyConsoleShortcutChanged() { ConsoleShortcutChanged?.Invoke(); }
 
         // Raised when tab-switch shortcuts are changed in the Key Mappings editor so the main window(s)
         // can re-read and re-register them without a restart.
@@ -2131,23 +2128,8 @@ namespace CNC.Controls
                 _migratedFormat = true;   // persist the injected layout/flag via the save below
             }
 
-            // One-shot: the console toggle shipped defaulted to Esc, which MainWindow's PreviewKeyDown then
-            // swallowed app-wide - so Esc stopped dismissing anything inside the main window. Move a profile
-            // still sitting on that default over to F12 (the same key the toggle now defaults to). Only ever
-            // touches the literal old default: a profile with any other binding, including a deliberate Esc
-            // set after this ran, is left alone.
-            if (!Base.ConsoleShortcutEscMigrated)
-            {
-                Base.ConsoleShortcutEscMigrated = true;
-
-                if (string.Equals(Base.ConsoleShortcut, "Esc", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(Base.ConsoleShortcut, "Escape", StringComparison.OrdinalIgnoreCase))
-                {
-                    Base.ConsoleShortcut = "F12";
-                    CNC.Core.DebugLog.Write("config", "ApplyOneTimeFixups: console toggle moved off Esc to F12");
-                }
-                _migratedFormat = true;   // persist the flag (and any change) via the save below
-            }
+            // (The Esc -> F12 console-toggle migration that lived here went with the toggle itself, removed
+            //  2026-08-13. Both config keys are gone; see the note where ConsoleShortcut was declared.)
 
             // One-shot: move Load Stock (now "Start Job") to the front of the tab order for existing saved
             // layouts that pin its old position. Mirrors the HeightMap injection above - guarded by a flag so a

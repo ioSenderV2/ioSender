@@ -968,7 +968,7 @@ namespace GCode_Sender
             if (AppConfig.Settings.Base.ConsoleWindowOpen)
                 openConsole();
 
-            registerConsoleShortcut();
+            hookWindowKeyHandlers();
             registerTabShortcuts();
 
             // UI-zoom shortcuts (assignable in Keyboard & Controller, "UI zoom" group) - seed real defaults
@@ -3431,8 +3431,9 @@ namespace GCode_Sender
                 UIViewModel.Console = new ConsoleWindow();
                 UIViewModel.Console.DataContext = DataContext;
                 UIViewModel.Console.IsVisibleChanged += Console_IsVisibleChanged;
-                // Same shortcut handler on the console window so the toggle also fires when the
-                // console (not the main window) has focus - lets one keypress hide it again.
+                // The same window-level key handler on the console window, so shortcuts still work while the
+                // console (not the main window) has focus. It carried the console TOGGLE until 2026-08-13 -
+                // that is gone, but F1 help, tab switches and every ActionKeyBinder action still need it here.
                 UIViewModel.Console.PreviewKeyDown += MainWindow_PreviewKeyDown;
                 UIViewModel.Console.Show();
             }
@@ -3455,29 +3456,23 @@ namespace GCode_Sender
             }
         }
 
-        private Key consoleKey = Key.None;
-        private ModifierKeys consoleModifiers = ModifierKeys.None;
+        private bool windowKeyHandlersHooked = false;
 
-        private bool consoleShortcutHooked = false;
-
-        private void registerConsoleShortcut()
+        // Attach the window-level key handlers. This used to be registerConsoleShortcut and also parsed the
+        // console toggle's key; that toggle was removed 2026-08-13 (the run strip's MDI button is bindable
+        // now - ActionKeyBinder "Program.Mdi"). The HOOKUP itself must stay: this preview is what dispatches
+        // F1 context help, tab-switch shortcuts, every ActionKeyBinder action, and the jog forwarding that
+        // keeps keyboard jogging alive when focus has drifted off the Job view. Deleting the method with the
+        // toggle would have taken all of that with it.
+        private void hookWindowKeyHandlers()
         {
-            // Parse the configurable console shortcut into key + modifiers. Parsed manually (not via
-            // KeyGesture) so a modifier-less key such as Esc is allowed. Default is Esc.
-            ShortcutKey.TryParse(AppConfig.Settings.Base.ConsoleShortcut, out consoleKey, out consoleModifiers);
+            if (windowKeyHandlersHooked)
+                return;
 
-            if (!consoleShortcutHooked)
-            {
-                // Tunneling preview so the key is seen before child controls (jog/keypress handlers) consume it.
-                PreviewKeyDown += MainWindow_PreviewKeyDown;
-                PreviewKeyUp += MainWindow_PreviewKeyUp;   // so a jog started while the Job view is unfocused still stops
-                // Re-register live when the shortcut is changed in the Key Mappings editor.
-                AppConfig.ConsoleShortcutChanged += registerConsoleShortcut;
-                consoleShortcutHooked = true;
-            }
-
-            // (The "Open Console" menu item that used to show this shortcut hint was removed in the menu
-            //  overhaul; the shortcut still toggles the console, and the Console tab tooltip mentions it.)
+            // Tunneling preview so the key is seen before child controls (jog/keypress handlers) consume it.
+            PreviewKeyDown += MainWindow_PreviewKeyDown;
+            PreviewKeyUp += MainWindow_PreviewKeyUp;   // so a jog started while the Job view is unfocused still stops
+            windowKeyHandlersHooked = true;
         }
 
         // --- tab-switch shortcuts ----------------------------------------------------------------
@@ -3616,7 +3611,7 @@ namespace GCode_Sender
             { "Tab.Tools.PID",       LayoutKeys.PID },
         };
 
-        // (Re)parse the saved tab-switch shortcuts. Called at startup (just after registerConsoleShortcut, which
+        // (Re)parse the saved tab-switch shortcuts. Called at startup (just after hookWindowKeyHandlers, which
         // hooks the window preview handler that dispatches them) and again whenever the editor saves changes.
         private void registerTabShortcuts()
         {
@@ -3750,13 +3745,6 @@ namespace GCode_Sender
             if (e.Key == Key.F1 && Keyboard.Modifiers == ModifierKeys.None)
             {
                 ManualHelp.Open(UIViewModel?.CurrentView?.ViewType ?? ViewType.Startup);
-                e.Handled = true;
-                return;
-            }
-
-            if (consoleKey != Key.None && e.Key == consoleKey && Keyboard.Modifiers == consoleModifiers)
-            {
-                openConsole();   // openConsole() toggles: shows when hidden/new, hides when visible
                 e.Handled = true;
                 return;
             }

@@ -86,13 +86,7 @@ namespace CNC.Controls
         public void Commit()
         {
             keyboard.ApplyJogBindings(rows.Where(r => r.IsJog).Select(r => r.Model));
-            keyboard.ApplyActionBindings(rows.Where(r => !r.IsJog && !r.IsConsole).Select(r => r.Model));
-
-            var console = rows.FirstOrDefault(r => r.IsConsole);
-            if (console != null)
-                AppConfig.Settings.Base.ConsoleShortcut = console.Model.Key == Key.None
-                    ? string.Empty
-                    : ShortcutKey.ToStorageString(console.Model.Key, console.Model.Modifiers);
+            keyboard.ApplyActionBindings(rows.Where(r => !r.IsJog).Select(r => r.Model));
 
             // Rebuild the saved tab-switch list from the bound rows only (unbound tabs are simply absent).
             AppConfig.Settings.Base.TabShortcuts = rows
@@ -130,7 +124,6 @@ namespace CNC.Controls
 
             keyboard.SaveMappings();   // persists into the App.config "KeyMap" section
             AppConfig.Settings.Save();
-            AppConfig.NotifyConsoleShortcutChanged();
             AppConfig.NotifyTabShortcutsChanged();
         }
 
@@ -149,13 +142,12 @@ namespace CNC.Controls
                 Add(new BindingRow(b, Label(b.Method)) { Description = Description(b.Method) });
             }
 
-            // The console toggle is just another program-level toggle - surface it alongside the rest.
-            var console = new KeypressHandler.KeyBinding { Method = "Console.Toggle", Context = "null", DefaultKey = Key.Escape };
-            ShortcutKey.TryParse(AppConfig.Settings.Base.ConsoleShortcut, out console.Key, out console.Modifiers);
-            Add(new BindingRow(console, "Toggle console window") { IsConsole = true, Description = "Show or hide the console window." });
+            // ("Toggle console window" was removed 2026-08-13. The run strip's MDI button is bindable now -
+            //  ActionKeyBinder "Program.Mdi", in this same Program group - which reaches the console without
+            //  needing a second store and a second dispatch path of its own. Esc still closes the console.)
 
             // Tab-switch shortcuts. Unbound by default (DefaultKey = None); persisted in Base.TabShortcuts and
-            // dispatched at the main-window level like the console toggle, so they fire regardless of focus.
+            // dispatched at the main-window level, so they fire regardless of focus.
             var saved = AppConfig.Settings.Base.TabShortcuts;
             foreach (var t in TabTargets)
             {
@@ -719,7 +711,6 @@ namespace CNC.Controls
         private static void Categorize(BindingRow r)
         {
             if (r.IsJog) { r.Set("Jog", 0); return; }
-            if (r.IsConsole) { r.Set("Program", 9); return; }
             // ActionKeyBinder rows carry their own group where they want one (the main-menu commands name
             // TopLevelGroup); the original zoom/OBS entries predate that field and default to "UI zoom".
             if (r.IsZoomAction) { r.Set(r.ActionGroup ?? "UI zoom", r.ActionGroup == TopLevelGroup ? TopLevelOrder : 9); return; }
@@ -1013,7 +1004,6 @@ namespace CNC.Controls
             public KeypressHandler.KeyBinding Model { get; }
             public string Label { get; }
             public string Description { get; set; }
-            public bool IsConsole { get; set; }
             public bool IsTabSwitch { get; set; }
             public bool IsZoomAction { get; set; }
             public string ActionGroup { get; set; }   // ActionKeyBinder.ActionInfo.Group, when the entry names one
