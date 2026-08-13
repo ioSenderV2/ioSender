@@ -154,7 +154,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>246 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>251 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -198,6 +198,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Feed Hold and Stop now outrank controller traffic instead of queueing behind it</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr225">225</a></td></tr>
 <tr><td>A jog cancelled before the controller parsed it left jogging dead until restart</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr228">228</a></td></tr>
 <tr><td>Commands sent during an in-flight jog no longer come back as a string of error:9.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr241">241</a></td></tr>
+<tr><td>A new install gets the busy nine-tab bar again; the compressed arrangement ships as a configuration overlay you apply instead.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr248">248</a></td></tr>
+<tr><td>The four corner buttons and the centre bullseye looked dead when they declined to move, and their safe-Z retract targeted the limit switch itself.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr250">250</a></td></tr>
 </table>
 
 <h3>Machine setup &amp; settings</h3>
@@ -244,6 +246,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Park positions checked against the envelope, work origins stored in the right frame, Validate corrected</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr226">226</a></td></tr>
 <tr><td>Probe prompts name the probe and tip, and the corner probe has one code path</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr231">231</a></td></tr>
 <tr><td>Reference points, homed state and the work envelope are mirrored from the real machine onto the simulator.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr242">242</a></td></tr>
+<tr><td>Layer a trimmed App.config onto an existing profile &mdash; adopt someone else's screen layout without touching your machine, macros or fixtures. Reversible.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr247">247</a></td></tr>
+<tr><td>With no configured target the Connect dialog lands on Serial, and a serial link is no longer handed over to the network behind your back.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr249">249</a></td></tr>
+<tr><td>A <code>$n=</code> typed at the MDI never reached ioSender's own copy, so Machine Setup &mdash; and the jog envelope &mdash; kept working from superseded numbers.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr251">251</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -722,7 +727,12 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">244</td><td><a href="#pr244">An error is an answer: no more waiting 36 seconds for an ok that never comes</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+94</span> <span class="del">-19</span></td></tr>
 <tr><td class="n">245</td><td><a href="#pr245">The app stops running out of memory during long macro runs</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+18</span> <span class="del">-0</span></td></tr>
 <tr><td class="n">246</td><td><a href="#pr246">Status pop-up: chosen dwell time, errors only, and focus handed back</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+208</span> <span class="del">-34</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (246 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">2335</span> <span class="del">30</span> <span class="add">+246</span><br><span class="k">Lines:</span> <span class="add">+101925</span> <span class="del">-24855</span></td></tr>
+<tr><td class="n">247</td><td><a href="#pr247">Configuration overlays</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">11</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+693</span> <span class="del">-13</span></td></tr>
+<tr><td class="n">248</td><td><a href="#pr248">Default layout back to the full tab bar</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+46</span> <span class="del">-37</span></td></tr>
+<tr><td class="n">249</td><td><a href="#pr249">First connect defaults to Serial</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+14</span> <span class="del">-8</span></td></tr>
+<tr><td class="n">250</td><td><a href="#pr250">Jog go-to buttons say why they refuse</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+28</span> <span class="del">-12</span></td></tr>
+<tr><td class="n">251</td><td><a href="#pr251">Settings changed elsewhere no longer go unnoticed</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+192</span> <span class="del">-0</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (251 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">2356</span> <span class="del">30</span> <span class="add">+247</span><br><span class="k">Lines:</span> <span class="add">+102898</span> <span class="del">-24925</span></td></tr>
 </table>
 </div>
 
@@ -4959,6 +4969,62 @@ clear an error message; loading a file containing #-expressions failed.</li>
 <tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">14</td><td class="num">0</td></tr>
 </table>
 <div class="desc"><p>Three corrections to windows that appear over the main one.</p><ul><li><strong>The pop-up status window's dwell time is a setting,</strong> rather than a fixed interval that was too short for some operators and too long for others.</li><li><strong>Only errors take the screen.</strong> Routine messages no longer raise the window over whatever is being worked on.</li><li><strong>Every pop-up hands focus back to ioSender when it closes,</strong> so the keyboard does not end up pointed at a window that is no longer there.</li></ul></div>
+</div>
+<!-- ===== #247 ===== -->
+<div class="pr">
+<h2 id="pr247"><span class="badge">#247</span>Configuration overlays &mdash; hand someone a config fragment and layer it on</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/ConfigOverlay.cs</td><td class="num add">255</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">217</td><td class="num del">10</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">169</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">6</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigView.xaml.cs</td><td class="num add">4</td><td class="num del">1</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">42</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Settings load only fills a section a profile does <em>not</em> already have, so an upgraded install keeps its saved <code>Layout</code> for ever and a new screen arrangement can never reach an existing user. An overlay is how you hand someone one specific change.</p><ul><li><strong>No new format.</strong> An overlay is a trimmed <code>App.config</code> &mdash; the same <code>&lt;AppConfig version="2"&gt;</code> root with a subset of its <code>&lt;section&gt;</code> entries. You can make one by deleting sections from a working config, and every section type works for free, including keys this build does not own.</li><li><strong>Two merge modes.</strong> <code>replace</code> (default) supplants a section wholesale; <code>merge</code> grafts only the child elements the fragment names onto what is already there, so an overlay can flip three fields without carrying all eighty.</li><li><strong>Help &gt; Support &gt; Apply / Export / Undo.</strong> Apply names the sections it will change <em>before</em> doing it, backs the profile up and restarts; Undo restores that backup. Export writes the current screen layout as a <code>.ioconfig</code>, scrubbing the port, network host, machine and firmware build so it is safe to hand to someone else.</li><li><strong>Applying is staged, never written live.</strong> Dozens of call sites save the config during a session, so anything written to <code>App.config</code> while the app runs is liable to be overwritten by the in-memory state moments later. Apply drops the fragment next to the config and restarts; the merge happens at load, where the file is authoritative.</li><li><strong><code>-overlay &lt;file&gt;</code></strong> is the same merge for one run only, with the session's writes redirected to a side file so the real profile cannot be touched.</li></ul><p class="foot">Engine verified against real configs: an exported layout scrubs all four machine-identity fields, applying it to the shipped template changes only the Layout section and leaves the other fourteen byte-identical, merge mode replaces one element of 140 in place, and a legacy v1 document is refused as both source and target rather than half-applied. Applying an overlay was confirmed on screen.</p></div>
+</div>
+<!-- ===== #248 ===== -->
+<div class="pr">
+<h2 id="pr248"><span class="badge">#248</span>The shipped default is the full tab bar again</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/LayoutModel.cs</td><td class="num add">26</td><td class="num del">16</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/Default-App.config</td><td class="num add">20</td><td class="num del">21</td></tr>
+</table>
+<div class="desc"><p>The 2026-08-03 cutback moved ten views off the tab strip into the File and Tools menus and made that the shipped default. That is the wrong way round now that overlays exist (<a href="#pr247">#247</a>): a saved <code>Layout</code> is never overwritten by the template, so an existing install keeps whatever it has &mdash; a crowded default that can be slimmed down with one overlay beats a slim default nobody can opt out of.</p><ul><li><strong>Tab bar:</strong> Settings, Feeds and Speeds, Start Job, Job, Offsets, SD Card, Work Order, Machine Setup, Lathe Wizards &mdash; the pre-cutback order.</li><li><strong>The Tools <em>container</em> tab does not come back.</strong> The Tools menu replaced it and is kept: Probing, Height Map, Tool Table, Trinamic and PID live there. Probing and Height Map came off the default bar in July when Start Job's Dynamic mode folded their functionality in, so restoring the old bar does not bring those back either.</li><li><strong>File menu is empty of views</strong> &mdash; Machine Setup and Settings are tabs again.</li></ul><p>Written in <em>both</em> places that decide it, because either alone is silently wrong: the layout tree and the flat tab list in the template, and the code-level default so &ldquo;Reset to default&rdquo; cannot disagree with what a fresh install gets. The menu slots are emptied rather than removed &mdash; a missing menu slot reads as &ldquo;not migrated yet&rdquo; and skips the placement invariants entirely.</p><p class="foot">Reviewed on screen against a fresh profile; tree and flat list list the same nine components in the same order.</p></div>
+</div>
+<!-- ===== #249 ===== -->
+<div class="pr">
+<h2 id="pr249"><span class="badge">#249</span>A first connect opens on the Serial tab, not Network</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/Default-App.config</td><td class="num add">3</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/PortDialog.xaml.cs</td><td class="num add">6</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">5</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>The Connect dialog hardcoded the Network tab for a profile with no target, on the reasoning that most grblHAL controllers are networked and the Scan button lives there. In practice a first connect is far more likely to be a USB cable already plugged in, and Network is one click away.</p><ul><li><strong>A saved target still selects its own tab</strong> &mdash; that logic is untouched, so only a first run (or a profile with nothing configured) is affected.</li><li><strong><code>Prefer network</code> now defaults off.</strong> It is what probes the IP reported by <code>$I</code> after a serial connect and silently migrates the link to the network; leaving it on would have contradicted the tab default. An existing profile keeps whatever it saved.</li></ul><p>Set in both places that state it &mdash; the shipped template and the code-level default &mdash; because a profile predating the element falls back to the field initializer, and the two disagreeing would give old and new profiles different behaviour.</p><p class="foot">Confirmed on a fresh profile: the dialog opens on Serial.</p></div>
+</div>
+<!-- ===== #250 ===== -->
+<div class="pr">
+<h2 id="pr250"><span class="badge">#250</span>Jog go-to buttons: a refusal is now visible, and the set-back applies at both ends</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JogBaseControl.xaml.cs</td><td class="num add">19</td><td class="num del">10</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">9</td><td class="num del">2</td></tr>
+</table>
+<div class="desc"><p>Two separate defects in the go-to buttons, both found on the machine.</p><ul><li><strong>The refusal was invisible.</strong> Each button declines unless the machine is homed, idle, has max travel set and soft limits on &mdash; they rapid to a machine coordinate. Each guard wrote its reason with a plain status message, whose setter clears the error flag; since the run strip lost its message line the only thing that displays an arriving message pops the log window <em>for a flagged message only</em>. So the reason went into a log nobody had open and the button looked broken. The eight refusals are now flagged, and the method that flags them is public with a widened contract: a command the UI refuses is as actionable as one the controller rejected.</li><li><strong>The set-back applied at one end of each axis only.</strong> With force-set-origin, the envelope clamp held the far end off by the clearance but pinned the home end to exactly zero &mdash; the limit switch itself. Caught from the wire log: a go-to-corner emitted a safe-Z retract straight to <code>Z0</code>. It was a no-op that run because Z was already home, which is why only this end had gone unnoticed. The same asymmetry put the centre button half a clearance off true middle.</li></ul><p class="foot">Wire-log verified on the machine: correct far-end targets, and the Z retract now stands off by the homing pull-off. The invisible-refusal half was reported from the machine as "they don't work".</p></div>
+</div>
+<!-- ===== #251 ===== -->
+<div class="pr">
+<h2 id="pr251"><span class="badge">#251</span>A setting changed outside the settings pages now reaches the rest of the app</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">114</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">73</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/MdiDispatcher.cs</td><td class="num add">5</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Reported as &ldquo;Machine Setup is showing stale info&rdquo;, and it was &mdash; but the page was faithfully rendering a cache that had itself stopped matching the controller. Three gaps, closed in order of how far the staleness reached.</p><ul><li><strong>An MDI write never updated the cached settings.</strong> <code>$132=120</code> is acked by the controller and goes nowhere near a save or a <code>$$</code> reload, so nothing refreshed the copy. The dispatcher's ack path &mdash; the one place that sees a command and its reply together &mdash; now records an accepted <code>$n=value</code>, rebaselines it as controller-held and re-derives the cached projections. That last part is the one that mattered: max travel is derived from the same collection, and the jog envelope clamp and the 3D machine frame read <em>those</em>, so after an MDI change they were all clamping against the old number.</li><li><strong>Nothing told a view the settings had changed.</strong> A <code>SettingsReloaded</code> notification is raised on both the read path and the write path; Machine Setup subscribes while active and re-reads. It refuses to run over edits in progress &mdash; an event from the controller may not discard someone's typing &mdash; tested by an explicit edit flag, because a stale page makes the pending-change list non-empty by itself.</li><li><strong>Opening Machine Setup re-reads <code>$$</code>.</strong> The two above only catch a change this app saw go out; a pendant, another sender or a controller-side macro leaves no trace on the wire. Opening the page whose numbers get written back to the machine is the right moment to ask. It stands down when disconnected, mid-job, or when unsaved edits exist anywhere &mdash; the settings pages share that collection.</li></ul><p>Not cosmetic: the page's Apply diffs the on-screen values against the live settings, so a stale entry comes back as a pending change and gets written to the machine. A travel envelope corrected from the MDI was one Apply away from being un-corrected.</p><p class="foot">The MDI parse is verified against the real commands in a session log &mdash; setting writes match, and jogs, queries, filesystem and reset commands are all ignored. The live refresh paths build clean but are not yet exercised against hardware.</p></div>
 </div>
 </section>
 
