@@ -41,6 +41,7 @@ using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;   // AdornerLayer - see the find-in-log highlighting
 using System.Windows.Input;
 using System.Windows.Threading;
 using CNC.Core;
@@ -71,6 +72,18 @@ namespace CNC.Controls
             logFlush.Start();
             DataContextChanged += (s, e) => HookLog();
             Loaded += (s, e) => HookLog();
+
+            // Find-in-log highlighting is drawn in an adorner over the scrollback, so it has to be repainted
+            // whenever what is on screen moves under it. ScrollChanged bubbles out of the TextBox's own
+            // internal ScrollViewer, which is why this can be handled on the TextBox itself. Both are cheap
+            // no-ops while nothing is being searched for (the adorner renders nothing without a query).
+            txtOutput.AddHandler(ScrollViewer.ScrollChangedEvent,
+                                 new ScrollChangedEventHandler((s, e) => _highlight?.InvalidateVisual()));
+            txtOutput.SizeChanged += (s, e) => _highlight?.InvalidateVisual();
+
+            // Resolve the adorner layer once there IS one - GetAdornerLayer returns null before the control
+            // is in a rendered tree, and the console is built well before it is first shown.
+            Loaded += (s, e) => RefreshHighlight();
         }
 
         // ---- Coalesced scrollback refresh ----
@@ -119,6 +132,23 @@ namespace CNC.Controls
             foreach (var line in log)
                 sb.AppendLine(line);   // same join the old converter produced, so line-index math holds
             txtOutput.Text = sb.ToString();
+
+            // Assigning Text invalidates every match offset we hold: new lines were appended, and once the
+            // scrollback hits its cap the trim drops lines off the TOP, which shifts every offset left. Stale
+            // offsets would highlight the wrong text, which is worse than highlighting none. Recompute against
+            // the text we just wrote. Only while a search is actually running - see RecomputeMatches' caller
+            // note; with an empty query this is a no-op and the console pays nothing for having the feature.
+            if (_matchQuery.Length > 0)
+            {
+                int prev = _matchIndex >= 0 && _matchIndex < _matches.Count ? _matches[_matchIndex] : -1;
+                RecomputeMatches();
+                // Keep pointing at the same occurrence where we still can; otherwise fall back to the first.
+                _matchIndex = prev >= 0 ? _matches.IndexOf(prev) : -1;
+                if (_matchIndex < 0 && _matches.Count > 0)
+                    _matchIndex = 0;
+                RefreshHighlight();
+                UpdateMatchUi();
+            }
         }
 
         // LogOnly: hide the inline input prompt and show just the scrollback - used by the run-control
@@ -316,11 +346,49 @@ namespace CNC.Controls
             AppConfig.Settings.Save();
         }
 
-        // ---- Find in log: search the console scrollback, select/scroll each match, n-of-m + up/down / F3-F4 ----
+        // ---- Find in log: search the console scrollback, highlight/scroll each match, n-of-m + up/down / F3-F4 ----
 
         private readonly List<int> _matches = new List<int>();   // character offsets of each match in txtOutput
         private int _matchIndex = -1;
         private string _matchQuery = string.Empty;
+        private SearchHighlightAdorner _highlight;
+
+        // The adorner layer only exists once we are in a visual tree that has one, and this control is hosted
+        // three ways (Console tab, floating console window, run-control overlay), so resolve it lazily and
+        // tolerate not getting one rather than assuming.
+        private SearchHighlightAdorner Highlight()
+        {
+            if (_highlight != null)
+                return _highlight;
+
+            var layer = AdornerLayer.GetAdornerLayer(txtOutput);
+            if (layer == null)
+            {
+                // Say so rather than drawing nothing in silence. Without a layer the highlighting simply does
+                // not appear, which looks exactly like "the search is broken again" - the one report this whole
+                // change exists to answer. A Window's default template supplies an AdornerDecorator, so this
+                // should not happen in any of the three hosts; if it ever does, the log names it.
+                DebugLog.Write("ui", "console find: no adorner layer over the scrollback - match highlighting is unavailable");
+                return null;
+            }
+
+            _highlight = new SearchHighlightAdorner(txtOutput);
+            layer.Add(_highlight);
+            return _highlight;
+        }
+
+        // Push the current match set at the adorner. Called after every search, nav, scroll and log flush.
+        private void RefreshHighlight()
+        {
+            var h = Highlight();
+            if (h == null)
+                return;
+
+            if (_matchQuery.Length == 0 || _matches.Count == 0)
+                h.Clear();
+            else
+                h.SetMatches(_matches, _matchQuery.Length, _matchIndex);
+        }
 
         private void searchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
@@ -369,6 +437,7 @@ namespace CNC.Controls
             else
                 txtOutput.Select(txtOutput.SelectionStart, 0);
 
+            RefreshHighlight();
             UpdateMatchUi();
         }
 
@@ -384,6 +453,7 @@ namespace CNC.Controls
             RecomputeMatches();
             if (_matches.Count == 0)
             {
+                RefreshHighlight();
                 UpdateMatchUi();
                 return;
             }
@@ -395,6 +465,7 @@ namespace CNC.Controls
 
             _matchIndex = ((_matchIndex + dir) % _matches.Count + _matches.Count) % _matches.Count;
             SelectMatch();
+            RefreshHighlight();
             UpdateMatchUi();
         }
 
