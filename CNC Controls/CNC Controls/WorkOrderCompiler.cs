@@ -916,18 +916,34 @@ namespace CNC.Controls
                 // 1/8" cutter is most fragile. Correcting it here makes op.Feed mean the one thing an
                 // operator can reason about: the speed of the CUTTING EDGE through the material.
                 //
-                // Per radius, not once: a multi-pass bore's inner helix (r == bitR, ratio 2) and its
-                // outermost (r >> bitR, ratio approaching 1) need different corrections.
+                // ONLY for a wall-following pass. This compensation is the standard one for PERIPHERAL arc
+                // milling - following a wall at some radial depth of cut, where the engaged edge genuinely
+                // does outrun the axis. It does NOT hold for a FULL-IMMERSION helix, and applying it there
+                // is a real mistake that broke a cutter:
                 //
-                // No floor is applied. As r shrinks the centre feed does approach zero, and that is correct
-                // rather than pathological - the circle is shrinking with it, so the TIME per revolution
-                // stays sane.
-                double arcFeed = r > 1e-6 && r + bitR > 1e-6 ? op.Feed * r / (r + bitR) : op.Feed;
+                //   When r <= bitR the tool covers the hole centre, so it is cutting a SLOT - 180 degrees of
+                //   engagement, centre to wall. In a full-immersion cut the chip thickness is set by how far
+                //   the tool AXIS advances per tooth, not by how fast the wall contact point sweeps round.
+                //   Halving the programmed feed there halves the actual chip, and a cutter taking a chip
+                //   thinner than its own edge radius rubs instead of shearing: fine powdery chips, chatter,
+                //   heat, then aluminium welds to the flute and it seizes.
+                //
+                //   Measured on a 5mm bore with a 2.5mm single flute at 12000 rpm: an entered 550 became a
+                //   programmed 275, an axis chip load of 0.023mm against a 0.03-0.05mm target. The workpiece
+                //   absorbed roughly ten times the energy the metal removal needed - all of it friction.
+                //
+                // So: correct only where r > bitR (an annular pass that is genuinely following a wall), and
+                // otherwise emit the feed as entered, which is what this did before the correction existed
+                // and was never the thing breaking cutters.
+                bool wallPass = r > bitR;
+                double arcFeed = wallPass && r + bitR > 1e-6 ? op.Feed * r / (r + bitR) : op.Feed;
 
                 if (radii.Count > 1)
                     lines.Add(string.Format("(helix {0} of {1} at radius {2})", i + 1, radii.Count, F(r)));
                 if (r > 1e-6)
-                    lines.Add(string.Format("(bore helix: centre feed {0} so the cutting edge cuts at {1})", F(arcFeed), F(op.Feed)));
+                    lines.Add(wallPass
+                        ? string.Format("(bore helix: wall pass, centre feed {0} so the cutting edge cuts at {1})", F(arcFeed), F(op.Feed))
+                        : string.Format("(bore helix: full immersion, feed {0} as entered - chip load is set by axis advance)", F(arcFeed)));
 
                 lines.Add("G0 Z" + F(SafeZ()));
                 lines.Add("G0 X" + F(cx + r) + " Y" + F(cy));
