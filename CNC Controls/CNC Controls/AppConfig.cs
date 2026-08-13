@@ -1417,6 +1417,31 @@ namespace CNC.Controls
             if (fileSlot == null || toolsSlot == null)
                 return;   // not migrated yet - MigrateTopLevelComponentsToMenus owns that case
 
+            // Invariant 3: the Job view is never menu-hosted. It is not just a place to put things - it boots
+            // the controller (Activate -> InitSystem -> $I, settings, parser state), owns the status poller and
+            // hosts the run controls, and the call sites that drive it resolve it with getTab(ViewType.GRBL),
+            // which returns null for a menu-hosted view. Menuing Job therefore cost you the connect handshake
+            // silently. MainPageEditor.CanMenu stops it being chosen; this puts back a profile that chose it
+            // under an earlier build. Runs BEFORE inMenus is computed so the tabs-list cleanup below doesn't
+            // then strip the entry we just restored.
+            var tabsSlot = root.Slot(LayoutKeys.SlotTabs);
+            if (tabsSlot != null)
+            {
+                int demenued = fileSlot.Items.RemoveAll(n => n?.Component == LayoutKeys.Grbl)
+                             + toolsSlot.Items.RemoveAll(n => n?.Component == LayoutKeys.Grbl);
+                if (demenued > 0)
+                {
+                    if (tabsSlot.Items.FindIndex(n => n?.Component == LayoutKeys.Grbl) < 0)
+                        tabsSlot.Items.Insert(0, new LayoutNode(LayoutKeys.Grbl));
+                    // TabOrder.Apply rebuilds the tabs slot from this flat list whenever it is non-empty, so
+                    // restoring only the tree would be undone on the very next load.
+                    if (Base?.Tabs != null && Base.Tabs.Count > 0 && !Base.Tabs.Contains(LayoutKeys.Grbl))
+                        Base.Tabs.Insert(0, LayoutKeys.Grbl);
+                    _migratedFormat = true;   // persist the repair rather than redoing it every launch
+                    CNC.Core.DebugLog.Write("config", "EnforceMenuPlacement: Job view moved back to the tab bar");
+                }
+            }
+
             var inMenus = new HashSet<string>(
                 fileSlot.Items.Concat(toolsSlot.Items).Select(n => n.Component), StringComparer.Ordinal);
 

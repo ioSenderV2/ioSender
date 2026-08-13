@@ -53,6 +53,7 @@ using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using System.Runtime.CompilerServices;
 #if ADD_CAMERA
 using CNC.Controls.Camera;
 #endif
@@ -2157,8 +2158,7 @@ namespace GCode_Sender
                 Comms.com.PurgeQueue();
                 // Activate the GRBL view to run the controller handshake (re-runs it after a disconnect
                 // because PrepareForReconnect() cleared its init state).
-                if (getView(getTab(ViewType.GRBL)) is ICNCView grbl)
-                    grbl.Activate(true, ViewType.Startup);
+                jobView()?.Activate(true, ViewType.Startup);
 
                 // A menu (re)connect can target a different controller than startup did (e.g. simulator ->
                 // real machine), so re-run the first-run wizard gate + ATC macro check against the now-
@@ -2195,8 +2195,7 @@ namespace GCode_Sender
             model.IsReady = false;
 
             // Clear the GRBL view's controller state so the next Connect re-runs the handshake.
-            if (getView(getTab(ViewType.GRBL)) is JobView grbl)
-                grbl.PrepareForReconnect();
+            (jobView() as JobView)?.PrepareForReconnect();
 
             UpdateSimulatorTint();
         }
@@ -2225,8 +2224,7 @@ namespace GCode_Sender
             if (ok)
             {
                 Comms.com.PurgeQueue();
-                if (getView(getTab(ViewType.GRBL)) is ICNCView grbl)
-                    grbl.Activate(true, ViewType.Startup);
+                jobView()?.Activate(true, ViewType.Startup);
             }
             UpdateSimulatorTint();
             return ok;
@@ -2252,8 +2250,7 @@ namespace GCode_Sender
             if (res == 0 && Comms.com != null && Comms.com.IsOpen)
             {
                 Comms.com.PurgeQueue();
-                if (getView(getTab(ViewType.GRBL)) is ICNCView grbl)
-                    grbl.Activate(true, ViewType.Startup);
+                jobView()?.Activate(true, ViewType.Startup);
                 ForceMachineSetupIfNeeded();
             }
             UpdateSimulatorTint();
@@ -2377,8 +2374,7 @@ namespace GCode_Sender
                             if (Comms.com != null && Comms.com.IsOpen)
                             {
                                 Comms.com.PurgeQueue();
-                                if (getView(getTab(ViewType.GRBL)) is ICNCView grbl)
-                                    grbl.Activate(true, ViewType.Startup);
+                                jobView()?.Activate(true, ViewType.Startup);
                             }
                             model.Message = migrated
                                 ? "Connection migrated to network (" + ip + ":23)"
@@ -2953,15 +2949,41 @@ namespace GCode_Sender
 
         public static void CloseFile ()
         {
-            ICNCView view, grbl = getView(getTab(ViewType.GRBL));
+            // grbl is closed FIRST (it owns the loaded program) and then skipped in the sweep below, so it
+            // must be resolved separately - but it was dereferenced unguarded, which is a straight
+            // NullReferenceException the moment the Job view is not a tab. It always is one now (see
+            // jobView), and the sweep closes every tab regardless, so a null here costs nothing but the
+            // ordering.
+            ICNCView view, grbl = jobView();
 
-            grbl.CloseFile();
+            grbl?.CloseFile();
 
             foreach (TabItem tabitem in UIUtils.FindLogicalChildren<TabItem>(ui.tabMode))
             {
                 if ((view = getView(tabitem)) != null && view != grbl)
                     view.CloseFile();
             }
+        }
+
+        /// <summary>
+        /// The Job view - the one view guaranteed to be on the tab bar. It is not merely a place to put
+        /// things: its Activate runs the controller handshake (InitSystem -> $I, settings, parser state) and
+        /// it owns the status poller, so MainPageEditor.CanMenu refuses to move it into a menu and
+        /// AppConfig.EnforceMenuPlacement puts back a profile that moved it under an earlier build.
+        ///
+        /// Resolving it therefore should never fail. It is worth a helper anyway, because the callers that
+        /// resolve it inline used `is ICNCView grbl` and no-opped on null: a missing Job view then looks
+        /// EXACTLY like a controller that never answered - no dialog, no log line, capabilities silently
+        /// unread. If the invariant is ever broken again, this says so instead of swallowing it.
+        /// </summary>
+        private static ICNCView jobView([CallerMemberName] string caller = null)
+        {
+            var view = getView(getTab(ViewType.GRBL));
+
+            if (view == null)
+                DebugLog.Write("connect", "jobView: Job view is not on the tab bar - " + caller + " had nothing to drive");
+
+            return view;
         }
 
         private static TabItem getTab(ViewType mode)
