@@ -154,7 +154,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>251 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>257 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -172,6 +172,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Per-Monitor&nbsp;V2 DPI awareness &mdash; the app reads the <em>live</em> per-monitor DPI (like Edge / VS&nbsp;Code) instead of a system-DPI value cached at logon, so it renders at the correct scale regardless of resolution / scale changes and is no longer thrown off by a stale DPI cache; adds <code>-debuglog=dpi</code> diagnostics</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr69">69</a></td></tr>
 <tr><td>The connect handshake no longer fails a healthy controller, and refuses to carry on blind if it does.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr235">235</a></td></tr>
 <tr><td>The UI pump no longer spins unbounded, which twice reached the 32-bit ceiling and killed the app.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr245">245</a></td></tr>
+<tr><td>A controller wait whose worker threw would spin for ever &mdash; responsive, and completely ignoring you. Forty of them now end.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr253">253</a></td></tr>
 </table>
 
 <h3>Jogging &amp; main page</h3>
@@ -200,6 +201,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Commands sent during an in-flight jog no longer come back as a string of error:9.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr241">241</a></td></tr>
 <tr><td>A new install gets the busy nine-tab bar again; the compressed arrangement ships as a configuration overlay you apply instead.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr248">248</a></td></tr>
 <tr><td>The four corner buttons and the centre bullseye looked dead when they declined to move, and their safe-Z retract targeted the limit switch itself.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr250">250</a></td></tr>
+<tr><td>Settings &gt; Top-level tabs let you move the Job view into a menu, which silently stopped the controller handshake from running at all.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr252">252</a></td></tr>
 </table>
 
 <h3>Machine setup &amp; settings</h3>
@@ -249,6 +251,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Layer a trimmed App.config onto an existing profile &mdash; adopt someone else's screen layout without touching your machine, macros or fixtures. Reversible.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr247">247</a></td></tr>
 <tr><td>With no configured target the Connect dialog lands on Serial, and a serial link is no longer handed over to the network behind your back.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr249">249</a></td></tr>
 <tr><td>A <code>$n=</code> typed at the MDI never reached ioSender's own copy, so Machine Setup &mdash; and the jog envelope &mdash; kept working from superseded numbers.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr251">251</a></td></tr>
+<tr><td>Pick a page from the filtered settings list and the matching controls on it are marked and scrolled to &mdash; dashed when the hit is in a tooltip.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr257">257</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -380,6 +383,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Works through the UI feedback Phil Barrett sent after his first sessions with V2.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr190">190</a></td></tr>
 <tr><td>One Top Level Tabs group holds every tab-strip and menu destination; a key reaches its target wherever it currently lives, menu commands can be bound too, and the menu shows the key.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr212">212</a></td></tr>
 <tr><td>Typed commands and streamed programs now share one dispatch path and one pacer.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr240">240</a></td></tr>
+<tr><td>Two new bindable actions in the Program group &mdash; MDI opens the console ready to type, Status shows the message history.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr254">254</a></td></tr>
+<tr><td>The &ldquo;Toggle console window&rdquo; shortcut (F12) is removed &mdash; bind MDI instead &mdash; and the MDI input line is now sized independently of the log above it.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr255">255</a></td></tr>
+<tr><td>Find-in-console highlights every match, with the current one picked out &mdash; previously it marked one, and that one frequently did not render at all.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr256">256</a></td></tr>
 </table>
 
 <h3>Polish, onboarding &amp; docs</h3>
@@ -732,7 +738,13 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">249</td><td><a href="#pr249">First connect defaults to Serial</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+14</span> <span class="del">-8</span></td></tr>
 <tr><td class="n">250</td><td><a href="#pr250">Jog go-to buttons say why they refuse</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+28</span> <span class="del">-12</span></td></tr>
 <tr><td class="n">251</td><td><a href="#pr251">Settings changed elsewhere no longer go unnoticed</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+192</span> <span class="del">-0</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (251 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">2356</span> <span class="del">30</span> <span class="add">+247</span><br><span class="k">Lines:</span> <span class="add">+102898</span> <span class="del">-24925</span></td></tr>
+<tr><td class="n">252</td><td><a href="#pr252">The Job view stays on the tab bar, because moving it broke connecting</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+84</span> <span class="del">-22</span></td></tr>
+<tr><td class="n">253</td><td><a href="#pr253">A worker that threw left the app pumping for ever</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">15</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+169</span> <span class="del">-245</span></td></tr>
+<tr><td class="n">254</td><td><a href="#pr254">MDI and Status can be put on a key</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+29</span> <span class="del">-1</span></td></tr>
+<tr><td class="n">255</td><td><a href="#pr255">The console toggle is retired; the MDI input is sized separately</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">14</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+124</span> <span class="del">-112</span></td></tr>
+<tr><td class="n">256</td><td><a href="#pr256">Console search now highlights every match</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+218</span> <span class="del">-1</span></td></tr>
+<tr><td class="n">257</td><td><a href="#pr257">Settings search points at the match on the page, not just at the page</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+321</span> <span class="del">-39</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (257 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">2393</span> <span class="del">30</span> <span class="add">+249</span><br><span class="k">Lines:</span> <span class="add">+103843</span> <span class="del">-25345</span></td></tr>
 </table>
 </div>
 
@@ -5025,6 +5037,83 @@ clear an error message; loading a file containing #-expressions failed.</li>
 <tr><td class="mono">CNC Core/CNC Core/MdiDispatcher.cs</td><td class="num add">5</td><td class="num">0</td></tr>
 </table>
 <div class="desc"><p>Reported as &ldquo;Machine Setup is showing stale info&rdquo;, and it was &mdash; but the page was faithfully rendering a cache that had itself stopped matching the controller. Three gaps, closed in order of how far the staleness reached.</p><ul><li><strong>An MDI write never updated the cached settings.</strong> <code>$132=120</code> is acked by the controller and goes nowhere near a save or a <code>$$</code> reload, so nothing refreshed the copy. The dispatcher's ack path &mdash; the one place that sees a command and its reply together &mdash; now records an accepted <code>$n=value</code>, rebaselines it as controller-held and re-derives the cached projections. That last part is the one that mattered: max travel is derived from the same collection, and the jog envelope clamp and the 3D machine frame read <em>those</em>, so after an MDI change they were all clamping against the old number.</li><li><strong>Nothing told a view the settings had changed.</strong> A <code>SettingsReloaded</code> notification is raised on both the read path and the write path; Machine Setup subscribes while active and re-reads. It refuses to run over edits in progress &mdash; an event from the controller may not discard someone's typing &mdash; tested by an explicit edit flag, because a stale page makes the pending-change list non-empty by itself.</li><li><strong>Opening Machine Setup re-reads <code>$$</code>.</strong> The two above only catch a change this app saw go out; a pendant, another sender or a controller-side macro leaves no trace on the wire. Opening the page whose numbers get written back to the machine is the right moment to ask. It stands down when disconnected, mid-job, or when unsaved edits exist anywhere &mdash; the settings pages share that collection.</li></ul><p>Not cosmetic: the page's Apply diffs the on-screen values against the live settings, so a stale entry comes back as a pending change and gets written to the machine. A travel envelope corrected from the MDI was one Apply away from being un-corrected.</p><p class="foot">The MDI parse is verified against the real commands in a session log &mdash; setting writes match, and jogs, queries, filesystem and reset commands are all ignored. The live refresh paths build clean but are not yet exercised against hardware.</p></div>
+</div>
+<!-- ===== #252 ===== -->
+<div class="pr">
+<h2 id="pr252"><span class="badge">#252</span>Moving the Job view into a menu quietly cost you the connect handshake</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">25</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MainPageEditor.xaml.cs</td><td class="num add">25</td><td class="num del">10</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">34</td><td class="num del">12</td></tr>
+</table>
+<div class="desc"><p>Every view on the tab bar can be sent to the File or Tools menu instead &mdash; that is the point of <a href="#pr210">#210</a>, and a keyboard shortcut follows its view wherever it lives. The Job view was offered the same choice, and it is the one view that cannot survive it.</p><p>Nine places in the code look the Job view up by asking the tab bar for it. A view that lives in a menu is not on the tab bar, so all nine got nothing back. Most did nothing at all in response; one closed the loaded file through it and would have thrown outright.</p><ul><li><strong>The silent ones were the damaging ones.</strong> Four of those nine are the connect paths, and their whole job is to wake the Job view so it runs the handshake: <code>$I</code>, the settings load, parser state, the status poller. Skipping that looks exactly like a controller that never answered &mdash; no dialog, no log line, capabilities simply unread.</li><li><strong>The invariant is now true instead of assumed.</strong> Rather than teach a dozen call sites to open a window mid-connect, the Job view is no longer offered the File/Tools menu at all. It is not an ordinary destination: it boots the controller, owns the poller and carries the run controls.</li><li><strong>A profile that already moved it is repaired on load</strong>, in both places that decide the tab bar &mdash; the layout tree and the older flat tab list. Fixing only the tree undoes itself on the next launch, because the flat list is replayed over it.</li><li><strong>If it ever goes missing again, the log says so.</strong> The lookup is one helper now, and it records which caller came up empty rather than shrugging.</li></ul><p class="foot">Verified: the Job row offers only Tab bar; connect, reconnect, simulator switch and network migration all still run the handshake.</p></div>
+</div>
+<!-- ===== #253 ===== -->
+<div class="pr">
+<h2 id="pr253"><span class="badge">#253</span>Forty waits on the controller that had no way to end</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/Comms.cs</td><td class="num add">44</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">49</td><td class="num del">95</td></tr>
+<tr><td class="mono">CNC Controls Probing/CNC Controls Probing/ProbingViewModel.cs</td><td class="num add">28</td><td class="num del">45</td></tr>
+<tr><td class="mono">CNC Controls Probing/CNC Controls Probing/Program.cs</td><td class="num add">8</td><td class="num del">20</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">8</td><td class="num del">20</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblSDCard.cs</td><td class="num add">4</td><td class="num del">10</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SDCardView.xaml.cs</td><td class="num add">4</td><td class="num del">10</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GrblConfigControl.xaml.cs</td><td class="num add">4</td><td class="num del">10</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OffsetView.xaml.cs</td><td class="num add">4</td><td class="num del">10</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/UiPump.cs</td><td class="num add">6</td><td class="num">0</td></tr>
+<tr><td class="mono">ToolView / TrinamicView / ControllerValidator / JobRunner / Grbl Config App (5 files)</td><td class="num add">10</td><td class="num del">25</td></tr>
+</table>
+<div class="desc"><p>One idiom appears about forty times in this codebase: start a background thread to wait for the controller, then pump the UI until that thread reports a result. Nothing in it can end the wait if the result never arrives. An exception inside the thread dies there &mdash; unobserved, no crash log, nothing sets the flag &mdash; and the app pumps for ever. It stays responsive and ignores you completely, which is a good deal harder to work out than a crash. <a href="#pr245">#245</a> fixed what that spin <em>costs</em>; this fixes that it need never stop.</p><ul><li><strong>The wait now owns its worker.</strong> A single helper runs the work, pumps while waiting, and re-throws the worker's failure on the calling thread with its original stack, so it surfaces where it can be handled instead of becoming a hang. Thirty-nine call sites converted.</li><li><strong>Two of them were not waiting on bad luck at all.</strong> The two &ldquo;wait for a work-offset update&rdquo; helpers started their worker only when the status poller was running, but waited outside that check. With the poller off, no thread ever ran, so nothing could ever end the wait &mdash; a guaranteed hang, no exception required. Both now report &ldquo;no update&rdquo; instead.</li><li><strong>No timeout, deliberately.</strong> These wait on a controller that legitimately goes quiet for minutes &mdash; grblHAL says nothing for a whole homing cycle, a file upload runs long &mdash; and each operation already carries its own per-message timeout. A backstop short enough to be useful would abort work that was merely slow, which is the worse failure.</li><li><strong>Two waits were left exactly as they were.</strong> The filesystem listings already catch their own failures and report &ldquo;did not answer&rdquo;, which is a real answer there and must not become an error &mdash; reporting an unanswered query as &ldquo;nothing found&rdquo; is a bug this app has paid for before.</li></ul><p class="foot">The four stream transports wait on comms state rather than a worker thread; same unboundedness, different cause, not addressed here.</p></div>
+</div>
+<!-- ===== #254 ===== -->
+<div class="pr">
+<h2 id="pr254"><span class="badge">#254</span>MDI and Status can be put on a key</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">21</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ActionKeyBinder.cs</td><td class="num add">7</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/KeyMapEditor.xaml.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>The run strip's two smallest buttons are the ones most worth reaching without the mouse. Both are now assignable under <em>Keyboard &amp; Controller &gt; Program</em>: <strong>MDI</strong> opens the console with the caret already in its input box, and <strong>Status</strong> opens the message history.</p><ul><li><strong>Each presses the actual button.</strong> The shortcut invokes that button's own click handler rather than a copy of it, so there is one implementation and the key cannot drift from what clicking does &mdash; and it refuses while the button is disabled, so a key can never do what a click currently cannot.</li><li><strong>They stay live during a run</strong>, unlike the bindable menu commands, which the menu bar disables wholesale while a job is going. Reaching the MDI console and the message history is exactly what you want mid-job.</li><li><strong>Unbound out of the box</strong>, like every other hand-bound command here. Claiming a key uninvited collides with whatever you already use.</li></ul><p class="foot">Verified: both bind, both fire, and both are refused while their button is disabled.</p></div>
+</div>
+<!-- ===== #255 ===== -->
+<div class="pr">
+<h2 id="pr255"><span class="badge">#255</span>F12 no longer toggles the console, and the MDI input has its own text size</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml</td><td class="num add">23</td><td class="num del">7</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">19</td><td class="num del">31</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">14</td><td class="num del">32</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml.cs</td><td class="num add">16</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/KeyMapEditor.xaml.cs</td><td class="num add">5</td><td class="num del">15</td></tr>
+<tr><td class="mono">docs/manual/index.html</td><td class="num add">4</td><td class="num del">3</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/Default-App.config</td><td class="num add">1</td><td class="num del">2</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">42</td><td class="num del">21</td></tr>
+</table>
+<div class="desc"><p>Two changes to the console, and the first one takes something away, so it is worth reading before you go looking for it.</p><ul><li><strong>&ldquo;Toggle console window&rdquo; is gone, and with it the F12 default.</strong> The run strip's MDI button is bindable now (see <a href="#pr254">#254</a>) and reaches the same place, without needing a config key, a store and a dispatch path of its own. Bind <em>MDI</em> to whatever key you like; <kbd>Esc</kbd> still closes the console. Its two saved settings are dropped from your profile on the next save.</li><li><strong>The MDI input line has its own text size</strong>, defaulting to roughly double what it was. It was never tied to the log's size &mdash; it was simply fixed and not adjustable. The console toolbar now carries two steppers, <em>Log</em> for the scrollback and <em>MDI</em> for the input, and both persist. They are deliberately separate: the scrollback is a log you skim, the input is a line you type g-code into and read back before pressing Enter.</li></ul><p class="foot">Removing the toggle came within an inch of taking F1 context help, every tab-switch shortcut and keyboard jogging with it &mdash; the routine that parsed its key also installed the window-wide key handler. That hookup stayed.</p></div>
+</div>
+<!-- ===== #256 ===== -->
+<div class="pr">
+<h2 id="pr256"><span class="badge">#256</span>Searching the console marked one match, and often not even that</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SearchHighlightAdorner.cs</td><td class="num add">146</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml.cs</td><td class="num add">72</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>The console's Search box found matches and counted them, but showed you almost nothing. Every match except the current one was unmarked by design, so the only way to reach them was to press F3 and watch the counter climb. And the current one was usually invisible too, for two further reasons.</p><ul><li><strong>Focus never leaves the search box</strong> while you type, so the scrollback is never focused &mdash; and WPF will not reliably paint a selection in a text box that has never held focus.</li><li><strong>The scrollback is rebuilt wholesale four times a second</strong> while output arrives, and rebuilding it drops the selection outright. Any highlight was gone within a quarter of a second.</li><li><strong>So the highlighting no longer goes through the selection at all.</strong> Every match gets a soft fill, the current one a stronger fill and outline, drawn over the log &mdash; which ignores focus and survives the rebuild. Stepping with F3/F4 or the arrows moves the strong one, and the view still scrolls to it.</li><li><strong>Match positions are recomputed after each rebuild.</strong> Once the scrollback hits its cap it trims from the top, which shifts every position &mdash; stale ones would confidently highlight the wrong text, which is worse than highlighting none.</li><li><strong>Not searching costs nothing.</strong> Only matches on visible lines are drawn, so a query hitting thousands of lines still costs one screenful; with the box empty nothing is drawn and nothing is recomputed.</li></ul><p class="foot">Verified in both the Console tab and the floating console window, with output arriving and across a scrollback trim.</p></div>
+</div>
+<!-- ===== #257 ===== -->
+<div class="pr">
+<h2 id="pr257"><span class="badge">#257</span>Settings search points at the match on the page, not just at the page</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SettingsNavShell.xaml.cs</td><td class="num add">196</td><td class="num del">19</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ElementHighlightAdorner.cs</td><td class="num add">125</td><td class="num del">20</td></tr>
+</table>
+<div class="desc"><p>Searching the settings list narrowed it to the right pages and stopped there. Opening one of them left you to find the word yourself &mdash; and the search also matches tooltip text, so a page could be a genuine hit with the word nowhere on screen at all. The tree explained that in words; explaining is not pointing.</p><ul><li><strong>Choosing a page now marks every control on it that matched</strong> and scrolls the first into view. Captions, group headers, text boxes, checkbox and button labels, and tooltips all count.</li><li><strong>A tooltip-only hit is drawn dashed</strong> rather than solid, so you can tell at a glance that the reason is hidden and the control is worth hovering &mdash; instead of a highlight that looks simply wrong. Tooltip text itself is left exactly as written.</li><li><strong>It scrolls to a hit you can read.</strong> If a page has both kinds, the visible one wins the scroll; landing on an invisible match while the word sits in plain sight further down is the same confusion in smaller form.</li><li><strong>A page that matched but could not be marked says so in the log</strong> rather than showing nothing, which would be indistinguishable from the bug this fixes.</li></ul><p>The <code>$</code>-setting search on the controller settings page is untouched; it already highlighted its matches.</p><p class="foot">Marks are drawn over the page rather than by restyling it, so no settings panel had to be touched, and none can lose the highlight to a background of its own.</p></div>
 </div>
 </section>
 
