@@ -488,10 +488,8 @@ static class Probe
         public int WriteLineCount { get { lock (Writes) return Writes.Count; } }
         public string WriteAt(int i) { lock (Writes) return Writes[i]; }
         public string GetReply(string command) { return string.Empty; }
-        public void AwaitAck() { }
-        public void AwaitAck(string command) { }
-        public void AwaitResponse(string command) { }
-        public void AwaitResponse() { }
+        public bool AwaitAck() { return true; }
+        public bool AwaitAck(string command) { return true; }
         public void PurgeQueue() { }
 
         public event DataReceivedHandler DataReceived { add { } remove { } }

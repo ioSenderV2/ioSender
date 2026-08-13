@@ -125,6 +125,18 @@ namespace CNC.Core
 
         public const int TXBUFFERSIZE = 4096, RXBUFFERSIZE = 1024;
 
+        /// <summary>
+        /// Backstop for the transports' ack waits. Deliberately LONGER than the per-operation caps
+        /// already in the codebase (AtcMacros.UnlinkWithTimeout 3000, ControllerValidator.AckTimeout
+        /// 4000) so it stays a backstop and never preempts them - it exists to end a wait that would
+        /// otherwise never end, not to police a reply that is merely slow.
+        ///
+        /// Safe for its two callers because neither waits on anything long-running: a `$n=v` settings
+        /// write and the PID report both ack in milliseconds. Do NOT reuse this for a wait that spans
+        /// a homing cycle or a YModem upload - grblHAL goes silent for the whole of both.
+        /// </summary>
+        public const int AckTimeoutMs = 5000;
+
         public static StreamComms com = null;
     }
 
@@ -175,10 +187,19 @@ namespace CNC.Core
         void WriteString(string data);
         void WriteCommand(string command);
         string GetReply(string command);
-        void AwaitAck();
-        void AwaitAck(string command);
-        void AwaitResponse(string command);
-        void AwaitResponse();
+
+        /// <summary>
+        /// Wait for the outstanding command to be acknowledged (ok) or rejected (error:N), pumping the
+        /// host UI meanwhile. Returns FALSE if <see cref="Comms.AckTimeoutMs"/> elapsed with neither -
+        /// the caller must treat that as "the controller did not answer", NOT as success: on timeout
+        /// <see cref="Reply"/> still holds whatever arrived last, which is stale and belongs to some
+        /// other exchange. See [[iosender-connect-handshake-last-reply-race]].
+        ///
+        /// These waits were unbounded until 2026-08-13 and could hang the UI for the rest of the
+        /// session; a settings write that was never acknowledged is reported as an error now.
+        /// </summary>
+        bool AwaitAck();
+        bool AwaitAck(string command);
         void PurgeQueue();
 
         event DataReceivedHandler DataReceived;
@@ -318,6 +339,36 @@ namespace CNC.Core
 
             if (failure != null)
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+        }
+
+        /// <summary>
+        /// Pump the host UI while <paramref name="pending"/> stays true, giving up after
+        /// <paramref name="msTimeout"/>. Returns true if the condition cleared, false on timeout.
+        ///
+        /// This is the counterpart to <see cref="RunPumped"/> for waits that have NO worker thread to
+        /// own them: the transports' ack waits spin on a volatile state field that the comms READ
+        /// thread assigns, so there is no result to wait for and nothing to rethrow - only a condition
+        /// that may never clear. Hence a wall clock, where RunPumped deliberately has none.
+        ///
+        /// Unlike the loops this replaces, every caller pumps. Two of the transports used to spin bare
+        /// (`while (...) ;`) and two slept without pumping, so the same operation froze the UI on
+        /// Telnet/Websocket but not on Serial/Eltima.
+        /// </summary>
+        public static bool WaitWhile(System.Func<bool> pending, int msTimeout)
+        {
+            if (pending == null)
+                return true;
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+
+            while (pending())
+            {
+                if (sw.ElapsedMilliseconds >= msTimeout)
+                    return false;
+                DoEvents();
+            }
+
+            return true;
         }
     }
 }

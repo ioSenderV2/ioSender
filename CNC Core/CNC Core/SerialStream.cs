@@ -426,36 +426,26 @@ namespace CNC.Core
             }
         }
 
-        public void AwaitAck()
+        // Pending predicates read this instance's own volatile state, not Comms.com's - the loops these
+        // replace all went through the global, which is only the same object by convention.
+        private bool AwaitingAck { get { return state == Comms.State.DataReceived || state == Comms.State.AwaitAck; } }
+
+        public bool AwaitAck()
         {
-            while (Comms.com.CommandState == Comms.State.DataReceived || Comms.com.CommandState == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
+            if (EventUtils.WaitWhile(() => AwaitingAck, Comms.AckTimeoutMs))
+                return true;
+
+            ConsoleLog.Write("[SerialStream] AwaitAck: no ok/error within " + Comms.AckTimeoutMs + "ms");
+            return false;
         }
 
-        public void AwaitAck(string command)
+        public bool AwaitAck(string command)
         {
             PurgeQueue();
             Reply = string.Empty;
             WriteCommand(command);
 
-            while (Comms.com.CommandState == Comms.State.DataReceived || Comms.com.CommandState == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
-        }
-
-        public void AwaitResponse()
-        {
-            while (Comms.com.CommandState == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
-        }
-
-        public void AwaitResponse(string command)
-        {
-            PurgeQueue();
-            Reply = string.Empty;
-            WriteCommand(command);
-
-            while (Comms.com.CommandState == Comms.State.AwaitAck)
-                System.Threading.Thread.Sleep(15);
+            return AwaitAck();
         }
 
         public string GetReply(string command)
@@ -463,7 +453,12 @@ namespace CNC.Core
             Reply = string.Empty;
             WriteCommand(command);
 
-            AwaitResponse();
+            // Any reply ends this wait, not just ok/error - GetReply's caller wants the response line.
+            if (!EventUtils.WaitWhile(() => state == Comms.State.AwaitAck, Comms.AckTimeoutMs))
+            {
+                ConsoleLog.Write("[SerialStream] GetReply('" + command + "'): no reply within " + Comms.AckTimeoutMs + "ms");
+                return string.Empty;
+            }
 
             return Reply;
         }

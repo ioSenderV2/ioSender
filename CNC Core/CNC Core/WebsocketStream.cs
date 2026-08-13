@@ -319,30 +319,27 @@ namespace CNC.Core
             }
         }
 
-        public void AwaitAck()
+        // Pending predicates read this instance's own volatile state, not Comms.com's - the loops these
+        // replace all went through the global, which is only the same object by convention.
+        private bool AwaitingAck { get { return state == Comms.State.DataReceived || state == Comms.State.AwaitAck; } }
+
+        public bool AwaitAck()
         {
-            while (Comms.com.CommandState == Comms.State.DataReceived || Comms.com.CommandState == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
+            if (EventUtils.WaitWhile(() => AwaitingAck, Comms.AckTimeoutMs))
+                return true;
+
+            ConsoleLog.Write("[WebsocketStream] AwaitAck: no ok/error within " + Comms.AckTimeoutMs + "ms");
+            return false;
         }
 
-        public void AwaitAck(string command)
+        public bool AwaitAck(string command)
         {
+            // This overload used to spin bare - `while (...) ;` - with no pump and no sleep: a frozen UI
+            // and a saturated core for as long as the controller stayed quiet. Serial/Eltima pumped, so
+            // the same operation behaved differently depending on how you were connected.
             WriteCommand(command);
 
-            while (Comms.com.CommandState == Comms.State.DataReceived || Comms.com.CommandState == Comms.State.AwaitAck) ;
-        }
-
-        public void AwaitResponse()
-        {
-            while (Comms.com.CommandState == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
-        }
-
-        public void AwaitResponse(string command)
-        {
-            WriteCommand(command);
-
-            while (Comms.com.CommandState == Comms.State.AwaitAck) ;
+            return AwaitAck();
         }
 
         public string GetReply(string command)
@@ -350,8 +347,12 @@ namespace CNC.Core
             Reply = string.Empty;
             WriteCommand(command);
 
-            while (state == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
+            // Any reply ends this wait, not just ok/error - GetReply's caller wants the response line.
+            if (!EventUtils.WaitWhile(() => state == Comms.State.AwaitAck, Comms.AckTimeoutMs))
+            {
+                ConsoleLog.Write("[WebsocketStream] GetReply('" + command + "'): no reply within " + Comms.AckTimeoutMs + "ms");
+                return string.Empty;
+            }
 
             return Reply;
         }

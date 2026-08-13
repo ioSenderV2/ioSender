@@ -3417,15 +3417,27 @@ namespace CNC.Core
             {
                 foreach (var setting in changed)
                 {
+                    bool acked;
 #if USE_ASYNC
                     var task = Task.Run(() => Comms.com.AwaitAck(string.Format("${0}={1}", Setting.Id, Setting.Value)));
-                    await await Task.WhenAny(task, Task.Delay(2500));
+                    acked = await await Task.WhenAny(task, Task.Delay(2500).ContinueWith(_ => false));
 #else
                     Comms.com.WriteCommand(string.Format("${0}={1}", setting.Id, setting.Value));
-                    Comms.com.AwaitAck();
+                    acked = Comms.com.AwaitAck();
 #endif
                     setting.ClearErrors();
-                    if (Comms.com.Reply.StartsWith("error:"))
+                    if (!acked)
+                    {
+                        // Neither ok nor error came back. Do NOT fall through to the Reply check below:
+                        // Comms.com.Reply is a last-writer-wins global that still holds some earlier
+                        // exchange's line, so it would report THAT one's outcome as this setting's - the
+                        // same defect as the connect handshake's. The setting stays dirty and unbaselined,
+                        // because we do not know whether the controller took it.
+                        // Unreachable before 2026-08-13: the wait was unbounded, so it hung here instead.
+                        ok = false;
+                        setting.SetError("No response from controller");
+                    }
+                    else if (Comms.com.Reply.StartsWith("error:"))
                     {
                         ok = false;
                         setting.SetError(GrblErrors.GetMessage(Comms.com.Reply.Substring(6)));
