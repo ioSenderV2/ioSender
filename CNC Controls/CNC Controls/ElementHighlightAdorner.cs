@@ -25,21 +25,52 @@ namespace CNC.Controls
         // wherever it appears.
         private static readonly Brush Fill = Freeze(new SolidColorBrush(Color.FromArgb(0x55, 0xFF, 0xE0, 0x4A)));
         private static readonly Brush OutlineBrush = Freeze(new SolidColorBrush(Color.FromArgb(0xEE, 0xD8, 0x5A, 0x00)));
-        private static readonly Pen Outline = FreezePen(new Pen(OutlineBrush, 1.5d));
+        private const double Thickness = 1.5d;   // const, so declaration order against Outline does not matter
 
-        // A DASHED outline means the match is not in anything you can see: it is in this control's tooltip.
-        // Without the distinction a tooltip hit marks a row with no matching text anywhere on it, which reads
-        // as a wrong result - you have to hover to discover why it is lit at all. Dashes say "the reason is
-        // hidden here, hover me" without changing the tooltip itself.
-        private static readonly Pen TooltipOutline = FreezePen(new Pen(OutlineBrush, 1.5d)
-        {
-            DashStyle = new DashStyle(new double[] { 3d, 2d }, 0d)
-        });
+        private static readonly Pen Outline = FreezePen(new Pen(OutlineBrush, Thickness));
 
         private readonly bool tooltipOnly;
 
         private static Brush Freeze(Brush b) { b.Freeze(); return b; }
         private static Pen FreezePen(Pen p) { p.Freeze(); return p; }
+
+        // A DASHED outline means the match is not in anything you can see: it is in this control's tooltip.
+        // Without the distinction a tooltip hit marks a row with no matching text anywhere on it, which reads
+        // as a wrong result - you have to hover to discover why it is lit at all. Dashes say "the reason is
+        // hidden here, hover me" without changing the tooltip itself.
+        //
+        // The GAP widens with UiScale, and that is not the same as "it already scales". UiScale is a
+        // LayoutTransform over the main window's visual tree, and this adorner is inside that tree, so stroke,
+        // dash and gap are ALREADY multiplied together - the ratio between them never changed, which is
+        // exactly the problem. As the stroke thickens at high zoom the anti-aliased ends of each dash bleed
+        // across a proportionally-constant gap and the outline closes up into a near-solid line. Keeping it
+        // legibly dashed needs the gap to grow FASTER than the stroke, so the multiplier itself scales.
+        //
+        // DashStyle lengths are multiples of PEN THICKNESS, not device pixels - which is why this is a change
+        // to the multiplier rather than to a pixel size.
+        private static Pen cachedTooltipPen;
+        private static double cachedScale = double.NaN;
+
+        private static Pen TooltipOutlineFor(double scale)
+        {
+            if (cachedTooltipPen != null && cachedScale == scale)
+                return cachedTooltipPen;
+
+            cachedScale = scale;
+            cachedTooltipPen = FreezePen(new Pen(OutlineBrush, Thickness)
+            {
+                DashStyle = new DashStyle(new double[] { 3d, 2d * scale }, 0d)
+            });
+            return cachedTooltipPen;
+        }
+
+        // Clamped: a wild UiScale must not turn the outline into four corner ticks, and a null config
+        // (designer, or a host that never loaded settings) must not throw.
+        private static double UiScale()
+        {
+            double s = AppConfig.Settings?.Base?.UiScale ?? 1d;
+            return double.IsNaN(s) || s < 1d ? 1d : System.Math.Min(s, 3d);
+        }
 
         /// <param name="tooltipOnly">
         /// True when the query was found only in the element's tooltip, not in any text it displays.
@@ -59,7 +90,7 @@ namespace CNC.Controls
             // Bleed slightly outside the control: a checkbox or label sized tight to its text reads better
             // with the mark sitting just proud of it than with the outline clipping the glyphs.
             var r = new Rect(-2d, -1d, size.Width + 4d, size.Height + 2d);
-            dc.DrawRoundedRectangle(Fill, tooltipOnly ? TooltipOutline : Outline, r, 3d, 3d);
+            dc.DrawRoundedRectangle(Fill, tooltipOnly ? TooltipOutlineFor(UiScale()) : Outline, r, 3d, 3d);
         }
     }
 }
