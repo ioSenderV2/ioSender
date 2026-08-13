@@ -1843,3 +1843,5 @@ CNC.Controls.WPF.g.en-US.resources:uigeneralconfigcontrol.baml,lbl_statusAutoClo
 CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,lbl_mdiFont:System.Windows.Controls.TextBlock.Text,Text,True,True,,MDI
 CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_mdiFontSmaller:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Smaller MDI input text
 CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,btn_mdiFontLarger:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Larger MDI input text
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wocornerreliefs:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Corner reliefs
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wocornerreliefs:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Cut a dogbone relief into each inside corner so a square-cornered part actually seats in the pocket. The cutter pokes out along each corner's diagonal until its circle reaches the true corner, leaving a small round nick in both walls. Applies to the pocket and side finish walls; a contour's corners are already cut exactly and are left alone."
