@@ -897,6 +897,11 @@ namespace CNC.Core
                 && message.IndexOf("STREAM ACTIVE", StringComparison.OrdinalIgnoreCase) < 0;
         }
 
+        // "firmware" while the [MSG:...] parse case is assigning Message - the one place that
+        // knows a status line came from the controller rather than this application. Read by the
+        // status log's source column, so "what did the MACHINE actually say" stays greppable.
+        private string _messageSource = "app";
+
         private void LogMessage(string message, bool isError)
         {
             if (!IsLoggableMessage(message))
@@ -905,6 +910,11 @@ namespace CNC.Core
             MessageLog.Add(string.Format("{0:HH:mm:ss}  {1}{2}", DateTime.Now, isError ? "! " : string.Empty, message));
             if (MessageLog.Count > 1200)
                 MessageLog.RemoveRange(0, 200);
+
+            // Durable copy. MessageLog above is memory-only and drops its OLDEST 200 lines on
+            // overflow, so without this the lines explaining how a session got into trouble are
+            // the first ones lost - and none of it survived a restart.
+            StatusLog.Write(isError ? "error" : "info", _messageSource, message);
         }
 
         public string Message
@@ -1598,6 +1608,9 @@ namespace CNC.Core
 
                     case "MSG":
                         var msg = data.Substring(5).Trim().TrimEnd(']');
+                        // Everything this case writes to Message came from the controller - tag
+                        // the status log accordingly (reset below, same case, every path).
+                        _messageSource = "firmware";
                         if (msg == "'$H'|'$X' to unlock")
                             Message = LibStrings.FindResource(GrblInfo.IsGrblHAL ? "ContUnlock" : "ContHomeUnlock");
                         else if (GrblState.State == GrblStates.Alarm && msg != "Caution: Unlocked")
@@ -1623,6 +1636,7 @@ namespace CNC.Core
                         }
                         else
                             Message = msg;
+                            _messageSource = "app";
                             if (msg == "Pgm End")
                             {
                                 ProgramEnd = true;

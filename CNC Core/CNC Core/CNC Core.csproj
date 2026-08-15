@@ -90,6 +90,7 @@
     <Compile Include="GCodeRunTimeIndex.cs" />
     <Compile Include="JogGate.cs" />
     <Compile Include="ConsoleLog.cs" />
+    <Compile Include="StatusLog.cs" />
     <Compile Include="DebugLog.cs" />
     <Compile Include="LinkMonitor.cs" />
     <Compile Include="PollDiag.cs" />

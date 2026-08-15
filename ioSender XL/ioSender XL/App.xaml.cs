@@ -188,6 +188,7 @@ namespace GCode_Sender
             CNC.Core.DebugLog.Write("app", "OnStartup - args: " + string.Join(" ", args));
 
             CNC.Core.ConsoleLog.Init();
+            CNC.Core.StatusLog.Init();
             CNC.Core.WireLog.Init(wireLog);
             if (CNC.Core.WireLog.Enabled)
                 CNC.Core.DebugLog.Write("app", "wire log: " + CNC.Core.WireLog.LogPath);
