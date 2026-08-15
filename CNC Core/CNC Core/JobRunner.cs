@@ -518,10 +518,18 @@ namespace CNC.Core
         /// <summary>The controller reported the line number it is executing: catch the sent markers up to it.</summary>
         public void OnLineNumberChanged(int lineNum)
         {
-            if (job.CurrBlock > 0)
+            // A status report carrying Ln: can arrive after the program it refers to is gone - a macro
+            // that alarms mid-probe tears its stay-put program down while the controller is still
+            // reporting the line it stopped on, so job.CurrBlock outlives the Source.Data it indexes.
+            // Clamping (rather than just bailing) keeps the marker catch-up working for the blocks that
+            // DO still exist. Same exposure the ack path already guards at the PendingLine site below -
+            // this one was missed, and it threw IndexOutOfRange out of a status report, which is a
+            // DISPATCHER-level crash: it killed the app on a real machine after a probe fail.
+            int count = Source == null || Source.Data == null ? 0 : Source.Data.Count;
+            if (job.CurrBlock > 0 && count > 0)
             {
                 int found = 0;
-                var block = job.CurrBlock;
+                var block = Math.Min(job.CurrBlock, count - 1);
                 do
                 {
                     if (Source.Data[block].LineNum == lineNum)
