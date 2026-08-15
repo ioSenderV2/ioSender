@@ -286,9 +286,38 @@ namespace CNC.Controls
             return targetZ;
         }
 
+        /// <summary>
+        /// Make arbitrary text safe to place INSIDE a (...) g-code comment.
+        ///
+        /// grblHAL-style parsers end a comment at the FIRST ')', so one nested bracket truncates the
+        /// block and everything after it parses as g-code. That is not theoretical: on 2026-08-15 a
+        /// real work order failed on
+        ///     (TOOLPATH T16 Rect 1 - v-carve "..." , 27.3 mm caps (sized to fit)-31387lines)
+        /// where the comment ended at "fit)" and the controller rejected "-31387lines)" with "G-code
+        /// words consist of a letter and a value" - error:2, at the very start of a 32-minute job.
+        ///
+        /// Every string that reaches a comment goes through here, rather than each call site
+        /// remembering: this file already carried FOUR copies of the same Replace pair, and the one
+        /// place that mattered had none. Newlines go too - a comment cannot span lines.
+        ///
+        /// Sanitise where g-code is GENERATED, never on the way out to the controller. Rewriting
+        /// blocks in the send path is what once dropped a G59.3 and drove the machine 128 mm into a
+        /// touch plate; what the operator's program says is what the controller must receive.
+        /// </summary>
+        internal static string CommentText(string text)
+        {
+            return (text ?? string.Empty)
+                .Replace('(', '[').Replace(')', ']')
+                .Replace((char)13, ' ').Replace((char)10, '|');
+        }
+
         private static void AppendSection(List<string> lines, string description, List<string> sectionLines)
         {
-            lines.Add(string.Format("(TOOLPATH {0} - {1} lines)", description, sectionLines.Count));
+            // description is assembled from operator-authored names AND from this file's own literals -
+            // and one of those literals, " (sized to fit)", is exactly what broke a real job. Sanitising
+            // HERE, at the boundary where text becomes a comment, covers both without every contributor
+            // to a description having to know it ends up inside brackets.
+            lines.Add(string.Format("(TOOLPATH {0} - {1} lines)", CommentText(description), sectionLines.Count));
             lines.AddRange(sectionLines);
         }
 
@@ -537,7 +566,7 @@ namespace CNC.Controls
                 var fit = WorkOrderTextFit.Resolve(tp);
                 if (!fit.Fits)
                     return new List<string> { "(ENGRAVE skipped - text does not fit: "
-                        + (fit.Error ?? "").Replace('(', '[').Replace(')', ']') + ")" };
+                        + CommentText(fit.Error) + ")" };
                 capHeight = fit.CapHeight; angleDeg = fit.Angle; fitDx = fit.OffsetX; fitDy = fit.OffsetY;
             }
 
@@ -583,8 +612,7 @@ namespace CNC.Controls
                 // grblHAL ends a comment at the FIRST ')' (see the note on this file's comment helper), so
                 // brackets in the operator's own text would truncate the block and let the rest parse as
                 // g-code. Newlines are folded to '|' for the same reason - one comment, one line.
-                (tp.Text ?? string.Empty).Replace('(', '[').Replace(')', ']')
-                                         .Replace((char)13, ' ').Replace((char)10, '|'),
+                CommentText(tp.Text),
                 capHeight, cut.Width, depth, halfAngle * 360d / Math.PI));
 
             if (cut.Clamped)
@@ -789,9 +817,8 @@ namespace CNC.Controls
             lines.Add(string.Format(CultureInfo.InvariantCulture,
                 "(VCARVE \"{0}\" in {1}{2}{3}, cap {4:0.###} mm, {5} passes to {6:0.###} mm max at {7:0.#} deg included)",
                 // Same sanitising as BuildEngrave: grblHAL ends a comment at the FIRST ')'.
-                (tp.Text ?? string.Empty).Replace('(', '[').Replace(')', ']')
-                                         .Replace((char)13, ' ').Replace((char)10, '|'),
-                tp.FontFamily.Replace('(', '[').Replace(')', ']'),
+                CommentText(tp.Text),
+                CommentText(tp.FontFamily),
                 tp.FontBold ? " bold" : string.Empty, tp.FontItalic ? " italic" : string.Empty,
                 capHeight, cutPasses, maxDepth, halfAngle * 360d / Math.PI));
 
@@ -1292,7 +1319,9 @@ namespace CNC.Controls
                                 : ct.Kind == CustomToolKind.BallEnd ? "BALL"
                                 : "FLAT";
                     string description = ct?.Name ?? ("tool " + op.Tool);
-                    yield return string.Format("(TOOL T={0} D={1:0.0##} TYPE={2} - {3})", t, EffectiveBitDiameter(tp, op), type, description);
+                    // description is the operator's own custom-tool name - a tool called
+                    // '1/4" endmill (roughing)' would truncate this comment exactly like the TOOLPATH one did.
+                    yield return string.Format("(TOOL T={0} D={1:0.0##} TYPE={2} - {3})", t, EffectiveBitDiameter(tp, op), type, CommentText(description));
                 }
         }
 
@@ -1584,8 +1613,7 @@ namespace CNC.Controls
                             // The operator's own text goes into a g-code comment, and grblHAL ends a comment
                             // at the FIRST ')' - so a bracket in it would truncate the block and let the rest
                             // parse as g-code. Sanitised exactly as BuildEngrave sanitises its own.
-                            string shown = (tp.Text ?? string.Empty).Replace('(', '[').Replace(')', ']')
-                                                                    .Replace((char)13, ' ').Replace((char)10, '|');
+                            string shown = CommentText(tp.Text);
                             // Shape text sized to fit reports the size the fit actually resolved, marked as
                             // such - "0 mm caps" would be the field, not the cut.
                             double descCap = tp.CapHeight;
