@@ -1543,15 +1543,32 @@ namespace CNC.Controls
                 CNC.Core.DebugLog.Write("config", string.Format(
                     "ApplyOneTimeFixups: removed {0} shortcut(s) for withdrawn second-level tab targets", deadShortcuts));
 
-            // 2026-07-20: Fixture.CornerOffsetX/Y (see Fixture.cs) is new. A fixture whose PositionValidated
-            // survived from before this field existed has CornerOffsetX/Y stuck at their 0d default, which
-            // StartJobView.BuildProgram would misread as "the true corner sits exactly at Coords" instead of
-            // "never actually probed under this scheme" - force those fixtures back to not-validated so the
-            // operator is prompted to re-run Test position (which now also captures the corner offset).
+            // 2026-08-15: seed Fixture.CornerLocated for fixtures saved before that flag existed.
+            //
+            // This REPLACES a check that ran here every launch (not once, despite the method name) and
+            // said "either offset exactly 0 => never probed => clear PositionValidated". That premise was
+            // wrong - Test position parks the machine AT the true corner, so an operator who sets the
+            // reference from there gets a legitimate 0.000 - and it would have silently un-validated a
+            // freshly probed fence on the NEXT restart, which is a nastier symptom than the refusal that
+            // exposed it (Generate blocked a validated Large Fence with Y offset exactly 0).
+            //
+            // The heuristic below is the same shape, and that is fine HERE and only here: this is a
+            // one-shot migration of existing data, where a rare wrong guess costs one re-run of Test
+            // position. As a standing runtime gate it was simply wrong. A pre-flag fixture has both
+            // offsets at their 0d default; any fixture with a non-zero offset was measured under the
+            // scheme, so its flag can be set with confidence.
             foreach (var fx in Fixtures.Items)
-                if (FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented && fx.PositionValidated
-                    && (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d))
+            {
+                if (fx.CornerLocated || !FixtureKinds.ProbesEdges(fx.Kind) || !fx.Implemented)
+                    continue;
+                if (fx.PositionValidated && (fx.CornerOffsetX != 0d || fx.CornerOffsetY != 0d))
+                    fx.CornerLocated = true;
+                else if (fx.PositionValidated)
+                    // Both offsets 0 AND validated: genuinely indistinguishable from a pre-flag fixture,
+                    // so this one really does need Test position re-run - clear the checkmark that says
+                    // otherwise, exactly as the old fixup did.
                     fx.PositionValidated = false;
+            }
 
             // 2026-07-20 (later still): LayoutKeys.StepperCalProbe (new Tools sub-tab) was added to
             // DefaultLayout.Build(), but that only seeds a FRESH profile - an already-persisted Layout tree

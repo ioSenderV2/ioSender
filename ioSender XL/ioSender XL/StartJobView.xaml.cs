@@ -1693,14 +1693,15 @@ namespace GCode_Sender
                 }
             }
 
-            // Corner 1's probe now points straight at Fixture.CornerOffsetX/Y instead of locating the corner
-            // fresh (see BuildProgram) - a fixture saved/tested before that feature shipped (or one whose
-            // Coords was re-set since, which zeros both - see Fixture.Coords) has 0s here, which would aim the
-            // tight probe at a point right next to the jogged reference. Neither is ever legitimately exactly
-            // 0 (Coords is always jogged clear of the corner), so this is a safe "never actually tested under
-            // this scheme" check.
-            if (!IsG28(fx) && FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented
-                && (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d))
+            // Corner 1's probe points straight at Fixture.CornerOffsetX/Y instead of locating the corner
+            // fresh (see BuildProgram), so it must not run against offsets that were never measured - a
+            // fixture saved before that feature shipped, or one whose position has been re-set since.
+            // Fixture.CornerLocated says whether the measurement happened. It used to be inferred from
+            // "either offset is exactly 0", on the premise that Coords is always jogged clear of the
+            // corner - FALSE, and it blocked a legitimately probed fence on real hardware 2026-08-15
+            // (Test position parks AT the corner, so a 0.000 offset is a normal result). See
+            // Fixture.CornerOffsetX's comment for the full account.
+            if (!IsG28(fx) && FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented && !fx.CornerLocated)
             {
                 AppDialogs.Show("This fixture's corner position hasn't been located yet - run Test position again in Machine Setup > Fixture definitions.",
                     "Setup", MessageBoxButton.OK, MessageBoxImage.Exclamation);

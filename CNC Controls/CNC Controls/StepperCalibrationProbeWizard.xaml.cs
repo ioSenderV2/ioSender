@@ -534,8 +534,10 @@ namespace CNC.Controls
                 txtWarnings.Text = "Select a validated Corner Fence fixture first.";
                 return;
             }
-            // Same "never actually captured under this scheme" guard StartJobView.Generate_Click uses.
-            if (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d)
+            // Same "never actually captured under this scheme" guard StartJobView.Generate_Click uses -
+            // the explicit flag, not "either offset is 0" (0 is a legitimate measurement; see
+            // Fixture.CornerOffsetX).
+            if (!fx.CornerLocated)
             {
                 txtWarnings.Text = "This fixture's corner position hasn't been located yet - run Test position again in Machine Setup > Fixture definitions.";
                 return;

@@ -276,6 +276,7 @@ namespace CNC.Controls
             // setter's own comment for why that broke on real hardware).
             fx.CornerOffsetX = 0d;
             fx.CornerOffsetY = 0d;
+            fx.CornerLocated = false;
             UpdatePositionDisplay();
             UpdateTestPositionEnabled();
         }
@@ -530,6 +531,7 @@ namespace CNC.Controls
                 // meaningless once that reference moves, and this is a genuine re-jog.
                 fx.CornerOffsetX = 0d;
                 fx.CornerOffsetY = 0d;
+                fx.CornerLocated = false;
                 UpdatePositionDisplay();
                 UpdateTestPositionEnabled();
             }
@@ -714,6 +716,10 @@ namespace CNC.Controls
                 var refPos = new Position(fx.Coords);
                 fx.CornerOffsetX = model.MachinePosition.X - refPos.X;
                 fx.CornerOffsetY = model.MachinePosition.Y - refPos.Y;
+                // The measurement happened - say so explicitly. Either offset can legitimately be 0.000
+                // (the operator can set the reference right on the corner, and Test position parks there),
+                // so the values themselves cannot carry "was this measured?".
+                fx.CornerLocated = true;
             }
             UpdatePositionDisplay();
 
