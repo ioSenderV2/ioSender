@@ -179,7 +179,7 @@ namespace CNC.Controls
                 tp.IndirectSource = workOrder.Toolpaths.FirstOrDefault(t => !t.IsIndirect)?.Name;
                 UpdateIndirectName(tp);
             }
-            EnsureTextEngraveOperation(tp);
+            EnsureEngraveOperation(tp);
             workOrder.Toolpaths.Add(tp);
             RebuildTree(tp);
             OnWorkOrderChanged();
@@ -190,9 +190,12 @@ namespace CNC.Controls
         // Making the operator open the picker to choose the only thing it can offer is pure ceremony, so
         // create it up front. NewOperation is what picks the V-bit and its feeds, so this stays one
         // definition of what an Engrave starts life as.
-        private static void EnsureTextEngraveOperation(WorkOrderToolpath tp)
+        private static void EnsureEngraveOperation(WorkOrderToolpath tp)
         {
-            if (tp == null || tp.Geometry != WorkOrderGeometryKind.Text)
+            // Text and Svg both land on a geometry whose ONLY available operation is Engrave
+            // (WorkOrderRules.AvailableOperations), so making the operator open a picker to choose the
+            // one thing it can offer is ceremony either way.
+            if (tp == null || (tp.Geometry != WorkOrderGeometryKind.Text && tp.Geometry != WorkOrderGeometryKind.Svg))
                 return;
             if (tp.Operations.Any(o => o.Kind == WorkOrderOpKind.Engrave))
                 return;     // switched away and back, or loaded from a saved work order
@@ -841,7 +844,10 @@ namespace CNC.Controls
             bool showText = isText || (canShapeText && tp.HasText);
             Show(fldLength, isLine);
             // The baseline angle is the same field a Line uses - degrees from +X - so Text just shows it too.
-            Show(fldAngle, isLine || isText);
+            // Angle rotates artwork about its anchor exactly as it rotates a text baseline - BuildVCarve
+            // already applies it (BuildEngrave passes tp.Angle straight through), so this is the whole
+            // of "rotate the logo 90 degrees".
+            Show(fldAngle, isLine || isText || tp.Geometry == WorkOrderGeometryKind.Svg);
             // Corner reliefs need corners: Square/Rect only. A circle or oval has none, a Line and Text
             // have no interior at all.
             bool canRelieveCorners = tp.Geometry == WorkOrderGeometryKind.Square || tp.Geometry == WorkOrderGeometryKind.Rect;
@@ -1125,7 +1131,12 @@ namespace CNC.Controls
                 txtSvgInfo.Text = string.Format("{0:0.#} x {1:0.#} mm - CANNOT CUT: this build does not import {2}.",
                                                 r.WidthMm, r.HeightMm, r.Describe());
             else
-                txtSvgInfo.Text = string.Format("{0:0.#} x {1:0.#} mm, {2} outline{3}.",
+                // Spelled out as a consequence - "at N mm wide it cuts WxH" - because the width is the
+                // OPERATOR'S choice, not something read from the file. An SVG carrying only a viewBox has
+                // no honest natural size in mm, so there is nothing to default it to and the field starts
+                // at 100; saying so here is cheaper than an operator wondering where 100 came from.
+                txtSvgInfo.Text = string.Format("Artwork is {0:0.00}:1. At {1:0.#} mm wide it cuts {1:0.#} x {2:0.#} mm, {3} outline{4}.",
+                                                r.HeightMm > 0d ? r.WidthMm / r.HeightMm : 0d,
                                                 r.WidthMm, r.HeightMm, r.Contours.Count,
                                                 r.Contours.Count == 1 ? string.Empty : "s");
         }
@@ -1228,7 +1239,7 @@ namespace CNC.Controls
             // Switching TO Text lands on a geometry with exactly one possible operation - give it the same
             // head start a freshly added Text toolpath gets. The drop above has already removed whatever the
             // previous geometry's operations were, so this cannot stack on top of them.
-            EnsureTextEngraveOperation(selectedToolpath);
+            EnsureEngraveOperation(selectedToolpath);
 
             RebuildTree(selectedToolpath);
             LoadFields();
@@ -1760,6 +1771,9 @@ namespace CNC.Controls
                         case WorkOrderGeometryKind.Text:
                             AddTextStrokes(center, geom, scale, stroke, thickness);
                             break;
+                        case WorkOrderGeometryKind.Svg:
+                            AddSvgOutline(center, geom, scale, stroke);
+                            break;
                         default:
                             AddRect(center, geom.Width / 2d * scale, geom.Depth / 2d * scale, stroke, thickness, null);
                             break;
@@ -1943,8 +1957,28 @@ namespace CNC.Controls
         private void AddCarvedText(Point center, WorkOrderToolpath tp, double scale, Brush brush,
                                    double capHeight, double angleDeg, double dx, double dy)
         {
-            var outline = TrueTypeOutlines.Render(tp.Text, tp.FontFamily, capHeight, tp.FontBold, tp.FontItalic);
-            if (outline.Count == 0)
+            AddFilledOutline(center, TrueTypeOutlines.Render(tp.Text, tp.FontFamily, capHeight, tp.FontBold, tp.FontItalic),
+                             scale, brush, angleDeg, dx, dy);
+        }
+
+        // Artwork preview. Same fill, same even-odd rule, same rotation as carved text - because it is
+        // the same cut: SvgOutlines and TrueTypeOutlines produce the identical contour type, and this
+        // draws whichever it is given. A file that cannot be imported draws NOTHING rather than a
+        // partial logo; the editor's info line and Validate both say why.
+        private void AddSvgOutline(Point center, WorkOrderToolpath tp, double scale, Brush brush)
+        {
+            var svg = SvgOutlines.Load(tp.SvgFile, tp.SvgWidth);
+            if (svg.Error != null || !svg.IsComplete)
+                return;
+            // SvgOutlines puts the origin at the artwork's bottom-left; the shared drawer centres on the
+            // outline's own bounds, so no extra offset is needed here.
+            AddFilledOutline(center, svg.Contours, scale, brush, tp.Angle, 0d, 0d);
+        }
+
+        private void AddFilledOutline(Point center, List<OutlineContour> outline, double scale, Brush brush,
+                                      double angleDeg, double dx, double dy)
+        {
+            if (outline == null || outline.Count == 0)
                 return;
 
             double minX = double.MaxValue, maxX = double.MinValue, minY = double.MaxValue, maxY = double.MinValue;
