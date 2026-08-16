@@ -51,9 +51,11 @@
 ;                       exactly enough if the reference (#<rx>/#<ry>) sits EXACTLY at the true edge - but that
 ;                       reference is the CALLER's own estimate, not something this macro has confirmed yet
 ;                       (finding it is the whole point of the face probe about to run), so this pads it.
-;                       Required (no safe default) - callers should pass 10 unless they have a specific reason
-;                       not to; a caller that omits it gets 0 (grblHAL's default for an unset global), which
-;                       is only as safe as the reference itself, no better.
+;                       FLOORED AT 20 by this macro (see the o13 block) - every caller in the app passes 10,
+;                       and 10 was not enough on real hardware 2026-08-16: the reference sat ~7 mm inside the
+;                       true face, leaving the Y-face start with ~4 mm of actual air instead of the intended
+;                       11. A caller may ask for MORE; it cannot ask for less. A caller that omits it gets 0
+;                       from grblHAL and is then floored to 20 like everyone else.
 ; The retreat clearance above a probed corner top (#<_safe_z> below) is a hardcoded 5 mm. It was 20, which
 ; is far more than any real spoilboard/stock variance - on a T-slot extrusion bed even 5 mm would take some
 ; doing - so 20 just spent Z travel on every retreat. A caller with a genuinely known safe height passes
@@ -114,6 +116,19 @@ O<pcorner> SUB
   #<inside> = #<_ls_inside>      ; 0 = outside corner/edge (default), 1 = inside (see file header)
   #<faces>  = #<_ls_faces>       ; 0 = both faces (default), 1 = X face only, 2 = Y face only (see file header)
   #<edge_margin> = #<_ls_edgemargin>   ; extra face-probe descent clearance, caller-supplied (see file header)
+
+  ; FLOOR the caller's margin. Every caller in the app passes 10, in four separate places - and 10 was
+  ; not enough on real hardware 2026-08-16: the Y-face start ended up with ~4 mm of actual air, because
+  ; the margin is measured from #<ry>, the operator's SAVED REFERENCE, and that reference sat ~7 mm
+  ; inside the true face. This macro cannot know how far off the reference is (finding the face is the
+  ; whole point of the probe about to run), so the only lever is more slop.
+  ;
+  ; Raised HERE rather than at the four call sites deliberately: one value, one place, and a caller that
+  ; genuinely wants more can still ask for it. Costs nothing but travel - the G38.2 targets below are
+  ; ABSOLUTE (#<rx> + 35*sx), so starting further out lengthens the seek instead of moving the goal.
+  o13 IF [#<edge_margin> LT 20]
+    #<edge_margin> = 20
+  o13 ENDIF
 
   ; Clear G54 AND cancel any active G92 offset (AND TLO, belt-and-suspenders) so the absolute Z probes
   ; below run in TRUE machine coordinates. WCO = G5x offset + G92 offset + TLO (grblHAL gc_get_offset,
@@ -223,6 +238,19 @@ O<pcorner> SUB
   ; material above it, but a corner left over BARE board (estimate too big) reaches the floor with nothing
   ; there and G38.2 aborts right away - no doomed side search into air. The spacer band guarantees the cap
   ; clears the board (floor > spoilboard); with spacer 0 the +1 keeps it a hair above the board.
+  ; ---- PROBE-RELEASED GATE ----
+  ; grblHAL refuses a G38.2 whose probe is ALREADY triggered and reports a bare ALARM:4, which the
+  ; caller then sees as "Warning: error 9 in named sub pcorner.macro" plus a triple error:9 cascade -
+  ; three unrelated-looking failures naming nothing. Confirmed on real hardware 2026-08-16 with a
+  ; failing 3D probe: it latched on the X face and stayed asserted through a 10 mm retract, a Z lift
+  ; and a diagonal traverse, so the NEXT seek was refused before it started.
+  ;
+  ; #<_probe_state> is grblHAL's own hal.probe.is_triggered (ngc_params.c): 1 = triggered, 0 = clear,
+  ; -1 = the driver cannot report it. FAIL OPEN on -1 - a controller that cannot answer must not lose
+  ; the ability to probe - and abort with a sentence on 1, which is the whole point of this gate.
+  o14 IF [#<_probe_state> EQ 1]
+    (ABORT, Probe is still triggered before the top seek - it did not release. Check the probe, its wiring and $6/$I inversion.)
+  o14 ENDIF
   G38.2 Z[#<_bottom> + 1] F[#<_ls_searchf>]        ; refuse to seek below the caller's material floor
   G91 G1 Z2 F1000
   G38.2 Z-5 F[#<_ls_latchf>]
@@ -286,6 +314,19 @@ O<pcorner> SUB
   G53 G1 F1000 Z[#<_start_z>]       ; controlled - final descent to the face-probe depth
   ; ABSOLUTE seeks (not G91): a G91 move right after a G53 mis-computes on a $23-inverted axis
   ; (firmware bug - target sign-flips -> false Alarm:2). Current X is #<rx>, so seek to an absolute X.
+  ; ---- PROBE-RELEASED GATE ----
+  ; grblHAL refuses a G38.2 whose probe is ALREADY triggered and reports a bare ALARM:4, which the
+  ; caller then sees as "Warning: error 9 in named sub pcorner.macro" plus a triple error:9 cascade -
+  ; three unrelated-looking failures naming nothing. Confirmed on real hardware 2026-08-16 with a
+  ; failing 3D probe: it latched on the X face and stayed asserted through a 10 mm retract, a Z lift
+  ; and a diagonal traverse, so the NEXT seek was refused before it started.
+  ;
+  ; #<_probe_state> is grblHAL's own hal.probe.is_triggered (ngc_params.c): 1 = triggered, 0 = clear,
+  ; -1 = the driver cannot report it. FAIL OPEN on -1 - a controller that cannot answer must not lose
+  ; the ability to probe - and abort with a sentence on 1, which is the whole point of this gate.
+  o15 IF [#<_probe_state> EQ 1]
+    (ABORT, Probe is still triggered before the X face seek - it did not release. Check the probe, its wiring and $6/$I inversion.)
+  o15 ENDIF
   G38.2 X[#<rx> + [35 * #<sx>]] F[#<_ls_searchf>]      ; coarse seek toward the X face
   #<x_c1> = #5061
   G1 X[#<x_c1> - [4 * #<sx>]] F1000                    ; back off so the deflecting ball RELEASES before the slow re-probe (G1: gentle, no rapid-accel jerk)
@@ -316,6 +357,19 @@ O<pcorner> SUB
   G53 G0 Z[#<_z_top> + 12]          ; rapid down to within 12mm of the KNOWN top (see X face above)
   G53 G1 F1000 Z[#<_start_z>]       ; controlled - final descent to the face-probe depth
   ; ABSOLUTE seeks (see X face) - current Y is #<ry>, so seek to an absolute Y.
+  ; ---- PROBE-RELEASED GATE ----
+  ; grblHAL refuses a G38.2 whose probe is ALREADY triggered and reports a bare ALARM:4, which the
+  ; caller then sees as "Warning: error 9 in named sub pcorner.macro" plus a triple error:9 cascade -
+  ; three unrelated-looking failures naming nothing. Confirmed on real hardware 2026-08-16 with a
+  ; failing 3D probe: it latched on the X face and stayed asserted through a 10 mm retract, a Z lift
+  ; and a diagonal traverse, so the NEXT seek was refused before it started.
+  ;
+  ; #<_probe_state> is grblHAL's own hal.probe.is_triggered (ngc_params.c): 1 = triggered, 0 = clear,
+  ; -1 = the driver cannot report it. FAIL OPEN on -1 - a controller that cannot answer must not lose
+  ; the ability to probe - and abort with a sentence on 1, which is the whole point of this gate.
+  o16 IF [#<_probe_state> EQ 1]
+    (ABORT, Probe is still triggered before the Y face seek - it did not release. Check the probe, its wiring and $6/$I inversion.)
+  o16 ENDIF
   G38.2 Y[#<ry> + [35 * #<sy>]] F[#<_ls_searchf>]      ; coarse seek toward the Y face
   #<y_c1> = #5062
   G1 Y[#<y_c1> - [4 * #<sy>]] F1000                    ; back off before the slow re-probe (G1: gentle, no rapid-accel jerk)
