@@ -375,6 +375,11 @@ namespace CNC.Core
         // OnPumpJobFinished, OnPumpError and AbortPump.
         private bool dryRunActive = false;
 
+        // A dry run's G92 offset is still on the controller and must come off. Set when the run ends,
+        // cleared only once the G92.1 has actually been given a chance to be parsed - see
+        // FlushPendingOffsetClear and ResetRunModeAfterJob's own note about the realtime-byte race.
+        private bool pendingOffsetClear = false;
+
         private volatile StreamingState streamingState = StreamingState.NoFile;
         private GrblState grblState;
         private GrblViewModel model;
@@ -838,6 +843,8 @@ namespace CNC.Core
                         }
                     }
 
+                    WarnOnForeignOffset();
+
                     job.ToolChangeLine = -1;
                     model.BlockExecuting = fromBlock;
                     job.CurrBlock = job.ACKPending = job.PendingLine = fromBlock;
@@ -984,8 +991,22 @@ namespace CNC.Core
                 // re-issuing them on every job end (including ordinary non-dry-run jobs, since AbortPump is
                 // the shared stop path) would fight a job that legitimately wants to leave the spindle running
                 // (M5 is not modal-safe to send blind).
-                Comms.com.WriteCommand("G92.1");
+                //
+                // 🔴 The G92.1 is QUEUED, NOT SENT HERE - it used to be, and it silently lost a race it did
+                // not know it was in. AbortPump calls this, then the Stop path writes CMD_STOP, which is a
+                // REALTIME byte: it bypasses the line queue entirely and flushes the controller's RX buffer,
+                // discarding the G92.1 that had been written 4 ms earlier. Proven on the wire 2026-08-16
+                // (G92.1 at 03:52:12.121, 0x19 at .125, and no ok for it ever came back).
+                //
+                // The consequence was not cosmetic: $384=0 means grblHAL PERSISTS G92 to NVS, so the
+                // orphaned dry-run offset (Z+37) survived every reset and power cycle, silently shifting
+                // work Z on every job afterwards until it happened to trip a soft limit hours later.
+                //
+                // So the restore is deferred to FlushPendingOffsetClear, driven off GrblStateChanged once
+                // the controller is genuinely Idle. See there for why Alarm is not good enough.
+                pendingOffsetClear = true;
                 model.IsDryRunMode = false;
+                FlushPendingOffsetClear();
             }
 
             // Check mode ($C) has no auto-exit of its own - grblHAL stays in the Check state after the checked
@@ -1038,6 +1059,93 @@ namespace CNC.Core
         {
             job.HasError = model.IsGrblHAL;
             streamingHandler.Call(StreamingState.Error, true);
+        }
+
+        /// <summary>
+        /// Say so, at Run, when the controller is carrying a G92 offset. ioSender never sets one except as
+        /// a dry run's Z clearance, and that is taken off again when the run ends - so a G92 still standing
+        /// here is either an orphan from a cleanup that did not land, or one the operator set themselves.
+        /// Either way it silently shifts EVERY coordinate in the program about to stream.
+        ///
+        /// A warning rather than a refusal: a G92 can be entirely deliberate, and refusing to run would be
+        /// this tool overruling the operator about their own machine. Naming it is enough - the failure this
+        /// exists for is the SILENT one, where an orphaned offset (2026-08-16: Z+37 from a stopped dry run,
+        /// persisted through resets by $384=0) quietly moved work Z on every job for hours.
+        ///
+        /// The backstop for FlushPendingOffsetClear: if the deferred restore never got a chance to run -
+        /// the app closed, the link dropped, the controller stayed alarmed - this is what surfaces it
+        /// BEFORE a program cuts on top of it rather than after.
+        /// </summary>
+        private void WarnOnForeignOffset()
+        {
+            try
+            {
+                // REFRESH FIRST. GrblWorkParameters is only re-read at a handful of points (connect, the
+                // probing view, Machine.cs) and none of them is Run - so reading it here without asking
+                // would test a snapshot that could be hours old. A warning derived from stale data is
+                // worse than no warning: it either names an offset already cleared, or stays silent about
+                // one just set. This is a $# handshake, which is what ProbingView and Machine.cs already
+                // do before they need offsets, and Run is operator-initiated rather than latency-critical.
+                if (!GrblWorkParameters.Get())
+                    return;   // could not read - say nothing rather than guess
+
+                var g92 = GrblWorkParameters.GetCoordinateSystem("G92");
+                if (g92 == null)
+                    return;
+
+                // ⚠️ Deliberately NOT reusing GrblParserState.IsPositionOffset, which would have been the
+                // obvious thing: that helper is INVERTED relative to its name -
+                //     isOffset |= !(double.IsNaN(v) || v != 0d)   ==   !IsNaN(v) && v == 0
+                // so it reports "offset" when the value is ZERO. Pre-existing (it drives whether G92/G43.1
+                // are added to the reported parser state), left alone here because changing it reaches
+                // further than this warning should - but do not build on it.
+                string where = string.Empty;
+                for (int i = 0; i < g92.Values.Length && i < GrblInfo.NumAxes; i++)
+                {
+                    double v = g92.Values[i];
+                    if (!double.IsNaN(v) && v != 0d)
+                        where += string.Format(" {0}{1:0.###}", GrblInfo.AxisLetters[i], v);
+                }
+
+                if (where.Length == 0)
+                    return;
+
+                model.SetErrorMessage(string.Format(
+                    "A G92 offset is active ({0}) - every coordinate in this program is shifted by it. "
+                    + "Clear it with G92.1 first unless you set it deliberately.", where.Trim()));
+            }
+            catch { /* a diagnostic must never be what stops a job starting */ }
+        }
+
+        /// <summary>
+        /// Send the deferred G92.1 that takes a dry run's Z offset back off the controller, once the
+        /// controller is somewhere it will actually be parsed. No-op unless one is pending.
+        /// </summary>
+        /// <param name="state">The state just reported, or null to read the current one.</param>
+        private void FlushPendingOffsetClear(GrblStates? state = null)
+        {
+            if (!pendingOffsetClear)
+                return;
+
+            var now = state ?? grblState.State;
+
+            // IDLE ONLY, and the exclusions are each a real failure mode rather than caution:
+            //  - Alarm  : grblHAL locks g-code out entirely (error:9). Sending here would be rejected and
+            //             the offset would stay - which is exactly the state a Stop leaves behind, so this
+            //             is the case that matters most. It waits for the operator to unlock.
+            //  - Run/Hold/Jog/Home: motion is in flight; a queued line either races it or lands mid-move.
+            //  - Door/Sleep/Tool  : not accepting program lines either.
+            // Anything not Idle simply leaves the flag set, and the next status report tries again.
+            if (now != GrblStates.Idle)
+                return;
+
+            // Cleared BEFORE the write, not after: the write can only fail by throwing, and a throw that
+            // left the flag set would retry on every single status report forever. One attempt from Idle
+            // is the honest contract - and if it somehow does not take, the run-start check (see
+            // WarnOnForeignOffset) is the backstop that tells the operator before the next program streams.
+            pendingOffsetClear = false;
+            Comms.com.WriteCommand("G92.1");
+            DebugLog.Write("run", "JobRunner: dry-run G92 offset cleared (deferred to Idle)");
         }
 
         // Stop the background pump (Stop/Reset/Alarm/connection-lost). Idempotent.
@@ -1557,6 +1665,12 @@ namespace CNC.Core
         {
             if (grblState.State == GrblStates.Jog)
                 model.IsJobRunning = false;
+
+            // Retry the deferred dry-run offset restore on every state report until it lands. Cheap (a bool
+            // test in the common case) and it is the only thing that makes the cleanup survive a Stop, an
+            // alarm, or a reset - each of which leaves the controller somewhere the G92.1 cannot be parsed
+            // at the moment the job ends.
+            FlushPendingOffsetClear(newstate.State);
 
             // Pump-stall watchdog: a pump-streamed run (e.g. Load Stock's O-word/probe program) can deadlock
             // with the controller idle but the pump believing its buffer is full, so the tail (final G30 park +
