@@ -104,6 +104,59 @@ namespace CNC.Controls
         private static readonly string[] UnsupportedElements =
             { "rect", "circle", "ellipse", "polygon", "polyline", "use", "image", "text" };
 
+        // Aspect (height/width of the INK bounding box) per file, so the model can answer "how tall is
+        // this at 150 mm wide?" without re-reading and re-flattening the artwork. That question is asked
+        // on every anchor/extent/preview evaluation - measured on the real logo, a full Load is ~30 ms,
+        // which is fine once and ruinous per property read.
+        //
+        // Keyed on path + last-write time + length, so editing the file in Inkscape and coming back
+        // invalidates it. A cache that cannot notice its source changed is the recurring bug in this
+        // codebase (see the stale-cache family), so it is keyed on the file's own stamp rather than
+        // trusting a manual refresh.
+        private static readonly Dictionary<string, double> _aspect = new Dictionary<string, double>();
+
+        private static string StampOf(string path)
+        {
+            try
+            {
+                var fi = new FileInfo(path);
+                return path + "|" + fi.LastWriteTimeUtc.Ticks + "|" + fi.Length;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// Height ÷ width of the artwork's ink bounding box, or 0 when the file cannot be measured.
+        /// Multiply by a chosen width to get the height it will occupy.
+        /// </summary>
+        public static double AspectOf(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                return 0d;
+
+            string stamp = StampOf(path);
+            if (stamp == null)
+                return 0d;
+
+            double aspect;
+            lock (_aspect)
+                if (_aspect.TryGetValue(stamp, out aspect))
+                    return aspect;
+
+            var r = Load(path, 0d);
+            aspect = r.Error == null && r.WidthMm > 0d ? r.HeightMm / r.WidthMm : 0d;
+
+            lock (_aspect)
+            {
+                // Unbounded growth is not a risk worth code here - one entry per file per edit, and a
+                // work order references a handful - but a runaway would be silent, so it is capped.
+                if (_aspect.Count > 64)
+                    _aspect.Clear();
+                _aspect[stamp] = aspect;
+            }
+            return aspect;
+        }
+
         /// <summary>
         /// Read <paramref name="path"/> and scale the artwork so its bounding box is
         /// <paramref name="targetWidthMm"/> wide, preserving aspect. A target of 0 keeps the file's

@@ -32,7 +32,10 @@ namespace CNC.Controls
     // which forks an independent copy instead. Surface is a facing pass over a Width x Depth area (reuses
     // those two fields, same as Oval/Rect) - it isn't cut relative to any enclosed shape, so it only ever
     // carries the one Surface operation (see WorkOrderRules.AvailableOperations).
-    public enum WorkOrderGeometryKind { Line, Circle, Oval, Square, Rect, Surface, Indirect, Text }
+    // Svg is appended, never inserted: these persist to the work order file by NAME through
+    // XmlSerializer, but Indirect/Text ordinals also reach App.config through older fragments, and
+    // renumbering them would silently re-point saved toolpaths at a different geometry.
+    public enum WorkOrderGeometryKind { Line, Circle, Oval, Square, Rect, Surface, Indirect, Text, Svg }
 
     // Which point of a toolpath's own bounding box its X/Y names. Front is -Y and back is +Y, matching the
     // corner order OddJobsGeometry.RectPoints already walks and the front/back sense pcorner.macro uses for
@@ -202,6 +205,21 @@ namespace CNC.Controls
         public WorkOrderTextHAlign TextHAlign = WorkOrderTextHAlign.Center;
         public WorkOrderTextVAlign TextVAlign = WorkOrderTextVAlign.Center;
 
+        // Svg only: artwork from a file, carved or engraved exactly the way Text is - the carve engine
+        // takes polygon contours and does not care whether a glyph or a logo produced them (see
+        // SvgOutlines, and docs/Architecture-SVG-Import.md).
+        //
+        // The path is stored as the operator chose it, NOT copied into the work order: artwork gets
+        // re-exported from Inkscape/Illustrator, and a work order that silently kept a stale snapshot
+        // would cut last week's logo while showing this week's filename. The cost is that a moved file
+        // breaks the toolpath - which is a visible, nameable failure rather than a silent wrong cut.
+        public string SvgFile = string.Empty;
+
+        // Width the artwork's INK bounding box occupies, in mm; the height follows from the file's own
+        // aspect (SvgOutlines.AspectOf). Width rather than a scale factor because "the logo is 150 mm
+        // across the stave" is the measurement an operator actually has.
+        public double SvgWidth = 100d;
+
         // Corner reliefs ("dogbones") - Square/Rect only. A round cutter leaves a radiused inside corner,
         // so a square-cornered part will not seat in the pocket it was cut for. Ticking this pokes the
         // cutter out along each corner's diagonal far enough that its circle passes through the true
@@ -236,7 +254,18 @@ namespace CNC.Controls
         // toolpath is offered (Pocket and Bottom finish need an enclosed area) and whether a Contour gets
         // tabs. A stroke font's glyphs are pen strokes, not loops - there is no interior to clear - so
         // letting Text read as closed would have offered to pocket the inside of the letter "S".
-        public bool IsClosed { get { return Geometry != WorkOrderGeometryKind.Line && Geometry != WorkOrderGeometryKind.Text; } }
+        // Svg joins them: artwork is carved/engraved by the same machinery, and "pocket the inside of the
+        // logo" is the same nonsense as pocketing the inside of an "S". Its contours ARE closed loops, but
+        // what IsClosed gates is whether an enclosed area is the operator's to clear - and here it is not.
+        public bool IsClosed
+        {
+            get
+            {
+                return Geometry != WorkOrderGeometryKind.Line
+                    && Geometry != WorkOrderGeometryKind.Text
+                    && Geometry != WorkOrderGeometryKind.Svg;
+            }
+        }
         public bool IsIndirect { get { return Geometry == WorkOrderGeometryKind.Indirect; } }
 
         // X/Y resolved to the shape's CENTER, whatever Anchor names. Everything downstream - the compiler's
@@ -267,6 +296,8 @@ namespace CNC.Controls
                     case WorkOrderGeometryKind.Text:
                         return (IsCarved ? TrueTypeOutlines.Measure(Text, FontFamily, CapHeight, FontBold, FontItalic)
                                          : CNC.Core.StrokeFont.Measure(Text, CapHeight)).X / 2d;
+                    // The operator names the artwork's width outright, so no measuring needed here.
+                    case WorkOrderGeometryKind.Svg: return SvgWidth / 2d;
                     default: return 0d;
                 }
             }
@@ -286,6 +317,10 @@ namespace CNC.Controls
                     case WorkOrderGeometryKind.Text:
                         return (IsCarved ? TrueTypeOutlines.Measure(Text, FontFamily, CapHeight, FontBold, FontItalic)
                                          : CNC.Core.StrokeFont.Measure(Text, CapHeight)).Y / 2d;
+                    // Height comes from the file's own ink aspect (cached) - the artwork decides its
+                    // proportions, the operator decides its width. Aspect 0 (unreadable file) yields 0
+                    // rather than a guessed square, so an anchor never shifts by an invented dimension.
+                    case WorkOrderGeometryKind.Svg: return SvgWidth * SvgOutlines.AspectOf(SvgFile) / 2d;
                     default: return 0d;
                 }
             }
@@ -371,8 +406,10 @@ namespace CNC.Controls
                 {
                     case WorkOrderGeometryKind.Line: return double.MaxValue;
                     // Nothing constrains the cutter: a V-bit engraves with its TIP, and the stroke width is
-                    // chosen by depth rather than limited by the bit's nominal diameter.
-                    case WorkOrderGeometryKind.Text: return double.MaxValue;
+                    // chosen by depth rather than limited by the bit's nominal diameter. Artwork carves the
+                    // same way, so it is unconstrained for the same reason.
+                    case WorkOrderGeometryKind.Text:
+                    case WorkOrderGeometryKind.Svg: return double.MaxValue;
                     case WorkOrderGeometryKind.Circle: return Diameter;
                     case WorkOrderGeometryKind.Square: return Size;
                     default: return Math.Min(Width, Depth);
@@ -622,7 +659,7 @@ namespace CNC.Controls
         public static readonly WorkOrderGeometryKind[] AllGeometries =
             { WorkOrderGeometryKind.Line, WorkOrderGeometryKind.Circle, WorkOrderGeometryKind.Oval,
               WorkOrderGeometryKind.Square, WorkOrderGeometryKind.Rect, WorkOrderGeometryKind.Surface,
-              WorkOrderGeometryKind.Text, WorkOrderGeometryKind.Indirect };
+              WorkOrderGeometryKind.Text, WorkOrderGeometryKind.Svg, WorkOrderGeometryKind.Indirect };
 
         public static readonly WorkOrderAnchor[] AllAnchors =
             { WorkOrderAnchor.Center, WorkOrderAnchor.FrontLeft, WorkOrderAnchor.FrontRight,
@@ -713,6 +750,7 @@ namespace CNC.Controls
                 case WorkOrderGeometryKind.Surface: return "Surface (width, depth) - face the whole area";
                 case WorkOrderGeometryKind.Indirect: return "Indirect (repeat another toolpath here)";
                 case WorkOrderGeometryKind.Text: return "Text (engrave or V-carve with a V-bit)";
+                case WorkOrderGeometryKind.Svg: return "SVG artwork (engrave or V-carve a logo)";
                 default: return kind.ToString();
             }
         }
@@ -808,7 +846,9 @@ namespace CNC.Controls
             // Text is engraved and nothing else. Its glyphs are pen strokes along a centreline, so there is
             // no outline to contour, no interior to pocket and no edge to chamfer - every other operation
             // here would be tracing a path that does not describe the letter's shape.
-            if (tp.Geometry == WorkOrderGeometryKind.Text)
+            // Svg is the same case: artwork is engraved or V-carved from its outlines, and contouring or
+            // pocketing "the logo" would be tracing something that does not describe it either.
+            if (tp.Geometry == WorkOrderGeometryKind.Text || tp.Geometry == WorkOrderGeometryKind.Svg)
             {
                 yield return WorkOrderOpKind.Engrave;
                 yield break;
@@ -914,6 +954,30 @@ namespace CNC.Controls
                     continue;
                 }
 
+                // Artwork is the only geometry whose shape lives OUTSIDE the work order, so it is the only
+                // one that can become invalid without anything in this file changing - the .svg gets moved,
+                // renamed, or re-exported with features this build cannot read. Checked here, at Generate,
+                // rather than only at compile time, so the operator is told before a job starts instead of
+                // finding a "(VCARVE skipped ...)" comment inside 30,000 lines of g-code.
+                if (tp.Geometry == WorkOrderGeometryKind.Svg)
+                {
+                    if (string.IsNullOrWhiteSpace(tp.SvgFile))
+                        warnings.Add(label + "no SVG file chosen.");
+                    else if (!System.IO.File.Exists(tp.SvgFile))
+                        warnings.Add(string.Format("{0}SVG file not found: {1}", label, tp.SvgFile));
+                    else
+                    {
+                        var probe = SvgOutlines.Load(tp.SvgFile, tp.SvgWidth);
+                        if (probe.Error != null)
+                            warnings.Add(label + probe.Error);
+                        else if (!probe.IsComplete)
+                            warnings.Add(string.Format("{0}{1} uses features this build cannot import ({2}) - the cut would be missing part of the artwork.",
+                                                       label, System.IO.Path.GetFileName(tp.SvgFile), probe.Describe()));
+                        else if (tp.SvgWidth <= 0d)
+                            warnings.Add(label + "SVG width must be greater than zero.");
+                    }
+                }
+
                 var allowed = AvailableOperations(tp).ToList();
                 foreach (var op in tp.Operations)
                 {
@@ -1004,6 +1068,12 @@ namespace CNC.Controls
                     return tp.IsCarved
                         ? string.Format("\"{0}\" {1:0.#} mm caps, {2}", t, tp.CapHeight, tp.FontFamily)
                         : string.Format("\"{0}\" {1:0.#} mm caps", t, tp.CapHeight);
+                case WorkOrderGeometryKind.Svg:
+                    // Same reason Text has its own case: falling through would summarize a logo as the
+                    // toolpath's unused rect defaults. Names the FILE, since that is the identity here.
+                    string f = string.IsNullOrEmpty(tp.SvgFile)
+                             ? "(no file)" : System.IO.Path.GetFileName(tp.SvgFile);
+                    return string.Format("{0} {1:0.#} mm wide", f, tp.SvgWidth);
                 default:
                     return string.Format("rect {0:0.#}x{1:0.#}{2}", tp.Width, tp.Depth, withText);
             }

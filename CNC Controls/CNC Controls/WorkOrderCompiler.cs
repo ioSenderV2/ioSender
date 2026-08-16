@@ -570,6 +570,11 @@ namespace CNC.Controls
                 capHeight = fit.CapHeight; angleDeg = fit.Angle; fitDx = fit.OffsetX; fitDy = fit.OffsetY;
             }
 
+            // Artwork has no stroke-font equivalent - an SVG IS outlines - so it always takes the carve
+            // path, whatever the engrave width says.
+            if (tp.Geometry == WorkOrderGeometryKind.Svg)
+                return BuildVCarve(tp, op, cx, cy, capHeight, angleDeg, fitDx, fitDy);
+
             // A toolpath carrying a real font family V-carves the glyph outlines instead of tracing
             // stroke-font pen paths - one op kind, two ways of cutting it, chosen on the GEOMETRY where the
             // font itself is chosen (see WorkOrderToolpath.FontFamily).
@@ -734,7 +739,26 @@ namespace CNC.Controls
         {
             var lines = new List<string>();
 
-            var outline = TrueTypeOutlines.Render(tp.Text, tp.FontFamily, capHeight, tp.FontBold, tp.FontItalic);
+            // Where the contours come from is the ONLY difference between carving a word and carving a
+            // logo - everything below this point is the same code (see docs/Architecture-SVG-Import.md).
+            List<OutlineContour> outline;
+            if (tp.Geometry == WorkOrderGeometryKind.Svg)
+            {
+                var svg = SvgOutlines.Load(tp.SvgFile, tp.SvgWidth);
+                if (svg.Error != null)
+                    return new List<string> { "(VCARVE skipped - " + CommentText(svg.Error) + ")" };
+                // An import that dropped elements must NOT cut the remainder. A partial logo looks
+                // plausible in the preview and is wrong in the wood, and the operator has no way to see
+                // which half went missing - so refuse, and name what was skipped.
+                if (!svg.IsComplete)
+                    return new List<string> { "(VCARVE skipped - "
+                        + CommentText(System.IO.Path.GetFileName(tp.SvgFile) + " uses features this build cannot import: "
+                                      + svg.Describe()) + ")" };
+                outline = svg.Contours;
+            }
+            else
+                outline = TrueTypeOutlines.Render(tp.Text, tp.FontFamily, capHeight, tp.FontBold, tp.FontItalic);
+
             if (outline.Count == 0)
                 return lines;   // blank text or an unresolvable family - emit nothing rather than a bare plunge
 
@@ -1610,6 +1634,17 @@ namespace CNC.Controls
                                 : string.Format("surface {0:0.0}x{1:0.0} mm, {2:0.0} mm deep", tp.Width, tp.Depth, TrueDepth(op));
                             break;
                         case WorkOrderOpKind.Engrave:
+                            // Artwork describes itself by FILE and size - falling through to the text
+                            // wording below would report a logo as v-carve "" in , 0 mm caps.
+                            if (tp.Geometry == WorkOrderGeometryKind.Svg)
+                            {
+                                double svgH = tp.SvgWidth * SvgOutlines.AspectOf(tp.SvgFile);
+                                desc = string.Format("v-carve {0}, {1:0.#} x {2:0.#} mm",
+                                                     CommentText(string.IsNullOrEmpty(tp.SvgFile)
+                                                                 ? "(no file)" : System.IO.Path.GetFileName(tp.SvgFile)),
+                                                     tp.SvgWidth, svgH);
+                                break;
+                            }
                             // The operator's own text goes into a g-code comment, and grblHAL ends a comment
                             // at the FIRST ')' - so a bracket in it would truncate the block and let the rest
                             // parse as g-code. Sanitised exactly as BuildEngrave sanitises its own.
