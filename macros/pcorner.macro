@@ -248,6 +248,17 @@ O<pcorner> SUB
   ; #<_probe_state> is grblHAL's own hal.probe.is_triggered (ngc_params.c): 1 = triggered, 0 = clear,
   ; -1 = the driver cannot report it. FAIL OPEN on -1 - a controller that cannot answer must not lose
   ; the ability to probe - and abort with a sentence on 1, which is the whole point of this gate.
+  ; G4 P0 FIRST - WITHOUT IT THIS GATE IS WORSE THAN USELESS, IT ABORTS HEALTHY PROBES.
+  ; grblHAL evaluates an o-word condition when the block is PARSED, and ngc_flowctrl.c / ngc_expr.c /
+  ; ngc_params.c never call protocol_buffer_synchronize() - so the read races ahead of queued motion.
+  ; The latch probe leaves the tool sitting ON the plate; the Z lift and the whole face approach are
+  ; merely QUEUED into the planner and return immediately, so the parser reaches the gate while the
+  ; probe is still physically in contact => false abort on every good probe. Confirmed on real hardware
+  ; 2026-08-16: touch plate, operator watching, nothing touching, the X-face gate fired anyway.
+  ; G4 P0 is the flush - mc_dwell() calls protocol_buffer_synchronize() unconditionally outside check
+  ; mode (motion_control.c) and delay_sec(0) computes one iteration then exits before running it, so it
+  ; costs no time. P0 is legal: gcode.c's dwell validation rejects a MISSING P and a NEGATIVE P, not 0.
+  G4 P0
   o14 IF [#<_probe_state> EQ 1]
     (ABORT, Probe is still triggered before the top seek - it did not release. Check the probe, its wiring and $6/$I inversion.)
   o14 ENDIF
@@ -324,6 +335,9 @@ O<pcorner> SUB
   ; #<_probe_state> is grblHAL's own hal.probe.is_triggered (ngc_params.c): 1 = triggered, 0 = clear,
   ; -1 = the driver cannot report it. FAIL OPEN on -1 - a controller that cannot answer must not lose
   ; the ability to probe - and abort with a sentence on 1, which is the whole point of this gate.
+  ; MANDATORY, not tidy-uppable - drains the planner so the read below sees the SETTLED machine
+  ; instead of the parse-time race. Full reasoning at the o14 gate above.
+  G4 P0
   o15 IF [#<_probe_state> EQ 1]
     (ABORT, Probe is still triggered before the X face seek - it did not release. Check the probe, its wiring and $6/$I inversion.)
   o15 ENDIF
@@ -367,6 +381,9 @@ O<pcorner> SUB
   ; #<_probe_state> is grblHAL's own hal.probe.is_triggered (ngc_params.c): 1 = triggered, 0 = clear,
   ; -1 = the driver cannot report it. FAIL OPEN on -1 - a controller that cannot answer must not lose
   ; the ability to probe - and abort with a sentence on 1, which is the whole point of this gate.
+  ; MANDATORY, not tidy-uppable - drains the planner so the read below sees the SETTLED machine
+  ; instead of the parse-time race. Full reasoning at the o14 gate above.
+  G4 P0
   o16 IF [#<_probe_state> EQ 1]
     (ABORT, Probe is still triggered before the Y face seek - it did not release. Check the probe, its wiring and $6/$I inversion.)
   o16 ENDIF
