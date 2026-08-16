@@ -41,6 +41,12 @@
   .toc td.sz .k { color:#8c959f; }     /* "Files:" / "Lines:" key */
   .toc tr.tot td { border-top:2px solid #d0d7de; border-bottom:none; font-weight:600; padding-top:6px; }
   .toc tr.ver-hdr td { background:#f6f8fa; font-weight:600; color:#24292f; padding:5px 6px; border-bottom:1px solid #d0d7de; }
+  /* Entries below this header are built but NOT in any published release yet. Amber so it cannot
+     be mistaken at a glance for a shipped "Version N.N" row - the whole point of the header is that
+     these changes are not in the version above it. tools/cut-release.ps1 replaces this row with the
+     real version header when the release is cut; tools/add-changelog-entry.ps1 recreates it for the
+     first entry added afterwards. */
+  .toc tr.ver-hdr.pending td { background:#fff8c5; color:#7d4e00; border-bottom:1px solid #d4a72c; }
   .foot { color:#57606a; font-size:9pt; margin-top:6px; }
   .feat { border:1px solid #d0d7de; border-radius:6px; padding:10px 14px; margin:14px 0 0; }
   .feat h3 { font-size:10.5pt; color:#0a3069; margin:11px 0 3px; border-bottom:1px solid #eaeef2; padding-bottom:2px; }
@@ -715,6 +721,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr class="ver-hdr"><td colspan="3">Version 2.41</td></tr>
 <tr><td class="n">216</td><td><a href="#pr216">Large programs load 12&times; faster</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+87</span> <span class="del">-5</span></td></tr>
 <tr><td class="n">217</td><td><a href="#pr217">Data column no longer starts collapsed</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+45</span> <span class="del">-9</span></td></tr>
+<tr class="ver-hdr pending" id="pending"><td colspan="3">Pending 2.42 (PR 20)</td></tr>
 <tr><td class="n">218</td><td><a href="#pr218">Portable core: CNC.Core runs without WPF, and builds on .NET 8</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">150</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+10527</span> <span class="del">-5440</span></td></tr>
 <tr><td class="n">219</td><td><a href="#pr219">Work Order runs in one press: one streaming engine for macros and programs</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">13</span> <span class="del">0</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+986</span> <span class="del">-940</span></td></tr>
 <tr><td class="n">220</td><td><a href="#pr220">The run strip: everything a running job needs, and the bottom status bar retired</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">31</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+1716</span> <span class="del">-391</span></td></tr>

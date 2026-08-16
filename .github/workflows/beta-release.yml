@@ -55,8 +55,12 @@ jobs:
           # are case-folded - "${{ github.repository }}" alone would give a mixed-case host. The
           # path segment keeps the repo's own casing and the file is lowercase overview.html; see
           # the publish step in release.yml that keeps that URL current.
+          # Anchor is #pending, NOT #features-and-fixes: a beta ships the merged-but-unreleased
+          # entries, and #pending is the TOC header those sit under. Landing on the top of the full
+          # changelog would drop the reader at #1 of 268 and make them hunt. Versioned releases keep
+          # #features-and-fixes (cut-release.ps1) because everything below it did ship in one.
           $owner, $repoName = "${{ github.repository }}" -split '/', 2
-          "pagesUrl=https://$($owner.ToLowerInvariant()).github.io/$repoName/overview.html#features-and-fixes" |
+          "pagesUrl=https://$($owner.ToLowerInvariant()).github.io/$repoName/overview.html#pending" |
             Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
           $path = "ioSender XL\ioSender XL\BuildInfo.cs"
@@ -103,9 +107,9 @@ jobs:
             powershell -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/${{ github.repository }}/master/install.ps1))) -Tag 'beta-pr${{ github.event.pull_request.number }}'"
             ```
 
-            Full changelog and feature documentation: [**Overview**](${{ steps.betaver.outputs.pagesUrl }}) (Ctrl+click for a new tab)
-            &mdash; that page is the changelog as of the last *released* version, so work on this PR
-            branch may not be listed in it yet.
+            What's in this beta: [**Overview &rarr; pending changes**](${{ steps.betaver.outputs.pagesUrl }}) (Ctrl+click for a new tab)
+            &mdash; the entries that are merged but not yet in any published release. Anything added
+            to this PR since the last push to `master` may not be listed there yet.
 
             **Test build only, not a release.** This release is replaced on every push to the PR and
             deleted automatically when the PR closes or the "beta" label is removed.

@@ -199,6 +199,18 @@ if (-not $DryRun -and $newEntries.Count -gt 0) {
     $firstN = ($newEntries | Sort-Object N | Select-Object -First 1).N
     $marker = "<tr><td class=""n"">$firstN</td>"
     if ($content.Contains($marker)) {
+        # Drop the "pending" placeholder header before inserting the real one. Entries that are
+        # merged but unreleased sit under a `ver-hdr pending` row (added by add-changelog-entry.ps1)
+        # so the TOC never implies they shipped in the version above them - which is exactly what
+        # went wrong before this existed: #218-#268 sat under "Version 2.41", a release that
+        # actually stopped at #217, so 51 unreleased entries read as shipped.
+        #
+        # Removing it here is not optional: the pending row sits immediately above $firstN, the same
+        # place the real header goes, so skipping this leaves BOTH stacked on the released version.
+        # add-changelog-entry.ps1 recreates a fresh pending row for the next entry added after this
+        # release, which is what stops the mislabelling from creeping back in a version or two.
+        $pendingRe = '<tr class="ver-hdr pending" id="pending"><td colspan="3">[^<]*</td></tr>\r?\n?'
+        $content = [regex]::Replace($content, $pendingRe, '')
         $hdr = "<tr class=""ver-hdr""><td colspan=""3"">Version $newVersion</td></tr>`n"
         $content = $content.Replace($marker, $hdr + $marker)
         [System.IO.File]::WriteAllText($Html, $content)
