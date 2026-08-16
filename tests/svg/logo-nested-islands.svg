@@ -17,9 +17,16 @@
   rule the winding numbers sum to +1-1-1 = -1, still non-zero, so a browser fills them correctly;
   a naive sign test carves them out.
 
-  Expected result: 9 subpaths, 3 at depth 0 (solid), 3 at depth 1 (holes), 3 at depth 2 (solid
-  islands). A correct importer cuts 6 solid regions. The sign rule cuts 3 and wrongly voids the
-  islands - which on a 150 mm logo is a visible chunk missing from the middle of each shape.
+  Expected result (measured): 9 subpaths, 3 at depth 0 (solid), 3 at depth 1 (holes), 3 at depth 2
+  (solid islands). A correct importer reports 6 solid regions and 3 holes, and marks exactly the 6
+  even-depth contours IsOuter. The winding-sign rule gets all three islands wrong.
+
+  CORRECTED 2026-08-15, same day: this comment first said the sign rule would "wrongly void the
+  islands", i.e. carve them out. It would not. VCarve.DistanceField.Inside is EVEN-ODD ray casting
+  across all contours together, which is containment parity, so the cut geometry is already right
+  whatever the winding - verified by transcribing that algorithm over this very file. IsOuter feeds
+  ONE thing (WorkOrderCompiler's per-glyph pass grouping), so getting it wrong costs cut ORDER, not
+  shape. Still worth asserting here; just not for the reason first written.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 300 120">
   <defs>

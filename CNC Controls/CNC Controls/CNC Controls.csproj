@@ -133,6 +133,7 @@
     <Compile Include="OddJobsToolMemory.cs" />
     <Compile Include="CustomTool.cs" />
     <Compile Include="TrueTypeOutlines.cs" />
+    <Compile Include="SvgOutlines.cs" />
     <Compile Include="WorkOrderView.xaml.cs">
       <DependentUpon>WorkOrderView.xaml</DependentUpon>
     </Compile>

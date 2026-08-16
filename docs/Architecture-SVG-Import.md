@@ -10,9 +10,11 @@ existing text-engraving pipeline. Nothing here is implemented; the two test file
 Text engraving already turns vector outlines into v-carved or engraved g-code. Could an `.svg` file
 feed the same machinery, so a logo cuts the way a word does?
 
-**Yes, and the seam already exists** — it was built deliberately. What follows is what is free, what
-has to be written, and the one thing that will silently cut the wrong shape if it is written
-carelessly.
+**Yes, and the seam already exists** — it was built deliberately. What follows is what is free and
+what has to be written.
+
+**Destination decided 2026-08-15: option (a)** — an SVG toolpath geometry inside a Work Order, with
+the file chosen per toolpath. See the table further down for what that rules out.
 
 ## Where the seam is
 
@@ -65,9 +67,31 @@ primitives (`rect`, `circle`, `ellipse`, `polygon`, `polyline`); `<use>`/`<defs>
 `style=` vs `class=` fills. This is the bulk of the work, and it is **breadth, not depth** — each
 piece is small and independently testable.
 
-### 3. 🔴 Winding — the part that must not be ported from the font path
+### 3. Winding — real, but it costs cut ORDER, not the shape
 
-This is the finding that motivated the document.
+> **⚠️ CORRECTED 2026-08-15, same day.** This section first claimed a mis-derived hole would be
+> *carved solid* — that a 17 x 16 mm chunk would go missing from the artwork. **That was wrong, and
+> it was wrong because I reasoned from `TrueTypeOutlines`' comment instead of reading the engine.**
+>
+> `VCarve.DistanceField.Inside()` is **even-odd ray casting across ALL contours together**, and
+> even-odd *is* containment parity. The engine never looks at winding direction. Verified by
+> transcribing its algorithm over `logo-nested-islands.svg`: a point in the depth-2 island reads
+> SOLID, a point in the hole around it reads void, both correct.
+>
+> **The v-carve engine is already correct for SVG, whatever the winding.** The measurement below
+> still stands and is still worth knowing — but its consequence is machining order, not geometry.
+> The original claim is left visible rather than deleted, because "the doc said the risk was
+> elsewhere" is exactly how the wrong thing gets built carefully.
+
+`OutlineContour.IsOuter` is read in exactly **one** place — `WorkOrderCompiler` line 787 — and only
+to group passes so each glyph is cut completely before the next, left to right. Nothing else reads
+it, and nothing reads `SignedArea` outside `TrueTypeOutlines` itself.
+
+So for SVG, `IsOuter` should mean *"bounds a solid region from outside"* = **even containment
+depth**. Get it wrong and some regions' passes fall to the unclaimed fallback and are cut last,
+out of the tidy left-to-right order. Worth doing properly; not a safety or correctness issue.
+
+The measurement that prompted all this:
 
 `TrueTypeOutlines` decides outer-vs-counter from the **sign of the signed area**, and says why that
 is safe:
@@ -91,12 +115,11 @@ subpath 1   area   -585   depth 2   containment: SOLID   sign rule: HOLE   ( 26 
 ```
 
 They render correctly in any browser: under `nonzero` the winding numbers sum to `+1-1-1 = -1`,
-which is non-zero, so they fill. The sign rule voids them. On a 150 mm-wide logo the first is a
-**17 x 16 mm chunk missing from the middle of the artwork** — from a preview that looks perfect.
+which is non-zero, so they fill. The sign rule calls them holes.
 
 **⇒ Derive `IsOuter` from containment nesting (point-in-polygon, depth parity), never from winding
-sign.** `VCarve.Contains` is already there. Supporting `fill-rule="evenodd"` is then a variation on
-the same traversal rather than a separate mechanism.
+sign.** `VCarve.Contains` is already there. That keeps pass grouping sensible; the cut geometry is
+the engine's even-odd test either way.
 
 ### 4. Open paths make the two operations diverge
 
