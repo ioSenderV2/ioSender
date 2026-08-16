@@ -111,7 +111,11 @@ namespace CNC.Controls
 
         private NumericField[] AllFields()
         {
+            // Every NumericField the editor owns MUST be here: this list is the only thing wiring
+            // ValueChanged -> CaptureFields, so one left out is a field that silently does nothing.
+            // fldSvgWidth was, and editing the artwork width changed neither the model nor the preview.
             return new[] { fldX, fldY, fldLength, fldAngle, fldDiameter, fldSize, fldWidth, fldDepthY, fldCapHeight, fldEngraveWidth,
+                           fldSvgWidth,
                            fldColumns, fldColumnSpacing, fldRows, fldRowSpacing,
                            fldPatternCount, fldPatternRadius, fldPatternStartAngle, fldPatternArcSpan,
                            fldHoleDiameter, fldTotalDepth, fldDepthOfCut, fldPeckDepth, fldBoreStepDown, fldStepover,
@@ -1091,6 +1095,11 @@ namespace CNC.Controls
             }
             else
                 return;
+
+            // The artwork readout is derived from SvgWidth, so it has to be re-derived whenever a field
+            // changes - not only when a file is picked, which is all the browse handler covered.
+            if (selectedToolpath != null && selectedToolpath.Geometry == WorkOrderGeometryKind.Svg)
+                UpdateSvgInfo();
 
             OnWorkOrderChanged();
         }

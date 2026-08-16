@@ -105,9 +105,13 @@ namespace CNC.Controls
             { "rect", "circle", "ellipse", "polygon", "polyline", "use", "image", "text" };
 
         // Aspect (height/width of the INK bounding box) per file, so the model can answer "how tall is
-        // this at 150 mm wide?" without re-reading and re-flattening the artwork. That question is asked
-        // on every anchor/extent/preview evaluation - measured on the real logo, a full Load is ~30 ms,
-        // which is fine once and ruinous per property read.
+        // this at 150 mm wide?" without re-reading and re-flattening the artwork. HalfDepth asks it on
+        // every extent evaluation, several times per redraw.
+        //
+        // MEASURED, not guessed (an earlier version of this comment claimed ~30 ms without checking):
+        // a full Load of the 23 KB / 42-contour reference logo is 6.1 ms. Cheap enough that the PREVIEW
+        // calls Load outright rather than caching contours - one redraw is a few ms - but not something
+        // to repeat inside a property getter.
         //
         // Keyed on path + last-write time + length, so editing the file in Inkscape and coming back
         // invalidates it. A cache that cannot notice its source changed is the recurring bug in this
