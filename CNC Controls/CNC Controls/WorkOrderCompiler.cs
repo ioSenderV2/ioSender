@@ -680,33 +680,98 @@ namespace CNC.Controls
         // the skip-first-tool-change option, feeds - none of them touch it; they act on the emitted
         // coordinates afterwards. So the passes are memoized on exactly those inputs: clicking Generate
         // again for another identical board - or after toggling "first tool already loaded", or after
-        // nudging X/Y - reuses the carve and takes seconds, while any edit to the text, font, size or
-        // V-bit changes the key and recomputes. Stale-by-construction is impossible: the key IS the full
-        // input set (the resolution/step consts are compile-time fixed). Pass objects are read-only
-        // downstream (grouping reorders references, emission reads points), so sharing them is safe.
+        // nudging X/Y - reuses the carve and takes seconds, while any edit to the artwork or the V-bit
+        // changes the key and recomputes. The key must BE the full input set, or the cache serves the
+        // wrong geometry with no symptom (the resolution/step consts are compile-time fixed, so they are
+        // not part of it - expose either as a setting and it MUST join the key). Pass objects are
+        // read-only downstream (grouping reorders references, emission reads points), so sharing is safe.
+        //
+        // THAT CLAIM WAS ONCE FALSE AND IT SHIPPED. The key covered only the TEXT inputs, because text
+        // was the only carvable thing when it was written; 7143bc4d added SVG as a second geometry
+        // source and did not extend it. Neither SvgFile nor SvgWidth was in the key, and capHeight -
+        // which IS in it, is the TEXT cap height, unrelated to artwork. So changing the artwork width and
+        // regenerating HIT the cache and reused the old passes (indistinguishable from the width field
+        // being inert, which is the bug fbc93787 had just fixed), and pointing a toolpath at a different
+        // .svg carved the PREVIOUS logo. Static and process-lifetime, so a restart hid it.
+        // Adding a geometry source means adding its inputs to CarveSourceKey. There is no other answer.
+
+        // U+0001 as the field separator - an unambiguous boundary even though Text and file paths are
+        // free-form; a bare concat, or any separator that can occur inside a value, lets different field
+        // combinations produce one key. Built from (char)1 rather than written as an escape on purpose:
+        // an escape in source is something a bulk edit can silently mangle, and this very method spent
+        // part of its own fix carrying a raw control byte for exactly that reason.
+        private static readonly string KeySep = ((char)1).ToString();
+
         private static readonly Dictionary<string, List<CNC.Core.VCarvePass>> carvePassCache = new Dictionary<string, List<CNC.Core.VCarvePass>>();
         private const int CarveCacheMax = 8;   // a work order rarely has more distinct carves than this
+
+        /// <summary>
+        /// Everything about WHERE THE CONTOURS COME FROM, as a key fragment - the half of the carve's
+        /// input set that differs per geometry kind. Leads with the kind, so a text carve and an SVG
+        /// carve can never collide however their other fields line up. Returns null when the inputs
+        /// cannot be fingerprinted, which means "do not cache this" - never "cache it under a guess".
+        /// </summary>
+        private static string CarveSourceKey(WorkOrderToolpath tp, double capHeight)
+        {
+            if (tp.Geometry != WorkOrderGeometryKind.Svg)
+                return string.Join(KeySep, "text", tp.Text, tp.FontFamily,
+                    tp.FontBold ? "b" : "", tp.FontItalic ? "i" : "",
+                    capHeight.ToString("R", CultureInfo.InvariantCulture));
+
+            // A PATH IS NOT ITS CONTENTS, so the key carries a hash of the BYTES. Iterating on a logo
+            // means re-exporting over the same filename, which leaves path and width identical while
+            // the artwork changes underneath - the cache would go stale in precisely the workflow the
+            // SVG feature exists to serve. Write-stamp+length was the cheaper option and was rejected:
+            // a restore from backup, or any exporter that preserves timestamps, changes content while
+            // both of those hold still. Hashing a few hundred KB is free against a carve measured in
+            // MINUTES, so there is no reason to accept a weaker identity here.
+            string hash;
+            try
+            {
+                using (var sha = System.Security.Cryptography.SHA256.Create())
+                    hash = BitConverter.ToString(sha.ComputeHash(System.IO.File.ReadAllBytes(tp.SvgFile)));
+            }
+            catch
+            {
+                hash = null;    // missing/unreadable/locked - see the null contract above
+            }
+            if (hash == null)
+                return null;
+
+            return string.Join(KeySep, "svg", tp.SvgFile ?? string.Empty,
+                tp.SvgWidth.ToString("R", CultureInfo.InvariantCulture), hash);
+        }
+
+        // What this carve is OF, for the debug trace - a HIT/MISS line that does not name its source
+        // cannot be read against the artwork that produced it.
+        private static string CarveSourceLabel(WorkOrderToolpath tp)
+        {
+            return tp.Geometry == WorkOrderGeometryKind.Svg
+                ? "svg=\"" + (string.IsNullOrEmpty(tp.SvgFile) ? "(none)" : System.IO.Path.GetFileName(tp.SvgFile))
+                  + "\" w=" + tp.SvgWidth.ToString("0.###", CultureInfo.InvariantCulture) + "mm"
+                : "text=\"" + tp.Text + "\"";
+        }
 
         private static List<CNC.Core.VCarvePass> CachedCarvePasses(WorkOrderToolpath tp, double capHeight,
                                                                    double halfAngle, double maxDepth, List<IList<Point2D>> polys)
         {
-            // U+0001-separated: an unambiguous key even though Text is free-form - a bare concat (or a
-            // separator that can appear in the values, like a digit) would let field combinations collide.
-            string key = string.Join("\u0001", tp.Text, tp.FontFamily,
-                tp.FontBold ? "b" : "", tp.FontItalic ? "i" : "",
-                capHeight.ToString("R", CultureInfo.InvariantCulture),
+            // The source fragment (see CarveSourceKey) plus the cone. A null source means the artwork
+            // could not be fingerprinted, so this carve is computed and simply not memoized - serving a
+            // possibly-stale hit is the one outcome worth refusing outright.
+            string source = CarveSourceKey(tp, capHeight);
+            string key = source == null ? null : string.Join(KeySep, source,
                 halfAngle.ToString("R", CultureInfo.InvariantCulture),
                 maxDepth.ToString("R", CultureInfo.InvariantCulture));
 
             List<CNC.Core.VCarvePass> passes;
-            if (carvePassCache.TryGetValue(key, out passes))
+            if (key != null && carvePassCache.TryGetValue(key, out passes))
             {
                 // Logged because the whole cost question turns on this: a HIT returns in microseconds and
                 // a MISS is the multi-minute build. A timing trace that does not say which it was is
-                // unreadable - the second Generate of the same text looks like a different engine.
+                // unreadable - the second Generate of the same artwork looks like a different engine.
                 if (DebugLog.Enabled)
                     DebugLog.Write("workorder", string.Format(CultureInfo.InvariantCulture,
-                        "carve cache HIT ({0} passes) text=\"{1}\"", passes.Count, tp.Text));
+                        "carve cache HIT ({0} passes) {1}", passes.Count, CarveSourceLabel(tp)));
                 return passes;
             }
 
@@ -715,13 +780,17 @@ namespace CNC.Controls
             swCarve.Stop();
             if (DebugLog.Enabled)
                 DebugLog.Write("workorder", string.Format(CultureInfo.InvariantCulture,
-                    "carve cache MISS {0:0}ms ({1} passes, {2} contours, res={3}mm, step={4}mm) text=\"{5}\"",
+                    "carve cache MISS {0:0}ms ({1} passes, {2} contours, res={3}mm, step={4}mm{5}) {6}",
                     swCarve.Elapsed.TotalMilliseconds, passes.Count, polys.Count,
-                    CarveResolution, CarveDepthStep, tp.Text));
+                    CarveResolution, CarveDepthStep,
+                    key == null ? ", NOT CACHEABLE" : string.Empty, CarveSourceLabel(tp)));
 
-            if (carvePassCache.Count >= CarveCacheMax)
-                carvePassCache.Clear();
-            carvePassCache[key] = passes;
+            if (key != null)
+            {
+                if (carvePassCache.Count >= CarveCacheMax)
+                    carvePassCache.Clear();
+                carvePassCache[key] = passes;
+            }
             return passes;
         }
 
