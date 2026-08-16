@@ -259,6 +259,8 @@
                         <local:NumericField x:Uid="fld_wochamferdepth" x:Name="fldChamferDepth" Label="Chamfer depth:" ColonAt="150" Format="##0.0##" Unit="mm"/>
                         <local:NumericField x:Uid="fld_woengravewidth" x:Name="fldEngraveWidth" Label="Stroke width:" ColonAt="150" Format="##0.0##" Unit="mm"
                                             ToolTip="How wide the engraved line should be. The plunge depth is worked out from this and the V-bit's included angle, because width is what you can measure on the part - the same 0.8 mm line is 0.40 mm deep on a 90 degree bit but 0.69 mm on a 60 degree one."/>
+                        <local:NumericField x:Uid="fld_wocarvemaxdepth" x:Name="fldCarveMaxDepth" Label="Max carve depth:" ColonAt="150" Format="##0.0##" Unit="mm"
+                                            ToolTip="Ceiling on how deep the carve may go. 0 = automatic, the deepest the bit itself can cut. A carve's depth follows each shape's own width, so this leaves fine detail untouched and only flattens off the areas wide enough to want more - which is what makes a very narrow bit usable on artwork that also has thick strokes."/>
                         <TextBlock x:Name="txtEngraveDepth" Foreground="#586069" FontSize="11" Margin="154,0,0,4" TextWrapping="Wrap" Visibility="Collapsed"/>
                         <local:NumericField x:Uid="fld_wocountersink" x:Name="fldCountersinkDiameter" Label="Countersink diameter:" ColonAt="150" Format="##0.0##" Unit="mm"
                                             ToolTip="Target finished diameter - the bit plunges straight down the hole's centerline until its cone reaches this width. Depth is computed automatically."/>

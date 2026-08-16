@@ -109,6 +109,47 @@ namespace CNC.Controls
 
             return cut;
         }
+
+        /// <summary>
+        /// The deepest a V-carve with this tool will go, given an operation's optional cap
+        /// (WorkOrderOperation.CarveMaxDepth; 0 = no cap asked for).
+        /// </summary>
+        /// <remarks>
+        /// One shared answer, for the same reason EngraveCutFor is: the compiler and the editor's note
+        /// both need it, and computing it twice is how they drift.
+        ///
+        /// A V-carve has no depth SETTING - depth is a consequence of the shape's own local width - so
+        /// this is a ceiling, not a target. Narrow detail never reaches it and is unaffected; only the
+        /// parts wide enough to want more get flattened off and cleared. That is what lets a very narrow
+        /// bit be used for fine lettering without the wide areas plunging: a 15 degree bit takes the
+        /// widest feature of a logo measured at 1.355 mm inscribed radius to 10.29 mm deep, while the
+        /// same artwork's 0.5 mm tagline strokes only ever ask for 1.88 mm.
+        /// </remarks>
+        public CarveDepth CarveDepthFor(double requestedCapMm)
+        {
+            var d = new CarveDepth();
+
+            // Past its own cutting diameter the cone has run out and the shank would be doing the work,
+            // so this is a hard ceiling no operation may raise - the same reasoning as the width clamp
+            // in EngraveCutFor. A tool with no diameter recorded cannot be checked against one; 3 mm
+            // matches the fallback the carve compiler has always used.
+            d.BitLimit = DiameterMm > 0d ? (DiameterMm / 2d) / Math.Tan(HalfAngleRad) : 3d;
+
+            d.Requested = requestedCapMm > 0d;
+            d.Clamped = d.Requested && requestedCapMm > d.BitLimit;
+            d.Depth = d.Requested ? Math.Min(requestedCapMm, d.BitLimit) : d.BitLimit;
+
+            return d;
+        }
+    }
+
+    /// <summary>The result of asking a tool how deep it will carve - see CustomTool.CarveDepthFor.</summary>
+    public struct CarveDepth
+    {
+        public double Depth;      // the ceiling actually applied, mm
+        public double BitLimit;   // the deepest this bit can carve at all, whatever was asked for
+        public bool Requested;    // the operation asked for a cap (rather than leaving it automatic)
+        public bool Clamped;      // the requested cap was deeper than the bit can go and was limited
     }
 
     /// <summary>The result of asking a tool for a given engraved stroke width - see CustomTool.EngraveCutFor.</summary>

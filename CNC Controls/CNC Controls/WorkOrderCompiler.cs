@@ -833,9 +833,13 @@ namespace CNC.Controls
 
             var tool = CustomTools.Find(op.Tool);
             double halfAngle = tool != null ? tool.HalfAngleRad : Math.PI / 4d;
-            double tanA = Math.Tan(halfAngle);
-            // The same clamp EngraveCutFor applies to a requested stroke width, expressed as a depth.
-            double maxDepth = tool != null && tool.DiameterMm > 0d ? (tool.DiameterMm / 2d) / tanA : 3d;
+            // One shared answer for the carve's depth ceiling, INCLUDING the operation's optional cap and
+            // the clamp at the bit's own cutting diameter - see CustomTool.CarveDepthFor. Computing it
+            // here as well as in the editor's note is how the two would drift apart (same reasoning, and
+            // the same precedent, as EngraveCutFor in BuildEngrave above).
+            double maxDepth = tool != null
+                ? tool.CarveDepthFor(op.CarveMaxDepth).Depth
+                : (op.CarveMaxDepth > 0d ? op.CarveMaxDepth : 3d);
 
             // The engine carves in the text's own coordinates (baseline flat, Y up) and the transform to
             // the stock happens per emitted point - same shape either way, but the field's grid stays

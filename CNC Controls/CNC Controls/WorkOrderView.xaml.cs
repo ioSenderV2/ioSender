@@ -115,7 +115,7 @@ namespace CNC.Controls
             // ValueChanged -> CaptureFields, so one left out is a field that silently does nothing.
             // fldSvgWidth was, and editing the artwork width changed neither the model nor the preview.
             return new[] { fldX, fldY, fldLength, fldAngle, fldDiameter, fldSize, fldWidth, fldDepthY, fldCapHeight, fldEngraveWidth,
-                           fldSvgWidth,
+                           fldCarveMaxDepth, fldSvgWidth,
                            fldColumns, fldColumnSpacing, fldRows, fldRowSpacing,
                            fldPatternCount, fldPatternRadius, fldPatternStartAngle, fldPatternArcSpan,
                            fldHoleDiameter, fldTotalDepth, fldDepthOfCut, fldPeckDepth, fldBoreStepDown, fldStepover,
@@ -934,6 +934,7 @@ namespace CNC.Controls
             fldFloorStockToLeave.Value = op.FloorStockToLeave;
             fldChamferDepth.Value = op.ChamferDepth;
             fldEngraveWidth.Value = op.EngraveWidth;
+            fldCarveMaxDepth.Value = op.CarveMaxDepth;
             fldCountersinkDiameter.Value = op.CountersinkDiameter;
             chkThrough.IsChecked = op.Through;
 
@@ -983,6 +984,10 @@ namespace CNC.Controls
             // the width field gives way and the note explains where depth comes from instead.
             bool isCarve = isEngrave && selectedToolpath != null && selectedToolpath.IsCarved;
             Show(fldEngraveWidth, isEngrave && !isCarve);
+            // The mirror image of the width field: a carve has no stroke width to ask for, but it is the
+            // only thing that HAS a depth worth capping (a stroke engrave's depth already follows from
+            // the width above it).
+            Show(fldCarveMaxDepth, isEngrave && isCarve);
             Show(txtEngraveDepth, isEngrave);
             if (isEngrave)
             {
@@ -1001,11 +1006,22 @@ namespace CNC.Controls
 
                 if (isCarve)
                 {
-                    // Mirrors BuildVCarve's own ceiling: past the bit's diameter the cone has run out.
-                    double maxCarve = vtool != null && vtool.DiameterMm > 0d ? (vtool.DiameterMm / 2d) / Math.Tan(half) : 3d;
+                    // Same helper the compiler uses, so what this says is what will be cut - the cap and
+                    // the bit-limit clamp included. Deriving it separately here is how the note and the
+                    // cut drift apart (the reason EngraveCutFor exists, applied to the carve's ceiling).
+                    var carve = vtool != null ? vtool.CarveDepthFor(op.CarveMaxDepth)
+                                              : new CarveDepth { Depth = op.CarveMaxDepth > 0d ? op.CarveMaxDepth : 3d,
+                                                                 BitLimit = 3d, Requested = op.CarveMaxDepth > 0d };
+
+                    // Say plainly when a requested cap could not be honoured, rather than quietly cutting
+                    // shallower than asked - the same courtesy the stroke branch pays a clamped width.
+                    if (carve.Clamped)
+                        note = string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                            "  Capped at {0:0.###} mm - the deepest this bit can carve.", carve.BitLimit) + note;
+
                     txtEngraveDepth.Text = string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                        "Depth follows the letter shapes - up to {0:0.###} mm with the {1:0.#}° bit. Wider strokes bottom out flat and are cleared.{2}",
-                        maxCarve, deg, note);
+                        "Depth follows the letter shapes - up to {0:0.###} mm with the {1:0.#}° bit{2}. Wider strokes bottom out flat and are cleared.{3}",
+                        carve.Depth, deg, carve.Requested && !carve.Clamped ? " (your cap)" : string.Empty, note);
                 }
                 else
                 {
@@ -1046,6 +1062,7 @@ namespace CNC.Controls
                 op.FloorStockToLeave = fldFloorStockToLeave.Value;
                 op.ChamferDepth = fldChamferDepth.Value;
                 op.EngraveWidth = fldEngraveWidth.Value;
+                op.CarveMaxDepth = fldCarveMaxDepth.Value;
                 op.CountersinkDiameter = fldCountersinkDiameter.Value;
                 // The target diameter drives the bit choice, not the other way around - confirmed on real
                 // hardware 2026-07-30 (operator: a 19.5mm target should pick the 21mm bit automatically).

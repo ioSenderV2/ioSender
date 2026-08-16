@@ -125,6 +125,20 @@ namespace CNC.Controls
         // and 0.69 mm on a 60. Getting that backwards is how the same job cuts differently after a bit
         // change.
         public double EngraveWidth = 0.8d;        // Engrave
+
+        // V-carve ONLY - a ceiling on how deep the carve may go, mm. 0 = automatic, meaning the deepest
+        // the bit itself can cut, which is the behaviour this had before the field existed and is why
+        // every saved work order is unaffected.
+        //
+        // A carve has no depth setting - depth is a consequence of the shape's own local width - so this
+        // caps nothing that is already shallower. Narrow detail is untouched; only areas wide enough to
+        // want more get flattened off at this depth and cleared. That is what makes a very narrow bit
+        // usable on artwork containing both: a 15-degree bit takes the Snorkel logo's widest feature to
+        // 10.29 mm while its 0.5 mm tagline strokes only ever ask for 1.88 mm, so a 2-3 mm cap buys the
+        // fine lettering its full depth and stops the emblem trenching a 38 mm cedar stave.
+        // Clamped to the bit's own limit by CustomTool.CarveDepthFor - a cap may lower, never raise.
+        public double CarveMaxDepth = 0d;         // Engrave (carve)
+
         // Countersink - the FINISHED diameter the operator wants (e.g. to seat a specific screw head), not a
         // raw plunge depth - WorkOrderCompiler.BuildCountersink converts it (depth = diameter / 2, same
         // 45-deg-per-side cone math as Chamfer's V-bit, just specified the other way around since a
