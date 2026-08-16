@@ -50,6 +50,15 @@ jobs:
           Write-Host "Stamping beta version: $ver"
           "version=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
+          # Pages URL for the rendered Overview, derived rather than hardcoded. Done here in pwsh
+          # because GitHub Actions expressions have no lowercase function and github.io hostnames
+          # are case-folded - "${{ github.repository }}" alone would give a mixed-case host. The
+          # path segment keeps the repo's own casing and the file is lowercase overview.html; see
+          # the publish step in release.yml that keeps that URL current.
+          $owner, $repoName = "${{ github.repository }}" -split '/', 2
+          "pagesUrl=https://$($owner.ToLowerInvariant()).github.io/$repoName/overview.html#features-and-fixes" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
           $path = "ioSender XL\ioSender XL\BuildInfo.cs"
           $content = Get-Content $path -Raw
           $content = $content -replace 'CommitSha = "dev"', "CommitSha = `"${{ github.event.pull_request.head.sha }}`""
@@ -93,6 +102,10 @@ jobs:
             ```
             powershell -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/${{ github.repository }}/master/install.ps1))) -Tag 'beta-pr${{ github.event.pull_request.number }}'"
             ```
+
+            Full changelog and feature documentation: [**Overview**](${{ steps.betaver.outputs.pagesUrl }}) (Ctrl+click for a new tab)
+            &mdash; that page is the changelog as of the last *released* version, so work on this PR
+            branch may not be listed in it yet.
 
             **Test build only, not a release.** This release is replaced on every push to the PR and
             deleted automatically when the PR closes or the "beta" label is removed.

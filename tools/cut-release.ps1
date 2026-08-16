@@ -156,7 +156,7 @@ $lines += "powershell -NoProfile -ExecutionPolicy Bypass -Command `"& ([scriptbl
 $lines += '```'
 $lines += ""
 if ($newEntries.Count -eq 0) {
-    $lines += "No changelog entries in this build (see [Overview.html](https://github.com/$Repo/blob/master/Overview.html#features-and-fixes) for the full history)."
+    $lines += "No changelog entries in this build."
 } else {
     foreach ($e in $newEntries) {
         # Strip inner HTML tags for a plain-text release note line.
@@ -164,6 +164,28 @@ if ($newEntries.Count -eq 0) {
         $lines += "- **[$($e.Tag)] #$($e.N)** $plain"
     }
 }
+$lines += ""
+
+# Link to the GitHub Pages copy, NOT the repo blob view. github.com/<repo>/blob/master/Overview.html
+# serves 880KB of HTML *source* in a code viewer - readable only as markup, and the
+# #features-and-fixes anchor is meaningless there. Pages serves it as text/html, so it renders as
+# the actual document and the anchor lands on the changelog. raw.githubusercontent.com is no good
+# either (text/plain), and attaching the file as a release asset downloads it instead of opening it.
+#
+# The Pages host is the owner lowercased - github.io hostnames are case-folded - while the path
+# segment keeps the repo's own casing, and the FILE is lowercase overview.html (see the publish
+# step in .github/workflows/release.yml, which is what keeps this URL from going stale).
+#
+# This used to live inside the "$newEntries.Count -eq 0" branch, which meant the link appeared only
+# on the rare release that shipped NO changelog entries - i.e. it was missing from essentially every
+# real release. It is unconditional now.
+#
+# Note for anyone tempted: the link cannot be made to open in a new tab. GitHub sanitizes release
+# body markdown and strips target attributes, so raw <a target="_blank"> gets scrubbed. Ctrl+click
+# or middle-click is the reader's only route, and that's fine.
+$owner, $repoName = $Repo -split '/', 2
+$overviewUrl = "https://$($owner.ToLowerInvariant()).github.io/$repoName/overview.html#features-and-fixes"
+$lines += "Full changelog and feature documentation: [**Overview**]($overviewUrl) (opens in your browser; Ctrl+click for a new tab)"
 $lines += ""
 $lines += "<!-- changelog-through:$currentMax -->"
 $notes = ($lines -join "`n")
