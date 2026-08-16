@@ -812,6 +812,7 @@ namespace CNC.Controls
             fldDiameter.Value = tp.Diameter; fldSize.Value = tp.Size;
             fldWidth.Value = tp.Width; fldDepthY.Value = tp.Depth;
             txtEngraveText.Text = tp.Text ?? string.Empty; fldCapHeight.Value = tp.CapHeight;
+            txtSvgFile.Text = tp.SvgFile ?? string.Empty; fldSvgWidth.Value = tp.SvgWidth;
             // A family saved on another machine may not be installed here. Adding it to the list rather
             // than falling back to index 0 keeps the choice intact - silently reverting to the stroke font
             // would change the MODE of the cut just by opening the file. (WPF itself falls back to Arial
@@ -852,6 +853,14 @@ namespace CNC.Controls
             Show(fldCapHeight, showText);
             Show(pnlFontRow, showText);
             Show(pnlFontStyleRow, showText);
+            // Artwork rows. Deliberately NOT folded into showText: an SVG toolpath has no text, no cap
+            // height and no font, and reusing those rows would have offered a font for a logo.
+            bool isSvg = tp.Geometry == WorkOrderGeometryKind.Svg;
+            Show(pnlSvgFileRow, isSvg);
+            Show(fldSvgWidth, isSvg);
+            Show(pnlSvgInfoRow, isSvg);
+            if (isSvg)
+                UpdateSvgInfo();
             Show(pnlTextHAlignRow, showText && !isText);
             Show(pnlTextVAlignRow, showText && !isText);
             // Sliding a rectangle around inside a curve voids the inscribed-fit guarantee - see
@@ -1051,6 +1060,7 @@ namespace CNC.Controls
                 {
                     tp.Length = fldLength.Value; tp.Angle = fldAngle.Value;
                     tp.Text = txtEngraveText.Text; tp.CapHeight = fldCapHeight.Value;
+                    tp.SvgFile = txtSvgFile.Text; tp.SvgWidth = fldSvgWidth.Value;
                     tp.FontFamily = cbxFont.SelectedIndex > 0 ? (string)cbxFont.SelectedItem : string.Empty;
                     tp.FontBold = chkFontBold.IsChecked == true; tp.FontItalic = chkFontItalic.IsChecked == true;
                     // HasText itself is toggled in chkHasText_Click (it adds/removes the Engrave op);
@@ -1090,6 +1100,61 @@ namespace CNC.Controls
         // Shape text on/off. Ticking adds the Engrave operation that will cut the text (with the V-bit
         // suggestion NewOperation already applies); unticking removes it - leaving it would leave an
         // Engrave op that no longer has anything to engrave, flagged by Validate but better not created.
+        // The artwork's real extent at the chosen width, plus anything the import cannot read. Shown
+        // in the editor rather than saved for Generate: "will this fit the stave, and can we even cut
+        // it" are questions the operator is asking WHILE choosing the file, and finding out at Generate
+        // - or worse, from a comment buried in 30,000 lines of g-code - is too late to be useful.
+        private void UpdateSvgInfo()
+        {
+            string path = txtSvgFile.Text;
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                txtSvgInfo.Text = "No file chosen.";
+                return;
+            }
+            if (!System.IO.File.Exists(path))
+            {
+                txtSvgInfo.Text = "File not found.";
+                return;
+            }
+
+            var r = SvgOutlines.Load(path, fldSvgWidth.Value);
+            if (r.Error != null)
+                txtSvgInfo.Text = r.Error;
+            else if (!r.IsComplete)
+                txtSvgInfo.Text = string.Format("{0:0.#} x {1:0.#} mm - CANNOT CUT: this build does not import {2}.",
+                                                r.WidthMm, r.HeightMm, r.Describe());
+            else
+                txtSvgInfo.Text = string.Format("{0:0.#} x {1:0.#} mm, {2} outline{3}.",
+                                                r.WidthMm, r.HeightMm, r.Contours.Count,
+                                                r.Contours.Count == 1 ? string.Empty : "s");
+        }
+
+        private void btnSvgBrowse_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog {
+                Title = "Choose SVG artwork",
+                Filter = "SVG artwork (*.svg)|*.svg|All files (*.*)|*.*",
+                CheckFileExists = true
+            };
+            // Reopen where the last one came from - artwork lives together, and re-picking from the
+            // same folder is the common case (a second logo, or a re-export of this one).
+            try
+            {
+                string dir = System.IO.Path.GetDirectoryName(txtSvgFile.Text);
+                if (!string.IsNullOrEmpty(dir) && System.IO.Directory.Exists(dir))
+                    dlg.InitialDirectory = dir;
+            }
+            catch { /* a malformed path is not a reason to refuse the dialog */ }
+
+            if (dlg.ShowDialog() != true)
+                return;
+
+            txtSvgFile.Text = dlg.FileName;
+            UpdateSvgInfo();
+            CaptureFields();
+        }
+
         private void chkHasText_Click(object sender, RoutedEventArgs e)
         {
             var tp = selectedToolpath;

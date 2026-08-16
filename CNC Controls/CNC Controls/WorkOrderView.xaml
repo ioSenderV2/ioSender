@@ -154,6 +154,22 @@
                             <CheckBox x:Uid="chk_wofontbold" x:Name="chkFontBold" Content="Bold" VerticalAlignment="Center"/>
                             <CheckBox x:Uid="chk_wofontitalic" x:Name="chkFontItalic" Content="Italic" Margin="12,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
+                        <!-- SVG artwork (Geometry = Svg). The file is REFERENCED, not copied into the work
+                             order, so re-exporting the artwork updates the cut - see WorkOrderToolpath.SvgFile.
+                             The size readout under the row is the artwork's real ink extent at the chosen
+                             width, which is what tells the operator whether it fits the stave. -->
+                        <StackPanel x:Name="pnlSvgFileRow" Orientation="Horizontal" Margin="0,2,0,2">
+                            <Label x:Uid="lbl_wosvgfile" Content="SVG file:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <TextBox x:Uid="txt_wosvgfile" x:Name="txtSvgFile" MinWidth="140" MaxWidth="180" MinHeight="22" VerticalContentAlignment="Center"
+                                     ToolTip="The .svg file to carve. It is referenced, not copied - re-export the artwork and the next Generate picks it up. Moving or renaming the file is reported at Generate rather than cutting something stale."/>
+                            <Button x:Uid="btn_wosvgbrowse" x:Name="btnSvgBrowse" Content="..." MinWidth="30" MinHeight="22" Margin="4,0,0,0"
+                                    Click="btnSvgBrowse_Click" ToolTip="Choose an .svg file."/>
+                        </StackPanel>
+                        <local:NumericField x:Uid="fld_wosvgwidth" x:Name="fldSvgWidth" Label="Artwork width:" ColonAt="150" Format="###0.0##" Unit="mm"
+                                            ToolTip="How wide the artwork itself is - measured across the drawing's own ink, not its page, so padding around the logo does not count. The height follows from the artwork's proportions."/>
+                        <StackPanel x:Name="pnlSvgInfoRow" Orientation="Horizontal" Margin="154,0,0,4">
+                            <TextBlock x:Name="txtSvgInfo" Foreground="#FF606060" FontSize="11" TextWrapping="Wrap" MaxWidth="240"/>
+                        </StackPanel>
                         <StackPanel x:Name="pnlTextHAlignRow" Orientation="Horizontal" Margin="0,2,0,2">
                             <Label x:Uid="lbl_wotexthalign" Content="Horizontal align:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
                             <ComboBox x:Name="cbxTextHAlign" MinWidth="180" MinHeight="22" VerticalAlignment="Center"
