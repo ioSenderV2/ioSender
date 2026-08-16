@@ -570,15 +570,12 @@ namespace CNC.Controls
                 capHeight = fit.CapHeight; angleDeg = fit.Angle; fitDx = fit.OffsetX; fitDy = fit.OffsetY;
             }
 
-            // Artwork has no stroke-font equivalent - an SVG IS outlines - so it always takes the carve
-            // path, whatever the engrave width says.
-            if (tp.Geometry == WorkOrderGeometryKind.Svg)
-                return BuildVCarve(tp, op, cx, cy, capHeight, angleDeg, fitDx, fitDy);
-
-            // A toolpath carrying a real font family V-carves the glyph outlines instead of tracing
-            // stroke-font pen paths - one op kind, two ways of cutting it, chosen on the GEOMETRY where the
-            // font itself is chosen (see WorkOrderToolpath.FontFamily).
-            if (tp.IsCarved)
+            // One op kind, two ways of cutting it. Artwork has no stroke-font equivalent - an SVG IS
+            // outlines - so it always carves whatever the engrave width says; text carves when it carries
+            // a real font family, chosen on the GEOMETRY where the font itself is (WorkOrderToolpath.
+            // FontFamily). Both used to be separate branches here while the editor tested only IsCarved,
+            // so the two disagreed about every SVG toolpath - see WorkOrderToolpath.CarvesOutlines.
+            if (tp.CarvesOutlines)
                 return BuildVCarve(tp, op, cx, cy, capHeight, angleDeg, fitDx, fitDy);
 
             var lines = new List<string>();

@@ -980,9 +980,13 @@ namespace CNC.Controls
             // deep on a 90-degree bit and 0.69 on a 60, and that difference decides whether a shallow
             // engraving goes through a veneer.
             bool isEngrave = op.Kind == WorkOrderOpKind.Engrave;
-            // A V-carve has no stroke width to ask for - depth follows the glyph's own local width - so
+            // A V-carve has no stroke width to ask for - depth follows the shape's own local width - so
             // the width field gives way and the note explains where depth comes from instead.
-            bool isCarve = isEngrave && selectedToolpath != null && selectedToolpath.IsCarved;
+            // CarvesOutlines, NOT IsCarved: the latter is a question about the FONT and is false for an
+            // SVG, so this used to offer artwork a Stroke width field the compiler ignores and quote it a
+            // stroke plunge depth. It is the same property BuildEngrave routes on, so the editor and the
+            // cut cannot disagree about what this toolpath is.
+            bool isCarve = isEngrave && selectedToolpath != null && selectedToolpath.CarvesOutlines;
             Show(fldEngraveWidth, isEngrave && !isCarve);
             // The mirror image of the width field: a carve has no stroke width to ask for, but it is the
             // only thing that HAS a depth worth capping (a stroke engrave's depth already follows from

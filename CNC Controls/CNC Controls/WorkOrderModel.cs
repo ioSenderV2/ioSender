@@ -248,7 +248,26 @@ namespace CNC.Controls
         public bool UsesText { get { return Geometry == WorkOrderGeometryKind.Text || (HasText && WorkOrderRules.SupportsShapeText(Geometry)); } }
 
         /// <summary>True when this toolpath's text V-carves a TrueType outline rather than engraving the stroke font.</summary>
+        /// <remarks>
+        /// TEXT ONLY - it asks about the font, so it is false for artwork. Use <see cref="CarvesOutlines"/>
+        /// for "does an Engrave operation on this toolpath v-carve", which is a different question.
+        /// </remarks>
         public bool IsCarved { get { return UsesText && !string.IsNullOrEmpty(FontFamily); } }
+
+        /// <summary>
+        /// True when an Engrave operation on this toolpath V-CARVES filled outlines rather than tracing
+        /// stroke-font pen paths - the one answer both the compiler and the editor ask.
+        /// </summary>
+        /// <remarks>
+        /// An SVG has no stroke-font equivalent (artwork IS outlines), so it always carves whatever the
+        /// engrave width says; text carves only when a real font family is chosen. The compiler had both
+        /// of those as separate branches and the editor asked only IsCarved, so the two disagreed about
+        /// every SVG toolpath: the editor showed it a Stroke width field that BuildVCarve ignores, quoted
+        /// it a stroke plunge depth for a cut whose depth actually follows the artwork, and hid the carve
+        /// depth cap - on the one geometry kind that needs it most, since a logo is exactly where thick
+        /// and hairline detail share a bit. One property so they cannot drift apart again.
+        /// </remarks>
+        public bool CarvesOutlines { get { return Geometry == WorkOrderGeometryKind.Svg || IsCarved; } }
 
         // Pattern: the whole toolpath repeats at each instance position. The X/Y above is instance one, and
         // stays the anchor - a Grid grows from it, a Circular pattern orbits it.
