@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  logo-nested-islands.svg - ACCEPTANCE TEST for a narrow SVG import (see
+  docs/Architecture-SVG-Import.md).
+
+  Deliberately matches the SHAPE CLASS of a real vendor logo measured on 2026-08-15: <path>
+  elements only, no transforms, no arcs, no quadratics, every subpath closed, fills by CSS class,
+  viewBox with no width/height. An importer that handles this file handles that one.
+
+  What it is built to break: the font shortcut. TrueTypeOutlines decides "outer vs counter" from
+  the SIGN of a contour's signed area, which is safe for TrueType because a glyph's counters are
+  guaranteed to wind opposite its outer boundary. SVG guarantees no such thing, and the real logo
+  already had 2 of its 42 subpaths misclassified by that rule.
+
+  Every shape here is a RING WITH AN ISLAND INSIDE IT - nesting depth 2 - and the islands are wound
+  the SAME way as the holes, exactly as the real file had them. Under SVG's default nonzero fill
+  rule the winding numbers sum to +1-1-1 = -1, still non-zero, so a browser fills them correctly;
+  a naive sign test carves them out.
+
+  Expected result: 9 subpaths, 3 at depth 0 (solid), 3 at depth 1 (holes), 3 at depth 2 (solid
+  islands). A correct importer cuts 6 solid regions. The sign rule cuts 3 and wrongly voids the
+  islands - which on a 150 mm logo is a visible chunk missing from the middle of each shape.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 300 120">
+  <defs>
+    <style>
+      .dark { fill: #4d4145; }
+      .tan  { fill: #be9262; }
+    </style>
+  </defs>
+
+  <!-- Shape 1: square ring with a square island. Outer CW (+), hole CCW (-), island CCW (-).
+       The island shares the hole's winding - this is the case that defeats the sign rule. -->
+  <path class="dark" d="M 10 10 L 90 10 L 90 110 L 10 110 Z
+                        M 25 25 L 25 95 L 75 95 L 75 25 Z
+                        M 40 45 L 40 75 L 60 75 L 60 45 Z" />
+
+  <!-- Shape 2: same nesting, curves only (cubic + smooth-cubic, relative), so the flattener is
+       exercised on the same topology. No arcs, no quadratics - the real logo had neither. -->
+  <path class="tan" d="M 150 10 c 22 0 40 22 40 50 s -18 50 -40 50 c -22 0 -40 -22 -40 -50 s 18 -50 40 -50 Z
+                       M 150 28 c -16 0 -28 15 -28 32 s 12 32 28 32 c 16 0 28 -15 28 -32 s -12 -32 -28 -32 Z
+                       M 150 55 c -7 0 -12 2 -12 5 s 5 5 12 5 c 7 0 12 -2 12 -5 s -5 -5 -12 -5 Z" />
+
+  <!-- Shape 3: mixed absolute/relative and the h/v/V shorthands the real file used heavily.
+       Same three-level nesting again. -->
+  <path class="dark" d="M 210 10 h 80 v 100 h -80 Z
+                        M 222 24 v 72 h 56 V 24 Z
+                        M 240 50 v 20 h 20 V 50 Z" />
+</svg>
