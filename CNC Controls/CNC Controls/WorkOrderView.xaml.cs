@@ -488,15 +488,21 @@ namespace CNC.Controls
 
             var item = new TreeViewItem
             {
-                Header = MakeCheckHeader(string.Format("{0}  ({1} toolpath{2})", name, members.Count,
-                                                       members.Count == 1 ? string.Empty : "s"),
-                                         allOn, on => ToggleGroup(captured, on)),
+                Header = MakeCheckHeader(GroupHeaderText(name, members.Count), allOn, on => ToggleGroup(captured, on)),
                 Tag = new GroupRow { Name = name },
                 IsExpanded = !collapsedGroups.Contains(name)
             };
             item.Expanded += (s, ev) => collapsedGroups.Remove(captured);
             item.Collapsed += (s, ev) => collapsedGroups.Add(captured);
             return item;
+        }
+
+        // One definition, because the header is written in two places - built by MakeGroupItem and rewritten
+        // in place by RefreshTreeHeaders - and two copies of a format string is how the same row starts
+        // reading differently depending on which path last touched it.
+        private static string GroupHeaderText(string name, int members)
+        {
+            return string.Format("{0}  ({1} toolpath{2})", name, members, members == 1 ? string.Empty : "s");
         }
 
         // Enables or disables every toolpath in a group at once. Operations underneath are left alone - a
@@ -755,24 +761,18 @@ namespace CNC.Controls
         // fixes the highlight and means Ctrl+Up immediately after Ctrl+Down keeps working on the same item.
         // Deferred to DispatcherPriority.Loaded - the item was just added this call and has no layout yet, so
         // an immediate Focus() would silently no-op.
+        // Searches at any depth (see AllRows). The two-level walk this used to do stopped finding an
+        // OPERATION once its toolpath sat under a group header, because that put it three levels down -
+        // the selection silently didn't move rather than failing visibly.
         private void SelectInTree(object tag)
         {
-            foreach (TreeViewItem tpItem in treeToolpaths.Items)
-            {
-                if (ReferenceEquals(tpItem.Tag, tag))
+            foreach (var item in AllRows(treeToolpaths))
+                if (ReferenceEquals(item.Tag, tag))
                 {
-                    tpItem.IsSelected = true;
-                    tpItem.Dispatcher.BeginInvoke((System.Action)(() => tpItem.Focus()), System.Windows.Threading.DispatcherPriority.Loaded);
+                    item.IsSelected = true;
+                    item.Dispatcher.BeginInvoke((System.Action)(() => item.Focus()), System.Windows.Threading.DispatcherPriority.Loaded);
                     return;
                 }
-                foreach (TreeViewItem opItem in tpItem.Items)
-                    if (ReferenceEquals(opItem.Tag, tag))
-                    {
-                        opItem.IsSelected = true;
-                        opItem.Dispatcher.BeginInvoke((System.Action)(() => opItem.Focus()), System.Windows.Threading.DispatcherPriority.Loaded);
-                        return;
-                    }
-            }
         }
 
         private void treeToolpaths_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -1719,21 +1719,60 @@ namespace CNC.Controls
 
         // Cheaper than a full RebuildTree (which would fight the current selection) - the structure hasn't
         // changed, only the summaries a parameter edit affects. The trailing placeholder row is left alone.
+        //
+        // Walks by TAG, at whatever depth a row sits. This used to pair treeToolpaths.Items[t] with
+        // workOrder.Toolpaths[t] BY INDEX, which was fine while every top-level row was a toolpath and became
+        // wrong the moment group headers joined that level: index N stopped meaning toolpath N, so the header
+        // was given the FIRST toolpath's summary, the toolpaths nested under it were given that toolpath's
+        // OPERATION summaries, and everything after shifted by one. It rendered as a group header wearing a
+        // toolpath's name over rows wearing operations' names - reported from a real work order, with the
+        // model underneath perfectly correct the whole time.
         private void RefreshTreeHeaders()
         {
-            for (int t = 0; t < treeToolpaths.Items.Count && t < workOrder.Toolpaths.Count; t++)
+            foreach (var item in AllRows(treeToolpaths))
             {
-                var tpItem = (TreeViewItem)treeToolpaths.Items[t];
-                var tp = workOrder.Toolpaths[t];
-                SetCheckHeader(tpItem, WorkOrderRules.Summarize(workOrder, tp), tp.Enabled, tp.Enabled);
-                for (int i = 0; i < tp.Operations.Count && i < tpItem.Items.Count; i++)
+                var tp = item.Tag as WorkOrderToolpath;
+                if (tp != null)
                 {
-                    var op = tp.Operations[i];
-                    // An operation under an unchecked toolpath keeps its own tick but is dimmed too - it isn't
-                    // going to run, and showing it bright would be a lie about what Generate will emit.
-                    SetCheckHeader((TreeViewItem)tpItem.Items[i], WorkOrderRules.Summarize(op), op.Enabled, op.Enabled && tp.Enabled,
-                        invalidTool: CustomTools.Find(op.Tool) == null);
+                    SetCheckHeader(item, WorkOrderRules.Summarize(workOrder, tp), tp.Enabled, tp.Enabled);
+                    // An Indirect toolpath's child rows are the BORROWED operations, not its own (it has
+                    // none), so this loop simply doesn't run for one - tp.Operations is empty.
+                    for (int i = 0; i < tp.Operations.Count && i < item.Items.Count; i++)
+                    {
+                        var op = tp.Operations[i];
+                        // An operation under an unchecked toolpath keeps its own tick but is dimmed too - it
+                        // isn't going to run, and showing it bright would be a lie about what Generate emits.
+                        SetCheckHeader((TreeViewItem)item.Items[i], WorkOrderRules.Summarize(op), op.Enabled, op.Enabled && tp.Enabled,
+                            invalidTool: CustomTools.Find(op.Tool) == null);
+                    }
+                    continue;
                 }
+
+                // A group header's own tick follows its members, so toggling one member updates it without a
+                // full rebuild - the same reason this method exists for toolpaths.
+                var group = item.Tag as GroupRow;
+                if (group != null)
+                {
+                    var members = WorkOrderRules.GroupMembers(workOrder, group.Name).ToList();
+                    bool allOn = members.Count > 0 && members.All(m => m.Enabled);
+                    SetCheckHeader(item, GroupHeaderText(group.Name, members.Count), allOn, allOn);
+                }
+            }
+        }
+
+        // Every row in the tree, at any depth.
+        //
+        // Groups made the tree three levels deep in places (header -> toolpath -> operation) where it had
+        // always been two, and both walkers over it assumed two. Recursing by Tag rather than indexing by
+        // position is immune to how deeply a row happens to be nested, which is the property that was
+        // missing when a new kind of row was added.
+        private static IEnumerable<TreeViewItem> AllRows(ItemsControl root)
+        {
+            foreach (var item in root.Items.OfType<TreeViewItem>())
+            {
+                yield return item;
+                foreach (var child in AllRows(item))
+                    yield return child;
             }
         }
 
