@@ -63,6 +63,8 @@ namespace CNC.Controls
                 cbxAnchor.Items.Add(new ComboBoxItem { Content = WorkOrderRules.AnchorLabel(a), Tag = a });
             foreach (var m in WorkOrderRules.AllOffsetModes)
                 cbxOffsetMode.Items.Add(new ComboBoxItem { Content = WorkOrderRules.OffsetModeLabel(m), Tag = m });
+            foreach (var t in WorkOrderRules.AllTransforms)
+                cbxTransform.Items.Add(new ComboBoxItem { Content = WorkOrderRules.TransformLabel(t), Tag = t });
 
             // Same select-on-focus behavior every NumericField already has - txtName is a plain TextBox
             // (free-text, not numeric), so it doesn't get that for free.
@@ -951,9 +953,13 @@ namespace CNC.Controls
             // is what X/Y are measured FROM, so that takes the same slot.
             Show(pnlAnchorRow, !tp.IsIndirect);
             Show(pnlOffsetModeRow, tp.IsIndirect);
+            // Mirroring belongs to the COPY, not to the original - reflecting a source in place is just
+            // editing it, and there would be nothing left to compare the reflection against.
+            Show(pnlTransformRow, tp.IsIndirect);
 
             cbxAnchor.SelectedIndex = Array.IndexOf(WorkOrderRules.AllAnchors, tp.Anchor);
             cbxOffsetMode.SelectedIndex = Array.IndexOf(WorkOrderRules.AllOffsetModes, tp.OffsetMode);
+            cbxTransform.SelectedIndex = Array.IndexOf(WorkOrderRules.AllTransforms, tp.Transform);
             fldX.Value = tp.X; fldY.Value = tp.Y;
             fldLength.Value = tp.Length; fldAngle.Value = tp.Angle;
             fldDiameter.Value = tp.Diameter; fldSize.Value = tp.Size;
@@ -1241,6 +1247,8 @@ namespace CNC.Controls
                 {
                     if (cbxOffsetMode.SelectedIndex >= 0)
                         tp.OffsetMode = WorkOrderRules.AllOffsetModes[cbxOffsetMode.SelectedIndex];
+                    if (cbxTransform.SelectedIndex >= 0)
+                        tp.Transform = WorkOrderRules.AllTransforms[cbxTransform.SelectedIndex];
                     UpdateIndirectName(tp);
                 }
                 else
@@ -1464,6 +1472,18 @@ namespace CNC.Controls
             OnWorkOrderChanged();
         }
 
+        // Like the anchor and the offset mode, this re-interprets rather than recomputes: the X/Y you typed
+        // stay as they are and the reflected set moves to suit. The generated name carries it, so which
+        // copy is the mirrored one is readable in the tree.
+        private void cbxTransform_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (loadingFields || selectedToolpath == null || cbxTransform.SelectedIndex < 0)
+                return;
+            selectedToolpath.Transform = WorkOrderRules.AllTransforms[cbxTransform.SelectedIndex];
+            UpdateIndirectName(selectedToolpath);
+            OnWorkOrderChanged();
+        }
+
         private void cbxGeometry_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (loadingFields || selectedToolpath == null || cbxGeometry.SelectedIndex < 0)
@@ -1530,7 +1550,12 @@ namespace CNC.Controls
             // from "at X=50" without having to select the toolpath to find out which.
             string fmt = tp.OffsetMode == WorkOrderOffsetMode.Relative ? "@{0}({1:+0.###;-0.###;+0},{2:+0.###;-0.###;+0})"
                                                                       : "@{0}({1:0.###},{2:0.###})";
-            tp.Name = string.Format(fmt, source, tp.X, tp.Y);
+            // A mirrored copy says so in its own name - two copies of one group at different offsets look
+            // identical in the tree otherwise, and which one is reflected is exactly what you need to know.
+            string mirror = tp.Transform == WorkOrderTransform.MirrorX ? " mirror X"
+                          : tp.Transform == WorkOrderTransform.MirrorY ? " mirror Y"
+                          : string.Empty;
+            tp.Name = string.Format(fmt, source, tp.X, tp.Y) + mirror;
             if (ReferenceEquals(selectedToolpath, tp))
             {
                 loadingFields = true;
