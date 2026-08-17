@@ -1202,17 +1202,23 @@ namespace CNC.Controls
 
                 if (tp.IsIndirect)
                 {
-                    var source = wo.Toolpaths.FirstOrDefault(t => string.Equals(t.Name, tp.IndirectSource, StringComparison.OrdinalIgnoreCase));
+                    // A source may name a GROUP as well as a single toolpath, so what this borrows is
+                    // whatever Expand says it borrows - the same call the compiler, the preview and the tree
+                    // all use. Resolving by toolpath name here instead reported every valid group reference
+                    // as "no longer exists", in red, beside a preview drawing it perfectly correctly.
+                    var borrowed = Expand(wo, tp).Select(p => p.Geometry).ToList();
+                    var named = wo.Toolpaths.FirstOrDefault(t => string.Equals(t.Name, tp.IndirectSource, StringComparison.OrdinalIgnoreCase));
+
                     if (string.IsNullOrEmpty(tp.IndirectSource))
-                        warnings.Add(label + "no source toolpath selected.");
+                        warnings.Add(label + "no source selected.");
                     else if (string.Equals(tp.IndirectSource, tp.Name, StringComparison.OrdinalIgnoreCase))
                         warnings.Add(label + "can't reference itself.");
-                    else if (source == null)
-                        warnings.Add(string.Format("{0}source toolpath \"{1}\" no longer exists - it was renamed or removed.", label, tp.IndirectSource));
-                    else if (source.IsIndirect)
+                    else if (named != null && named.IsIndirect)
                         warnings.Add(label + "an Indirect toolpath can't point at another Indirect toolpath.");
-                    else if (source.Operations.Count == 0)
-                        warnings.Add(string.Format("{0}source toolpath \"{1}\" has no operations of its own yet.", label, tp.IndirectSource));
+                    else if (borrowed.Count == 0)
+                        warnings.Add(string.Format("{0}source \"{1}\" no longer exists - the toolpath or group was renamed, removed, or emptied.", label, tp.IndirectSource));
+                    else if (borrowed.Sum(b => b.Operations.Count) == 0)
+                        warnings.Add(string.Format("{0}source \"{1}\" has no operations of its own yet.", label, tp.IndirectSource));
                     continue;
                 }
 
