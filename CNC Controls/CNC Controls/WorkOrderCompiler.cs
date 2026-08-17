@@ -410,12 +410,17 @@ namespace CNC.Controls
                 if (source == null)
                     continue;
 
+                // Absolute or relative to the source's own position - see WorkOrderRules.ResolvedCenter,
+                // which the preview calls too so both draw and cut the same place. The shadow keeps the
+                // default Center anchor, so this center survives as a center downstream.
+                var at = WorkOrderRules.ResolvedCenter(wo, tp);
+
                 resolved.Toolpaths.Add(new WorkOrderToolpath
                 {
                     Name = tp.Name,
                     Geometry = source.Geometry,
                     Enabled = tp.Enabled,
-                    X = tp.CenterX, Y = tp.CenterY,
+                    X = at[0], Y = at[1],
                     Length = source.Length, Angle = source.Angle, Diameter = source.Diameter,
                     Width = source.Width, Depth = source.Depth, Size = source.Size,
                     Pattern = tp.Pattern,

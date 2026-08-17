@@ -58,6 +58,8 @@ namespace CNC.Controls
                 cbxPattern.Items.Add(new ComboBoxItem { Content = WorkOrderRules.PatternLabel(kind), Tag = kind });
             foreach (var a in WorkOrderRules.AllAnchors)
                 cbxAnchor.Items.Add(new ComboBoxItem { Content = WorkOrderRules.AnchorLabel(a), Tag = a });
+            foreach (var m in WorkOrderRules.AllOffsetModes)
+                cbxOffsetMode.Items.Add(new ComboBoxItem { Content = WorkOrderRules.OffsetModeLabel(m), Tag = m });
 
             // Same select-on-focus behavior every NumericField already has - txtName is a plain TextBox
             // (free-text, not numeric), so it doesn't get that for free.
@@ -818,7 +820,15 @@ namespace CNC.Controls
             Show(pnlGeometryRow, !tp.IsIndirect);
             cbxGeometry.SelectedIndex = Array.IndexOf(WorkOrderRules.AllGeometries, tp.Geometry);
 
+            // Exactly one of these two rows is ever up. An Indirect toolpath has no shape of its own for an
+            // anchor to name a corner of - the row was inert for it, and worse than inert, since a live
+            // dropdown that changes nothing reads as a setting that didn't take. What it wants to say instead
+            // is what X/Y are measured FROM, so that takes the same slot.
+            Show(pnlAnchorRow, !tp.IsIndirect);
+            Show(pnlOffsetModeRow, tp.IsIndirect);
+
             cbxAnchor.SelectedIndex = Array.IndexOf(WorkOrderRules.AllAnchors, tp.Anchor);
+            cbxOffsetMode.SelectedIndex = Array.IndexOf(WorkOrderRules.AllOffsetModes, tp.OffsetMode);
             fldX.Value = tp.X; fldY.Value = tp.Y;
             fldLength.Value = tp.Length; fldAngle.Value = tp.Angle;
             fldDiameter.Value = tp.Diameter; fldSize.Value = tp.Size;
@@ -1090,6 +1100,8 @@ namespace CNC.Controls
 
                 if (tp.IsIndirect)
                 {
+                    if (cbxOffsetMode.SelectedIndex >= 0)
+                        tp.OffsetMode = WorkOrderRules.AllOffsetModes[cbxOffsetMode.SelectedIndex];
                     UpdateIndirectName(tp);
                 }
                 else
@@ -1240,6 +1252,24 @@ namespace CNC.Controls
             OnWorkOrderChanged();
         }
 
+        // Like the anchor above, this RE-INTERPRETS the X/Y already typed rather than recomputing them - the
+        // geometry moves, the numbers stay as they are. Switching an Indirect toolpath sitting at (50,0) to
+        // Relative leaves it reading (50,0), now meaning 50 mm past its source instead of 50 mm from the WCS
+        // origin. Rewriting the numbers to hold the shape still would be the other choice, and it is the
+        // wrong one here: the offset you want from a source is nearly always a round number you'd type, not
+        // whatever the difference happens to be.
+        //
+        // The generated name carries the mode (see UpdateIndirectName), so which one is in force stays
+        // visible in the tree rather than only on the selected toolpath's own panel.
+        private void cbxOffsetMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (loadingFields || selectedToolpath == null || cbxOffsetMode.SelectedIndex < 0)
+                return;
+            selectedToolpath.OffsetMode = WorkOrderRules.AllOffsetModes[cbxOffsetMode.SelectedIndex];
+            UpdateIndirectName(selectedToolpath);
+            OnWorkOrderChanged();
+        }
+
         private void cbxGeometry_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (loadingFields || selectedToolpath == null || cbxGeometry.SelectedIndex < 0)
@@ -1298,7 +1328,11 @@ namespace CNC.Controls
         private void UpdateIndirectName(WorkOrderToolpath tp)
         {
             string source = string.IsNullOrEmpty(tp.IndirectSource) ? "?" : tp.IndirectSource;
-            tp.Name = string.Format("@{0}({1:0.###},{2:0.###})", source, tp.X, tp.Y);
+            // Relative offsets are signed (@Src(+50,+0)) so the tree distinguishes "50 mm past the source"
+            // from "at X=50" without having to select the toolpath to find out which.
+            string fmt = tp.OffsetMode == WorkOrderOffsetMode.Relative ? "@{0}({1:+0.###;-0.###;+0},{2:+0.###;-0.###;+0})"
+                                                                      : "@{0}({1:0.###},{2:0.###})";
+            tp.Name = string.Format(fmt, source, tp.X, tp.Y);
             if (ReferenceEquals(selectedToolpath, tp))
             {
                 loadingFields = true;
@@ -1766,7 +1800,7 @@ namespace CNC.Controls
             // its source (see WillRun/GeometrySource) - it has none of its own to check here.
             foreach (var tp in workOrder.Toolpaths)
                 if (WillRun(tp))
-                    foreach (var pos in tp.PatternPositions())
+                    foreach (var pos in PositionsOf(tp))
                         DrawEnvelope(GeometrySource(tp), pos[0], pos[1], scale);
 
             var geomBrushes = OddJobsStockCanvas.GeometryBrushes(StartJobConfig.Section?.Material ?? string.Empty);
@@ -1782,7 +1816,7 @@ namespace CNC.Controls
                 bool willRun = WillRun(tp);
                 var stroke = !willRun ? geomBrushes.HeldBack : isSelected ? geomBrushes.Selected : geomBrushes.Normal;
                 double thickness = isSelected ? 2d : 1d;
-                var positions = tp.PatternPositions().ToList();
+                var positions = PositionsOf(tp).ToList();
 
                 // Every pattern instance is drawn: a pattern that only showed its anchor would hide exactly the
                 // overlap this drawing exists to catch.
@@ -1828,7 +1862,8 @@ namespace CNC.Controls
                 // Black at all times: the labels sit over the stock's own material colour (olive for MDF, tan,
                 // grey for metals), and a grey or steel-blue label was unreadable against it. Selection is
                 // carried by weight instead of colour.
-                var anchor = OddJobsStockCanvas.ToPixel(stockTransform, tp.CenterX, tp.CenterY);
+                var at = WorkOrderRules.ResolvedCenter(workOrder, tp);
+                var anchor = OddJobsStockCanvas.ToPixel(stockTransform, at[0], at[1]);
                 var label = new TextBlock
                 {
                     Text = positions.Count > 1 ? string.Format("{0} (x{1})", tp.Name, positions.Count) : tp.Name,
@@ -1849,6 +1884,18 @@ namespace CNC.Controls
         private WorkOrderToolpath GeometrySource(WorkOrderToolpath tp)
         {
             return WorkOrderRules.ResolveIndirectSource(workOrder, tp) ?? tp;
+        }
+
+        // Where `tp`'s instances are drawn - its pattern laid out around its RESOLVED center, so an Indirect
+        // toolpath set to Relative draws where it will actually cut. The preview is the only caller that has
+        // to do this itself; the compiler sees a shadow toolpath whose X/Y is already resolved.
+        //
+        // Sharing WorkOrderRules.ResolvedCenter with the compiler is the point of it existing. Drawing and
+        // cutting were free to drift apart while both independently said "X/Y" - they aren't now.
+        private IEnumerable<double[]> PositionsOf(WorkOrderToolpath tp)
+        {
+            var at = WorkOrderRules.ResolvedCenter(workOrder, tp);
+            return tp.PatternPositions(at[0], at[1]);
         }
 
         // Whether this toolpath's cut will actually show up in Generate - its own enabled operations, or

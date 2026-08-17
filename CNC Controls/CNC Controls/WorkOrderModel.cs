@@ -42,6 +42,18 @@ namespace CNC.Controls
     // its corner ids - so "front left" means the same thing here as it does when probing one.
     public enum WorkOrderAnchor { Center, FrontLeft, FrontRight, BackLeft, BackRight }
 
+    // Indirect only: how that toolpath's X/Y are to be read. An Indirect toolpath borrows its geometry from
+    // a source and has no shape of its own, so there is no bounding box for an Anchor to name a corner of -
+    // HalfWidth/HalfDepth return 0 for it and the anchor has never done anything. This replaces that row
+    // rather than sitting beside it, because the useful choice for an Indirect toolpath isn't WHICH point of
+    // a shape X/Y names, it's what they are measured FROM.
+    //
+    //   Absolute - a position in the work order's WCS: where the source's geometry ends up centered.
+    //              What Indirect has always done, so it stays the default and no saved work order moves.
+    //   Relative - an offset from the SOURCE's own position. Moving the source moves this one with it,
+    //              which is what makes a row of copies stay a row when the first one is nudged.
+    public enum WorkOrderOffsetMode { Absolute, Relative }
+
     // Repeats a whole toolpath - geometry AND every operation on it - at a set of offsets.
     public enum WorkOrderPatternKind { None, Grid, Circular }
 
@@ -196,6 +208,14 @@ namespace CNC.Controls
         // it is for - typing a corner coordinate read off the previous operation so a follow-on pass lines up
         // against a known edge, instead of doing the half-width arithmetic in your head every time.
         public WorkOrderAnchor Anchor = WorkOrderAnchor.Center;
+
+        // Indirect only - see WorkOrderOffsetMode. Ignored entirely for every other geometry, which uses
+        // Anchor above instead; the two rows swap places in the editor on IsIndirect.
+        //
+        // Read it through WorkOrderRules.ResolvedCenter, never directly. X/Y alone are not a position under
+        // Relative, and a caller that reads them as one gets the right answer only while the mode happens to
+        // be Absolute - which is exactly the kind of agreement that holds until someone changes a setting.
+        public WorkOrderOffsetMode OffsetMode = WorkOrderOffsetMode.Absolute;
 
         // Dimensions - which of these matter depends on Geometry.
         public double Length = 50d;      // Line
@@ -411,7 +431,16 @@ namespace CNC.Controls
 
         // Every position this toolpath's geometry is cut at, instance one first. A None pattern yields exactly
         // the anchor point, so callers never need to special-case the unpatterned toolpath.
-        public IEnumerable<double[]> PatternPositions()
+        public IEnumerable<double[]> PatternPositions() { return PatternPositions(CenterX, CenterY); }
+
+        // Same pattern, laid out around a center supplied by the caller.
+        //
+        // An Indirect toolpath's center can depend on its SOURCE's position (WorkOrderRules.ResolvedCenter),
+        // which this type has no way to reach - it knows the source only by name, and names are resolved
+        // against the work order. So the editor's preview resolves the center and passes it in here.
+        // The compiler never needs this overload: ResolveIndirect has already baked the resolved position
+        // into the shadow toolpath's own X/Y before anything asks it for positions.
+        public IEnumerable<double[]> PatternPositions(double cx, double cy)
         {
             switch (Pattern)
             {
@@ -421,7 +450,7 @@ namespace CNC.Controls
                     int rows = Math.Max(1, (int)Math.Round(Rows));
                     for (int r = 0; r < rows; r++)
                         for (int c = 0; c < cols; c++)
-                            yield return new[] { CenterX + c * ColumnSpacing, CenterY + r * RowSpacing };
+                            yield return new[] { cx + c * ColumnSpacing, cy + r * RowSpacing };
                     break;
                 }
                 case WorkOrderPatternKind.Circular:
@@ -435,12 +464,12 @@ namespace CNC.Controls
                     for (int i = 0; i < n; i++)
                     {
                         double a = (PatternStartAngle + i * stepDeg) * Math.PI / 180d;
-                        yield return new[] { CenterX + PatternRadius * Math.Cos(a), CenterY + PatternRadius * Math.Sin(a) };
+                        yield return new[] { cx + PatternRadius * Math.Cos(a), cy + PatternRadius * Math.Sin(a) };
                     }
                     break;
                 }
                 default:
-                    yield return new[] { CenterX, CenterY };
+                    yield return new[] { cx, cy };
                     break;
             }
         }
@@ -774,6 +803,48 @@ namespace CNC.Controls
                 return tp;
             var source = wo.Toolpaths.FirstOrDefault(t => string.Equals(t.Name, tp.IndirectSource, StringComparison.OrdinalIgnoreCase));
             return source != null && !source.IsIndirect ? source : null;
+        }
+
+        // WHERE a toolpath's geometry actually ends up, centered, in work coordinates - and the only place
+        // that knows how that is arrived at.
+        //
+        // This exists as one method rather than as a property on the toolpath because a Relative Indirect
+        // position cannot be computed from the toolpath alone - it needs the work order to find its source.
+        // Both consumers of a position go through here (WorkOrderCompiler.ResolveIndirect builds the shadow
+        // toolpath from it, and the stock-canvas preview draws at it) specifically so the editor and the
+        // compiler cannot end up disagreeing about where something is. They each did their own arithmetic
+        // before this, which was survivable only while the answer was "X/Y, unchanged".
+        //
+        // A broken source reference falls back to Absolute rather than throwing or guessing an origin: the
+        // toolpath is already invalid and Validate is what reports that, but the preview still has to draw
+        // something and the compiler still has to reach its own drop-the-toolpath path intact.
+        public static double[] ResolvedCenter(WorkOrder wo, WorkOrderToolpath tp)
+        {
+            if (tp == null)
+                return new[] { 0d, 0d };
+
+            if (!tp.IsIndirect || tp.OffsetMode != WorkOrderOffsetMode.Relative)
+                return new[] { tp.CenterX, tp.CenterY };
+
+            var source = ResolveIndirectSource(wo, tp);
+            if (source == null)
+                return new[] { tp.CenterX, tp.CenterY };
+
+            // ResolveIndirectSource never returns an Indirect toolpath (a chained reference is a broken one),
+            // so the source's own center is a plain anchor resolution and this cannot recurse.
+            return new[] { source.CenterX + tp.X, source.CenterY + tp.Y };
+        }
+
+        public static readonly WorkOrderOffsetMode[] AllOffsetModes =
+            { WorkOrderOffsetMode.Absolute, WorkOrderOffsetMode.Relative };
+
+        public static string OffsetModeLabel(WorkOrderOffsetMode mode)
+        {
+            switch (mode)
+            {
+                case WorkOrderOffsetMode.Relative: return "Relative to source toolpath";
+                default: return "Absolute (work coordinates)";
+            }
         }
 
         public static readonly WorkOrderPatternKind[] AllPatterns =

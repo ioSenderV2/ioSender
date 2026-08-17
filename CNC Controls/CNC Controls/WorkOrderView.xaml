@@ -112,6 +112,11 @@
                             <ComboBox x:Uid="cbx_woanchor" x:Name="cbxAnchor" MinWidth="180" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxAnchor_SelectionChanged"
                                       ToolTip="Which point of this shape the X and Y offsets below name. Center is the default. Picking a corner lets you type a coordinate read straight off a previous operation, so a follow-on pass lines up against a known edge without doing the half-width arithmetic yourself. Changing this moves the shape - the numbers you typed stay as they are."/>
                         </StackPanel>
+                        <StackPanel x:Name="pnlOffsetModeRow" Orientation="Horizontal" Margin="0,2,0,2">
+                            <Label x:Uid="lbl_wooffsetmode" Content="X/Y offsets are:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Uid="cbx_wooffsetmode" x:Name="cbxOffsetMode" MinWidth="180" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxOffsetMode_SelectionChanged"
+                                      ToolTip="What the X and Y offsets below are measured from. Absolute places the borrowed geometry at those work coordinates. Relative measures from the source toolpath's own position, so moving the source moves this copy with it and a row of them stays a row."/>
+                        </StackPanel>
                         <local:NumericField x:Uid="fld_wox" x:Name="fldX" Label="X offset:" ColonAt="150" Format="-####0.0##" Unit="mm"/>
                         <local:NumericField x:Uid="fld_woy" x:Name="fldY" Label="Y offset:" ColonAt="150" Format="-####0.0##" Unit="mm"/>
                         <local:NumericField x:Uid="fld_wolen" x:Name="fldLength" Label="Length:" ColonAt="150" Format="###0.0##" Unit="mm"/>
