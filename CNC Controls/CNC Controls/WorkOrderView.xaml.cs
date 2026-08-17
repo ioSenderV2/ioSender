@@ -344,26 +344,12 @@ namespace CNC.Controls
         // immediately - editing either copy afterward doesn't touch the other.
         private void DuplicateToolpath(WorkOrderToolpath tp)
         {
-            var copy = new WorkOrderToolpath
-            {
-                Name = NextDuplicateName(tp.Name),
-                Geometry = tp.Geometry,
-                Enabled = tp.Enabled,
-                X = tp.X, Y = tp.Y, Anchor = tp.Anchor,
-                Length = tp.Length, Angle = tp.Angle, Diameter = tp.Diameter,
-                Width = tp.Width, Depth = tp.Depth, Size = tp.Size,
-                // The text block was missing here entirely - duplicating a Text toolpath used to come up
-                // with the "TEXT" defaults, silently.
-                Text = tp.Text, CapHeight = tp.CapHeight,
-                FontFamily = tp.FontFamily, FontBold = tp.FontBold, FontItalic = tp.FontItalic,
-                HasText = tp.HasText, TextHAlign = tp.TextHAlign, TextVAlign = tp.TextVAlign,
-                CornerReliefs = tp.CornerReliefs,
-                Pattern = tp.Pattern,
-                Columns = tp.Columns, RowSpacing = tp.RowSpacing, ColumnSpacing = tp.ColumnSpacing, Rows = tp.Rows,
-                PatternCount = tp.PatternCount, PatternRadius = tp.PatternRadius,
-                PatternStartAngle = tp.PatternStartAngle, PatternArcSpan = tp.PatternArcSpan,
-                IndirectSource = tp.IndirectSource
-            };
+            var copy = CopyFields(tp, new WorkOrderToolpath());
+
+            // Name and Operations are the only two fields marked [NoClone] (see WorkOrderModel, where each
+            // carries its own reason) - CopyFields skipped them, so supply them here: a unique name, and a
+            // list of operations of its own. copy.Operations is already an empty list from its initialiser.
+            copy.Name = NextDuplicateName(tp.Name);
             foreach (var op in tp.Operations)
                 copy.Operations.Add(CloneOperation(op));
 
@@ -372,19 +358,38 @@ namespace CNC.Controls
             OnWorkOrderChanged();
         }
 
+        // Every field on WorkOrderOperation is a value type or a string, so a flat field copy IS a deep copy -
+        // there is no reference here for the two copies to share.
         private static WorkOrderOperation CloneOperation(WorkOrderOperation op)
         {
-            return new WorkOrderOperation
+            return CopyFields(op, new WorkOrderOperation());
+        }
+
+        // Copies every public instance field from source to target except those marked [NoClone], and
+        // returns target.
+        //
+        // Reflection rather than a hand-written initialiser, deliberately. Both copies above used to list
+        // their fields by hand, and both silently lost every field added afterwards: a Text toolpath once
+        // duplicated back to the "TEXT" defaults, and later an SVG toolpath duplicated with no SvgFile at
+        // all (SvgWidth, CarveMaxDepth, EngraveWidth and Direction reverting alongside it). The failure is
+        // always SILENT - a field nobody copied reads back as a plausible default rather than as an error,
+        // so it surfaces as a wrong cut rather than as a bug, hours later.
+        //
+        // Inverting the default is the actual fix: copying is automatic, and the rare field that must not be
+        // copied says so on itself in WorkOrderModel. Adding a field to either type now needs no thought
+        // here at all.
+        //
+        // Instance-only, so the static readonly tables on these types are untouched. Computed members
+        // (UsesText, CarvesOutlines, IsIndirect, CenterX/Y) are properties, which GetFields never returns.
+        private static T CopyFields<T>(T source, T target)
+        {
+            foreach (var f in typeof(T).GetFields(System.Reflection.BindingFlags.Public |
+                                                  System.Reflection.BindingFlags.Instance))
             {
-                Kind = op.Kind, Enabled = op.Enabled, Tool = op.Tool, BitDiameter = op.BitDiameter,
-                HoleDiameter = op.HoleDiameter, TotalDepth = op.TotalDepth, Through = op.Through,
-                NumTabs = op.NumTabs, TabWidth = op.TabWidth, TabHeight = op.TabHeight,
-                DepthOfCut = op.DepthOfCut, Stepover = op.Stepover, PeckDepth = op.PeckDepth, DrillHss = op.DrillHss,
-                BoreStepDown = op.BoreStepDown, WallStockToLeave = op.WallStockToLeave,
-                FloorStockToLeave = op.FloorStockToLeave, ChamferDepth = op.ChamferDepth,
-                CountersinkDiameter = op.CountersinkDiameter,
-                Feed = op.Feed, PlungeFeed = op.PlungeFeed, SpindleRPM = op.SpindleRPM, BitMaxRPM = op.BitMaxRPM
-            };
+                if (!f.IsDefined(typeof(NoCloneAttribute), false))
+                    f.SetValue(target, f.GetValue(source));
+            }
+            return target;
         }
 
         // Strips a trailing " (n)" before re-deriving the next free number, so duplicating a duplicate lands

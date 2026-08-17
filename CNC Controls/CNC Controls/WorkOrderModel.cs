@@ -152,10 +152,24 @@ namespace CNC.Controls
         public WorkOrderCutDirection Direction = WorkOrderCutDirection.Conventional;
     }
 
+    // Excludes one field from the blanket field copy that WorkOrderView's Duplicate uses (see CopyFields
+    // there). Duplicate clones every public instance field REFLECTIVELY rather than from a hand-written
+    // list, because a hand-written list silently loses every field added after it: a Text toolpath once
+    // duplicated back to the "TEXT" defaults, and later an SVG toolpath duplicated with no SvgFile at all.
+    // Both failures were invisible, because an uncopied field reads back as a plausible default instead of
+    // as an error - it surfaces as a wrong cut, not as a bug.
+    //
+    // So the default is now "copy it", and the exclusions are declared HERE, on the field itself, where
+    // anyone adding or reading a field can see the decision. Adding a field needs no thought at all; the
+    // only thing that needs thinking about is the rare field that must NOT be copied verbatim.
+    [AttributeUsage(AttributeTargets.Field)]
+    public sealed class NoCloneAttribute : Attribute { }
+
     // A named piece of geometry plus the operations that cut it.
     public class WorkOrderToolpath
     {
-        public string Name = "Toolpath";
+        // Not cloned: a duplicate needs its own unique name - WorkOrderView.NextDuplicateName derives it.
+        [NoClone] public string Name = "Toolpath";
         public WorkOrderGeometryKind Geometry = WorkOrderGeometryKind.Circle;
 
         // Surface only: face the whole in-bounds machine travel envelope (spoilboard resurfacing) instead of
@@ -281,7 +295,11 @@ namespace CNC.Controls
         // WorkOrderRules.Validate flags rather than something the compiler can silently paper over.
         public string IndirectSource = null;
 
-        public List<WorkOrderOperation> Operations = new List<WorkOrderOperation>();
+        // Not cloned: copying this field verbatim hands the duplicate the SAME List instance, so editing
+        // either copy's operations would edit both. That shared-reference behaviour is exactly what an
+        // Indirect toolpath is for, and exactly what Duplicate must not do - it forks. WorkOrderView's
+        // DuplicateToolpath builds a fresh list of cloned operations instead.
+        [NoClone] public List<WorkOrderOperation> Operations = new List<WorkOrderOperation>();
 
         // Text is OPEN, like a Line. This matters more than it looks: IsClosed gates the operations a
         // toolpath is offered (Pocket and Bottom finish need an enclosed area) and whether a Contour gets
