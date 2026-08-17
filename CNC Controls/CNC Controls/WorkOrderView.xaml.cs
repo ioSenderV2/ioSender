@@ -2088,19 +2088,25 @@ namespace CNC.Controls
             }
         }
 
-        // Whether this toolpath's cut will actually show up in Generate - its own enabled operations, or
-        // (Indirect) those of whatever it borrows. A group counts if ANY member contributes something.
+        // Whether this toolpath's cut will actually show up in Generate.
         //
-        // Goes through Expand so a group reference is handled by the one place that knows what a group
-        // expands to. And it gates on THIS toolpath's Enabled, then on the borrowed OPERATIONS' - which is
-        // what the compiler does (shadow.Enabled = tp.Enabled, shadow.Operations = the borrowed ones), not
-        // what this used to do. Calling EnabledOperations on the source folded in the SOURCE's Enabled and
-        // dropped tp's, so a disabled toolpath referenced by an enabled Indirect drew greyed and cut anyway.
-        // That template case is deliberate - define it here, cut it there - and the preview now agrees.
+        // Mirrors WorkOrderCompiler.ResolveIndirect exactly, and the two halves differ on purpose:
+        //
+        //   ordinary  its own tick, and at least one operation still ticked under it.
+        //   Indirect  its own tick, and a source that DEFINES something - what the source has ticked is
+        //             not consulted, because the copy doesn't inherit those ticks either.
+        //
+        // Reading the source's ticks here would grey out a copy that is about to cut, which is what this
+        // did while the compiler shared the source's operation objects. A group counts if any member
+        // contributes; Expand is what knows what a group expands to.
         private bool WillRun(WorkOrderToolpath tp)
         {
-            return tp.Enabled
-                && WorkOrderRules.Expand(workOrder, tp).Any(p => p.Geometry.Operations.Any(o => o.Enabled));
+            if (!tp.Enabled)
+                return false;
+
+            return tp.IsIndirect
+                ? WorkOrderRules.Expand(workOrder, tp).Any(p => p.Geometry.Operations.Count > 0)
+                : tp.Operations.Any(o => o.Enabled);
         }
 
         // Vertical half-extent in pixels, so a label can sit clear of the shape it names.

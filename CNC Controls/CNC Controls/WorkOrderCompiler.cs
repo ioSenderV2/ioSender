@@ -432,21 +432,35 @@ namespace CNC.Controls
                     var shadow = WorkOrderRules.CopyFields(geom, new WorkOrderToolpath());
 
                     // ... except the handful the INDIRECT toolpath supplies, which is what makes this a
-                    // different toolpath rather than a second copy. [NoClone] already held back Name and
-                    // Operations, and both are wanted here anyway - Operations as the same LIST INSTANCE as
-                    // the borrowed toolpath's, deliberately: editing those must be picked up the next time
-                    // this runs. That live link is the entire point of Indirect versus Duplicate.
+                    // different toolpath rather than a second copy. [NoClone] held back Name and Operations,
+                    // and both are set explicitly just below.
                     //
                     // A group expands to several shadows, so each is named for the member it came from -
                     // otherwise every (TOOLPATH ...) comment in the program would carry the same name.
                     shadow.Name = placements.Count > 1 ? tp.Name + "/" + geom.Name : tp.Name;
-                    shadow.Operations = geom.Operations;
 
-                    // The Indirect's own switch is the only gate, as it has always been - a DISABLED source
-                    // still copies. That is worth keeping rather than tidying away: it is what lets a
-                    // toolpath (or a whole group, via its header checkbox) act as a template that is defined
-                    // in place, not cut there, and cut only where it is referenced.
+                    // The Indirect toolpath's own tick is the ONLY gate on its output: it cuts what the
+                    // source DEFINES, not what the source currently has ticked.
+                    //
+                    // So the borrowed operations are copied here with Enabled forced on, rather than shared
+                    // as the same objects. Sharing them meant the source's ticks gated the copy too, and
+                    // unticking a group - which cascades to its members' operations - silently produced a
+                    // ticked Indirect toolpath that cut nothing at all. Reported the first time anyone
+                    // disabled a group whose copy they still wanted.
+                    //
+                    // This costs nothing in liveness. ResolveIndirect runs at Generate, so every parameter
+                    // is still read fresh from the source each time - feeds, depths, tools, the lot. The one
+                    // thing not inherited is the tick, which is a staging control ("what do I want cut on
+                    // this run") rather than part of the definition being borrowed.
                     shadow.Enabled = tp.Enabled;
+                    shadow.Operations = geom.Operations
+                                            .Select(o =>
+                                            {
+                                                var copy = WorkOrderRules.CopyFields(o, new WorkOrderOperation());
+                                                copy.Enabled = true;
+                                                return copy;
+                                            })
+                                            .ToList();
 
                     // Position comes from the placement, already resolved - absolute, or relative to the
                     // source's own, and for a group offset from its anchor member. It is a CENTER, so the
