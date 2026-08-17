@@ -177,6 +177,15 @@ namespace CNC.Controls
     [AttributeUsage(AttributeTargets.Field)]
     public sealed class NoCloneAttribute : Attribute { }
 
+    // One placed instance of borrowed geometry - see WorkOrderRules.Expand. Geometry is the toolpath that
+    // supplies the shape, its size, its pattern and its operations; X/Y is where that shape's CENTER goes.
+    // Never the Indirect toolpath itself: an Indirect has no geometry, which is the whole point of it.
+    public struct WorkOrderPlacement
+    {
+        public WorkOrderToolpath Geometry;
+        public double X, Y;
+    }
+
     // A named piece of geometry plus the operations that cut it.
     public class WorkOrderToolpath
     {
@@ -814,13 +823,14 @@ namespace CNC.Controls
                 && wo.Toolpaths.Any(t => string.Equals(t.Group, name, StringComparison.OrdinalIgnoreCase));
         }
 
-        // Every toolpath in a group, in work-order order - Indirect ones included. This is the membership
-        // the TREE shows and the group checkbox drives, so it has to be all of them.
+        // Every toolpath in a group, in work-order order.
         //
-        // Expansion is the caller that must be choosier: WorkOrderRules.Expand copies only the non-Indirect
-        // members, for the same reason ResolveIndirectSource refuses an Indirect source. A group holding a
-        // reference back to itself would otherwise expand forever, and refusing to copy references keeps
-        // that impossible by construction instead of needing cycle detection.
+        // Only LEAF toolpaths can be in a group - an Indirect one never carries a Group, which WorkOrderView
+        // enforces by hiding the row for it and clearing the field when a toolpath is switched to Indirect.
+        // That single rule is what makes a group unable to contain a reference to itself, directly or round
+        // a chain, so nothing here or in Expand needs cycle detection or a filter: it is impossible to build
+        // the cycle in the first place. It also means the membership the TREE shows and the membership that
+        // EXPANDS are the same set, rather than two notions that could drift apart.
         public static IEnumerable<WorkOrderToolpath> GroupMembers(WorkOrder wo, string name)
         {
             if (string.IsNullOrEmpty(name))
@@ -875,6 +885,21 @@ namespace CNC.Controls
             return target;
         }
 
+        // The toolpath a GROUP is positioned by: its first non-Indirect member. Everything else in the group
+        // keeps its offset from this one, so an Indirect pointing at the group places this member at its X/Y
+        // and the rest fall in around it, rigidly.
+        //
+        // The first member rather than the group's bounding-box center, deliberately. A bounding box would
+        // need every member's true extents - measured SVG artwork, measured TrueType text, each member's own
+        // pattern folded in - and would MOVE the whole copy whenever any single member was resized. Anchoring
+        // on one named toolpath is a rule that fits in a sentence and stays put.
+        //
+        // No Indirect filter needed: a group only ever holds leaf toolpaths - see GroupMembers.
+        public static WorkOrderToolpath GroupAnchor(WorkOrder wo, string name)
+        {
+            return GroupMembers(wo, name).FirstOrDefault();
+        }
+
         // WHERE a toolpath's geometry actually ends up, centered, in work coordinates - and the only place
         // that knows how that is arrived at.
         //
@@ -896,13 +921,64 @@ namespace CNC.Controls
             if (!tp.IsIndirect || tp.OffsetMode != WorkOrderOffsetMode.Relative)
                 return new[] { tp.CenterX, tp.CenterY };
 
-            var source = ResolveIndirectSource(wo, tp);
-            if (source == null)
+            // ResolveIndirectSource never returns an Indirect toolpath (a chained reference is a broken one),
+            // and GroupAnchor skips Indirect members for the same reason, so the origin's own center is a
+            // plain anchor resolution either way and this cannot recurse.
+            var origin = ResolveIndirectSource(wo, tp) ?? GroupAnchor(wo, tp.IndirectSource);
+            if (origin == null)
                 return new[] { tp.CenterX, tp.CenterY };
 
-            // ResolveIndirectSource never returns an Indirect toolpath (a chained reference is a broken one),
-            // so the source's own center is a plain anchor resolution and this cannot recurse.
-            return new[] { source.CenterX + tp.X, source.CenterY + tp.Y };
+            return new[] { origin.CenterX + tp.X, origin.CenterY + tp.Y };
+        }
+
+        // Everything `tp` actually puts on the stock: which toolpath supplies each shape, and where that
+        // shape's center goes. One placement for an ordinary toolpath, one for an Indirect pointing at a
+        // single toolpath, and N for an Indirect pointing at a GROUP.
+        //
+        // This is the one expansion, and both consumers go through it - WorkOrderCompiler.ResolveIndirect
+        // builds a shadow toolpath per placement, and the editor's preview draws one per placement. They
+        // each had their own version of this before, which held together only while the answer was "one
+        // shape, at X/Y". A group makes it one-to-many, and two independent implementations of one-to-many
+        // would disagree the first time either changed.
+        //
+        // Pattern is deliberately NOT handled here: each placement's Geometry carries its own, and the
+        // caller lays it out around the placement (PatternPositions takes a center for exactly this). So a
+        // group of patterned toolpaths copies as a group of patterned toolpaths, with no cross-product to
+        // define - an Indirect toolpath has no pattern of its own to multiply by (WorkOrderView forces it
+        // to None and hides the section).
+        public static List<WorkOrderPlacement> Expand(WorkOrder wo, WorkOrderToolpath tp)
+        {
+            var placed = new List<WorkOrderPlacement>();
+            if (tp == null)
+                return placed;
+
+            if (!tp.IsIndirect)
+            {
+                placed.Add(new WorkOrderPlacement { Geometry = tp, X = tp.CenterX, Y = tp.CenterY });
+                return placed;
+            }
+
+            var at = ResolvedCenter(wo, tp);
+
+            var single = ResolveIndirectSource(wo, tp);
+            if (single != null)
+            {
+                placed.Add(new WorkOrderPlacement { Geometry = single, X = at[0], Y = at[1] });
+                return placed;
+            }
+
+            // No filtering, and no cycle detection: a group holds only leaf toolpaths (see GroupMembers), so
+            // it cannot contain a reference back to itself however the references are arranged.
+            var members = GroupMembers(wo, tp.IndirectSource).ToList();
+            if (members.Count == 0)
+                return placed;      // broken or empty reference - the tree marks it, see RebuildTree
+
+            // Rigid: the anchor lands on the resolved position and everyone else keeps their offset from it.
+            double ox = members[0].CenterX, oy = members[0].CenterY;
+            foreach (var m in members)
+                placed.Add(new WorkOrderPlacement { Geometry = m, X = at[0] + (m.CenterX - ox), Y = at[1] + (m.CenterY - oy) });
+
+            return placed;
         }
 
         public static readonly WorkOrderOffsetMode[] AllOffsetModes =

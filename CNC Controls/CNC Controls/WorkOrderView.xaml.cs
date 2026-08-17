@@ -555,19 +555,34 @@ namespace CNC.Controls
                     // .AvailableOperations. Read-only rows instead, listing what the source actually
                     // contributes, so the tree still shows what this toolpath will cut without implying it
                     // can be edited from here.
-                    var source = workOrder.Toolpaths.FirstOrDefault(t => string.Equals(t.Name, tp.IndirectSource, StringComparison.OrdinalIgnoreCase));
-                    if (source == null)
+                    //
+                    // Resolved through Expand, not by toolpath name: the source may be a GROUP, and looking
+                    // only for a toolpath of that name marked every valid group reference "(source not
+                    // found)" in red while the compiler expanded it perfectly happily. Same call the
+                    // compiler and the preview use, so all three agree on what this borrows.
+                    var borrowed = WorkOrderRules.Expand(workOrder, tp).Select(p => p.Geometry).ToList();
+                    if (borrowed.Count == 0)
                     {
                         tpItem.Items.Add(new TreeViewItem { Header = "(source not found)", Foreground = Brushes.IndianRed, FontStyle = FontStyles.Italic });
                     }
-                    else if (source.Operations.Count == 0)
+                    else if (borrowed.Sum(b => b.Operations.Count) == 0)
                     {
                         tpItem.Items.Add(new TreeViewItem { Header = "(source has no operations yet)", Foreground = Brushes.Gray, FontStyle = FontStyles.Italic });
                     }
                     else
                     {
-                        foreach (var op in source.Operations)
-                            tpItem.Items.Add(new TreeViewItem { Header = WorkOrderRules.Summarize(op), Foreground = Brushes.Gray, IsEnabled = false });
+                        // A group contributes several toolpaths' worth, so each row says which member it
+                        // came from - otherwise a dozen identical-looking rows appear with no way to tell
+                        // what belongs to what.
+                        bool many = borrowed.Count > 1;
+                        foreach (var b in borrowed)
+                            foreach (var op in b.Operations)
+                                tpItem.Items.Add(new TreeViewItem
+                                {
+                                    Header = many ? b.Name + " - " + WorkOrderRules.Summarize(op) : WorkOrderRules.Summarize(op),
+                                    Foreground = Brushes.Gray,
+                                    IsEnabled = false
+                                });
                     }
                 }
                 else
@@ -846,6 +861,12 @@ namespace CNC.Controls
             // Indirect's name is generated, not typed - see UpdateIndirectName - so the box is shown but
             // disabled, same idiom as a drill's hole diameter field being driven by the geometry instead of
             // editable (LoadOperationFields).
+            // Only LEAF toolpaths can join a group. An Indirect one is a reference, and letting a reference
+            // into a group is what would make a group able to contain itself - see WorkOrderRules
+            // .GroupMembers. Refusing it here, at the one place membership is set, is why nothing downstream
+            // needs cycle detection.
+            Show(pnlGroupRow, !tp.IsIndirect);
+
             // Rebuilt every load so a group created on another toolpath a moment ago is offerable here. The
             // box is editable, so a name that isn't in the list yet is how a NEW group gets made.
             cbxGroup.Items.Clear();
@@ -953,6 +974,13 @@ namespace CNC.Controls
                 cbxIndirectSource.Items.Clear();
                 foreach (var candidate in workOrder.Toolpaths.Where(t => !ReferenceEquals(t, tp) && !t.IsIndirect))
                     cbxIndirectSource.Items.Add(candidate.Name);
+                // Groups are offered alongside single toolpaths - a group reference copies every member at
+                // once, so adding a toolpath to the group later adds it to every copy without going and
+                // finding them. That is the whole reason to point at a group rather than at each member.
+                // Listed after the toolpaths and marked, since the two share one namespace here and
+                // resolution tries toolpaths first (see WorkOrderRules.Expand).
+                foreach (var g in WorkOrderRules.GroupNames(workOrder).Where(g => !ReferenceEquals(tp.Group, g)))
+                    cbxIndirectSource.Items.Add(g);
                 cbxIndirectSource.SelectedItem = tp.IndirectSource;
             }
 
@@ -963,7 +991,7 @@ namespace CNC.Controls
             //
             // Which is NOT the same as an Indirect toolpath never patterning: it inherits the SOURCE's
             // pattern, so pointing one at a 3x2 grid cuts six instances at the new position (see
-            // WorkOrderCompiler.ResolveIndirect, and PositionsOf, which draws them). What is being refused
+            // WorkOrderCompiler.ResolveIndirect, and the preview, which draws them). What is being refused
             // here is a second pattern layered over that one - the count still shows up in the tree row,
             // via WorkOrderRules.Summarize.
             Show(pnlPatternSection, !tp.IsIndirect);
@@ -1339,6 +1367,24 @@ namespace CNC.Controls
             if (string.Equals(name, selectedToolpath.Group ?? string.Empty, StringComparison.Ordinal))
                 return;
 
+            // An Indirect toolpath names its source in one namespace shared by toolpaths and groups, and
+            // resolution tries toolpaths first (WorkOrderRules.Expand). A group sharing a toolpath's name
+            // would therefore be permanently unreachable - referencing it would silently get the toolpath
+            // instead. Refused at the point of naming, where it can still be corrected, rather than left to
+            // be discovered as a copy of the wrong thing.
+            if (!string.IsNullOrEmpty(name)
+                && workOrder.Toolpaths.Any(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase)))
+            {
+                AppDialogs.Show(string.Format("\"{0}\" is already a toolpath name. A group needs a name of its own - "
+                                            + "an Indirect toolpath picks its source from one list, and the toolpath would "
+                                            + "always win.", name),
+                                "Work Order", MessageBoxButton.OK, MessageBoxImage.Information);
+                loadingFields = true;
+                cbxGroup.Text = selectedToolpath.Group ?? string.Empty;
+                loadingFields = false;
+                return;
+            }
+
             var tp = selectedToolpath;
             tp.Group = name;
 
@@ -1385,6 +1431,10 @@ namespace CNC.Controls
             if (kind == WorkOrderGeometryKind.Indirect)
             {
                 selectedToolpath.Pattern = WorkOrderPatternKind.None;
+                // Groups hold leaf toolpaths only - a reference in a group is what would let a group contain
+                // itself. Dropped here rather than refused, matching how the Pattern above and the operations
+                // are dropped when a toolpath becomes Indirect.
+                selectedToolpath.Group = string.Empty;
                 if (string.IsNullOrEmpty(selectedToolpath.IndirectSource))
                     selectedToolpath.IndirectSource = workOrder.Toolpaths.FirstOrDefault(t => !ReferenceEquals(t, selectedToolpath) && !t.IsIndirect)?.Name;
                 UpdateIndirectName(selectedToolpath);
@@ -1886,68 +1936,80 @@ namespace CNC.Controls
             // Envelopes first, so the nominal outlines stay legible on top of them.
             // A held-back toolpath gets no envelope: the envelope shows where material WILL be removed, and
             // this one isn't going to remove any. An Indirect toolpath's "own operations" are borrowed from
-            // its source (see WillRun/GeometrySource) - it has none of its own to check here.
+            // its source (see WillRun, and WorkOrderRules.Expand) - it has none of its own to check here.
             foreach (var tp in workOrder.Toolpaths)
                 if (WillRun(tp))
-                    foreach (var pos in PositionsOf(tp))
-                        DrawEnvelope(GeometrySource(tp), pos[0], pos[1], scale);
+                    foreach (var placement in WorkOrderRules.Expand(workOrder, tp))
+                        foreach (var pos in placement.Geometry.PatternPositions(placement.X, placement.Y))
+                            DrawEnvelope(placement.Geometry, pos[0], pos[1], scale);
 
             var geomBrushes = OddJobsStockCanvas.GeometryBrushes(StartJobConfig.Section?.Material ?? string.Empty);
             foreach (var tp in workOrder.Toolpaths)
             {
-                // What actually decides the drawn shape/size/reach - the toolpath itself, or (Indirect) whatever
-                // it currently points at. Position, pattern and the name label still come from tp itself.
-                var geom = GeometrySource(tp);
-
                 bool isSelected = ReferenceEquals(tp, selectedToolpath);
                 // Still drawn when held back - it's geometry you authored and want to see for fit against the
                 // rest - but greyed, so what's actually going to be cut reads at a glance.
                 bool willRun = WillRun(tp);
                 var stroke = !willRun ? geomBrushes.HeldBack : isSelected ? geomBrushes.Selected : geomBrushes.Normal;
                 double thickness = isSelected ? 2d : 1d;
-                var positions = PositionsOf(tp).ToList();
 
-                // Every pattern instance is drawn: a pattern that only showed its anchor would hide exactly the
-                // overlap this drawing exists to catch.
-                foreach (var pos in positions)
+                // Everything this toolpath puts on the stock: one placement normally, one per member when it
+                // is an Indirect pointing at a GROUP. Each placement brings its own geometry AND its own
+                // pattern, which is why the pattern is laid out per placement rather than once out here.
+                // Same WorkOrderRules.Expand the compiler builds its shadow toolpaths from, so the drawing
+                // and the cut cannot describe different arrangements.
+                var placements = WorkOrderRules.Expand(workOrder, tp);
+                int drawn = 0;
+
+                foreach (var placement in placements)
                 {
-                    var center = OddJobsStockCanvas.ToPixel(stockTransform, pos[0], pos[1]);
-                    switch (geom.Geometry)
+                    var geom = placement.Geometry;
+
+                    // Every pattern instance is drawn: a pattern that only showed its anchor would hide
+                    // exactly the overlap this drawing exists to catch.
+                    foreach (var pos in geom.PatternPositions(placement.X, placement.Y))
                     {
-                        case WorkOrderGeometryKind.Line:
-                            AddLine(center, geom, scale, stroke, thickness);
-                            break;
-                        case WorkOrderGeometryKind.Circle:
-                            AddEllipse(center, geom.Diameter / 2d * scale, geom.Diameter / 2d * scale, stroke, thickness, null);
-                            break;
-                        case WorkOrderGeometryKind.Oval:
-                            AddEllipse(center, geom.Width / 2d * scale, geom.Depth / 2d * scale, stroke, thickness, null);
-                            break;
-                        case WorkOrderGeometryKind.Square:
-                            AddRect(center, geom.Size / 2d * scale, geom.Size / 2d * scale, stroke, thickness, null);
-                            break;
-                        case WorkOrderGeometryKind.Text:
-                            AddTextStrokes(center, geom, scale, stroke, thickness);
-                            break;
-                        case WorkOrderGeometryKind.Svg:
-                            AddSvgOutline(center, geom, scale, stroke);
-                            break;
-                        default:
-                            AddRect(center, geom.Width / 2d * scale, geom.Depth / 2d * scale, stroke, thickness, null);
-                            break;
+                        var center = OddJobsStockCanvas.ToPixel(stockTransform, pos[0], pos[1]);
+                        switch (geom.Geometry)
+                        {
+                            case WorkOrderGeometryKind.Line:
+                                AddLine(center, geom, scale, stroke, thickness);
+                                break;
+                            case WorkOrderGeometryKind.Circle:
+                                AddEllipse(center, geom.Diameter / 2d * scale, geom.Diameter / 2d * scale, stroke, thickness, null);
+                                break;
+                            case WorkOrderGeometryKind.Oval:
+                                AddEllipse(center, geom.Width / 2d * scale, geom.Depth / 2d * scale, stroke, thickness, null);
+                                break;
+                            case WorkOrderGeometryKind.Square:
+                                AddRect(center, geom.Size / 2d * scale, geom.Size / 2d * scale, stroke, thickness, null);
+                                break;
+                            case WorkOrderGeometryKind.Text:
+                                AddTextStrokes(center, geom, scale, stroke, thickness);
+                                break;
+                            case WorkOrderGeometryKind.Svg:
+                                AddSvgOutline(center, geom, scale, stroke);
+                                break;
+                            default:
+                                AddRect(center, geom.Width / 2d * scale, geom.Depth / 2d * scale, stroke, thickness, null);
+                                break;
+                        }
+
+                        // Shape text draws INSIDE the outline just drawn, at the fit's own size and
+                        // placement - so the preview answers "does it fit, and where" as you type.
+                        if (geom.HasText && geom.Geometry != WorkOrderGeometryKind.Text && WorkOrderRules.SupportsShapeText(geom.Geometry))
+                            AddTextStrokes(center, geom, scale, stroke, 1d);
+
+                        var dot = new Ellipse { Width = 5, Height = 5, Fill = stroke };
+                        Canvas.SetLeft(dot, center.X - 2.5); Canvas.SetTop(dot, center.Y - 2.5);
+                        canvasDiagram.Children.Add(dot);
+                        drawn++;
                     }
-
-                    // Shape text draws INSIDE the outline just drawn, at the fit's own size and
-                    // placement - so the preview answers "does it fit, and where" as you type.
-                    if (geom.HasText && geom.Geometry != WorkOrderGeometryKind.Text && WorkOrderRules.SupportsShapeText(geom.Geometry))
-                        AddTextStrokes(center, geom, scale, stroke, 1d);
-
-                    var dot = new Ellipse { Width = 5, Height = 5, Fill = stroke };
-                    Canvas.SetLeft(dot, center.X - 2.5); Canvas.SetTop(dot, center.Y - 2.5);
-                    canvasDiagram.Children.Add(dot);
                 }
 
-                // Named once, on the anchor instance - one label per instance would just be clutter.
+                // Named once, on the anchor instance - one label per instance would just be clutter, and for
+                // a group that would be one label per member on top of that. The count is every instance the
+                // toolpath draws, across all its placements.
                 // Black at all times: the labels sit over the stock's own material colour (olive for MDF, tan,
                 // grey for metals), and a grey or steel-blue label was unreadable against it. Selection is
                 // carried by weight instead of colour.
@@ -1955,46 +2017,33 @@ namespace CNC.Controls
                 var anchor = OddJobsStockCanvas.ToPixel(stockTransform, at[0], at[1]);
                 var label = new TextBlock
                 {
-                    Text = positions.Count > 1 ? string.Format("{0} (x{1})", tp.Name, positions.Count) : tp.Name,
+                    Text = drawn > 1 ? string.Format("{0} (x{1})", tp.Name, drawn) : tp.Name,
                     FontSize = 13,
                     Foreground = Brushes.Black,
                     FontWeight = isSelected ? FontWeights.Bold : FontWeights.Normal
                 };
                 label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
                 Canvas.SetLeft(label, anchor.X - label.DesiredSize.Width / 2d);
-                Canvas.SetTop(label, anchor.Y - ShapeHalfHeightPx(geom, scale) - 17d);
+                // Cleared by the FIRST placement's shape - for a group that is its anchor member, which is
+                // what the resolved center refers to as well, so the label sits over the thing it names.
+                Canvas.SetTop(label, anchor.Y - ShapeHalfHeightPx(placements.Count > 0 ? placements[0].Geometry : tp, scale) - 17d);
                 canvasDiagram.Children.Add(label);
             }
         }
 
-        // The toolpath that actually decides drawn shape/size/reach for `tp` - itself, unless `tp` is Indirect,
-        // in which case its resolved source (or `tp` itself, drawing as a default-sized placeholder, if the
-        // reference is currently broken - see WorkOrderRules.ResolveIndirectSource).
-        private WorkOrderToolpath GeometrySource(WorkOrderToolpath tp)
-        {
-            return WorkOrderRules.ResolveIndirectSource(workOrder, tp) ?? tp;
-        }
-
-        // Where `tp`'s instances are drawn: the pattern of whatever supplies its geometry, laid out around
-        // its RESOLVED center. Both halves matter and both are borrowed for an Indirect toolpath - the
-        // center because Relative measures from the source's position, and the PATTERN because the shadow
-        // the compiler builds now inherits the source's (see WorkOrderCompiler.ResolveIndirect). Reading
-        // tp.Pattern here would draw one instance of a source that is about to cut six, which is precisely
-        // the editor-vs-compiler disagreement WorkOrderRules.ResolvedCenter exists to stop.
-        //
-        // Unchanged for everything else: GeometrySource returns the toolpath itself when it isn't Indirect.
-        private IEnumerable<double[]> PositionsOf(WorkOrderToolpath tp)
-        {
-            var at = WorkOrderRules.ResolvedCenter(workOrder, tp);
-            return GeometrySource(tp).PatternPositions(at[0], at[1]);
-        }
-
         // Whether this toolpath's cut will actually show up in Generate - its own enabled operations, or
-        // (Indirect) its resolved source's.
+        // (Indirect) those of whatever it borrows. A group counts if ANY member contributes something.
+        //
+        // Goes through Expand so a group reference is handled by the one place that knows what a group
+        // expands to. And it gates on THIS toolpath's Enabled, then on the borrowed OPERATIONS' - which is
+        // what the compiler does (shadow.Enabled = tp.Enabled, shadow.Operations = the borrowed ones), not
+        // what this used to do. Calling EnabledOperations on the source folded in the SOURCE's Enabled and
+        // dropped tp's, so a disabled toolpath referenced by an enabled Indirect drew greyed and cut anyway.
+        // That template case is deliberate - define it here, cut it there - and the preview now agrees.
         private bool WillRun(WorkOrderToolpath tp)
         {
-            var source = WorkOrderRules.ResolveIndirectSource(workOrder, tp);
-            return source != null && workOrder.EnabledOperations(source).Any();
+            return tp.Enabled
+                && WorkOrderRules.Expand(workOrder, tp).Any(p => p.Geometry.Operations.Any(o => o.Enabled));
         }
 
         // Vertical half-extent in pixels, so a label can sit clear of the shape it names.
