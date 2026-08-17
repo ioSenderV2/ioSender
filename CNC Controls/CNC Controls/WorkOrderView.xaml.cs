@@ -483,12 +483,15 @@ namespace CNC.Controls
         private TreeViewItem MakeGroupItem(string name)
         {
             var members = WorkOrderRules.GroupMembers(workOrder, name).ToList();
-            bool allOn = members.Count > 0 && members.All(m => m.Enabled);
+            // "Is anything under me still on?", exactly as a toolpath's own tick reads it (ToggleEnabled).
+            // Not "is everything on" - unticking one member of four would otherwise clear this header while
+            // the other three still ran, which is the same misreading the cascade exists to prevent.
+            bool anyOn = members.Any(m => m.Enabled);
             string captured = name;
 
             var item = new TreeViewItem
             {
-                Header = MakeCheckHeader(GroupHeaderText(name, members.Count), allOn, on => ToggleGroup(captured, on)),
+                Header = MakeCheckHeader(GroupHeaderText(name, members.Count), anyOn, on => ToggleGroup(captured, on)),
                 Tag = new GroupRow { Name = name },
                 IsExpanded = !collapsedGroups.Contains(name)
             };
@@ -505,14 +508,23 @@ namespace CNC.Controls
             return string.Format("{0}  ({1} toolpath{2})", name, members, members == 1 ? string.Empty : "s");
         }
 
-        // Enables or disables every toolpath in a group at once. Operations underneath are left alone - a
-        // toolpath's own operation switches are its own, and turning a group back on should restore exactly
-        // what it was, not re-enable operations somebody deliberately held back.
+        // Enables or disables every toolpath in a group at once, cascading to their operations - the same
+        // rule a toolpath applies to its own operations, one level up. See ToggleEnabled's comment: a tick
+        // and everything under it move together, so there is never an unticked row hiding ticked ones.
+        //
+        // This originally set only member.Enabled and left the operations alone, reasoning that a held-back
+        // operation shouldn't be re-enabled by switching a group back on. That produced exactly the state
+        // the rule exists to forbid - four unticked toolpaths with every operation under them still ticked -
+        // and it was reported as looking wrong the first time anyone tried it. The concern was real but it
+        // is already the accepted trade-off for a toolpath's own tick; making the group behave differently
+        // bought nothing and cost the invariant.
         private void ToggleGroup(string name, bool on)
         {
             foreach (var member in WorkOrderRules.GroupMembers(workOrder, name))
-                member.Enabled = on;
-            RebuildTree(null);
+                SetToolpathEnabled(member, on);
+
+            // No RebuildTree: OnWorkOrderChanged refreshes every row's header in place - group headers
+            // included, now - which repaints the cascade without disturbing the selection.
             OnWorkOrderChanged();
         }
 
@@ -1754,8 +1766,8 @@ namespace CNC.Controls
                 if (group != null)
                 {
                     var members = WorkOrderRules.GroupMembers(workOrder, group.Name).ToList();
-                    bool allOn = members.Count > 0 && members.All(m => m.Enabled);
-                    SetCheckHeader(item, GroupHeaderText(group.Name, members.Count), allOn, allOn);
+                    bool anyOn = members.Any(m => m.Enabled);   // same rule as MakeGroupItem - see there
+                    SetCheckHeader(item, GroupHeaderText(group.Name, members.Count), anyOn, anyOn);
                 }
             }
         }
@@ -1789,14 +1801,20 @@ namespace CNC.Controls
                 tp.Enabled = tp.Operations.Any(o => o.Enabled);
             }
             else
-            {
-                tp.Enabled = on;
-                foreach (var each in tp.Operations)
-                    each.Enabled = on;
-            }
+                SetToolpathEnabled(tp, on);
 
             // OnWorkOrderChanged refreshes every row's header, which is what repaints the cascaded ticks.
             OnWorkOrderChanged();
+        }
+
+        // The one definition of what enabling or disabling a whole toolpath means - its own tick and every
+        // operation under it move together. Extracted so the group header drives toolpaths exactly the way
+        // a toolpath drives its operations, rather than through a second, subtly different rule.
+        private static void SetToolpathEnabled(WorkOrderToolpath tp, bool on)
+        {
+            tp.Enabled = on;
+            foreach (var each in tp.Operations)
+                each.Enabled = on;
         }
 
         private void UpdateValidation()
