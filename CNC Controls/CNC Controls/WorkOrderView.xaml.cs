@@ -1885,8 +1885,11 @@ namespace CNC.Controls
             if (isActiveTab)
                 MacroProcessor.IsGenerateReady = warnings.Count == 0 && workOrder.Toolpaths.Count > 0;
 
-            int ops = workOrder.EnabledOperationCount;
-            int tps = workOrder.Toolpaths.Count(t => workOrder.EnabledOperations(t).Any());
+            // What will actually be EMITTED, so an Indirect toolpath counts for what it copies rather than
+            // for the nothing it owns. This read "4 toolpaths, 4 operations" beside five toolpaths cutting
+            // 21 instances, because a copy contributed zero to both numbers.
+            int ops = workOrder.GeneratedOperationCount;
+            int tps = workOrder.Toolpaths.Count(t => workOrder.ContributedOperationCount(t) > 0);
             string summary = workOrder.Toolpaths.Count == 0
                 ? "Add a toolpath to get started."
                 : string.Format("{0} toolpath{1}, {2} operation{3} - runs as one program in the order listed.",

@@ -566,18 +566,46 @@ namespace CNC.Controls
         // whatever TLO is currently in force. Hence off by default and stated in the program header.
         public bool SkipFirstToolChange = false;
 
-        // The single definition of "what Generate will actually cut" - a toolpath contributes only if it is
-        // itself enabled, and only the operations under it that are enabled. Everything downstream (the
-        // scheduler, the tool declarations, validation, the tool-change count, the summary line) goes through
-        // here, so a held-back operation can't leak into one of them and not the others.
+        // The operations a toolpath OWNS and has ticked. Everything downstream of the compiler (the
+        // scheduler, the tool declarations, the tool-change count) goes through here, so a held-back
+        // operation can't leak into one of them and not the others.
+        //
+        // This used to describe itself as "what Generate will actually cut". It isn't, and hasn't been since
+        // an Indirect toolpath stopped inheriting its source's ticks: an Indirect OWNS no operations at all
+        // and still cuts everything its source defines. By the time the COMPILER asks this question that
+        // distinction is gone - it runs on the resolved work order, where every Indirect toolpath has become
+        // a shadow that owns its operations - but on the authored work order the two differ, and asking this
+        // one there reports zero for a toolpath about to cut seventeen instances. Use
+        // ContributedOperationCount for "what will be emitted".
         public IEnumerable<WorkOrderOperation> EnabledOperations(WorkOrderToolpath tp)
         {
             return tp.Enabled ? tp.Operations.Where(o => o.Enabled) : Enumerable.Empty<WorkOrderOperation>();
         }
 
+        // How many operations a toolpath will actually put in the program, Indirect toolpaths included -
+        // mirroring WorkOrderCompiler.ResolveIndirect, which gives a shadow enabled copies of everything its
+        // source defines. Only meaningful on the AUTHORED work order; on the resolved one every toolpath
+        // owns what it cuts and EnabledOperations is the right question.
+        public int ContributedOperationCount(WorkOrderToolpath tp)
+        {
+            if (!tp.IsIndirect)
+                return EnabledOperations(tp).Count();
+
+            return tp.Enabled
+                ? WorkOrderRules.Expand(this, tp).Sum(p => p.Geometry.Operations.Count)
+                : 0;
+        }
+
+        // Owned and ticked, across the work order. Pairs with TotalOperationCount to say how much of what
+        // you AUTHORED is currently held back - which is a question about your own ticks, so borrowed
+        // operations have no business in either number.
         public int EnabledOperationCount { get { return Toolpaths.Sum(t => EnabledOperations(t).Count()); } }
         public int TotalOperationCount { get { return Toolpaths.Sum(t => t.Operations.Count); } }
         public bool AnyHeldBack { get { return EnabledOperationCount != TotalOperationCount; } }
+
+        // What Generate will emit, across the work order. The number to test against zero before telling
+        // anyone there is nothing to generate.
+        public int GeneratedOperationCount { get { return Toolpaths.Sum(t => ContributedOperationCount(t)); } }
 
         private IEnumerable<WorkOrderOperation> AllOperations => Toolpaths.SelectMany(t => t.Operations);
 
@@ -1338,7 +1366,12 @@ namespace CNC.Controls
                 // Entire-spoilboard touches off its own Z0 and temporarily borrows G54, machine-referenced -
                 // it resets the work origin, which would corrupt any operation that runs after it in the same
                 // program. Safe only as the work order's one and only enabled operation.
-                if (tp.EntireSpoilboard && wo.EnabledOperations(tp).Any() && wo.EnabledOperationCount > 1)
+                // GeneratedOperationCount, because an Indirect toolpath's copies run in this program too and
+                // the origin reset would corrupt them exactly as it would anything else. Counting only owned
+                // operations left this silent when the other output was a copy - and WorkOrderView leans on
+                // this rule holding to decide it can SKIP the cached-origin confirmation before Generate, so
+                // the miss would have suppressed that prompt for a program that did depend on the cache.
+                if (tp.EntireSpoilboard && wo.EnabledOperations(tp).Any() && wo.GeneratedOperationCount > 1)
                     warnings.Add(label + "Entire spoilboard resets the work origin - it must be the only enabled operation in this work order.");
 
                 // Shape text: the fit is resolved here with the SAME resolver the compiler uses, so a
@@ -1361,7 +1394,11 @@ namespace CNC.Controls
             // Everything above deliberately checks what's AUTHORED, not what's enabled: holding an operation
             // back shouldn't hide a mistake in it, and a subset run of just the finishing passes still wants
             // the "needs a roughing op" rule satisfied by the roughing op sitting there unchecked.
-            if (wo.TotalOperationCount > 0 && wo.EnabledOperationCount == 0)
+            // GeneratedOperationCount, not EnabledOperationCount: an Indirect toolpath owns no operations, so
+            // the owned count is zero for a work order whose entire output is a copy. Unticking the source
+            // group therefore greyed Generate out with "nothing to generate" beside a preview drawing all 17
+            // instances of a copy that was still ticked and would have cut perfectly well.
+            if (wo.TotalOperationCount > 0 && wo.GeneratedOperationCount == 0)
                 warnings.Add("Every operation is unchecked - nothing to generate.");
 
             return warnings;
