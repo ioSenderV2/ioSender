@@ -357,6 +357,9 @@ namespace CNC.Controls
             copy.Name = NextDuplicateName(tp.Name);
             foreach (var op in tp.Operations)
                 copy.Operations.Add(CloneOperation(op));
+            // Same contents, its own list - a duplicate of an Indirect toolpath holds back what the original
+            // held back, and changing either afterwards leaves the other alone.
+            copy.HeldBack = new List<string>(tp.HeldBack);
 
             workOrder.Toolpaths.Insert(workOrder.Toolpaths.IndexOf(tp) + 1, copy);
             RebuildTree(copy);
@@ -429,6 +432,15 @@ namespace CNC.Controls
             public string Name;
         }
 
+        // Marks one borrowed-toolpath row under an Indirect toolpath. Nothing here is editable either - the
+        // parameters belong to the SOURCE and are edited there - so its checkbox is likewise the only thing
+        // it does, holding that member back in THIS copy only.
+        private class BorrowedRow
+        {
+            public WorkOrderToolpath Indirect;
+            public WorkOrderToolpath Member;
+        }
+
         // Header for a toolpath/operation row: an enable checkbox plus the summary text. The text is a separate
         // TextBlock rather than the CheckBox's own Content on purpose - as Content, clicking the row's label to
         // SELECT it would toggle the checkbox as a side effect.
@@ -498,6 +510,23 @@ namespace CNC.Controls
             item.Expanded += (s, ev) => collapsedGroups.Remove(captured);
             item.Collapsed += (s, ev) => collapsedGroups.Add(captured);
             return item;
+        }
+
+        // One borrowed row's text: which toolpath it is, and what that toolpath will cut here. Always named,
+        // even when only one is borrowed - the row is about a MEMBER, and a conditional prefix is one more
+        // thing for the build path and the refresh path to disagree about.
+        private static string BorrowedRowText(WorkOrderToolpath member)
+        {
+            return member.Name + " - " + string.Join(", ", member.Operations.Select(o => WorkOrderRules.Summarize(o)));
+        }
+
+        // Holds one borrowed toolpath back in THIS copy, or lets it run again. Writes only to the Indirect
+        // toolpath's own HeldBack - the source keeps its own ticks, which is the entire point of the copy
+        // having switches of its own.
+        private void ToggleBorrowed(WorkOrderToolpath indirect, WorkOrderToolpath member, bool on)
+        {
+            WorkOrderRules.SetHeldBack(indirect, member, !on);
+            OnWorkOrderChanged();
         }
 
         // One definition, because the header is written in two places - built by MakeGroupItem and rewritten
@@ -574,11 +603,10 @@ namespace CNC.Controls
                     // contributes, so the tree still shows what this toolpath will cut without implying it
                     // can be edited from here.
                     //
-                    // Resolved through Expand, not by toolpath name: the source may be a GROUP, and looking
-                    // only for a toolpath of that name marked every valid group reference "(source not
-                    // found)" in red while the compiler expanded it perfectly happily. Same call the
-                    // compiler and the preview use, so all three agree on what this borrows.
-                    var borrowed = WorkOrderRules.Expand(workOrder, tp).Select(p => p.Geometry).ToList();
+                    // BorrowedBy, not Expand: Expand is the filtered view of what actually cuts, and a
+                    // held-back member still needs a row here to tick back on. Both resolve a source the
+                    // same way, so a group reference lists its members rather than reading as missing.
+                    var borrowed = WorkOrderRules.BorrowedBy(workOrder, tp);
                     if (borrowed.Count == 0)
                     {
                         tpItem.Items.Add(new TreeViewItem { Header = "(source not found)", Foreground = Brushes.IndianRed, FontStyle = FontStyles.Italic });
@@ -589,18 +617,25 @@ namespace CNC.Controls
                     }
                     else
                     {
-                        // A group contributes several toolpaths' worth, so each row says which member it
-                        // came from - otherwise a dozen identical-looking rows appear with no way to tell
-                        // what belongs to what.
-                        bool many = borrowed.Count > 1;
+                        // One TICKABLE row per borrowed toolpath. The copy has a fate of its own - it doesn't
+                        // inherit the source's switches - so it needs switches of its own, and this is where
+                        // they live. Ticking here writes to this Indirect toolpath's HeldBack and touches
+                        // nothing on the source.
+                        //
+                        // A row per borrowed TOOLPATH rather than per operation: held-back is recorded by
+                        // member name, and an operation has no name to record. The operations it contributes
+                        // are named in the row's text so the row still says what it will cut.
                         foreach (var b in borrowed)
-                            foreach (var op in b.Operations)
-                                tpItem.Items.Add(new TreeViewItem
-                                {
-                                    Header = many ? b.Name + " - " + WorkOrderRules.Summarize(op) : WorkOrderRules.Summarize(op),
-                                    Foreground = Brushes.Gray,
-                                    IsEnabled = false
-                                });
+                        {
+                            var member = b;
+                            var indirect = tp;
+                            tpItem.Items.Add(new TreeViewItem
+                            {
+                                Header = MakeCheckHeader(BorrowedRowText(b), !WorkOrderRules.IsHeldBack(tp, b),
+                                                         on => ToggleBorrowed(indirect, member, on)),
+                                Tag = new BorrowedRow { Indirect = tp, Member = b }
+                            });
+                        }
                     }
                 }
                 else
@@ -796,6 +831,18 @@ namespace CNC.Controls
             if (item?.Tag is AddOperationPlaceholder placeholder)
             {
                 selectedToolpath = placeholder.Toolpath;
+                selectedOp = null;
+                LoadFields();
+                DrawDiagram();
+                return;
+            }
+
+            // A borrowed row owns nothing editable - its parameters live on the SOURCE toolpath and are
+            // edited there. Selecting one shows the Indirect toolpath it belongs to, so clicking a row to
+            // tick it doesn't blank the panel out from under you.
+            if (item?.Tag is BorrowedRow borrowed)
+            {
+                selectedToolpath = borrowed.Indirect;
                 selectedOp = null;
                 LoadFields();
                 DrawDiagram();
@@ -1768,6 +1815,18 @@ namespace CNC.Controls
                     var members = WorkOrderRules.GroupMembers(workOrder, group.Name).ToList();
                     bool anyOn = members.Any(m => m.Enabled);   // same rule as MakeGroupItem - see there
                     SetCheckHeader(item, GroupHeaderText(group.Name, members.Count), anyOn, anyOn);
+                    continue;
+                }
+
+                // A borrowed row describes a toolpath it does NOT own, so editing that source elsewhere has
+                // to repaint it here - the operations it lists are the source's, and they change without
+                // this row's own Indirect toolpath being touched at all.
+                var borrowedRow = item.Tag as BorrowedRow;
+                if (borrowedRow != null)
+                {
+                    bool runs = !WorkOrderRules.IsHeldBack(borrowedRow.Indirect, borrowedRow.Member);
+                    SetCheckHeader(item, BorrowedRowText(borrowedRow.Member), runs,
+                                   runs && borrowedRow.Indirect.Enabled);
                 }
             }
         }

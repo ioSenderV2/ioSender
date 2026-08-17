@@ -335,6 +335,25 @@ namespace CNC.Controls
         // WorkOrderRules.Validate flags rather than something the compiler can silently paper over.
         public string IndirectSource = null;
 
+        // Indirect only: the NAMES of borrowed toolpaths this copy skips. Everything it borrows and does not
+        // name here runs.
+        //
+        // The copy needs enable state of its own because it has a fate of its own - it cuts what the source
+        // DEFINES, not what the source has ticked (see WorkOrderCompiler.ResolveIndirect), so the source's
+        // own switches can't stand in for these. Unticking the group of originals must not silently empty
+        // the copy, and holding one member back in the copy must not touch the original.
+        //
+        // Held-back rather than enabled-list, deliberately, and the direction is the safety property: a
+        // member added to the source group is ABSENT from this list and therefore runs, so the copy tracks
+        // its group without anyone maintaining this. A member renamed or removed leaves a stale name behind,
+        // which does nothing at all. The failure mode is only ever "didn't hold something back" - never
+        // "silently dropped geometry", which is the direction that costs material.
+        //
+        // Not cloned: a blanket field copy would hand the duplicate the SAME List instance, so holding a
+        // member back in one copy would hold it back in the other. Same reason Operations is [NoClone];
+        // WorkOrderView.DuplicateToolpath gives the duplicate its own list with the same contents.
+        [NoClone] public List<string> HeldBack = new List<string>();
+
         // Not cloned: copying this field verbatim hands the duplicate the SAME List instance, so editing
         // either copy's operations would edit both. That shared-reference behaviour is exactly what an
         // Indirect toolpath is for, and exactly what Duplicate must not do - it forks. WorkOrderView's
@@ -959,26 +978,66 @@ namespace CNC.Controls
             }
 
             var at = ResolvedCenter(wo, tp);
+            var borrowed = BorrowedBy(wo, tp);
+            if (borrowed.Count == 0)
+                return placed;      // broken or empty reference - the tree marks it, see RebuildTree
+
+            // Rigid: the anchor - the single source, or a group's FIRST member - lands on the resolved
+            // position and everything else keeps its offset from it. The anchor stays the anchor whether or
+            // not this copy holds it back, so holding one member back cannot slide the rest sideways.
+            //
+            // A single-toolpath source is the same arithmetic with one member: its own offset from itself is
+            // zero, so it lands exactly on `at`. Worth not special-casing - two branches computing a
+            // position is how they end up disagreeing.
+            double ox = borrowed[0].CenterX, oy = borrowed[0].CenterY;
+            foreach (var m in borrowed)
+            {
+                if (IsHeldBack(tp, m))
+                    continue;
+                placed.Add(new WorkOrderPlacement { Geometry = m, X = at[0] + (m.CenterX - ox), Y = at[1] + (m.CenterY - oy) });
+            }
+
+            return placed;
+        }
+
+        // Everything an Indirect toolpath borrows, held back or not, in order.
+        //
+        // This is the membership the EDITOR lists, so a held-back member still has a row to tick back on.
+        // Expand is the filtered view - what actually cuts. Keeping them as two calls over one resolution
+        // is the point: the tree shows all of it, the compiler and preview take the subset, and neither
+        // decides for itself what "borrowed" means.
+        //
+        // No cycle detection needed: a group holds only leaf toolpaths (see GroupMembers), so it cannot
+        // contain a reference back to itself however the references are arranged.
+        public static List<WorkOrderToolpath> BorrowedBy(WorkOrder wo, WorkOrderToolpath tp)
+        {
+            if (tp == null || !tp.IsIndirect)
+                return new List<WorkOrderToolpath>();
 
             var single = ResolveIndirectSource(wo, tp);
             if (single != null)
-            {
-                placed.Add(new WorkOrderPlacement { Geometry = single, X = at[0], Y = at[1] });
-                return placed;
-            }
+                return new List<WorkOrderToolpath> { single };
 
-            // No filtering, and no cycle detection: a group holds only leaf toolpaths (see GroupMembers), so
-            // it cannot contain a reference back to itself however the references are arranged.
-            var members = GroupMembers(wo, tp.IndirectSource).ToList();
-            if (members.Count == 0)
-                return placed;      // broken or empty reference - the tree marks it, see RebuildTree
+            return GroupMembers(wo, tp.IndirectSource).ToList();
+        }
 
-            // Rigid: the anchor lands on the resolved position and everyone else keeps their offset from it.
-            double ox = members[0].CenterX, oy = members[0].CenterY;
-            foreach (var m in members)
-                placed.Add(new WorkOrderPlacement { Geometry = m, X = at[0] + (m.CenterX - ox), Y = at[1] + (m.CenterY - oy) });
+        // Whether `borrowed` is one this Indirect toolpath skips - see WorkOrderToolpath.HeldBack. Anything
+        // not named there runs, so a member added to the source group needs no bookkeeping here to appear.
+        public static bool IsHeldBack(WorkOrderToolpath indirect, WorkOrderToolpath borrowed)
+        {
+            return indirect.HeldBack != null
+                && indirect.HeldBack.Any(n => string.Equals(n, borrowed.Name, StringComparison.OrdinalIgnoreCase));
+        }
 
-            return placed;
+        // Adds or removes `borrowed` from an Indirect toolpath's held-back set.
+        public static void SetHeldBack(WorkOrderToolpath indirect, WorkOrderToolpath borrowed, bool held)
+        {
+            if (indirect.HeldBack == null)
+                indirect.HeldBack = new List<string>();
+
+            indirect.HeldBack.RemoveAll(n => string.Equals(n, borrowed.Name, StringComparison.OrdinalIgnoreCase));
+            if (held)
+                indirect.HeldBack.Add(borrowed.Name);
         }
 
         public static readonly WorkOrderOffsetMode[] AllOffsetModes =
@@ -1206,7 +1265,10 @@ namespace CNC.Controls
                     // whatever Expand says it borrows - the same call the compiler, the preview and the tree
                     // all use. Resolving by toolpath name here instead reported every valid group reference
                     // as "no longer exists", in red, beside a preview drawing it perfectly correctly.
-                    var borrowed = Expand(wo, tp).Select(p => p.Geometry).ToList();
+                    // BorrowedBy, not Expand: Expand drops the members this copy holds back, and holding
+                    // every member back is a deliberate "don't cut this one" - the same thing as unticking
+                    // the toolpath - not a broken reference to report in red.
+                    var borrowed = BorrowedBy(wo, tp);
                     var named = wo.Toolpaths.FirstOrDefault(t => string.Equals(t.Name, tp.IndirectSource, StringComparison.OrdinalIgnoreCase));
 
                     if (string.IsNullOrEmpty(tp.IndirectSource))
