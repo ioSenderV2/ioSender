@@ -97,6 +97,12 @@
                             <TextBox x:Name="txtName" MinWidth="180" MinHeight="22" VerticalAlignment="Center" VerticalContentAlignment="Center"
                                      TextChanged="txtName_TextChanged"/>
                         </StackPanel>
+                        <StackPanel x:Name="pnlGroupRow" Orientation="Horizontal" Margin="0,0,0,6">
+                            <Label x:Uid="lbl_wogroup" Content="Group:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Uid="cbx_wogroup" x:Name="cbxGroup" MinWidth="180" MinHeight="22" VerticalAlignment="Center" IsEditable="True"
+                                      LostFocus="cbxGroup_Changed" SelectionChanged="cbxGroup_Changed"
+                                      ToolTip="Collects toolpaths under one heading in the tree so a set can be enabled or disabled together, and gives an Indirect toolpath a whole group to copy instead of a single toolpath. Pick an existing group or type a new name; leave blank for none. Joining a group moves this toolpath next to the others in it, because the tree order is the cutting order."/>
+                        </StackPanel>
                         <StackPanel x:Name="pnlGeometryRow" Orientation="Horizontal" Margin="0,0,0,6">
                             <Label x:Uid="lbl_wogeom" Content="Geometry:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
                             <ComboBox x:Name="cbxGeometry" MinWidth="180" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxGeometry_SelectionChanged"/>

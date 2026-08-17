@@ -40,6 +40,9 @@ namespace CNC.Controls
         // away and remakes them on every edit, so without this a real collapse (as opposed to the old
         // permanently-forced IsExpanded="true") would spring back open the moment you changed anything.
         private readonly HashSet<WorkOrderToolpath> collapsedToolpaths = new HashSet<WorkOrderToolpath>();
+        // Group headers collapse by NAME, not by object - a group has no object, and the name is what
+        // survives a RebuildTree.
+        private readonly HashSet<string> collapsedGroups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         // The .workorder file this came from/was last saved to - null until one of those happens. Drives the
         // title bar (name, no path or extension) and Save's suggested filename.
         private string currentFilePath = null;
@@ -418,6 +421,14 @@ namespace CNC.Controls
             public WorkOrderToolpath Toolpath;
         }
 
+        // Marks a group header row. Also neither a toolpath nor an operation, so selecting one shows no
+        // parameter panel at all (LoadFields hides both) - a group has nothing of its own to edit. It is a
+        // label over a run of toolpaths, and its checkbox is the only thing it does.
+        private class GroupRow
+        {
+            public string Name;
+        }
+
         // Header for a toolpath/operation row: an enable checkbox plus the summary text. The text is a separate
         // TextBlock rather than the CheckBox's own Content on purpose - as Content, clicking the row's label to
         // SELECT it would toggle the checkbox as a side effect.
@@ -466,11 +477,65 @@ namespace CNC.Controls
                 label.ClearValue(TextBlock.ForegroundProperty);
         }
 
+        // A group's header row. Its checkbox reads ON only when every member is on, and toggling it drives
+        // all of them - which is the entire reason the row exists. Indirect members are included here (they
+        // are toolpaths in the group like any other); only EXPANSION skips them, see WorkOrderRules.Expand.
+        private TreeViewItem MakeGroupItem(string name)
+        {
+            var members = WorkOrderRules.GroupMembers(workOrder, name).ToList();
+            bool allOn = members.Count > 0 && members.All(m => m.Enabled);
+            string captured = name;
+
+            var item = new TreeViewItem
+            {
+                Header = MakeCheckHeader(string.Format("{0}  ({1} toolpath{2})", name, members.Count,
+                                                       members.Count == 1 ? string.Empty : "s"),
+                                         allOn, on => ToggleGroup(captured, on)),
+                Tag = new GroupRow { Name = name },
+                IsExpanded = !collapsedGroups.Contains(name)
+            };
+            item.Expanded += (s, ev) => collapsedGroups.Remove(captured);
+            item.Collapsed += (s, ev) => collapsedGroups.Add(captured);
+            return item;
+        }
+
+        // Enables or disables every toolpath in a group at once. Operations underneath are left alone - a
+        // toolpath's own operation switches are its own, and turning a group back on should restore exactly
+        // what it was, not re-enable operations somebody deliberately held back.
+        private void ToggleGroup(string name, bool on)
+        {
+            foreach (var member in WorkOrderRules.GroupMembers(workOrder, name))
+                member.Enabled = on;
+            RebuildTree(null);
+            OnWorkOrderChanged();
+        }
+
         private void RebuildTree(object toSelect)
         {
             treeToolpaths.Items.Clear();
+
+            // A contiguous run of toolpaths sharing a group nests under one header. Membership is KEPT
+            // contiguous when a group is assigned (see cbxGroup_Changed), so a run is the whole group.
+            // A hand-edited file could still interleave them, and that shows up honestly as a second header
+            // of the same name rather than being silently re-sorted behind your back - re-sorting would
+            // change the program order, since Schedule's default IS this order.
+            TreeViewItem groupItem = null;
+            string groupName = null;
+
             foreach (var tp in workOrder.Toolpaths)
             {
+                if (string.IsNullOrEmpty(tp.Group))
+                {
+                    groupItem = null;
+                    groupName = null;
+                }
+                else if (!string.Equals(tp.Group, groupName, StringComparison.OrdinalIgnoreCase))
+                {
+                    groupName = tp.Group;
+                    groupItem = MakeGroupItem(groupName);
+                    treeToolpaths.Items.Add(groupItem);
+                }
+
                 var owner = tp;
                 var tpItem = new TreeViewItem
                 {
@@ -542,7 +607,7 @@ namespace CNC.Controls
                     };
                     tpItem.Items.Add(addItem);
                 }
-                treeToolpaths.Items.Add(tpItem);
+                ((ItemsControl)groupItem ?? treeToolpaths).Items.Add(tpItem);
             }
 
             // Root-level placeholder that adds a whole new toolpath - replaces the old "+" button in the
@@ -781,6 +846,13 @@ namespace CNC.Controls
             // Indirect's name is generated, not typed - see UpdateIndirectName - so the box is shown but
             // disabled, same idiom as a drill's hole diameter field being driven by the geometry instead of
             // editable (LoadOperationFields).
+            // Rebuilt every load so a group created on another toolpath a moment ago is offerable here. The
+            // box is editable, so a name that isn't in the list yet is how a NEW group gets made.
+            cbxGroup.Items.Clear();
+            foreach (var g in WorkOrderRules.GroupNames(workOrder))
+                cbxGroup.Items.Add(g);
+            cbxGroup.Text = tp.Group ?? string.Empty;
+
             txtName.Text = tp.Name;
             txtName.IsEnabled = !tp.IsIndirect;
             txtName.ToolTip = tp.IsIndirect ? "Generated from the source toolpath and X/Y - change those instead." : null;
@@ -1247,6 +1319,43 @@ namespace CNC.Controls
                 return;
             selectedToolpath.OffsetMode = WorkOrderRules.AllOffsetModes[cbxOffsetMode.SelectedIndex];
             UpdateIndirectName(selectedToolpath);
+            OnWorkOrderChanged();
+        }
+
+        // Joining a group MOVES the toolpath to sit with the rest of that group, rather than only relabelling
+        // it. Schedule's default program order is tree order, so a header drawn around toolpaths that are
+        // scattered through the run would show a grouping the machine doesn't cut - and for an Indirect
+        // pointing at the group, the members' offsets are taken from the FIRST one, which needs to be a
+        // stable, visible thing rather than whichever happened to be added first.
+        //
+        // Leaving a group doesn't move anything back: there is nowhere to move it to, and the position it
+        // has is as good as any. Only the label is cleared.
+        private void cbxGroup_Changed(object sender, RoutedEventArgs e)
+        {
+            if (loadingFields || selectedToolpath == null)
+                return;
+
+            string name = (cbxGroup.Text ?? string.Empty).Trim();
+            if (string.Equals(name, selectedToolpath.Group ?? string.Empty, StringComparison.Ordinal))
+                return;
+
+            var tp = selectedToolpath;
+            tp.Group = name;
+
+            if (!string.IsNullOrEmpty(name))
+            {
+                // Pull it out FIRST, then look for the run - so the index found is already an index into the
+                // list being inserted into, and there is no off-by-one to reason about.
+                int wasAt = workOrder.Toolpaths.IndexOf(tp);
+                workOrder.Toolpaths.Remove(tp);
+
+                // After the last existing member, so a group grows in the order you add to it. A brand new
+                // group has no run to join, so the toolpath stays exactly where it was.
+                int last = workOrder.Toolpaths.FindLastIndex(t => string.Equals(t.Group, name, StringComparison.OrdinalIgnoreCase));
+                workOrder.Toolpaths.Insert(last >= 0 ? last + 1 : wasAt, tp);
+            }
+
+            RebuildTree(tp);
             OnWorkOrderChanged();
         }
 

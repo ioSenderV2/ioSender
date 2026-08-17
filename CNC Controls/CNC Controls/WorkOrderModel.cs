@@ -182,6 +182,17 @@ namespace CNC.Controls
     {
         // Not cloned: a duplicate needs its own unique name - WorkOrderView.NextDuplicateName derives it.
         [NoClone] public string Name = "Toolpath";
+
+        // Optional grouping label; empty means ungrouped. Purely an AUTHORING construct - it collects
+        // toolpaths under one header in the tree so a set can be enabled or disabled together, and it gives
+        // an Indirect toolpath something to point at other than a single toolpath (see
+        // WorkOrderRules.GroupMembers). Nothing downstream of Generate knows groups exist: Schedule,
+        // EnabledOperations and the tool-change grouping all still see plain toolpaths.
+        //
+        // Members are kept CONTIGUOUS in Toolpaths (WorkOrderView moves a toolpath next to its groupmates
+        // when you set this). That is not cosmetic - Schedule's default program order IS tree order, so a
+        // tree drawing a grouping that the cut order doesn't follow would be showing you a lie.
+        public string Group = string.Empty;
         public WorkOrderGeometryKind Geometry = WorkOrderGeometryKind.Circle;
 
         // Surface only: face the whole in-bounds machine travel envelope (spoilboard resurfacing) instead of
@@ -793,6 +804,37 @@ namespace CNC.Controls
         }
 
         #endregion
+
+        // Whether `name` is a group anyone is actually in. Empty is never a group - it means ungrouped, and
+        // an Indirect toolpath with no source selected must not silently resolve to "every ungrouped
+        // toolpath in the work order".
+        public static bool IsGroup(WorkOrder wo, string name)
+        {
+            return !string.IsNullOrEmpty(name)
+                && wo.Toolpaths.Any(t => string.Equals(t.Group, name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Every toolpath in a group, in work-order order - Indirect ones included. This is the membership
+        // the TREE shows and the group checkbox drives, so it has to be all of them.
+        //
+        // Expansion is the caller that must be choosier: WorkOrderRules.Expand copies only the non-Indirect
+        // members, for the same reason ResolveIndirectSource refuses an Indirect source. A group holding a
+        // reference back to itself would otherwise expand forever, and refusing to copy references keeps
+        // that impossible by construction instead of needing cycle detection.
+        public static IEnumerable<WorkOrderToolpath> GroupMembers(WorkOrder wo, string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return Enumerable.Empty<WorkOrderToolpath>();
+            return wo.Toolpaths.Where(t => string.Equals(t.Group, name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Every group name in use, in the order the groups first appear.
+        public static IEnumerable<string> GroupNames(WorkOrder wo)
+        {
+            return wo.Toolpaths.Where(t => !string.IsNullOrEmpty(t.Group))
+                               .Select(t => t.Group)
+                               .Distinct(StringComparer.OrdinalIgnoreCase);
+        }
 
         // The toolpath an Indirect one actually borrows geometry and operations from, or null if the reference
         // is broken (missing, renamed, or itself Indirect - see Validate). Everything else resolves to itself,
