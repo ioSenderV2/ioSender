@@ -805,6 +805,34 @@ namespace CNC.Controls
             return source != null && !source.IsIndirect ? source : null;
         }
 
+        // Copies every public instance field from source to target except those marked [NoClone], and
+        // returns target.
+        //
+        // Reflection rather than a hand-written initialiser, deliberately, and used by BOTH places that
+        // build one toolpath from another - WorkOrderView's Duplicate and WorkOrderCompiler.ResolveIndirect.
+        // Both of them used to list their fields by hand, and both silently lost every field added
+        // afterwards: a Text toolpath duplicated back to the "TEXT" defaults, an SVG toolpath duplicated
+        // with no SvgFile at all, and an Indirect toolpath resolving with no SvgFile, no SvgWidth, no text
+        // block and no corner reliefs. The failure is always SILENT - a field nobody copied reads back as a
+        // plausible default rather than as an error, so it surfaces as a wrong cut, not as a bug.
+        //
+        // Inverting the default is the actual fix: copying is automatic, and the rare field that must not be
+        // copied verbatim says so on itself. Adding a field to WorkOrderToolpath now needs no thought in
+        // either caller.
+        //
+        // Instance-only, so the static readonly tables on these types are untouched. Computed members
+        // (UsesText, CarvesOutlines, IsIndirect, CenterX/Y) are properties, which GetFields never returns.
+        public static T CopyFields<T>(T source, T target)
+        {
+            foreach (var f in typeof(T).GetFields(System.Reflection.BindingFlags.Public |
+                                                  System.Reflection.BindingFlags.Instance))
+            {
+                if (!f.IsDefined(typeof(NoCloneAttribute), false))
+                    f.SetValue(target, f.GetValue(source));
+            }
+            return target;
+        }
+
         // WHERE a toolpath's geometry actually ends up, centered, in work coordinates - and the only place
         // that knows how that is arrived at.
         //
@@ -1201,11 +1229,16 @@ namespace CNC.Controls
             }
         }
 
-        public static string Summarize(WorkOrderToolpath tp)
+        // Takes the work order because the pattern an Indirect toolpath actually cuts is its SOURCE's (see
+        // WorkOrderCompiler.ResolveIndirect), and a source is reachable only by name through the work order.
+        // Counting tp's own instances instead would print "1" beside a toolpath about to cut six - the tree
+        // disagreeing with the g-code about the same toolpath.
+        public static string Summarize(WorkOrder wo, WorkOrderToolpath tp)
         {
-            int n = tp.InstanceCount;
+            var geom = ResolveIndirectSource(wo, tp) ?? tp;
+            int n = geom.InstanceCount;
             string pattern = n > 1
-                ? string.Format(", {0} {1}", n, tp.Pattern == WorkOrderPatternKind.Grid ? "in a grid" : "on a bolt circle")
+                ? string.Format(", {0} {1}", n, geom.Pattern == WorkOrderPatternKind.Grid ? "in a grid" : "on a bolt circle")
                 : string.Empty;
             return string.Format("{0}  ({1} @ X{2:0.0} Y{3:0.0}{4})", tp.Name, DescribeGeometry(tp), tp.X, tp.Y, pattern);
         }

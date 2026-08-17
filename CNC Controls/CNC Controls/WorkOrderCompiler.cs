@@ -410,25 +410,47 @@ namespace CNC.Controls
                 if (source == null)
                     continue;
 
-                // Absolute or relative to the source's own position - see WorkOrderRules.ResolvedCenter,
-                // which the preview calls too so both draw and cut the same place. The shadow keeps the
-                // default Center anchor, so this center survives as a center downstream.
-                var at = WorkOrderRules.ResolvedCenter(wo, tp);
+                // Everything comes from the SOURCE by default - it is the toolpath being borrowed, and the
+                // shadow exists to be it, somewhere else. Listing the source's fields by hand instead is how
+                // this silently lost SvgFile, SvgWidth, the whole text block and CornerReliefs: an Indirect
+                // pointing at an SVG resolved to a toolpath with no artwork, and one pointing at Text
+                // resolved back to the "TEXT" default. Inverting the default means a field added to
+                // WorkOrderToolpath is inherited here without anyone remembering to come back for it.
+                //
+                // The pattern block comes from the source with everything else, and that is a real change:
+                // it used to be copied from `tp`, where WorkOrderView forces Pattern to None for every
+                // Indirect toolpath and hides the section outright - so those eight fields only ever copied
+                // defaults, and an Indirect pointing at a 3x2 grid cut ONE instance instead of six. A
+                // pattern is part of what the borrowed toolpath does, so it comes along.
+                var shadow = WorkOrderRules.CopyFields(source, new WorkOrderToolpath());
 
-                resolved.Toolpaths.Add(new WorkOrderToolpath
-                {
-                    Name = tp.Name,
-                    Geometry = source.Geometry,
-                    Enabled = tp.Enabled,
-                    X = at[0], Y = at[1],
-                    Length = source.Length, Angle = source.Angle, Diameter = source.Diameter,
-                    Width = source.Width, Depth = source.Depth, Size = source.Size,
-                    Pattern = tp.Pattern,
-                    Columns = tp.Columns, RowSpacing = tp.RowSpacing, ColumnSpacing = tp.ColumnSpacing, Rows = tp.Rows,
-                    PatternCount = tp.PatternCount, PatternRadius = tp.PatternRadius,
-                    PatternStartAngle = tp.PatternStartAngle, PatternArcSpan = tp.PatternArcSpan,
-                    Operations = source.Operations
-                });
+                // ... except the handful the INDIRECT toolpath supplies, which is what makes it a different
+                // toolpath rather than a second copy of the source. [NoClone] already held back Name and
+                // Operations (see WorkOrderModel), and both are wanted here anyway - Name from tp, and
+                // Operations as the same LIST INSTANCE as the source's, deliberately: editing the source's
+                // operations must be picked up here the next time this runs. That live link is the entire
+                // point of Indirect versus Duplicate.
+                shadow.Name = tp.Name;
+                shadow.Enabled = tp.Enabled;
+                shadow.Operations = source.Operations;
+
+                // Position: absolute, or relative to the source's own - see WorkOrderRules.ResolvedCenter,
+                // which the preview calls too, so both draw and cut the same place. What comes back is a
+                // CENTER, already anchor-resolved, so the shadow is pinned to Center/Absolute: inheriting
+                // the source's anchor would apply its half-width a second time, and inheriting a Relative
+                // mode would resolve a position that has already been resolved.
+                var at = WorkOrderRules.ResolvedCenter(wo, tp);
+                shadow.X = at[0];
+                shadow.Y = at[1];
+                shadow.Anchor = WorkOrderAnchor.Center;
+                shadow.OffsetMode = WorkOrderOffsetMode.Absolute;
+
+                // The shadow presents the source's geometry, so it is not Indirect and must not look it -
+                // IsIndirect keys off Geometry, but a stale name left here would be a live reference for
+                // anything that reads the field rather than the property.
+                shadow.IndirectSource = null;
+
+                resolved.Toolpaths.Add(shadow);
             }
             return resolved;
         }

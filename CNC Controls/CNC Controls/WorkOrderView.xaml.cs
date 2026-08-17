@@ -346,7 +346,7 @@ namespace CNC.Controls
         // immediately - editing either copy afterward doesn't touch the other.
         private void DuplicateToolpath(WorkOrderToolpath tp)
         {
-            var copy = CopyFields(tp, new WorkOrderToolpath());
+            var copy = WorkOrderRules.CopyFields(tp, new WorkOrderToolpath());
 
             // Name and Operations are the only two fields marked [NoClone] (see WorkOrderModel, where each
             // carries its own reason) - CopyFields skipped them, so supply them here: a unique name, and a
@@ -364,34 +364,7 @@ namespace CNC.Controls
         // there is no reference here for the two copies to share.
         private static WorkOrderOperation CloneOperation(WorkOrderOperation op)
         {
-            return CopyFields(op, new WorkOrderOperation());
-        }
-
-        // Copies every public instance field from source to target except those marked [NoClone], and
-        // returns target.
-        //
-        // Reflection rather than a hand-written initialiser, deliberately. Both copies above used to list
-        // their fields by hand, and both silently lost every field added afterwards: a Text toolpath once
-        // duplicated back to the "TEXT" defaults, and later an SVG toolpath duplicated with no SvgFile at
-        // all (SvgWidth, CarveMaxDepth, EngraveWidth and Direction reverting alongside it). The failure is
-        // always SILENT - a field nobody copied reads back as a plausible default rather than as an error,
-        // so it surfaces as a wrong cut rather than as a bug, hours later.
-        //
-        // Inverting the default is the actual fix: copying is automatic, and the rare field that must not be
-        // copied says so on itself in WorkOrderModel. Adding a field to either type now needs no thought
-        // here at all.
-        //
-        // Instance-only, so the static readonly tables on these types are untouched. Computed members
-        // (UsesText, CarvesOutlines, IsIndirect, CenterX/Y) are properties, which GetFields never returns.
-        private static T CopyFields<T>(T source, T target)
-        {
-            foreach (var f in typeof(T).GetFields(System.Reflection.BindingFlags.Public |
-                                                  System.Reflection.BindingFlags.Instance))
-            {
-                if (!f.IsDefined(typeof(NoCloneAttribute), false))
-                    f.SetValue(target, f.GetValue(source));
-            }
-            return target;
+            return WorkOrderRules.CopyFields(op, new WorkOrderOperation());
         }
 
         // Strips a trailing " (n)" before re-deriving the next free number, so duplicating a duplicate lands
@@ -501,7 +474,7 @@ namespace CNC.Controls
                 var owner = tp;
                 var tpItem = new TreeViewItem
                 {
-                    Header = MakeCheckHeader(WorkOrderRules.Summarize(tp), tp.Enabled, on => ToggleEnabled(owner, null, on)),
+                    Header = MakeCheckHeader(WorkOrderRules.Summarize(workOrder, tp), tp.Enabled, on => ToggleEnabled(owner, null, on)),
                     Tag = tp,
                     // Real collapse now (see collapsedToolpaths' own comment) - not a hardcoded "true" that
                     // made this a flat checklist wearing tree chrome rather than an actual disclosure tree.
@@ -911,9 +884,16 @@ namespace CNC.Controls
                 cbxIndirectSource.SelectedItem = tp.IndirectSource;
             }
 
-            // Indirect already IS a single repeat of the source at a different X/Y - a pattern on top of that
-            // would be a repeat of a repeat, and everything else about the cut lives on the source anyway (see
-            // pnlPatternSection's own comment), so the whole section is hidden rather than just left blank.
+            // Indirect already IS a single repeat of the source at a different X/Y - a pattern of its OWN on
+            // top of that would be a repeat of a repeat, and everything else about the cut lives on the
+            // source anyway (see pnlPatternSection's own comment), so the whole section is hidden rather than
+            // just left blank.
+            //
+            // Which is NOT the same as an Indirect toolpath never patterning: it inherits the SOURCE's
+            // pattern, so pointing one at a 3x2 grid cuts six instances at the new position (see
+            // WorkOrderCompiler.ResolveIndirect, and PositionsOf, which draws them). What is being refused
+            // here is a second pattern layered over that one - the count still shows up in the tree row,
+            // via WorkOrderRules.Summarize.
             Show(pnlPatternSection, !tp.IsIndirect);
             if (!tp.IsIndirect)
             {
@@ -1586,7 +1566,7 @@ namespace CNC.Controls
             {
                 var tpItem = (TreeViewItem)treeToolpaths.Items[t];
                 var tp = workOrder.Toolpaths[t];
-                SetCheckHeader(tpItem, WorkOrderRules.Summarize(tp), tp.Enabled, tp.Enabled);
+                SetCheckHeader(tpItem, WorkOrderRules.Summarize(workOrder, tp), tp.Enabled, tp.Enabled);
                 for (int i = 0; i < tp.Operations.Count && i < tpItem.Items.Count; i++)
                 {
                     var op = tp.Operations[i];
@@ -1886,16 +1866,18 @@ namespace CNC.Controls
             return WorkOrderRules.ResolveIndirectSource(workOrder, tp) ?? tp;
         }
 
-        // Where `tp`'s instances are drawn - its pattern laid out around its RESOLVED center, so an Indirect
-        // toolpath set to Relative draws where it will actually cut. The preview is the only caller that has
-        // to do this itself; the compiler sees a shadow toolpath whose X/Y is already resolved.
+        // Where `tp`'s instances are drawn: the pattern of whatever supplies its geometry, laid out around
+        // its RESOLVED center. Both halves matter and both are borrowed for an Indirect toolpath - the
+        // center because Relative measures from the source's position, and the PATTERN because the shadow
+        // the compiler builds now inherits the source's (see WorkOrderCompiler.ResolveIndirect). Reading
+        // tp.Pattern here would draw one instance of a source that is about to cut six, which is precisely
+        // the editor-vs-compiler disagreement WorkOrderRules.ResolvedCenter exists to stop.
         //
-        // Sharing WorkOrderRules.ResolvedCenter with the compiler is the point of it existing. Drawing and
-        // cutting were free to drift apart while both independently said "X/Y" - they aren't now.
+        // Unchanged for everything else: GeometrySource returns the toolpath itself when it isn't Indirect.
         private IEnumerable<double[]> PositionsOf(WorkOrderToolpath tp)
         {
             var at = WorkOrderRules.ResolvedCenter(workOrder, tp);
-            return tp.PatternPositions(at[0], at[1]);
+            return GeometrySource(tp).PatternPositions(at[0], at[1]);
         }
 
         // Whether this toolpath's cut will actually show up in Generate - its own enabled operations, or
