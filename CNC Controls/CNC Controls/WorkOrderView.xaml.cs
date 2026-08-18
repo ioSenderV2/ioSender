@@ -2650,6 +2650,23 @@ namespace CNC.Controls
             using (var sw = new System.IO.StringWriter(sb))
                 new System.Xml.Serialization.XmlSerializer(typeof(WorkOrder)).Serialize(sw, wo);
             sb.Append("|v=").Append(System.Reflection.Assembly.GetExecutingAssembly().GetName().Version);
+            // ...and the BUILD, not just the version. Every dev build carries the same version number, so a
+            // change to the compiler did not move this fingerprint: Generate matched the stamp on the
+            // previous build's work_order.macro and handed it straight back. A fix would appear to do
+            // nothing, and - worse, on 2026-08-18 - a line that had been REVERTED came back, because the
+            // file predating the revert still matched.
+            //
+            // ModuleVersionId is a GUID the compiler stamps into an assembly on every compile. It is what
+            // makes the binary's bytes differ build to build, so hashing the exe would be measuring this
+            // indirectly, at the cost of reading and digesting a file on a path that runs on every input
+            // change. Taken directly instead, and from the two assemblies that actually SHAPE the output:
+            // CNC.Controls carries WorkOrderCompiler and WorkOrderModel, CNC Core carries VCarve and
+            // MacroRunner. ioSender.exe carries none of them.
+            //
+            // Within one run of a released build these never change, so the cache still does its job - it
+            // only ever invalidates across a rebuild, which is exactly when it must.
+            sb.Append("|mvc=").Append(System.Reflection.Assembly.GetExecutingAssembly().ManifestModule.ModuleVersionId.ToString("N"));
+            sb.Append("|mvk=").Append(typeof(CNC.Core.VCarve).Assembly.ManifestModule.ModuleVersionId.ToString("N"));
             // The Setup tab's stock feeds the compiler - Thickness has always driven TrueDepth, and the
             // stock size is now emitted as the program's own (STOCK ...) declaration - but none of it was
             // in the fingerprint, so editing stock in Setup silently reused the previous compile. Found
