@@ -1888,7 +1888,18 @@ namespace CNC.Controls
 
             txtWarnings.Text = string.Join("\n", warnings);
             if (isActiveTab)
+            {
                 MacroProcessor.IsGenerateReady = warnings.Count == 0 && workOrder.Toolpaths.Count > 0;
+                // The reason travels with the gate, so the greyed-out Run bar can say what it wants instead
+                // of the operator having to find this panel and read it. First warning plus a count: the
+                // whole list would not fit a tooltip, and the first is the one to go and fix.
+                MacroProcessor.GenerateBlockedReason =
+                    workOrder.Toolpaths.Count == 0 ? "This work order has no toolpaths yet."
+                    : warnings.Count == 0 ? string.Empty
+                    : warnings.Count == 1 ? warnings[0]
+                    : string.Format("{0}\n\n(and {1} more - see the list under the parameters panel)",
+                                    warnings[0], warnings.Count - 1);
+            }
 
             // What will actually be EMITTED, so an Indirect toolpath counts for what it copies rather than
             // for the nothing it owns. This read "4 toolpaths, 4 operations" beside five toolpaths cutting

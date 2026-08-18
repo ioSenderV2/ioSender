@@ -93,6 +93,18 @@ namespace CNC.Controls
             set { _isGenerateReady = value; ActiveProgramChanged?.Invoke(); }
         }
 
+        /// <summary>
+        /// Why <see cref="IsGenerateReady"/> is false, in the operator's words - shown on the disabled Run
+        /// bar so a greyed-out button says what it wants. Empty when there is no specific reason.
+        ///
+        /// A tab that blocks generation knows exactly why (a validation warning, usually), and that reason
+        /// used to go only into the tab's own warnings panel. If the panel had scrolled, or the operator was
+        /// looking at the button rather than the panel, the button simply did nothing and explained nothing.
+        /// Set it wherever IsGenerateReady is set, or leave it empty and the bar falls back to its generic
+        /// "nothing to run yet" text.
+        /// </summary>
+        public static string GenerateBlockedReason { get; set; } = string.Empty;
+
         // False = nothing generated yet (or it was discarded) - Run bar reads "Generate". True = a program is
         // built and ActiveRun will stream it - Run bar reads "Run". The tab flips this true right after a
         // successful ActiveGenerate, and false again whenever it discards the program (an input changed, or

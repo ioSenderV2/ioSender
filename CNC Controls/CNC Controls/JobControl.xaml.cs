@@ -847,7 +847,20 @@ namespace CNC.Controls
                               : showSimulate ? FindResource("StartModeSimulate")
                               : connected && model.IsDryRunMode ? FindResource("StartModeDryRun")
                               : NormalModeLabel();
-            btnStart.ToolTip = !IsRunEnabled ? FindResource("StartTipDisabled")
+            // Branch on IsRunActionEnabled, which is what actually gates the button - NOT IsRunEnabled, which
+            // is only half of it (IsRunActionEnabled = IsRunEnabled && MacroProcessor.IsGenerateReady). With
+            // the old test, a tab that had blocked generation left the button DISABLED wearing an ENABLED
+            // tooltip: it greyed out and, hovered, cheerfully described the run it was refusing to start.
+            // Reported against a work order whose drill sizes failed validation - "it doesn't tell me what it
+            // doesn't like" - and the reason was sitting in the tab's warnings panel the whole time.
+            //
+            // MacroProcessor.GenerateBlockedReason is that reason, published by whichever tab set the gate.
+            // Empty falls back to the generic text, which is right for "nothing loaded at all".
+            string blocked = MacroProcessor.GenerateBlockedReason;
+            btnStart.ToolTip = !IsRunActionEnabled
+                                  ? (IsRunEnabled && !string.IsNullOrEmpty(blocked)
+                                        ? (object)blocked
+                                        : FindResource("StartTipDisabled"))
                               : showCheck ? FindResource("StartTipCheck")
                               : showSimulate ? FindResource("StartTipSimulate")
                               : connected && model.IsDryRunMode ? FindResource("StartTipDryRun")

@@ -814,9 +814,14 @@ namespace CNC.Controls
 
         #region Standard drill sizes
 
-        // The sizes a shop drill index actually holds: metric 1-13 mm in 0.5 mm steps, plus the common
-        // imperial fractions. A hole matching one of these can be DRILLED with a bit that size; anything else
-        // has to be BORED helically with a smaller end mill (see AvailableOperations).
+        // The sizes a shop actually has bits for: a metric index (1-13 mm in 0.5 mm steps), the common
+        // imperial fractions, and the metric TAPPING and CLEARANCE series - which are not in any index and
+        // are exactly what a machine build is full of. A hole matching one of these can be DRILLED with a bit
+        // that size; anything else has to be BORED helically with a smaller end mill (see AvailableOperations).
+        //
+        // This is a list of what EXISTS, not of what the operator owns, and it gates Generate outright - so
+        // being wrong here stops a legitimate job rather than merely advising against it. Err towards
+        // including a size.
         private static readonly List<KeyValuePair<double, string>> StandardDrills = BuildDrillList();
 
         private static List<KeyValuePair<double, string>> BuildDrillList()
@@ -833,6 +838,36 @@ namespace CNC.Controls
             list.Add(new KeyValuePair<double, string>(9.525d, "3/8\""));
             list.Add(new KeyValuePair<double, string>(12.7d, "1/2\""));
 
+            // Metric TAPPING drills. The 0.5 mm series above is a drill INDEX - what a set contains - and a
+            // metric shop's most-used bits are not in it: every one of these is bought individually, for
+            // threading. 4.2 for an M5 is the commonest hole in a machine build (NEMA mounts, rail bolts,
+            // bearing blocks), and it read as "not a standard drill size - use a Bore operation instead",
+            // which hard-blocks Generate. Reported against a real work order whose FIVE toolpaths were all
+            // 4.2, by someone holding the 4.2 mm bit.
+            list.Add(new KeyValuePair<double, string>(1.6d, "M2 tap"));
+            list.Add(new KeyValuePair<double, string>(2.05d, "M2.5 tap"));
+            list.Add(new KeyValuePair<double, string>(2.5d, "M3 tap"));
+            list.Add(new KeyValuePair<double, string>(3.3d, "M4 tap"));
+            list.Add(new KeyValuePair<double, string>(4.2d, "M5 tap"));
+            list.Add(new KeyValuePair<double, string>(5.0d, "M6 tap"));
+            list.Add(new KeyValuePair<double, string>(6.8d, "M8 tap"));
+            list.Add(new KeyValuePair<double, string>(8.5d, "M10 tap"));
+            list.Add(new KeyValuePair<double, string>(10.2d, "M12 tap"));
+
+            // Metric CLEARANCE drills (close fit) - the other half of the same job: the bolt passes through
+            // this hole and threads into the tapped one. Equally standard, equally absent from a 0.5 mm index.
+            list.Add(new KeyValuePair<double, string>(2.4d, "M2.2 clear"));
+            list.Add(new KeyValuePair<double, string>(3.2d, "M3 clear"));
+            list.Add(new KeyValuePair<double, string>(4.3d, "M4 clear"));
+            list.Add(new KeyValuePair<double, string>(5.3d, "M5 clear"));
+            list.Add(new KeyValuePair<double, string>(6.4d, "M6 clear"));
+            list.Add(new KeyValuePair<double, string>(8.4d, "M8 clear"));
+            list.Add(new KeyValuePair<double, string>(10.5d, "M10 clear"));
+
+            // A duplicate diameter is possible between the series above (5.0 is both the 0.5 index and the M6
+            // tap; 12.7 is 1/2" and near nothing else). TryMatchDrill takes the FIRST within tolerance and the
+            // list is sorted, so a duplicate only ever changes which NAME is reported, never whether the size
+            // is accepted. Left rather than deduplicated: the names are what make a match readable.
             return list.OrderBy(e => e.Key).ToList();
         }
 
