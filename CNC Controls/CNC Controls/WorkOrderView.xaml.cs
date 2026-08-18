@@ -1883,10 +1883,17 @@ namespace CNC.Controls
 
         private void UpdateValidation()
         {
-            var warnings = WorkOrderRules.Validate(workOrder);
+            List<string> advisories;
+            var warnings = WorkOrderRules.Validate(workOrder, out advisories);
             warnings.AddRange(ParameterWarnings());
 
-            txtWarnings.Text = string.Join("\n", warnings);
+            // Both shown, only the blocking ones gate. An advisory is marked so it reads as something to
+            // consider rather than something to fix - it is in the list precisely BECAUSE this build cannot
+            // be certain it is right and the operator can.
+            var shown = new List<string>(warnings);
+            foreach (var a in advisories)
+                shown.Add("Note: " + a);
+            txtWarnings.Text = string.Join("\n", shown);
             if (isActiveTab)
             {
                 MacroProcessor.IsGenerateReady = warnings.Count == 0 && workOrder.Toolpaths.Count > 0;

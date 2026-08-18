@@ -1297,9 +1297,29 @@ namespace CNC.Controls
         }
 
         // Bogus combinations - flagged on Generate, not merely filtered out of the picker.
+        // Blocking problems only - see the two-list overload. Kept for callers that just want "may this
+        // generate", which is every caller except the editor's own warnings panel.
         public static List<string> Validate(WorkOrder wo)
         {
+            List<string> ignored;
+            return Validate(wo, out ignored);
+        }
+
+        /// <summary>
+        /// Everything wrong with this work order, split by whether it should STOP Generate.
+        ///
+        /// The distinction exists because one check could not honestly block: a hole diameter is compared
+        /// against a list of standard drill sizes, and that list can never be complete - fractional, number
+        /// and letter drills, and whatever a particular shop actually owns. It told an operator holding a
+        /// 4.2 mm bit that 4.2 mm was not a drill size, and refused to generate. A rule that cannot be right
+        /// about the world has no business being the one that says no.
+        ///
+        /// So: advisories are shown, and ignored if the operator knows better. Everything else still blocks.
+        /// </summary>
+        public static List<string> Validate(WorkOrder wo, out List<string> advisories)
+        {
             var warnings = new List<string>();
+            advisories = new List<string>();
 
             // A rotated WCS (G10 L2 R, grblHAL ROTATION_ENABLE) is a real hazard here: WorkOrderCompiler
             // computes every toolpath's X/Y assuming the active WCS's axes are aligned with the machine's
@@ -1383,9 +1403,11 @@ namespace CNC.Controls
                     if (!allowed.Contains(op.Kind) && !(op.Kind == WorkOrderOpKind.Pocket || op.Kind == WorkOrderOpKind.Contour))
                         warnings.Add(label + OpLabel(op.Kind) + " is not possible on this geometry.");
 
-                    // A drill only exists in stock sizes - anything else has to be bored out.
+                    // ADVISORY, not blocking - see the overload's own comment. The size list is a list of
+                    // what usually exists, not of what is in this operator's rack, so it can say "use a
+                    // Bore instead" about a bit they are holding. Worth saying, never worth refusing.
                     if (op.Kind == WorkOrderOpKind.Drill && !TryMatchDrill(op.HoleDiameter, out _))
-                        warnings.Add(string.Format("{0}Ø{1:0.###} mm is not a standard drill size - use a Bore operation instead.", label, op.HoleDiameter));
+                        advisories.Add(string.Format("{0}Ø{1:0.###} mm is not a size this build knows as a standard drill - if you don't have that bit, use a Bore operation instead.", label, op.HoleDiameter));
                 }
 
                 if (tp.Operations.Count(o => o.Kind == WorkOrderOpKind.Pocket || o.Kind == WorkOrderOpKind.Contour) > 1)
