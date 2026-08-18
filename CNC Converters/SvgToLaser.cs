@@ -14,9 +14,14 @@
  *
  * ---- What it emits ----
  *
- * Outlines only - each contour traced once per pass. No fill: raster engraving needs scanline
- * conversion, overscan past each line end so acceleration does not scorch the edges, and power
- * compensation, none of which are here.
+ * Outlines - each contour traced once per pass - and optionally SHADING first, which scans back and
+ * forth across the enclosed areas (see SvgLaserFill). Shading off leaves the program byte-for-byte
+ * what it was before shading existed.
+ *
+ * No overscan. It exists to stop a constant-power beam scorching the ends of each scan line while the
+ * head decelerates - and M4 dynamic power already solves that by scaling power with speed, which is
+ * what laser mode is for. It would be worth adding if the M3 constant-power path is ever used for
+ * shading; it is not needed for the M4 one.
  *
  *   G21 G90 G17
  *   G92 X0 Y0          the head's CURRENT position becomes the artwork's origin
@@ -142,7 +147,7 @@ namespace CNC.Converters
             {
                 job.AddBlock(filename, CNC.Core.Action.New);
 
-                job.AddBlock("(SVG to laser - outlines only)");
+                job.AddBlock(settings.Fill ? "(SVG to laser - shading then outline)" : "(SVG to laser - outlines only)");
                 job.AddBlock(string.Format(CultureInfo.InvariantCulture,
                     "(artwork {0} x {1} mm, {2} outline{3}, {4} pass{5})",
                     F(art.WidthMm), F(art.HeightMm), art.Contours.Count, art.Contours.Count == 1 ? "" : "s",
@@ -162,6 +167,18 @@ namespace CNC.Converters
                 job.AddBlock("G21 G90 G17");
                 job.AddBlock("G92 X0 Y0");
                 job.AddBlock((settings.Dynamic ? "M4" : "M3") + " S0");
+
+                if (settings.Fill)
+                    EmitFill(job, art);
+
+                if (settings.Fill && !settings.OutlineAfterFill)
+                {
+                    job.AddBlock("M5");
+                    job.AddBlock(string.Format(CultureInfo.InvariantCulture, "G0 X0 Y0 F{0}", N(settings.TravelFeed)));
+                    job.AddBlock("G92.1");
+                    job.AddBlock("M30", CNC.Core.Action.End);
+                    return;
+                }
 
                 for (int pass = 0; pass < settings.Passes; pass++)
                 {
@@ -201,6 +218,38 @@ namespace CNC.Converters
                 job.AddBlock("G92.1");
                 job.AddBlock("M30", CNC.Core.Action.End);
             }
+        }
+
+        // The shading pass: horizontal spans across the interior, burned one row at a time.
+        //
+        // Rows alternate direction (SvgLaserFill serpentines them), so consecutive spans are usually
+        // adjacent and the G0 between them is short. The beam is commanded off on every one of those
+        // rapids for the same reason as elsewhere - laser mode already blanks a G0, but a file that
+        // does not rely on it is a file that cannot scar the work if $32 is ever cleared.
+        private void EmitFill(CNC.Controls.GCode job, SvgImportResult art)
+        {
+            var spans = SvgLaserFill.Build(art.Contours, settings.Interval);
+
+            if (spans.Count == 0)
+            {
+                job.AddBlock("(shading: nothing enclosed to fill at this interval)");
+                return;
+            }
+
+            job.AddBlock(string.Format(CultureInfo.InvariantCulture,
+                "(shading: {0} spans at {1} mm interval, S{2} F{3})",
+                spans.Count, F(settings.Interval), N(settings.FillPower), N(settings.FillFeed)));
+
+            foreach (var s in spans)
+            {
+                job.AddBlock(string.Format(CultureInfo.InvariantCulture,
+                    "G0 X{0} Y{1} S0 F{2}", F(s.X0), F(s.Y), N(settings.TravelFeed)));
+                job.AddBlock(string.Format(CultureInfo.InvariantCulture,
+                    "G1 X{0} Y{1} S{2} F{3}", F(s.X1), F(s.Y), N(settings.FillPower), N(settings.FillFeed)));
+            }
+
+            if (settings.OutlineAfterFill)
+                job.AddBlock("(outline follows the shading, so the edge lands crisp over it)");
         }
     }
 }

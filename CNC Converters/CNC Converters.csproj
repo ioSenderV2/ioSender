@@ -64,6 +64,7 @@
     <Compile Include="HpglToGCode.cs" />
     <Compile Include="SvgToLaser.cs" />
     <Compile Include="SvgLaserSettings.cs" />
+    <Compile Include="SvgLaserFill.cs" />
     <Compile Include="JobParametersDialog.xaml.cs">
       <DependentUpon>JobParametersDialog.xaml</DependentUpon>
       <SubType>Code</SubType>

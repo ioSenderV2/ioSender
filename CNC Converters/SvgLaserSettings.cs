@@ -20,6 +20,8 @@ namespace CNC.Converters
         private double _width = 100d, _power = 150d, _feed = 1200d, _travel = 3000d;
         private int _passes = 1;
         private bool _dynamic = true;
+        private bool _fill = false, _outlineAfterFill = true;
+        private double _interval = 0.1d, _fillPower = 120d, _fillFeed = 3000d;
 
         public event PropertyChangedEventHandler PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string name = null)
@@ -31,7 +33,7 @@ namespace CNC.Converters
         public double WidthMm
         {
             get { return _width; }
-            set { _width = value; OnPropertyChanged(); OnPropertyChanged("HeightSummary"); }
+            set { _width = value; OnPropertyChanged(); OnPropertyChanged("HeightSummary"); OnPropertyChanged("FillSummary"); }
         }
 
         /// <summary>Height divided by width, from SvgOutlines.AspectOf. Set before the dialog opens.</summary>
@@ -79,6 +81,64 @@ namespace CNC.Converters
         {
             get { return _dynamic; }
             set { _dynamic = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>
+        /// Shade enclosed areas by scanning back and forth across them, rather than only tracing their
+        /// boundary. Off leaves the emitted program exactly as it was before shading existed.
+        /// </summary>
+        public bool Fill
+        {
+            get { return _fill; }
+            set { _fill = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>Trace the boundary after shading, so the edge is crisp over the fill.</summary>
+        public bool OutlineAfterFill
+        {
+            get { return _outlineAfterFill; }
+            set { _outlineAfterFill = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>
+        /// Distance between scan lines, mm. Around the beam's spot size: tighter overlaps and darkens,
+        /// wider leaves visible banding. 0.1 suits a typical diode.
+        /// </summary>
+        public double Interval
+        {
+            get { return _interval; }
+            set { _interval = value; OnPropertyChanged(); OnPropertyChanged("FillSummary"); }
+        }
+
+        /// <summary>Shading usually wants less power and more speed than an outline - it covers area, not edges.</summary>
+        public double FillPower
+        {
+            get { return _fillPower; }
+            set { _fillPower = value; OnPropertyChanged(); }
+        }
+
+        public double FillFeed
+        {
+            get { return _fillFeed; }
+            set { _fillFeed = value; OnPropertyChanged(); OnPropertyChanged("FillSummary"); }
+        }
+
+        /// <summary>
+        /// Roughly how long the shading will take, so a 0.05 mm interval on a big piece of artwork is
+        /// questioned before it is started rather than forty minutes in. Deliberately crude: it assumes
+        /// every scan line crosses the full width, which is the worst case, and ignores acceleration.
+        /// </summary>
+        public string FillSummary
+        {
+            get
+            {
+                if (_interval <= 0d || _fillFeed <= 0d)
+                    return string.Empty;
+
+                double lines = _width * Aspect / _interval;
+                double minutes = lines * _width / _fillFeed;
+                return string.Format("~{0:0} scan lines, {1:0} min or less", lines, minutes);
+            }
         }
 
         public string HeightSummary

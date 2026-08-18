@@ -32,6 +32,21 @@
                 </StackPanel>
             </GroupBox>
 
+            <GroupBox x:Uid="grp_svglaser_fill" Header="Shading" Margin="5,5,0,0" MinWidth="290">
+                <StackPanel>
+                    <CheckBox x:Uid="chk_svglaser_fill" x:Name="chkFill" Content="Fill enclosed areas" Margin="8,4,0,2" IsChecked="{Binding Path=Fill, Mode=TwoWay}"
+                              ToolTip="Scan back and forth across the inside of each shape instead of only tracing its boundary. Holes and counters are left unburned. Adds significant time - see the estimate below."/>
+                    <StackPanel x:Name="pnlFill" IsEnabled="{Binding Path=Fill, Mode=OneWay}">
+                        <Controls:NumericField x:Uid="fld_svglaser_interval" Label="Interval:" ColonAt="90" Unit="mm" Format="0.###" Value="{Binding Path=Interval, Mode=TwoWay}"/>
+                        <Controls:NumericField x:Uid="fld_svglaser_fillpower" Label="Fill power:" ColonAt="90" Unit="" Format="###0" Value="{Binding Path=FillPower, Mode=TwoWay}"/>
+                        <Controls:NumericField x:Uid="fld_svglaser_fillfeed" Label="Fill feed:" ColonAt="90" Unit="mm/min" Format="###0" Value="{Binding Path=FillFeed, Mode=TwoWay}"/>
+                        <TextBlock x:Name="txtFill" Text="{Binding Path=FillSummary, Mode=OneWay}" Foreground="#586069" FontSize="11" Margin="94,0,0,4"/>
+                        <CheckBox x:Uid="chk_svglaser_outlineafter" x:Name="chkOutlineAfter" Content="Trace outline after shading" Margin="94,2,0,4" IsChecked="{Binding Path=OutlineAfterFill, Mode=TwoWay}"
+                                  ToolTip="Burn the boundary once the shading is done, so the edge lands crisp on top of it. Untick to shade only."/>
+                    </StackPanel>
+                </StackPanel>
+            </GroupBox>
+
             <GroupBox x:Uid="grp_svglaser_origin" Header="Before you run this" Margin="5,5,0,0" MinWidth="290">
                 <StackPanel>
                     <TextBlock x:Uid="txt_svglaser_origin" TextWrapping="Wrap" Margin="4,2,4,2" FontSize="11"

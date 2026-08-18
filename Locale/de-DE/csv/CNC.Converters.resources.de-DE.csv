@@ -32,3 +32,13 @@ CNC.Converters.g.en-US.resources:svglaserdialog.baml,grp_svglaser_origin:System.
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,txt_svglaser_origin:System.Windows.Controls.TextBlock.Text,Text,True,True,,The head's position when the job starts becomes the artwork's lower-left corner. Jog it there first - no homing needed.
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,btn_svglaser_ok:System.Windows.Controls.ContentControl.Content,Button,True,True,,OK
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,btn_svglaser_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,grp_svglaser_fill:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Shading
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,chk_svglaser_fill:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Fill enclosed areas
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,chk_svglaser_fill:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Scan back and forth across the inside of each shape instead of only tracing its boundary. Holes and counters are left unburned. Adds significant time - see the estimate below.
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_interval:CNC.Controls.NumericField.Label,None,False,True,,Interval:
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_interval:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_fillpower:CNC.Controls.NumericField.Label,None,False,True,,Fill power:
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_fillfeed:CNC.Controls.NumericField.Label,None,False,True,,Fill feed:
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_fillfeed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,chk_svglaser_outlineafter:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Trace outline after shading
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,chk_svglaser_outlineafter:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Burn the boundary once the shading is done, so the edge lands crisp on top of it. Untick to shade only."
