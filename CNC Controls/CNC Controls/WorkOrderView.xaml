@@ -1,4 +1,4 @@
-<local:ConfigPanel x:TypeArguments="local:WorkOrder" x:Class="CNC.Controls.WorkOrderView"
+﻿<local:ConfigPanel x:TypeArguments="local:WorkOrder" x:Class="CNC.Controls.WorkOrderView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -256,7 +256,7 @@
                         <TextBlock x:Name="txtDrillMatch" Foreground="#586069" FontSize="11" Margin="0,2,0,4" TextWrapping="Wrap" Visibility="Collapsed"/>
                         <local:NumericField x:Uid="fld_wototal" x:Name="fldTotalDepth" Label="Total depth:" ColonAt="150" Format="###0.0##" Unit="mm"/>
                         <local:NumericField x:Uid="fld_wodoc" x:Name="fldDepthOfCut" Label="Depth of cut:" ColonAt="150" Format="###0.0##" Unit="mm"
-                                            ToolTip="Axial step per pass - how much deeper each pass goes."/>
+                                            ToolTip="Axial step per pass - how much deeper each pass goes. On a V-carve it is the step between depth levels: the walls tile exactly either way, so a larger step just means fewer, heavier passes. Set it to the carve's full depth to cut each groove in one, if the bit will take it."/>
                         <local:NumericField x:Uid="fld_wopeck" x:Name="fldPeckDepth" Label="Peck depth:" ColonAt="150" Format="###0.0##" Unit="mm"
                                             ToolTip="How far the drill advances between full retracts. Retracting clears the chips instead of packing them into the flutes."/>
                         <local:NumericField x:Uid="fld_wostepdown" x:Name="fldBoreStepDown" Label="Step down (per rev):" ColonAt="150" Format="###0.0##" Unit="mm"

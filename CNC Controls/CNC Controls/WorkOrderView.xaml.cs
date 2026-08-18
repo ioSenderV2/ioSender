@@ -1106,7 +1106,12 @@ namespace CNC.Controls
             // A through cut takes its depth from the stock thickness, so Total depth has nothing left to say.
             Show(fldTotalDepth, ownsDepth && !(supportsThrough && op.Through));
             // Surface is a single skim pass, not stepped roughing - no depth-of-cut to set.
-            Show(fldDepthOfCut, op.Kind == WorkOrderOpKind.Pocket || op.Kind == WorkOrderOpKind.Contour);
+            // Engrave included: for a V-carve this is the depth STEP between iso-contour levels, which was
+            // a hardcoded 0.5 mm until it turned out the shallower levels are geometrically redundant
+            // wherever a region reaches full depth - a deeper pass's flank runs through the tip of the one
+            // above, so the deepest pass alone recreates the whole V. See WorkOrderCompiler.CarveStep.
+            Show(fldDepthOfCut, op.Kind == WorkOrderOpKind.Pocket || op.Kind == WorkOrderOpKind.Contour
+                             || op.Kind == WorkOrderOpKind.Engrave);
             Show(fldPeckDepth, op.Kind == WorkOrderOpKind.Drill);
             Show(fldBoreStepDown, op.Kind == WorkOrderOpKind.Bore);
 

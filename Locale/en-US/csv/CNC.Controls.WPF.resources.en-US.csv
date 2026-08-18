@@ -1412,7 +1412,7 @@ CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wototal:CNC.Controls.N
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wototal:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wodoc:CNC.Controls.NumericField.Label,None,False,True,,Depth of cut:
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wodoc:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wodoc:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Axial step per pass - how much deeper each pass goes.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wodoc:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Axial step per pass - how much deeper each pass goes. On a V-carve it is the step between depth levels: the walls tile exactly either way, so a larger step just means fewer, heavier passes. Set it to the carve's full depth to cut each groove in one, if the bit will take it."
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopeck:CNC.Controls.NumericField.Label,None,False,True,,Peck depth:
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopeck:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wopeck:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,How far the drill advances between full retracts. Retracting clears the chips instead of packing them into the flutes.

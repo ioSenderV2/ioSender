@@ -750,10 +750,24 @@ namespace CNC.Controls
         // a V-bit leaves in wood, and text-sized fields build in well under a second at it.
         private const double CarveResolution = 0.1d;
 
-        // Depth between successive carve levels. This does NOT scallop the walls - consecutive passes tile
-        // the cone exactly, a deeper pass's flank running through the tip of the one above - it only sets
-        // how much material a single ring removes, and the in-plan faceting of curved boundaries.
-        private const double CarveDepthStep = 0.5d;
+        // Default depth between successive carve levels, used when an operation has no depth of cut set.
+        // This does NOT scallop the walls - consecutive passes tile the cone exactly, a deeper pass's flank
+        // running through the tip of the one above - it only sets how much material a single ring removes,
+        // and the in-plan faceting of curved boundaries.
+        //
+        // Which also means the shallower levels are geometrically REDUNDANT wherever the region reaches
+        // full depth: the deepest pass alone recreates the whole V, and the ones above it cut material that
+        // pass is about to take. They are depth-of-cut stepping, nothing more - so the operation's own
+        // DepthOfCut now drives it (CarveStep), and this is only the fallback for one left at zero.
+        private const double CarveDepthStepDefault = 0.5d;
+
+        // The depth step a carve should use: the operation's own, or the default when it has none. Clamped
+        // to something a tip can survive being asked for - a step of zero would be an infinite level count,
+        // and the engine's own Math.Max would silently turn it into 0.01 mm and build for a very long time.
+        private static double CarveStep(WorkOrderOperation op)
+        {
+            return op != null && op.DepthOfCut > 0.01d ? op.DepthOfCut : CarveDepthStepDefault;
+        }
 
         // The distance-field build inside VCarve.Build is by far the most expensive thing Generate does -
         // minutes for board-sized lettering at CarveResolution - and it depends on NOTHING but the glyph
@@ -834,15 +848,19 @@ namespace CNC.Controls
         }
 
         private static List<CNC.Core.VCarvePass> CachedCarvePasses(WorkOrderToolpath tp, double capHeight,
-                                                                   double halfAngle, double maxDepth, List<IList<Point2D>> polys)
+                                                                   double halfAngle, double maxDepth, double step,
+                                                                   List<IList<Point2D>> polys)
         {
-            // The source fragment (see CarveSourceKey) plus the cone. A null source means the artwork
-            // could not be fingerprinted, so this carve is computed and simply not memoized - serving a
-            // possibly-stale hit is the one outcome worth refusing outright.
+            // The source fragment (see CarveSourceKey) plus the cone AND the depth step. The step is in the
+            // key because it is now a setting rather than a compile-time constant - which the comment above
+            // named as the exact condition requiring it. Without it, changing an operation's depth of cut
+            // and regenerating would HIT the cache and reuse passes built at the old step: the field would
+            // look inert, which is precisely how the SVG width bug presented.
             string source = CarveSourceKey(tp, capHeight);
             string key = source == null ? null : string.Join(KeySep, source,
                 halfAngle.ToString("R", CultureInfo.InvariantCulture),
-                maxDepth.ToString("R", CultureInfo.InvariantCulture));
+                maxDepth.ToString("R", CultureInfo.InvariantCulture),
+                step.ToString("R", CultureInfo.InvariantCulture));
 
             List<CNC.Core.VCarvePass> passes;
             if (key != null && carvePassCache.TryGetValue(key, out passes))
@@ -857,13 +875,13 @@ namespace CNC.Controls
             }
 
             var swCarve = System.Diagnostics.Stopwatch.StartNew();
-            passes = CNC.Core.VCarve.Build(polys, halfAngle, maxDepth, CarveResolution, CarveDepthStep);
+            passes = CNC.Core.VCarve.Build(polys, halfAngle, maxDepth, CarveResolution, step);
             swCarve.Stop();
             if (DebugLog.Enabled)
                 DebugLog.Write("workorder", string.Format(CultureInfo.InvariantCulture,
                     "carve cache MISS {0:0}ms ({1} passes, {2} contours, res={3}mm, step={4}mm{5}) {6}",
                     swCarve.Elapsed.TotalMilliseconds, passes.Count, polys.Count,
-                    CarveResolution, CarveDepthStep,
+                    CarveResolution, step,
                     key == null ? ", NOT CACHEABLE" : string.Empty, CarveSourceLabel(tp)));
 
             if (key != null)
@@ -941,7 +959,7 @@ namespace CNC.Controls
 
             // clearFlats on (the default): where a stroke is wider than the cone can span, the engine
             // appends the maxDepth clearing generations itself - see VCarve.Build.
-            var passes = CachedCarvePasses(tp, capHeight, halfAngle, maxDepth, polys);
+            var passes = CachedCarvePasses(tp, capHeight, halfAngle, maxDepth, CarveStep(op), polys);
             if (passes.Count == 0)
                 return lines;
 
