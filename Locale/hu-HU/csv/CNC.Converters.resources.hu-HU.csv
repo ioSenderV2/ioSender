@@ -16,3 +16,19 @@ CNC.Converters.g.en-US.resources:jobparametersdialog.baml,grp_scalingFactors:Sys
 CNC.Converters.g.en-US.resources:jobparametersdialog.baml,grp_spindle_feed:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Orsó és előtolás
 CNC.Converters.g.en-US.resources:jobparametersdialog.baml,grp_tool:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Eszköz
 CNC.Converters.g.en-US.resources:jobparametersdialog.baml,grp_zPosition:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Z pozíciók (a munkadarab felületéhez viszonyítva)
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,grp_svglaser_size:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Size
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_width:CNC.Controls.NumericField.Label,None,False,True,,Width:
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_width:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,grp_svglaser_burn:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Burn
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_power:CNC.Controls.NumericField.Label,None,False,True,,Power (S):
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_feed:CNC.Controls.NumericField.Label,None,False,True,,Feed:
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_feed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_travel:CNC.Controls.NumericField.Label,None,False,True,,Travel:
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_travel:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_passes:CNC.Controls.NumericField.Label,None,False,True,,Passes:
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,chk_svglaser_dynamic:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,M4 dynamic power
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,chk_svglaser_dynamic:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Scales power with speed, so corners are not burned dark as the machine decelerates into them. Needs $32=1. Uncheck for M3 constant power, which suits cutting through more than engraving."
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,grp_svglaser_origin:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Before you run this
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,txt_svglaser_origin:System.Windows.Controls.TextBlock.Text,Text,True,True,,The head's position when the job starts becomes the artwork's lower-left corner. Jog it there first - no homing needed.
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,btn_svglaser_ok:System.Windows.Controls.ContentControl.Content,Button,True,True,,OK
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,btn_svglaser_cancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel

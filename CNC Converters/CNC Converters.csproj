@@ -56,10 +56,20 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="SvgLaserDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Compile Include="Excellon2GCode.cs" />
     <Compile Include="HpglToGCode.cs" />
+    <Compile Include="SvgToLaser.cs" />
+    <Compile Include="SvgLaserSettings.cs" />
     <Compile Include="JobParametersDialog.xaml.cs">
       <DependentUpon>JobParametersDialog.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="SvgLaserDialog.xaml.cs">
+      <DependentUpon>SvgLaserDialog.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
   </ItemGroup>

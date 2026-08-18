@@ -1012,6 +1012,10 @@ namespace GCode_Sender
             GCode.File.AddConverter(c.GetType(), c.FileType, c.FileExtensions);
             c = new HpglToGCode();
             GCode.File.AddConverter(c.GetType(), c.FileType, c.FileExtensions);
+            // Outline-only SVG -> plain-Grbl laser g-code. Separate from the Work Order's SVG carving,
+            // which emits grblHAL and would be rejected outright by a diode laser controller.
+            c = new SvgToLaser();
+            GCode.File.AddConverter(c.GetType(), c.FileType, c.FileExtensions);
 
             GCode.File.AddTransformer(typeof(GCodeRotateViewModel), (string)FindResource("MenuRotate"), UIViewModel.TransformMenuItems);
             GCode.File.AddTransformer(typeof(ArcsToLines), (string)FindResource("MenuArcsToLines"), UIViewModel.TransformMenuItems);

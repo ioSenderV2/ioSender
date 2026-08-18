@@ -1,0 +1,50 @@
+﻿<Window x:Class="CNC.Converters.SvgLaserDialog"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:Controls="clr-namespace:CNC.Controls;assembly=CNC.Controls.WPF"
+             xmlns:local="clr-namespace:CNC.Converters"
+             mc:Ignorable="d"
+             d:DesignHeight="420" d:DesignWidth="320"
+             SizeToContent="WidthAndHeight"
+             ResizeMode="NoResize" Icon="App.ico"
+             Title="SVG to laser">
+    <Grid Background="#FFE5E5E5">
+        <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="5,5">
+
+            <GroupBox x:Uid="grp_svglaser_size" Header="Size" Margin="5,5,0,0" MinWidth="290">
+                <StackPanel>
+                    <Controls:NumericField x:Uid="fld_svglaser_width" Label="Width:" ColonAt="90" Unit="mm" Format="###0.###" Value="{Binding Path=WidthMm, Mode=TwoWay}"/>
+                    <TextBlock x:Name="txtHeight" Text="{Binding Path=HeightSummary, Mode=OneWay}" Foreground="#586069" FontSize="11" Margin="94,0,0,4"/>
+                </StackPanel>
+            </GroupBox>
+
+            <GroupBox x:Uid="grp_svglaser_burn" Header="Burn" Margin="5,5,0,0" MinWidth="290">
+                <StackPanel>
+                    <Controls:NumericField x:Uid="fld_svglaser_power" Label="Power (S):" ColonAt="90" Unit="" Format="###0" Value="{Binding Path=Power, Mode=TwoWay}"/>
+                    <TextBlock x:Name="txtPower" Text="{Binding Path=PowerSummary, Mode=OneWay}" Foreground="#586069" FontSize="11" Margin="94,0,0,4"/>
+                    <Controls:NumericField x:Uid="fld_svglaser_feed" Label="Feed:" ColonAt="90" Unit="mm/min" Format="###0" Value="{Binding Path=Feed, Mode=TwoWay}"/>
+                    <Controls:NumericField x:Uid="fld_svglaser_travel" Label="Travel:" ColonAt="90" Unit="mm/min" Format="###0" Value="{Binding Path=TravelFeed, Mode=TwoWay}"/>
+                    <Controls:NumericField x:Uid="fld_svglaser_passes" Label="Passes:" ColonAt="90" Unit="" Format="##0" Value="{Binding Path=Passes, Mode=TwoWay}"/>
+                    <CheckBox x:Uid="chk_svglaser_dynamic" x:Name="chkDynamic" Content="M4 dynamic power" Margin="94,6,0,2" IsChecked="{Binding Path=Dynamic, Mode=TwoWay}"
+                              ToolTip="Scales power with speed, so corners are not burned dark as the machine decelerates into them. Needs $32=1. Uncheck for M3 constant power, which suits cutting through more than engraving."/>
+                </StackPanel>
+            </GroupBox>
+
+            <GroupBox x:Uid="grp_svglaser_origin" Header="Before you run this" Margin="5,5,0,0" MinWidth="290">
+                <StackPanel>
+                    <TextBlock x:Uid="txt_svglaser_origin" TextWrapping="Wrap" Margin="4,2,4,2" FontSize="11"
+                               Text="The head's position when the job starts becomes the artwork's lower-left corner. Jog it there first - no homing needed."/>
+                    <TextBlock x:Name="txtLaserMode" Text="{Binding Path=LaserModeSummary, Mode=OneWay}" TextWrapping="Wrap" Margin="4,4,4,2" FontSize="11"/>
+                </StackPanel>
+            </GroupBox>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,5,4">
+                <Button x:Uid="btn_svglaser_ok" x:Name="btnOk" Content="OK" IsDefault="True" MinWidth="75" Height="24" Margin="0,0,6,0" Click="btnOk_Click"/>
+                <Button x:Uid="btn_svglaser_cancel" x:Name="btnCancel" Content="Cancel" IsCancel="True" MinWidth="75" Height="24"/>
+            </StackPanel>
+
+        </StackPanel>
+    </Grid>
+</Window>

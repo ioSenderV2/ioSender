@@ -115,6 +115,9 @@ TARGETS = [
 
     # CNC.Controls.Camera (the camera view + its App-settings panel)
     ('CNC Controls Camera/CNC Controls Camera/ConfigControl.xaml', 'CNC.Controls.Camera'),
+
+    # CNC.Converters (the file-import converters' own parameter dialogs)
+    ('CNC Converters/SvgLaserDialog.xaml', 'CNC.Converters'),
 ]
 
 # LibStrings.xaml ResourceDictionaries (code-string localization). Each <system:String x:Uid=..>value..
