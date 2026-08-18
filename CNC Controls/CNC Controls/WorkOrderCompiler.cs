@@ -361,6 +361,33 @@ namespace CNC.Controls
                 lines.Add("M5");
         }
 
+        // Lift to MACHINE top before an operation goes anywhere, so the traverse to its first position
+        // happens above everything on the table rather than at Safe Z.
+        //
+        // "Safe Z" is a WORK-coordinate height, and that is the whole problem: with a work Z origin
+        // 113 mm below machine top, the G0 Z20 that AppendToolEnd leaves behind puts the tool 93 mm BELOW
+        // machine top, and the next operation's "G0 X.. Y.." then crosses the entire table at that height,
+        // through whatever clamps, vises and fixtures are in the way. Exactly the failure recorded against
+        // the RETURN leg on real hardware 2026-08-02, which was fixed there by routing it through
+        // MacroRunner.EmitGotoG30 - the outbound leg was left as it was.
+        //
+        // Three separate moves on purpose. A single combined rapid would cut the corner diagonally, which
+        // is the same traverse-through-the-unknown by another name; lifting first, then crossing, then
+        // descending means the tool is only ever low when it is already over where it is going.
+        //
+        // The lift names X and Y through #<_abs_x>/#<_abs_y> rather than being a bare "G53 G0 Z0". That is
+        // not decoration: a G53 move leaving a homing-direction-inverted ($23) axis unmoved sign-flips its
+        // parser base on some builds and throws a false Alarm:2 mid-program. See EmitGotoG30's comment,
+        // which carries the same idiom for the same reason.
+        //
+        // Per OPERATION, not per pattern instance. Instances of one operation are the same feature repeated
+        // across a small area and hop between themselves at Safe Z as before; a full-height round trip per
+        // hole would multiply a 17-instance grid's cycle time for clearance it does not need.
+        private static void AppendApproach(List<string> lines)
+        {
+            lines.Add("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z0");
+        }
+
         // Walks a path at floorZ, emitting tab bridges when this operation is the one that finishes a through
         // cut. Assumes the tool is already at path[0] and plunged. tabSource is the operation that OWNS the
         // tab settings (the through contour), which is not necessarily the operation currently cutting - a
@@ -1024,6 +1051,18 @@ namespace CNC.Controls
             double peck = op.PeckDepth > 0d ? op.PeckDepth : 2d;
 
             lines.Add("G0 X" + F(cx) + " Y" + F(cy));
+
+            // Drop to Safe Z as a RAPID before the first peck feeds. Every other operation reaches its
+            // start depth through AppendPlunge or an explicit rapid; this loop feeds straight from
+            // whatever height it finds itself at, which was Safe Z and is now machine top (see
+            // AppendApproach). Without this the first peck would feed the entire distance from machine
+            // top to the surface at the plunge rate - safe, since it is descending over the hole it is
+            // about to drill, but minutes of air per patterned toolpath.
+            //
+            // Matches the height the peck loop already retracts to, so the first peck and every peck
+            // after it start from the same place.
+            lines.Add("G0 Z" + F(SafeZ()));
+
             double z = openDepth;
             if (openDepth > 0d)
                 lines.Add(string.Format("(rapid through {0:0.0} mm already opened at this centerline)", openDepth));
@@ -1413,6 +1452,7 @@ namespace CNC.Controls
                 return BuildSurfaceEntireSpoilboard(op);
 
             AppendToolStart(lines, op, currentTool, spindleOn, currentRpm);
+            AppendApproach(lines);
 
             var positions = tp.PatternPositions().ToList();
             for (int n = 0; n < positions.Count; n++)
