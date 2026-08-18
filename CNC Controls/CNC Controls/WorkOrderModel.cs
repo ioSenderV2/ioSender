@@ -54,20 +54,6 @@ namespace CNC.Controls
     //              which is what makes a row of copies stay a row when the first one is nudged.
     public enum WorkOrderOffsetMode { Absolute, Relative }
 
-    // Indirect only: a reflection applied to what it copies, so one authored set can cut as a left-hand and
-    // a right-hand part without being drawn twice.
-    //
-    // Mirrored about the ANCHOR - the single source, or a group's first member (WorkOrderRules.GroupAnchor).
-    // The anchor stays put and everything else unfolds the other way from it, so the copy lands beside its
-    // original and the toolpath's own X/Y offset then moves the whole reflected set as one. MirrorX negates
-    // the X offsets, MirrorY the Y offsets.
-    //
-    // Not every geometry can be reflected. A Line's direction and a pattern's layout mirror exactly (see
-    // WorkOrderRules.Mirrored), but Text and SVG would need their outlines reflected through the carve
-    // pipeline - and mirrored lettering is never what anyone means - so Validate refuses those instead of
-    // cutting something that looks nearly right.
-    public enum WorkOrderTransform { None, MirrorX, MirrorY }
-
     // Repeats a whole toolpath - geometry AND every operation on it - at a set of offsets.
     public enum WorkOrderPatternKind { None, Grid, Circular }
 
@@ -250,10 +236,6 @@ namespace CNC.Controls
         // Relative, and a caller that reads them as one gets the right answer only while the mode happens to
         // be Absolute - which is exactly the kind of agreement that holds until someone changes a setting.
         public WorkOrderOffsetMode OffsetMode = WorkOrderOffsetMode.Absolute;
-
-        // Indirect only - see WorkOrderTransform. Applied by WorkOrderRules.Expand, so the preview and the
-        // compiler get the reflection from the same place rather than each applying their own.
-        public WorkOrderTransform Transform = WorkOrderTransform.None;
 
         // Dimensions - which of these matter depends on Geometry.
         public double Length = 50d;      // Line
@@ -1035,90 +1017,15 @@ namespace CNC.Controls
             // A single-toolpath source is the same arithmetic with one member: its own offset from itself is
             // zero, so it lands exactly on `at`. Worth not special-casing - two branches computing a
             // position is how they end up disagreeing.
-            // A mirror reflects the offsets from the anchor, so the anchor itself stays put and everything
-            // else unfolds the other way from it - and each member's own geometry turns over with it (see
-            // Mirrored). Both halves come from here so the preview and the compiler read one reflection
-            // rather than each computing their own.
-            double sx = tp.Transform == WorkOrderTransform.MirrorX ? -1d : 1d;
-            double sy = tp.Transform == WorkOrderTransform.MirrorY ? -1d : 1d;
-
             double ox = borrowed[0].CenterX, oy = borrowed[0].CenterY;
             foreach (var m in borrowed)
             {
                 if (IsHeldBack(tp, m))
                     continue;
-                placed.Add(new WorkOrderPlacement
-                {
-                    Geometry = Mirrored(m, tp.Transform),
-                    X = at[0] + sx * (m.CenterX - ox),
-                    Y = at[1] + sy * (m.CenterY - oy)
-                });
+                placed.Add(new WorkOrderPlacement { Geometry = m, X = at[0] + (m.CenterX - ox), Y = at[1] + (m.CenterY - oy) });
             }
 
             return placed;
-        }
-
-        // A reflected copy of `m` - the geometry a mirrored Indirect toolpath actually cuts.
-        //
-        // Reflecting the member's CENTER is not enough, which is the part that isn't obvious: a toolpath
-        // carries its own internal layout, and that has to turn over too. A 4-column grid anchored at its
-        // first hole still marches +X from a mirrored center unless the spacing is negated, so the copy
-        // comes out with its holes in different relative positions - a translation wearing a mirror's name.
-        //
-        //   Line      its direction: 180-a reflecting X, -a reflecting Y.
-        //   Grid      the spacing direction, so columns march the other way.
-        //   Circular  the sweep: reflect the start angle and reverse the span.
-        //
-        // Text and SVG are NOT handled and cannot be - their shape lives in outlines that would have to be
-        // reflected through the measuring and carving pipeline, and mirrored lettering is never the intent.
-        // WorkOrderRules.Validate refuses them rather than letting this return something plausible.
-        //
-        // Operations are shared, not copied: every consumer only reads them, and the compiler makes its own
-        // enabled copies for the shadow (WorkOrderCompiler.ResolveIndirect).
-        public static WorkOrderToolpath Mirrored(WorkOrderToolpath m, WorkOrderTransform transform)
-        {
-            if (transform == WorkOrderTransform.None)
-                return m;
-
-            bool mx = transform == WorkOrderTransform.MirrorX;
-
-            var g = CopyFields(m, new WorkOrderToolpath());
-            g.Name = m.Name;                // [NoClone] holds it back, and callers name sections from it
-            g.Operations = m.Operations;
-
-            g.Angle = mx ? 180d - m.Angle : -m.Angle;
-
-            if (mx)
-                g.ColumnSpacing = -m.ColumnSpacing;
-            else
-                g.RowSpacing = -m.RowSpacing;
-
-            g.PatternStartAngle = mx ? 180d - m.PatternStartAngle : -m.PatternStartAngle;
-            g.PatternArcSpan = -m.PatternArcSpan;
-
-            return g;
-        }
-
-        // Whether a geometry survives being reflected - see Mirrored. Everything whose shape is defined by
-        // dimensions and angles does; the two whose shape is an OUTLINE do not.
-        public static bool CanMirror(WorkOrderToolpath tp)
-        {
-            return tp.Geometry != WorkOrderGeometryKind.Text
-                && tp.Geometry != WorkOrderGeometryKind.Svg
-                && !tp.HasText;
-        }
-
-        public static readonly WorkOrderTransform[] AllTransforms =
-            { WorkOrderTransform.None, WorkOrderTransform.MirrorX, WorkOrderTransform.MirrorY };
-
-        public static string TransformLabel(WorkOrderTransform t)
-        {
-            switch (t)
-            {
-                case WorkOrderTransform.MirrorX: return "Mirror in X (left-right)";
-                case WorkOrderTransform.MirrorY: return "Mirror in Y (front-back)";
-                default: return "None";
-            }
         }
 
         // Everything an Indirect toolpath borrows, held back or not, in order.
@@ -1402,19 +1309,6 @@ namespace CNC.Controls
                         warnings.Add(string.Format("{0}source \"{1}\" no longer exists - the toolpath or group was renamed, removed, or emptied.", label, tp.IndirectSource));
                     else if (borrowed.Sum(b => b.Operations.Count) == 0)
                         warnings.Add(string.Format("{0}source \"{1}\" has no operations of its own yet.", label, tp.IndirectSource));
-
-                    // A mirror reflects dimensions and angles (WorkOrderRules.Mirrored). It cannot reflect an
-                    // OUTLINE - artwork and lettering would have to be turned over through the measuring and
-                    // carving pipeline, and mirrored text is never what anyone means. Named rather than
-                    // silently passed through unreflected, which would cut a copy that looks nearly right
-                    // and is not a mirror at all.
-                    if (tp.Transform != WorkOrderTransform.None)
-                    {
-                        var unmirrorable = borrowed.Where(b => !CanMirror(b)).Select(b => b.Name).ToList();
-                        if (unmirrorable.Count > 0)
-                            warnings.Add(string.Format("{0}can't mirror {1} - artwork and lettering can't be reflected. Hold {2} back in this copy, or drop the mirror.",
-                                label, string.Join(", ", unmirrorable), unmirrorable.Count == 1 ? "it" : "them"));
-                    }
                     continue;
                 }
 
