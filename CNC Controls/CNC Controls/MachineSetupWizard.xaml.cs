@@ -807,6 +807,16 @@ namespace CNC.Controls
             foreach (var axis in Setup.Axes)
             {
                 double stored = GrblSettings.GetDouble(GrblSetting.MaxTravelBase + axis.Index);
+
+                // Say so when the controller's travel does not come back. The page shows 0 in that case,
+                // which looks exactly like a machine configured with no travel - and the operator cannot
+                // tell the two apart from the table. Logged with the axis index and the setting id actually
+                // asked for, because a wrong index would produce the same empty answer as a missing value.
+                if (!(stored > 0d))
+                    CNC.Core.DebugLog.Write("setup", string.Format(
+                        "axis {0} (index {1}): ${2} read back as '{3}' - travel shown as 0 and NOT written by Apply",
+                        axis.Letter, axis.Index, (int)(GrblSetting.MaxTravelBase + axis.Index), stored));
+
                 axis.MaxTravel = stored > 0d ? stored : 0d;   // table value IS $13x (max travel); no pull-off fudge
                 double rate = GrblSettings.GetDouble(GrblSetting.MaxFeedRateBase + axis.Index);
                 axis.MaxRate = rate > 0d ? rate : axis.DefaultMaxRate;   // keep an existing rate, else a stepper-friendly default
@@ -1085,9 +1095,18 @@ namespace CNC.Controls
             // round-trip compounded across re-applies and silently shrank $13x (e.g. 120 -> 110 -> 100).
             foreach (var axis in Setup.Axes)
             {
-                double stored = Math.Max(0d, axis.MaxTravel);
-                targets[GrblSetting.MaxTravelBase + axis.Index] = stored.ToInvariantString();
-                targets[GrblSetting.MaxFeedRateBase + axis.Index] = axis.MaxRate.ToInvariantString();
+                // Only write travel when it is KNOWN, exactly as steps/mm below already did. 0 is not a
+                // travel, it is the absence of one: LoadCurrentSettingsCore stores 0 whenever $13x reads
+                // back non-positive, so an unloaded/unavailable setting was indistinguishable from a real
+                // value here and Apply would write $130=0 $131=0 $132=0 - a machine with soft limits enabled
+                // and a zero envelope, where every move is out of bounds.
+                //
+                // Found 2026-08-19 with the Axis table displaying zeros while the controller held 860/840/135;
+                // the guard was already three lines below for steps/mm and had simply never been extended up.
+                if (axis.MaxTravel > 0d)
+                    targets[GrblSetting.MaxTravelBase + axis.Index] = axis.MaxTravel.ToInvariantString();
+                if (axis.MaxRate > 0d)      // same reasoning - a zero max rate is not a rate either
+                    targets[GrblSetting.MaxFeedRateBase + axis.Index] = axis.MaxRate.ToInvariantString();
                 if (axis.StepsPerMm > 0d)   // only write steps/mm when known (current value or a preset) - never clobber with 0
                     targets[GrblSetting.TravelResolutionBase + axis.Index] = axis.StepsPerMm.ToInvariantString();
             }
