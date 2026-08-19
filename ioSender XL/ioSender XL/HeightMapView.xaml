@@ -99,14 +99,13 @@
                 <TextBlock x:Name="txtNoProbe" Foreground="#C0392B" TextWrapping="Wrap" Visibility="Collapsed"
                            Text="No probe defined. Add a 3D probe, touch plate or edge finder in Machine Setup Wizard &gt; Probe definitions."/>
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <Button x:Uid="hm_start" Content="Start" MinWidth="70" MinHeight="26" Click="Start_Click"
+                    <Button x:Uid="hm_start" x:Name="btnStart" Content="Start" MinWidth="70" MinHeight="26" Click="Start_Click"
                             Style="{StaticResource PrimaryButtonStyle}"
-                            IsEnabled="{Binding IsJobRunning, Converter={StaticResource IsNotRunning}}"
                             ToolTip="Start probing the height map grid."/>
                     <Button x:Uid="hm_continue" x:Name="btnContinue" Content="Continue" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Continue_Click" IsEnabled="False"
                             ToolTip="Resume a run that is holding for the touch plate to be moved. Cycle Start does the same thing."/>
-                    <Button x:Uid="hm_stop" Content="Stop" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Stop_Click"
-                            IsEnabled="{Binding IsJobRunning}"
+                    <Button x:Uid="hm_stop" x:Name="btnStop" Content="Stop" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Stop_Click"
+                            IsEnabled="False"
                             ToolTip="Cancel the height map probing in progress."/>
                     <Button x:Uid="hm_apply" Content="Apply" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Apply_Click"
                             IsEnabled="{Binding HeightMap.CanApply, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"

@@ -163,7 +163,14 @@ namespace GCode_Sender
                 RefreshProbes();
                 DefaultArea();
                 RefreshPreview();
+                if (primaryStyle == null)
+                {
+                    primaryStyle = btnStart.Style;     // PrimaryButtonStyle, from the XAML
+                    plainStyle = btnContinue.Style;    // an ordinary button in this same bar
+                }
+
                 UpdateAreaModeUi();
+                UpdateRunUi();
                 UpdateWarnings();
             }
         }
@@ -209,11 +216,7 @@ namespace GCode_Sender
                     if (e.PropertyName != nameof(ProbingViewModel.IsPaused))
                         return;
                     // Property changes arrive off the engine's own pump, not necessarily the UI thread.
-                    Dispatcher.BeginInvoke(new System.Action(() =>
-                    {
-                        if (btnContinue != null)
-                            btnContinue.IsEnabled = probing.IsPaused;
-                    }));
+                    Dispatcher.BeginInvoke(new System.Action(() => UpdateRunUi()));
                 };
             }
             return probing;
@@ -309,8 +312,51 @@ namespace GCode_Sender
         // for these transient messages; the keys are added alongside in LibStrings.xaml.
         private static string Loc(string key) => CNC.Controls.LibStrings.FindResource(key).Replace("\\n", "\n");
 
+        // True for the WHOLE of a run, not just the engine's part of it.
+        //
+        // Start was bound to IsJobRunning, which the probing engine only sets once it begins executing - so
+        // through the seconds of setup before that (writing the work origin, parking at machine Z0,
+        // traversing to the first point) the button stayed live and a second press would have started a
+        // second run on top of the first. Stop was bound to the same flag, so it was dead over exactly that
+        // window - which is when the machine is making its longest unattended moves and Stop is most wanted.
+        private bool runActive = false;
+
+        // Captured once from the buttons themselves. plainStyle is whatever a button in this bar looks like
+        // WITHOUT the primary treatment - an implicit style, not necessarily null - so swapping back cannot
+        // strip styling the theme applied.
+        private Style primaryStyle, plainStyle;
+
+        /// <summary>Put the run bar in the state the run is actually in.</summary>
+        private void UpdateRunUi()
+        {
+            if (btnStart == null)
+                return;
+
+            bool busy = runActive || (model != null && model.IsJobRunning);
+            bool holding = busy && probing != null && probing.IsPaused;
+
+            btnStart.IsEnabled = !busy;
+            btnStop.IsEnabled = busy;
+            btnContinue.IsEnabled = holding;
+
+            // The blue button is whichever one the operator is meant to press next. Idle, that is Start;
+            // holding for the plate to be moved, it is Continue - the one moment in the run where the machine
+            // is waiting on a person, and it should be obvious which button ends the wait.
+            if (primaryStyle != null)
+            {
+                btnStart.Style = holding ? plainStyle : primaryStyle;
+                btnContinue.Style = holding ? primaryStyle : plainStyle;
+            }
+        }
+
         private void Start_Click(object sender, RoutedEventArgs e)
         {
+            if (runActive)
+                return;   // a second Start must not stack a run on top of the one already going
+
+            runActive = true;
+            UpdateRunUi();
+
             try
             {
                 StartProbing();
@@ -318,6 +364,13 @@ namespace GCode_Sender
             catch (Exception ex)
             {
                 AppDialogs.Show(Loc("HmStartError") + "\r\n\r\n" + ex.Message, "Height map", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                // In a finally so an early return, a cancelled run and a thrown exception all leave the bar
+                // usable again. A Start button stuck disabled is its own kind of hang.
+                runActive = false;
+                UpdateRunUi();
             }
         }
 
