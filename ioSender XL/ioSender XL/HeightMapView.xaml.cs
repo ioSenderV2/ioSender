@@ -536,6 +536,21 @@ namespace GCode_Sender
 
         // ---- full work surface: origin handling ----
 
+        /// <summary>
+        /// Whether the active work offset already places X0 Y0 at the given machine position.
+        ///
+        /// Compared to the tolerance the offset is WRITTEN at (3 decimals), not to an exact double equality:
+        /// the value makes a round trip through g-code text and back through the status report, so the bits
+        /// that come home are not the bits that went out.
+        /// </summary>
+        private bool OriginMatches(double ox, double oy)
+        {
+            if (model == null)
+                return false;
+            return Math.Abs(model.WorkPositionOffset.X - ox) < 0.001d &&
+                   Math.Abs(model.WorkPositionOffset.Y - oy) < 0.001d;
+        }
+
         /// <summary>The WCS the controller currently has active, e.g. "G54"; G54 if it has not reported one.</summary>
         private string ActiveWcs()
         {
@@ -585,15 +600,32 @@ namespace GCode_Sender
                     "Height map", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
                 return false;
 
+            // Whether the origin is ALREADY where this run wants it - which it is on every run after the
+            // first, and which decides whether there is anything to wait for below.
+            bool already = OriginMatches(ox, oy);
+
             model.ExecuteCommand(string.Format(CultureInfo.InvariantCulture, "G10L2P{0}X{1:0.###}Y{2:0.###}", ActiveWcsP(), ox, oy));
 
             // The offset has to be in effect before the area below is read in the new frame - a grid computed
             // against the OLD offset would be placed off the table by however far the origin just moved.
+            //
+            // Wait only when the value is actually going to CHANGE. OnWCOUpdated fires on change, not on
+            // write, so re-writing an origin that already holds the wanted value produces no event at all -
+            // and waiting for one then failed the whole run after a four second pause, on the very case
+            // where nothing was wrong (2026-08-19: WCO 7.000,-780.000 written again as 7,-780).
             var pr = EnsureProbing();
-            if (pr != null && !pr.WaitForWcoUpdate())
+            if (!already && pr != null)
+                pr.WaitForWcoUpdate();
+
+            // Then gate on the VALUE, never on the event. This is the question actually being asked - "is
+            // the origin where I need it" - and it answers correctly whether the write changed anything,
+            // changed it before the wait was armed, or had nothing to change.
+            if (!OriginMatches(ox, oy))
             {
-                AppDialogs.Show("The controller did not report the new work offset, so the probe area cannot be trusted. Nothing has been probed.",
-                                "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(string.Format(CultureInfo.InvariantCulture,
+                        "The work origin did not take: {0} still reads X{1:0.###} Y{2:0.###}, not X{3:0.###} Y{4:0.###}. Nothing has been probed.",
+                        wcs, model.WorkPositionOffset.X, model.WorkPositionOffset.Y, ox, oy),
+                        "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return false;
             }
 
