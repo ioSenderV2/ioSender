@@ -55,7 +55,10 @@
 ;                       and 10 was not enough on real hardware 2026-08-16: the reference sat ~7 mm inside the
 ;                       true face, leaving the Y-face start with ~4 mm of actual air instead of the intended
 ;                       11. A caller may ask for MORE; it cannot ask for less. A caller that omits it gets 0
-;                       from grblHAL and is then floored to 20 like everyone else.
+;                       and is then floored to 20 like everyone else - but that 0 comes from the EXISTS[]
+;                       guard at the top of the SUB, NOT from grblHAL. This note used to say "gets 0 from
+;                       grblHAL", which is simply untrue: an unset named parameter is error:2, exactly as
+;                       the #<_ls_topmargin> note below says. Do not remove that guard.
 ; The retreat clearance above a probed corner top (#<_safe_z> below) is a hardcoded 5 mm. It was 20, which
 ; is far more than any real spoilboard/stock variance - on a T-slot extrusion bed even 5 mm would take some
 ; doing - so 20 just spent Z travel on every retreat. A caller with a genuinely known safe height passes
@@ -105,6 +108,33 @@
 ;   outside the faces.
 
 O<pcorner> SUB
+  ; --- OPTIONAL globals, defaulted BEFORE anything below reads them ---
+  ; grblHAL does NOT hand back 0 for a named parameter no caller has set. The lookup fails and the
+  ; parser turns that into Status_BadNumberFormat, which arrives as "error:2 in named sub
+  ; pcorner.macro" and aborts the run part-way into a probe. Every global in the header above marked
+  ; "0 (default)" therefore has to be defaulted HERE; documenting a default does not create one.
+  ;
+  ; This is the failure this file's own #<_ls_topmargin> note has warned about since 2026-08-02.
+  ; #<_ls_inside>/#<_ls_faces> were added afterwards as plain unguarded reads, and only ONE of the
+  ; four callers in the app sets them - so Fixture "Test position" and the stepper calibration wizard
+  ; both aborted here on real hardware (2026-08-19), while Start Job worked and hid it.
+  ;
+  ; Guarded in the macro rather than fixed at the call sites on purpose: the default belongs with the
+  ; macro that defines what the parameter MEANS, and a fifth caller cannot forget what it never has
+  ; to remember. Same shape as tc.macro's o199 guard for #<_tlo_ref>.
+  o5 IF [EXISTS[#<_ls_inside>]]
+  o5 ELSE
+    #<_ls_inside> = 0
+  o5 ENDIF
+  o6 IF [EXISTS[#<_ls_faces>]]
+  o6 ELSE
+    #<_ls_faces> = 0
+  o6 ENDIF
+  o7 IF [EXISTS[#<_ls_edgemargin>]]
+  o7 ELSE
+    #<_ls_edgemargin> = 0
+  o7 ENDIF
+
   #<rad>    = #1                 ; tip radius = the single CALL arg; rest via globals
   #<corner> = #<_ls_corner>
   #<rx>     = #<_ls_refx>
