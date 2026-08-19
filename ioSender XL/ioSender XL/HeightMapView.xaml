@@ -169,7 +169,11 @@
                 </StackPanel>
             </GroupBox>
 
-            <GroupBox x:Uid="hm_grpView" Header="Surface" Grid.Row="1">
+            <!-- Surface and Program share this space rather than the program borrowing MainWindow's
+                 overlay: this view is menu-hostable, and when it opens in its own ViewHostWindow that
+                 overlay renders on the main window, behind the window the operator is actually looking at. -->
+            <TabControl x:Name="tabView" Grid.Row="1">
+            <TabItem x:Uid="hm_tabSurface" Header="Surface">
             <helix:HelixViewport3D x:Name="viewport" ZoomExtentsWhenLoaded="True"
                                    RotateAroundMouseDownPoint="True" ZoomAroundMouseDownPoint="True">
                 <helix:HelixViewport3D.Camera>
@@ -199,7 +203,12 @@
                 <helix:LinesVisual3D Thickness="1" Color="Lime" Points="{Binding HeightMap.BoundaryPoints, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
                 <helix:PointsVisual3D Size="4" Color="Red" Points="{Binding HeightMap.MapPoints, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
             </helix:HelixViewport3D>
-            </GroupBox>
+            </TabItem>
+            <TabItem x:Uid="hm_tabProgram" x:Name="tabProgram" Header="Program"
+                     ToolTip="The probing program this run will send, listed before it moves anything. Rebuilt each time Start is pressed.">
+                <ContentControl x:Name="programHost"/>
+            </TabItem>
+            </TabControl>
         </Grid>
     </Grid>
 </UserControl>

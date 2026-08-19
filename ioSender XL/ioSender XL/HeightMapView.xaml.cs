@@ -166,9 +166,6 @@ namespace GCode_Sender
 
         public void Activate(bool activate, ViewType chgMode)
         {
-            if (!activate)
-                programView?.Disconnect();   // the active program follows the focused tab, as Start Job's does
-
             if (activate)
             {
                 if (model == null)
@@ -623,8 +620,7 @@ namespace GCode_Sender
             // The listing is a RENDERING, not the literal program: the engine's own markers are not g-code
             // and would be dropped or mangled by the viewer's parser, and a preview that quietly omits lines
             // is worse than none. See PreviewText.
-            MacroProcessor.PublishGenerated("Height map", PreviewText(pr.Program.ToString()),
-                                            EnsureProgramView, () => programView);
+            ShowProgram(PreviewText(pr.Program.ToString()));
 
             // The whole program, numbered, before a byte of it goes out.
             //
@@ -699,13 +695,32 @@ namespace GCode_Sender
                 machineZ - firstZ);
         }
 
-        // Its own program view, created on first use, exactly as Start Job keeps one for "Setup".
+        // Hosted in this page's own Program tab, NOT through MacroProcessor.PublishGenerated.
+        //
+        // PublishGenerated routes to MainWindow's overlay, which is right for a tab that lives in the main
+        // window and wrong for this one: Height Map is menu-hostable, and when it opens in its own
+        // ViewHostWindow the overlay renders on the main window - behind the window being looked at. The
+        // program was published correctly and simply could not be seen (2026-08-19).
+        //
+        // AutoShow off for the same reason: nothing here should try to pop the main window's overlay.
         private CNC.Controls.ProgramView programView;
 
-        private void EnsureProgramView()
+        private void ShowProgram(string text)
         {
+            if (programHost == null)
+                return;
+
             if (programView == null)
-                programView = new CNC.Controls.ProgramView { Title = "Height map" };
+            {
+                programView = new CNC.Controls.ProgramView { Title = "Height map", AutoShow = false };
+                programHost.Content = programView;
+            }
+
+            programView.SetProgramText(text);
+
+            // Keep a generated copy alongside the other tabs' programs. Worth having on its own: a probing
+            // run that drives the length of the Z axis should leave a record of exactly what it sent.
+            CNC.Core.MacroRunner.SaveGeneratedCopy("Height map", text);
         }
 
         /// <summary>
