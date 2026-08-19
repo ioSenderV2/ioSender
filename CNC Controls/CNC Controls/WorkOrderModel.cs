@@ -1,4 +1,4 @@
-/*
+﻿/*
  * WorkOrderModel.cs - part of CNC Controls library
  *
  * Odd Jobs "Work Order" data model. The unit of work is a TOOLPATH: a named piece of geometry (one of the
@@ -210,6 +210,18 @@ namespace CNC.Controls
         // as scratch space and restoring the Work Order's own WCS afterward - see WorkOrderCompiler.BuildSurface.
         // WorkOrderRules.Validate warns if this isn't the work order's only enabled operation.
         public bool EntireSpoilboard = false;
+
+        // Entire Spoilboard only: trust the work origin that is already set instead of establishing a fresh
+        // one. The default (false) keeps the self-contained behaviour - park machine-referenced, jog-to-touch
+        // a new Z0, borrow a scratch WCS - which is right when nothing is set up.
+        //
+        // Set it when the Height Map tab's "Full work surface" has just run: that plants X0 Y0 on the table
+        // corner and Z0 on the HIGHEST point probed across the board, which is a strictly better reference
+        // than one eyeballed touch at one spot - a single touch cannot tell you whether you touched a high
+        // spot or a low one, and that is exactly what decides whether the first pass cuts air.
+        //
+        // The two must not both happen: the touch-off would overwrite the mapped Z0 with a worse number.
+        public bool UseExistingOrigin = false;
 
         // Unchecked = the whole toolpath sits out of Generate, whatever its operations are set to. Their own
         // Enabled flags are left alone so re-checking the toolpath restores exactly what was set before.

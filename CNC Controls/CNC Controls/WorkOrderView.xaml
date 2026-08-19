@@ -203,9 +203,11 @@
                         </StackPanel>
 
                         <!-- Surface only - see WorkOrderToolpath.EntireSpoilboard's own comment. -->
-                        <StackPanel x:Name="pnlEntireSpoilboard" Orientation="Horizontal" Margin="0,0,0,6">
+                        <StackPanel x:Name="pnlEntireSpoilboard" Margin="0,0,0,6">
                             <CheckBox x:Uid="chk_woentirespoilboard" x:Name="chkEntireSpoilboard" Content="Entire spoilboard" VerticalAlignment="Center" Click="chkEntireSpoilboard_Click"
                                       ToolTip="Face the whole in-bounds machine travel, ignoring this toolpath's Width/Depth/X/Y above. Machine-referenced (no WCS to set it from) - touches off its own Z0 by jogging to the surface, and must be the only enabled operation in this work order."/>
+                            <CheckBox x:Uid="chk_wospoilexistingorigin" x:Name="chkSpoilExistingOrigin" Content="Use the work origin already set" Margin="18,4,0,0" VerticalAlignment="Center" IsEnabled="{Binding IsChecked, ElementName=chkEntireSpoilboard}" Click="chkSpoilExistingOrigin_Click"
+                                      ToolTip="Skip the park and jog-to-touch, and cut on the origin that is already set. Tick this after the Height Map tab's Full work surface has run: it puts X0 Y0 on the table corner and Z0 on the highest point it probed, which beats a single eyeballed touch - one touch cannot tell you whether you hit a high spot or a low one."/>
                         </StackPanel>
 
                         <!-- Pattern: repeats this toolpath - geometry AND all its operations - at each instance

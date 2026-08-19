@@ -1,4 +1,4 @@
-/*
+﻿/*
  * WorkOrderView.xaml.cs - part of CNC Controls library
  *
  * Odd Jobs "Work Order": the single composer tab that replaced the five fixed job wizards (Surface Stock,
@@ -970,6 +970,7 @@ namespace CNC.Controls
             chkFontBold.IsChecked = tp.FontBold; chkFontItalic.IsChecked = tp.FontItalic;
             UpdateFontStyleEnabled();
             chkEntireSpoilboard.IsChecked = tp.EntireSpoilboard;
+            chkSpoilExistingOrigin.IsChecked = tp.UseExistingOrigin;
 
             // Only the dimensions this geometry actually has. Indirect has none of its own - it borrows
             // whatever the source toolpath has.
@@ -1620,6 +1621,14 @@ namespace CNC.Controls
                 return;
             selectedOp.Through = chkThrough.IsChecked == true;
             LoadFields();
+            OnWorkOrderChanged();
+        }
+
+        private void chkSpoilExistingOrigin_Click(object sender, RoutedEventArgs e)
+        {
+            if (loadingFields || selectedToolpath == null)
+                return;
+            selectedToolpath.UseExistingOrigin = chkSpoilExistingOrigin.IsChecked == true;
             OnWorkOrderChanged();
         }
 

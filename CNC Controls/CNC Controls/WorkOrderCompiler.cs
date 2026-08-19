@@ -1,4 +1,4 @@
-/*
+﻿/*
  * WorkOrderCompiler.cs - part of CNC Controls library
  *
  * Compiles an Odd Jobs WorkOrder (toolpaths -> operations, see WorkOrderModel.cs) into ONE merged g-code
@@ -1356,7 +1356,7 @@ namespace CNC.Controls
         // the work order's own real one, WorkOrderWcs) to hold that touch-off, then restores the real one
         // before returning, since WorkOrderRules.Validate only WARNS this must be the sole enabled operation
         // rather than enforcing it structurally.
-        private static List<string> BuildSurfaceEntireSpoilboard(WorkOrderOperation op)
+        private static List<string> BuildSurfaceEntireSpoilboard(WorkOrderToolpath tp, WorkOrderOperation op)
         {
             var lines = new List<string>();
             double stepover = Math.Max(0.5d, op.BitDiameter * (op.Stepover / 100d));
@@ -1369,6 +1369,38 @@ namespace CNC.Controls
             // G10 L2's P-number addresses a WCS by slot index (P1=G54 ... P6=G59), not by G-code - has to
             // track ScratchWcs()'s own choice of slot.
             int scratchP = ScratchWcs() == "G54" ? 1 : 2;
+
+            // Two ways in. With an origin already established - the Height Map tab's "Full work surface"
+            // sets X0 Y0 on the table corner and Z0 on the highest point it probed - there is nothing to
+            // find, and touching off again would only replace a measured reference with an eyeballed one.
+            // Without it, the operation stays self-contained: park machine-referenced, touch off, anchor a
+            // scratch WCS, exactly as the retired SurfaceSpoilboardWizard did.
+            if (tp != null && tp.UseExistingOrigin)
+            {
+                lines.Add("(surface - entire spoilboard, on the existing work origin)");
+                lines.Add(WorkOrderWcs());
+                lines.Add("G0 Z" + F(SafeZ()));
+                lines.Add("(WAITIDLE)");
+                lines.Add("(MBOX, OKCANCEL, About to surface the whole board using the work origin already set - X0 Y0 at the table corner, Z0 at the highest point mapped. Fit the dust boot and check the cutter is the one that was mapped, then click OK to start. Click Cancel to abort.)");
+                lines.Add("(WAITIDLE)");
+
+                int t0 = ToolNumberFor(op);
+                lines.Add("M6 T" + N(t0));
+                double r0 = Rpm(op);
+                if (r0 > 0d)
+                    lines.Add("S" + N(r0) + " M3");
+
+                var path0 = RasterPath(w, h, stepover);
+                lines.Add("G0 " + XY(path0[0]));
+                AppendPlunge(lines, z, 0d, op.PlungeFeed);
+                for (int i = 1; i < path0.Count; i++)
+                    lines.Add("G1 " + XY(path0[i]) + " F" + F(op.Feed));
+
+                lines.Add("G0 Z" + F(SafeZ()));
+                if (r0 > 0d)
+                    lines.Add("M5");
+                return lines;
+            }
 
             lines.Add("(surface - entire spoilboard, machine-referenced)");
             lines.Add("G53 G0 Z" + F(zTop));
@@ -1428,7 +1460,7 @@ namespace CNC.Controls
             // comment for why that order matters), not this generic wrapper's normal before-everything-else
             // placement.
             if (op.Kind == WorkOrderOpKind.Surface && tp.EntireSpoilboard)
-                return BuildSurfaceEntireSpoilboard(op);
+                return BuildSurfaceEntireSpoilboard(tp, op);
 
             AppendToolStart(lines, op, currentTool, spindleOn, currentRpm);
 
