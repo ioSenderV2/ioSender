@@ -166,6 +166,9 @@ namespace GCode_Sender
 
         public void Activate(bool activate, ViewType chgMode)
         {
+            if (!activate)
+                programView?.Disconnect();   // the active program follows the focused tab, as Start Job's does
+
             if (activate)
             {
                 if (model == null)
@@ -612,6 +615,17 @@ namespace GCode_Sender
                 dir *= -1d;
             }
 
+            // Publish the program so it can be READ before it moves anything - the Generate half of the
+            // Generate/Run idiom, without changing how it runs. Same seam Start Job publishes its "Setup"
+            // program through, so it lands in the same place, is saved as a generated copy alongside the
+            // others, and needs no hosting of its own here.
+            //
+            // The listing is a RENDERING, not the literal program: the engine's own markers are not g-code
+            // and would be dropped or mangled by the viewer's parser, and a preview that quietly omits lines
+            // is worse than none. See PreviewText.
+            MacroProcessor.PublishGenerated("Height map", PreviewText(pr.Program.ToString()),
+                                            EnsureProgramView, () => programView);
+
             // The whole program, numbered, before a byte of it goes out.
             //
             // Written after being unable to say from the logs WHICH step a stalled run was sitting on: the
@@ -683,6 +697,52 @@ namespace GCode_Sender
                 HeightMap.MinY + row * map.GridY,
                 machineZ - plateOff,
                 machineZ - firstZ);
+        }
+
+        // Its own program view, created on first use, exactly as Start Job keeps one for "Setup".
+        private CNC.Controls.ProgramView programView;
+
+        private void EnsureProgramView()
+        {
+            if (programView == null)
+                programView = new CNC.Controls.ProgramView { Title = "Height map" };
+        }
+
+        /// <summary>
+        /// Render the probing engine's program as readable g-code.
+        ///
+        /// Three of its lines are engine markers rather than g-code, and handing them to a g-code viewer
+        /// would get them dropped or misparsed - which in a PREVIEW is the worst possible failure, because
+        /// the operator reads it as "this is what will run":
+        ///
+        ///   "#text"   a status message      -&gt; shown as a comment
+        ///   "pause"   hold for the operator -&gt; shown as a comment naming what it waits for
+        ///   "!G0Z2"   a move whose captured position is discarded (the latch retract between the fast probe
+        ///             and the slow re-touch) -&gt; shown as the move, annotated
+        ///
+        /// Everything else passes through untouched, so what is listed is what is sent.
+        /// </summary>
+        private static string PreviewText(string program)
+        {
+            var sb = new System.Text.StringBuilder();
+
+            foreach (var raw in (program ?? string.Empty).Split(new[] { char.ConvertFromUtf32(10) }, StringSplitOptions.None))
+            {
+                string line = raw.TrimEnd();
+
+                if (line.Length == 0)
+                    continue;
+                else if (line.StartsWith("#"))
+                    sb.AppendLine("(" + line.Substring(1) + ")");
+                else if (line == "pause")
+                    sb.AppendLine("(HOLD - reposition the touch plate, then press Continue)");
+                else if (line.StartsWith("!"))
+                    sb.AppendLine(line.Substring(1) + " (retract between the fast probe and the slow re-touch)");
+                else
+                    sb.AppendLine(line);
+            }
+
+            return sb.ToString();
         }
 
         /// <summary>The WCS the controller currently has active, e.g. "G54"; G54 if it has not reported one.</summary>
