@@ -41,7 +41,20 @@ namespace GCode_Sender
         public AreaSource Area
         {
             get { return _area; }
-            set { if (value != _area) { _area = value; DefaultArea(); RefreshPreview(); UpdateAreaModeUi(); } }
+            set
+            {
+                if (value == _area)
+                    return;
+                _area = value;
+                // Full work surface is the movable-touch-plate case by default: the board cannot be probed
+                // without putting something conductive under the bit, so holding at each point is the norm
+                // rather than the exception. Set only on the transition, so an explicit untick survives.
+                if (_area == AreaSource.FullTravel)
+                    HeightMap.AddPause = true;
+                DefaultArea();
+                RefreshPreview();
+                UpdateAreaModeUi();
+            }
         }
 
         // ---- Full work surface: grid stated as DIVISIONS, not millimetres ----
@@ -149,7 +162,25 @@ namespace GCode_Sender
             if (model == null)
                 return null;
             if (probing == null)
+            {
                 probing = new ProbingViewModel(model);   // params come from the shared probe library now
+
+                // Light up Continue while the run is holding. The engine signals a hold by setting IsPaused
+                // and waits for it to be cleared (Cycle Start does the same); without something bound to it
+                // this view would hold with no way to resume from the app at all - the old Probing tab had a
+                // button for exactly this and the port here never brought one across.
+                probing.PropertyChanged += (s, e) =>
+                {
+                    if (e.PropertyName != nameof(ProbingViewModel.IsPaused))
+                        return;
+                    // Property changes arrive off the engine's own pump, not necessarily the UI thread.
+                    Dispatcher.BeginInvoke(new System.Action(() =>
+                    {
+                        if (btnContinue != null)
+                            btnContinue.IsEnabled = probing.IsPaused;
+                    }));
+                };
+            }
             return probing;
         }
 
@@ -395,6 +426,18 @@ namespace GCode_Sender
                 for (int y = 0; y < map.SizeY; y++)
                 {
                     pr.Program.AddMessage(string.Format("Probing point {0} of {1}...", ++point, points));
+
+                    // Hold before each point (never the first - the operator is already standing at it) so a
+                    // touch plate can be moved to the next spot. Without this the run rapids straight on and
+                    // probes bare board, which on a spoilboard means descending the full probe depth into
+                    // something that will never make contact.
+                    //
+                    // The mechanism is the Probing library's own: AddPause sets IsPaused and the run resumes
+                    // on Cycle Start. This view had never called it, so the whole movable-plate workflow was
+                    // unavailable here even though the engine and the view model property both existed.
+                    if (HeightMap.AddPause && point > 1)
+                        pr.Program.AddPause();
+
                     if (HeightMap.SettleDwell > 0d)
                         pr.Program.Add("G4P" + HeightMap.SettleDwell.ToInvariantString());   // let a fragile probe release/settle
                     pr.Program.AddProbingAction(AxisFlags.Z, true);
@@ -542,9 +585,21 @@ namespace GCode_Sender
                 ? "No Setup needed. The origin is set from the table: X0 Y0 at the corner before probing, Z0 at the highest point after."
                 : string.Empty;
 
+            if (stepsProgram != null)
+                stepsProgram.Visibility = full ? Visibility.Collapsed : Visibility.Visible;
+            if (stepsFullSurface != null)
+                stepsFullSurface.Visibility = full ? Visibility.Visible : Visibility.Collapsed;
+
             txtDivisionsNote.Text = full
                 ? string.Format("{0} probes ({1} x {2} points across the table).", DivisionsX * DivisionsY, DivisionsX, DivisionsY)
                 : string.Empty;
+        }
+
+        /// <summary>Release a hold between probe points - the operator has moved the touch plate.</summary>
+        private void Continue_Click(object sender, RoutedEventArgs e)
+        {
+            if (probing != null && probing.IsPaused)
+                probing.IsPaused = false;   // the engine resumes on the property changing, not on a command
         }
 
         private void Stop_Click(object sender, RoutedEventArgs e)

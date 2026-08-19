@@ -76,6 +76,9 @@
                                     <cnccontrols:NumericField x:Uid="hm_divY" Label="Y:" ColonAt="20" Format="##0" Margin="8,0,0,0"
                                         Value="{Binding DivisionsY, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                                 </StackPanel>
+                                <CheckBox x:Uid="hm_pauseEachPoint" x:Name="chkPauseEachPoint" Content="Hold at each point (move the touch plate)" Margin="0,6,0,0"
+                                          IsChecked="{Binding HeightMap.AddPause, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"
+                                          ToolTip="Pause before every point after the first so the touch plate can be moved to the next spot. Press Cycle Start to continue. Untick only if the probe reaches the board on its own - a spoilboard is not conductive, so a plate normally has to travel with the probe."/>
                                 <TextBlock x:Name="txtDivisionsNote" Foreground="#586069" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
                             </StackPanel>
                             <StackPanel x:Name="pnlGridMm" Orientation="Horizontal">
@@ -113,6 +116,8 @@
                             Style="{StaticResource PrimaryButtonStyle}"
                             IsEnabled="{Binding IsJobRunning, Converter={StaticResource IsNotRunning}}"
                             ToolTip="Start probing the height map grid."/>
+                    <Button x:Uid="hm_continue" x:Name="btnContinue" Content="Continue" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Continue_Click" IsEnabled="False"
+                            ToolTip="Resume a run that is holding for the touch plate to be moved. Cycle Start does the same thing."/>
                     <Button x:Uid="hm_stop" Content="Stop" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Stop_Click"
                             IsEnabled="{Binding IsJobRunning}"
                             ToolTip="Cancel the height map probing in progress."/>
@@ -135,7 +140,8 @@
             </Grid.RowDefinitions>
 
             <GroupBox x:Uid="hm_grpSteps" Header="Steps" Grid.Row="0" Margin="0,0,0,8">
-                <TextBlock x:Uid="hm_steps" Margin="8" TextWrapping="Wrap" LineHeight="18">
+                <StackPanel>
+                <TextBlock x:Uid="hm_steps" x:Name="stepsProgram" Margin="8" TextWrapping="Wrap" LineHeight="18">
                     <Run FontWeight="Bold" Text="1. Set the work origin on the stock."/>
                     <Run Text=" Probing happens in the current work coordinates, so jog to the stock corner and zero X/Y (the Setup tab can do this). The area below is in those work coordinates, so this is how it knows where the stock is."/>
                     <LineBreak/>
@@ -151,6 +157,30 @@
                     <Run FontWeight="Bold" Text="5. Apply / Save."/>
                     <Run Text=" Apply rewrites the loaded program to follow the surface. Save stores the map (.map) to reuse later (Load)."/>
                 </TextBlock>
+
+                <!-- Full work surface has a different shape end to end: nothing to set up first, and the
+                     operator is part of the loop at every point. Shown INSTEAD of the steps above rather
+                     than bolted onto them, because almost every line of those would have to be contradicted. -->
+                <TextBlock x:Uid="hm_stepsFull" x:Name="stepsFullSurface" Margin="8" TextWrapping="Wrap" LineHeight="18" Visibility="Collapsed">
+                    <Run FontWeight="Bold" Text="Surfacing the whole spoilboard - no origin to set."/>
+                    <Run Text=" This mode sets the work origin itself, so there is no Setup pass and no corner to probe: X0 Y0 is placed on the table corner before probing starts, and Z0 on the highest point found once it finishes."/>
+                    <LineBreak/>
+                    <Run FontWeight="Bold" Text="1. Fit the cutter you will surface with."/>
+                    <Run Text=" The map is measured through whatever is in the spindle, so measuring with one tool and cutting with another throws the whole reference out by the difference between them."/>
+                    <LineBreak/>
+                    <Run FontWeight="Bold" Text="2. Choose the divisions."/>
+                    <Run Text=" Points per axis across the whole table - 4 x 4 is 16 probes, which is plenty to find the high and low spots of a gently-dished board. Every extra division costs you probes, and you are placing the plate for each one by hand."/>
+                    <LineBreak/>
+                    <Run FontWeight="Bold" Text="3. Have the touch plate ready."/>
+                    <Run Text=" MDF will not close a circuit, so the plate has to travel with the probe. The machine positions over each point and holds; put the plate under the bit, press Continue (or Cycle Start), and it probes Z and moves on. It holds before every point except the first, where you are already standing."/>
+                    <LineBreak/>
+                    <Run FontWeight="Bold" Text="4. Jog Z to a safe clearance, then Start."/>
+                    <Run Text=" The probe descends from wherever Z is parked and retracts back to it between points, so park a few mm above the plate. Probe depth must cover that clearance plus how much the board varies. Stop cancels."/>
+                    <LineBreak/>
+                    <Run FontWeight="Bold" Text="5. Then surface."/>
+                    <Run Text=" It reports the highest and lowest points and sets Z0 to the highest. In Work Order's Surface operation tick 'Entire spoilboard' and 'Use the work origin already set', give it a depth, and run - the range it reported is how deep you must go to clean up the whole board rather than only the high spots."/>
+                </TextBlock>
+                </StackPanel>
             </GroupBox>
 
             <GroupBox x:Uid="hm_grpView" Header="Surface" Grid.Row="1">
