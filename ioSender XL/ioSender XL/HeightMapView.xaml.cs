@@ -103,6 +103,18 @@ namespace GCode_Sender
         private const double PlateClearance = 15d;
 
         /// <summary>
+        /// How much LOWER than the previous point the next one is allowed to be and still be found.
+        ///
+        /// After the first probe the surface height is known, so every later probe only has to cover the lift
+        /// off the last point plus however much the board falls away between the two. Using the probe
+        /// definition's full search distance instead is both pointless and dangerous: from a start already
+        /// most of the way down the Z axis, a 50mm search targets a depth past the soft limit and alarms
+        /// before it moves (2026-08-19, G38.3 Z-50 from Z-81.8 targeting -131.8 against a floor near -129 -
+        /// travel less the homing pull-off, which grblHAL reserves).
+        /// </summary>
+        private const double BoardVariation = 10d;
+
+        /// <summary>
         /// Thickness to take off every probed Z, in mm.
         ///
         /// A touch plate triggers at its OWN top face, so the board is one plate-thickness below where the
@@ -553,7 +565,10 @@ namespace GCode_Sender
                     // after the fact, and "which point was it on" is the first question every failure asks.
                     double tx = HeightMap.MinX + x * map.GridX;
                     double ty = HeightMap.MinY + (dir > 0d ? y : map.SizeY - 1 - y) * map.GridY;
-                    double thisSearch = point == 1 ? searchZ : probeDrop;
+                    // The first point searches from the top of travel because nothing knows where the board
+                    // is; every later one starts a known 15mm above it and needs only that plus the board's
+                    // fall-away. Capped by the probe's own search distance, never exceeding it.
+                    double thisSearch = point == 1 ? searchZ : Math.Min(probeDrop, hover + BoardVariation);
 
                     pr.Program.AddMessage(string.Format(CultureInfo.InvariantCulture,
                         "Probing point {0} of {1} at X{2:0.###} Y{3:0.###}, searching {4:0.###} mm down...",
