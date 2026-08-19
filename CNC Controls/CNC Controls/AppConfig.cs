@@ -110,10 +110,8 @@ namespace CNC.Controls
     public class ProbeConfig : ViewModelBase
     {
         private bool _CheckProbeStatus = true;
-        private bool _ValidateProbeConnected = false;
 
         public bool CheckProbeStatus { get { return _CheckProbeStatus; } set { _CheckProbeStatus = value; OnPropertyChanged(); } }
-        public bool ValidateProbeConnected { get { return _ValidateProbeConnected; } set { _ValidateProbeConnected = value; OnPropertyChanged(); } }
     }
 
     [Serializable]

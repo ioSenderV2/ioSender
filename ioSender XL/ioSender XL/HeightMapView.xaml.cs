@@ -391,11 +391,6 @@ namespace GCode_Sender
                     "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
-            if (!pr.VerifyProbe())
-            {
-                AppDialogs.Show(Loc("HmProbeNotReady"), "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                return;
-            }
             if (!pr.Program.Init())
             {
                 AppDialogs.Show(string.IsNullOrEmpty(pr.Message) ? Loc("HmInitFailed") : pr.Message,

@@ -296,9 +296,6 @@ namespace CNC.Controls.Probing
                 return;
             }
 
-            if (!probing.VerifyProbe())
-                return;
-
             pass = preview ? 1 : probing.Passes;
 
             if (CreateProgram(preview))

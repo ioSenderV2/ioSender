@@ -90,9 +90,6 @@
     <Compile Include="MacroDialog.xaml.cs">
       <DependentUpon>MacroDialog.xaml</DependentUpon>
     </Compile>
-    <Compile Include="ProbeVerify.xaml.cs">
-      <DependentUpon>ProbeVerify.xaml</DependentUpon>
-    </Compile>
     <Compile Include="ProbingConfig.cs" />
     <Compile Include="ProbingMacros.cs" />
     <Compile Include="ProbingView.xaml.cs">
@@ -165,10 +162,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="MacroDialog.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="ProbeVerify.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

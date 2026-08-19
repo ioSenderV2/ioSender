@@ -153,22 +153,15 @@ namespace CNC.Controls.Probing
         {
         }
 
-        public bool VerifyProbe ()
-        {
-            bool probeOk = ProbeVerified || Grbl.Signals.Value.HasFlag(Signals.Probe);
-
-            if (!probeOk)
-            {
-                new ProbeVerify(this) { Owner = System.Windows.Application.Current.MainWindow }.ShowDialog();
-                if (!ProbeVerified)
-                    ProbeVerified = AppDialogs.Show(LibStrings.FindResource("NoVerifyContinue"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
-
-                if (ProbeVerified)
-                    Grbl.Message = LibStrings.FindResource("VerifyStart");
-            }
-
-            return probeOk;
-        }
+        // VerifyProbe and its ProbeVerify dialog are gone (2026-08-19). It stopped every probing operation
+        // to demand the operator trigger the probe by hand first, which tells you nothing you did not already
+        // intend - you are about to probe, so the probe is fitted - and it cost a second button press to get
+        // past even once satisfied ("Press [Start] again to start probing"). Probing now assumes the probe
+        // works and lets the probe itself report otherwise, which it does: a probe that never makes contact
+        // fails the probing action, which is a real signal rather than a ritual.
+        //
+        // If connection validation is ever wanted back, it belongs where the probe is DEFINED, not in front
+        // of every use of it.
 
         public bool WaitForResponse(string command)
         {
@@ -443,7 +436,6 @@ namespace CNC.Controls.Probing
             }
         }
 
-        public bool ProbeVerified { get; set; } = false;
         public string FastProbe { get { return string.Format(Probing.Command + "F{0}", ProbeFeedRate.ToInvariantString()); } }
         public string SlowProbe { get { return string.Format(Probing.Command + "F{0}", LatchFeedRate.ToInvariantString()); } }
         public string Instructions { get { return _instructions; } set { _instructions = value; OnPropertyChanged(); } }

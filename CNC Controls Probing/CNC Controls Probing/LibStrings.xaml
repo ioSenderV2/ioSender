@@ -15,8 +15,6 @@
     <system:String x:Uid="str_probingDistanceError" x:Key="ErrorProbingDistance">Probing distance must be larger than XY Clearance + ½ Probe/tool diameter.</system:String>
     <system:String x:Uid="str_probingLatchDistanceError" x:Key="ErrorLatchDistance">Latch distance must be less than Probing distance.</system:String>
     <system:String x:Uid="str_probingIllegalPosition" x:Key="IllegalPosition">Illegal probe position, try again.</system:String>
-    <system:String x:Uid="str_probingNoVerifyContinue" x:Key="NoVerifyContinue">Probe connection was not verified, continue anyway?</system:String>
-    <system:String x:Uid="str_probingVerifyStart" x:Key="VerifyStart">Press [Start] again to start probing.</system:String>
     <system:String x:Uid="str_probingProbingAtX0Y0" x:Key="ProbingAtX0Y0">Probing @X0Y0...</system:String>
     <system:String x:Uid="str_macroChangedSave" x:Key="MacroChangedSave">Macro was changed, save?</system:String>
 </ResourceDictionary>

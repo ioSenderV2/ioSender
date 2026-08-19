@@ -125,9 +125,6 @@ namespace CNC.Controls.Probing
                 return;
             }
 
-            if (!probing.VerifyProbe())
-                return;
-
             if (!probing.Program.Init())
                 return;
 

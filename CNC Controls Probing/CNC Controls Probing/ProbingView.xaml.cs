@@ -366,7 +366,6 @@ namespace CNC.Controls.Probing
                 if (!(wasMetric = GrblParserState.IsMetric))
                     model.WaitForResponse("G21");
 
-                model.ProbeVerified = !AppConfig.Settings.Probing.ValidateProbeConnected;
                 model.DistanceMode = GrblParserState.DistanceMode;
                 model.Tool = model.Grbl.Tool == GrblConstants.NO_TOOL ? "0" : model.Grbl.Tool;
                 model.CanProbe = !model.Grbl.Signals.Value.HasFlag(Signals.Probe);
