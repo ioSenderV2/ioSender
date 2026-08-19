@@ -354,13 +354,18 @@ namespace GCode_Sender
             // Ensure realtime reports are flowing (WaitForIdle waits for one) - polling may be off on this tab.
             model.Poller.SetState(AppConfig.Settings.Base.PollInterval);
 
-            // Single gentle probe at one approach feed (LatchDistance = 0 -> no fast/slow two-stage), from the
-            // parked Z down by Probe depth, then retract to the parked Z. Keeps a fragile probe happy.
-            pr.ProbeFeedRate = HeightMap.ProbeFeed > 0d ? HeightMap.ProbeFeed : (p.LatchFeedRate > 0d ? p.LatchFeedRate : p.ProbeFeedRate);
-            pr.ProbeDistance = HeightMap.ProbeDepth;
-            pr.LatchDistance = 0d;
-            // Height mapping probes straight down with a spindle-centred Z-probe, so do NOT apply the probe's XY
-            // (edge-finder) offset - it would shift the grid off the corner. Probe the grid at the work coords.
+            // Feeds, search distance and latch come from the SELECTED PROBE, not from this tab.
+            //
+            // ProbingViewModel already copies all four off the probe definition when one is selected, and this
+            // page then overrode three of them with its own boxes - so a probe carefully set up in Machine
+            // Setup was ignored here, and the settings had to be kept in agreement by hand in two places.
+            //
+            // Forcing LatchDistance = 0 in particular removed the fast-search-then-slow-retouch the probe
+            // definition asks for, which is why a touch produced no retract and no second pass: the tab had
+            // disabled the behaviour, not the probe.
+            //
+            // The XY offset stays zeroed: that is an edge-finder's tip offset, and a height map probes
+            // straight down on the spindle centreline, so applying it would shift the whole grid.
             pr.ProbeOffsetX = 0d;
             pr.ProbeOffsetY = 0d;
             pr.HeightMap.MinX = HeightMap.MinX; pr.HeightMap.MaxX = HeightMap.MaxX;
@@ -441,7 +446,9 @@ namespace GCode_Sender
             //
             // The retract deliberately sits INSIDE the probe distance (by ProbeVariationMargin) so that a
             // board sitting proud at the next point still triggers rather than being crashed into.
-            double hover = Math.Max(2d, HeightMap.ProbeDepth - ProbeVariationMargin);
+            // The probe's own search distance is what each later point drops by, and the retract sits inside it.
+            double probeDrop = pr.ProbeDistance > 0d ? pr.ProbeDistance : 5d;
+            double hover = Math.Max(2d, probeDrop - ProbeVariationMargin);
 
             // How far the FIRST probe may travel down. It starts at machine Z0 (the top), so the distance
             // available is the drop from there to the safe floor - NOT the axis travel.
@@ -457,7 +464,7 @@ namespace GCode_Sender
                 "run: {0} points ({1}x{2}), first probe searches {3:0.###} mm from machine Z0 (Z travel {4:0.###}, inset {5:0.###}), " +
                 "later probes {6:0.###} mm with {7:0.###} mm retract, feed {8:0.###}",
                 map.TotalPoints, map.SizeX, map.SizeY, searchZ, WorkSurface.AxisTravel(2), WorkSurface.Inset(),
-                HeightMap.ProbeDepth, hover, pr.ProbeFeedRate));
+                probeDrop, hover, pr.ProbeFeedRate));
 
             pr.Program.Add(string.Format("G91F{0}", pr.ProbeFeedRate.ToInvariantString()));
             double dir = 1d;
@@ -473,7 +480,7 @@ namespace GCode_Sender
                     // after the fact, and "which point was it on" is the first question every failure asks.
                     double tx = HeightMap.MinX + x * map.GridX;
                     double ty = HeightMap.MinY + (dir > 0d ? y : map.SizeY - 1 - y) * map.GridY;
-                    double thisSearch = point == 1 ? searchZ : HeightMap.ProbeDepth;
+                    double thisSearch = point == 1 ? searchZ : probeDrop;
 
                     pr.Program.AddMessage(string.Format(CultureInfo.InvariantCulture,
                         "Probing point {0} of {1} at X{2:0.###} Y{3:0.###}, searching {4:0.###} mm down...",
@@ -498,8 +505,6 @@ namespace GCode_Sender
                     if (HeightMap.AddPause && point > 1)
                         pr.Program.AddPause();
 
-                    if (HeightMap.SettleDwell > 0d)
-                        pr.Program.Add("G4P" + HeightMap.SettleDwell.ToInvariantString());   // let a fragile probe release/settle
 
                     // AddProbingAction composes the distance into the program text as it is added, so setting
                     // ProbeDistance here varies it PER POINT even though it is a single view-model property.
@@ -517,6 +522,17 @@ namespace GCode_Sender
                     pr.Program.AddRapid(string.Format("X{0}", map.GridX.ToInvariantString(model.Format)));
                 dir *= -1d;
             }
+
+            // The whole program, numbered, before a byte of it goes out.
+            //
+            // Written after being unable to say from the logs WHICH step a stalled run was sitting on: the
+            // wire shows what was sent, and the response log shows what came back, but neither shows what the
+            // engine INTENDED to send next - so a step that is consumed without reaching the wire (a message,
+            // a pause, or a command that never made it) is invisible from both. With the program on record,
+            // "step 4 produced no traffic" names the line instead of inviting a theory about it.
+            var programLines = pr.Program.ToString().Split(new[] { char.ConvertFromUtf32(10) }, StringSplitOptions.None);
+            for (int i = 0; i < programLines.Length; i++)
+                CNC.Core.DebugLog.Write("heightmap", string.Format("program[{0}] = {1}", i, programLines[i]));
 
             pr.Program.Execute(true);
             model.Message = string.Empty;   // clear the stale "Probing point N of M..." progress line
@@ -829,9 +845,9 @@ namespace GCode_Sender
 
         private void cbxProbe_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            // Default the probe feed to the chosen probe's latch (slow) feed, without clobbering a user override.
-            if (HeightMap.ProbeFeed <= 0d && cbxProbe.SelectedItem is ProbeDefinition p)
-                HeightMap.ProbeFeed = p.LatchFeedRate > 0d ? p.LatchFeedRate : p.ProbeFeedRate;
+            // Nothing to seed any more: feeds, search distance and latch are read from the selected probe at
+            // run time (see StartProbing) rather than copied into fields on this page that then had to be
+            // kept in agreement with it by hand.
         }
     }
 }
