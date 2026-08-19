@@ -25,6 +25,8 @@
                     <Controls:NumericField x:Uid="fld_svglaser_power" Label="Power (S):" ColonAt="90" Unit="" Format="###0" Value="{Binding Path=Power, Mode=TwoWay}"/>
                     <TextBlock x:Name="txtPower" Text="{Binding Path=PowerSummary, Mode=OneWay}" Foreground="#586069" FontSize="11" Margin="94,0,0,4"/>
                     <Controls:NumericField x:Uid="fld_svglaser_feed" Label="Feed:" ColonAt="90" Unit="mm/min" Format="###0" Value="{Binding Path=Feed, Mode=TwoWay}"/>
+                    <TextBlock x:Name="txtExposure" Text="{Binding Path=ExposureSummary, Mode=OneWay}" Foreground="#586069" FontSize="11" Margin="94,0,0,4"
+                               ToolTip="Power divided by feed - how much beam energy lands per mm travelled. This is what decides whether wood browns or chars; the S value alone does not."/>
                     <Controls:NumericField x:Uid="fld_svglaser_travel" Label="Travel:" ColonAt="90" Unit="mm/min" Format="###0" Value="{Binding Path=TravelFeed, Mode=TwoWay}"/>
                     <Controls:NumericField x:Uid="fld_svglaser_passes" Label="Passes:" ColonAt="90" Unit="" Format="##0" Value="{Binding Path=Passes, Mode=TwoWay}"/>
                     <CheckBox x:Uid="chk_svglaser_dynamic" x:Name="chkDynamic" Content="M4 dynamic power" Margin="94,6,0,2" IsChecked="{Binding Path=Dynamic, Mode=TwoWay}"
@@ -40,6 +42,8 @@
                         <Controls:NumericField x:Uid="fld_svglaser_interval" Label="Interval:" ColonAt="90" Unit="mm" Format="0.###" Value="{Binding Path=Interval, Mode=TwoWay}"/>
                         <Controls:NumericField x:Uid="fld_svglaser_fillpower" Label="Fill power:" ColonAt="90" Unit="" Format="###0" Value="{Binding Path=FillPower, Mode=TwoWay}"/>
                         <Controls:NumericField x:Uid="fld_svglaser_fillfeed" Label="Fill feed:" ColonAt="90" Unit="mm/min" Format="###0" Value="{Binding Path=FillFeed, Mode=TwoWay}"/>
+                        <TextBlock x:Name="txtFillExposure" Text="{Binding Path=FillExposureSummary, Mode=OneWay}" Foreground="#586069" FontSize="11" Margin="94,0,0,4"
+                                   ToolTip="The shading's burn against the outline's. Raising fill power while the fill feed runs faster can leave this unchanged - which is invisible from the S values alone."/>
                         <TextBlock x:Name="txtFill" Text="{Binding Path=FillSummary, Mode=OneWay}" Foreground="#586069" FontSize="11" Margin="94,0,0,4"/>
                         <CheckBox x:Uid="chk_svglaser_outlineafter" x:Name="chkOutlineAfter" Content="Trace outline after shading" Margin="94,2,0,4" IsChecked="{Binding Path=OutlineAfterFill, Mode=TwoWay}"
                                   ToolTip="Burn the boundary once the shading is done, so the edge lands crisp on top of it. Untick to shade only."/>

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SvgToLaser.cs - part of the CNC Converters library
  *
  * Turns an SVG into plain-GRBL laser g-code and hands it to the Job tab, the same way the HPGL and
@@ -65,7 +65,10 @@ namespace CNC.Converters
         public string FileExtensions { get { return "svg"; } }
 
         // Everything the operator chose, so the emitter reads as one thing rather than a parameter list.
-        private SvgLaserSettings settings = new SvgLaserSettings();
+        // The instance is the PERSISTED one (App.config, "SvgLaser" section), not a fresh default: this
+        // converter is rebuilt by Activator.CreateInstance on every load, so a per-instance settings
+        // object meant the operator retyped power and feed for each import. See SvgLaserSettings.
+        private SvgLaserSettings settings = SvgLaserSettings.Current;
 
         private static string F(double v) { return v.ToString("0.###", CultureInfo.InvariantCulture); }
         private static string N(double v) { return v.ToString("0", CultureInfo.InvariantCulture); }

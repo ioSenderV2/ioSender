@@ -1,4 +1,4 @@
-/*
+﻿/*
  * AppConfig.cs - part of CNC Controls library
  *
  * v0.47 / 2026-02-11 / Io Engineering (Terje Io)
@@ -767,6 +767,11 @@ namespace CNC.Controls
 
             // Jog panel selection, migrated off Properties.Settings/user.config (see UiState.cs).
             ConfigStore.Register(new OwnedSection<UiState>("UiState", UiState.ImportLegacy));
+
+            // SVG-to-laser dialog values. Power and feed for a material are found by burning test strips;
+            // before this they were rebuilt from the field initializers on every single import, because
+            // GCode.LoadViaConverter constructs the converter fresh each time.
+            ConfigStore.Register(new OwnedSection<SvgLaserSettings>("SvgLaser"));
 
             // Workholding fixture library (Machine Setup: Fixture definitions; selected by Start Job) -
             // replaces the retired G28 named-position combo. Needs the ObservableCollection-mirror callback

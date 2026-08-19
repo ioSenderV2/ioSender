@@ -4,10 +4,16 @@
  * Parameters for an SVG-to-laser conversion. Deliberately small: width, power, feed, travel, passes,
  * and which of M4/M3 to use. Everything else the emitter needs it already knows (SvgToLaser).
  *
- * The two grey summary lines under Width and Power exist because neither number means anything on its
- * own - a width without the height it implies, and an S value without $30 to scale it against, are
- * both quantities you have to go and work out somewhere else. They are bound one-way to the settings
- * so they follow as you type.
+ * The grey summary lines under Width, Power and the fill fields exist because none of those numbers
+ * means anything on its own - a width without the height it implies, an S value without $30 to scale
+ * it against, and above all a power without the feed it is divided by. They are bound one-way to the
+ * settings so they follow as you type.
+ *
+ * The exposure lines are the important ones: S150 at F1200 and S400 at F3000 look like a large power
+ * increase and are the same burn. See SvgLaserSettings.Exposure.
+ *
+ * OK persists the settings - they are the shared config-store instance, so the values found for a
+ * material survive both the next import and the next session.
  */
 
 using System.Windows;
@@ -56,6 +62,11 @@ namespace CNC.Converters
                                 "SVG to laser", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+
+            // Persist what the operator settled on. Deliberately here rather than in the property
+            // setters: XmlSerializer calls those during deserialization, and a save that runs mid-load
+            // has already made this config unloadable once (see the NOTE in UiState.cs).
+            AppConfig.Settings.Save();
 
             DialogResult = true;
         }

@@ -1,19 +1,31 @@
 /*
- * SvgLaserSettings.cs - part of the CNC Converters library
+ * SvgLaserSettings.cs - part of CNC Controls library
  *
  * What the operator chose for an SVG-to-laser conversion. See SvgToLaser for what is done with it.
  *
- * Persisted through the profile store the other converters use, so the numbers you arrived at for a
- * material are still there next time - power and feed are found by burning test strips, and having to
- * re-derive them every session is how a good setting gets lost.
+ * Persisted as its own App.config section, so the numbers you arrived at for a material are still
+ * there next time - power and feed are found by burning test strips, and having to re-derive them
+ * every session is how a good setting gets lost.
+ *
+ * It lives HERE, in CNC Controls, rather than next to SvgToLaser in CNC Converters, for one reason:
+ * AppConfig registers the config sections and CNC Controls cannot reference CNC Converters (that is
+ * the dependency the other way round). Registering late from MainWindow does not work either - a
+ * section registered after ConfigStore.ReadDocument has its saved payload stashed in _unknown and
+ * never read, so the settings would silently load as defaults forever.
+ *
+ * The header this file used to carry CLAIMED it was "persisted through the profile store the other
+ * converters use". It was not - nothing persisted it, and GCode.LoadViaConverter builds the converter
+ * with Activator.CreateInstance on EVERY load, so each import started from the field initializers
+ * below. That is now true rather than aspirational, but it is why a comment is not evidence.
  */
 
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Xml.Serialization;
 using CNC.Core;
 
-namespace CNC.Converters
+namespace CNC.Controls
 {
     public class SvgLaserSettings : INotifyPropertyChanged
     {
@@ -22,6 +34,19 @@ namespace CNC.Converters
         private bool _dynamic = true;
         private bool _fill = false, _outlineAfterFill = true;
         private double _interval = 0.1d, _fillPower = 120d, _fillFeed = 3000d;
+
+        /// <summary>
+        /// The live instance from the config store - the one the dialog edits and AppConfig saves.
+        /// Never null: falls back to a private default when the section has not been registered (a
+        /// helper tool that never builds AppConfig), so the converter still works, just unremembered.
+        /// </summary>
+        [XmlIgnore]
+        public static SvgLaserSettings Current
+        {
+            get { return ConfigStore.Get<SvgLaserSettings>() ?? fallback; }
+        }
+
+        private static readonly SvgLaserSettings fallback = new SvgLaserSettings();
 
         public event PropertyChangedEventHandler PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string name = null)
@@ -36,25 +61,33 @@ namespace CNC.Converters
             set { _width = value; OnPropertyChanged(); OnPropertyChanged("HeightSummary"); OnPropertyChanged("FillSummary"); }
         }
 
+        // The three below are read from the artwork and the controller on every open, never from the
+        // saved file. Persisting a $30 or $32 captured against a different machine - or the same machine
+        // before a settings change - would scale every power figure in this dialog against a number that
+        // is no longer true, and it would look exactly like a correct reading.
+
         /// <summary>Height divided by width, from SvgOutlines.AspectOf. Set before the dialog opens.</summary>
+        [XmlIgnore]
         public double Aspect { get; set; } = 1d;
 
         /// <summary>Full-power S value, from $30. Shown so the power below has a scale to mean anything against.</summary>
+        [XmlIgnore]
         public double MaxPower { get; set; } = 1000d;
 
         /// <summary>Whether $32 is on. Drives the warning - a rapid travels LIT without it.</summary>
+        [XmlIgnore]
         public bool LaserModeOn { get; set; } = true;
 
         public double Power
         {
             get { return _power; }
-            set { _power = value; OnPropertyChanged(); OnPropertyChanged("PowerSummary"); }
+            set { _power = value; OnPropertyChanged(); OnPropertyChanged("PowerSummary"); OnPropertyChanged("ExposureSummary"); OnPropertyChanged("FillExposureSummary"); }
         }
 
         public double Feed
         {
             get { return _feed; }
-            set { _feed = value; OnPropertyChanged(); }
+            set { _feed = value; OnPropertyChanged(); OnPropertyChanged("ExposureSummary"); OnPropertyChanged("FillExposureSummary"); }
         }
 
         public double TravelFeed
@@ -114,13 +147,13 @@ namespace CNC.Converters
         public double FillPower
         {
             get { return _fillPower; }
-            set { _fillPower = value; OnPropertyChanged(); }
+            set { _fillPower = value; OnPropertyChanged(); OnPropertyChanged("FillExposureSummary"); }
         }
 
         public double FillFeed
         {
             get { return _fillFeed; }
-            set { _fillFeed = value; OnPropertyChanged(); OnPropertyChanged("FillSummary"); }
+            set { _fillFeed = value; OnPropertyChanged(); OnPropertyChanged("FillSummary"); OnPropertyChanged("FillExposureSummary"); }
         }
 
         /// <summary>
@@ -144,6 +177,60 @@ namespace CNC.Converters
         public string HeightSummary
         {
             get { return string.Format("{0:0.##} mm tall at this width", _width * Aspect); }
+        }
+
+        /// <summary>
+        /// Power divided by feed - how much beam energy lands per mm travelled. This, not the S value on
+        /// its own, is what decides whether wood browns or chars, and it is the number the two S fields
+        /// in this dialog conspire to hide: an outline at S150/F1200 and a fill at S400/F3000 look like
+        /// a large power increase and are in fact the same burn (0.125 vs 0.133). Raising fill power
+        /// while the fill feed runs 2.5x faster buys nothing, which is not visible from the S values.
+        ///
+        /// The unit (S per mm/min) is arbitrary and only meaningful against itself - hence the ratio.
+        /// </summary>
+        [XmlIgnore]
+        public double Exposure
+        {
+            get { return _feed > 0d ? _power / _feed : 0d; }
+        }
+
+        /// <summary>Same for the shading pass. Compare with <see cref="Exposure"/>, never in isolation.</summary>
+        [XmlIgnore]
+        public double FillExposure
+        {
+            get { return _fillFeed > 0d ? _fillPower / _fillFeed : 0d; }
+        }
+
+        public string ExposureSummary
+        {
+            get
+            {
+                return Exposure <= 0d
+                    ? string.Empty
+                    : string.Format("exposure {0:0.###} (S per mm/min) - the reference for shading", Exposure);
+            }
+        }
+
+        /// <summary>
+        /// The shading's burn stated against the outline's, because that is the comparison the operator
+        /// is actually making and the one the raw numbers obscure. Deliberately says nothing about what
+        /// ratio is "right" - that depends on material, wattage and focus, and is found with a test strip.
+        /// </summary>
+        public string FillExposureSummary
+        {
+            get
+            {
+                if (FillExposure <= 0d)
+                    return string.Empty;
+
+                if (Exposure <= 0d)
+                    return string.Format("exposure {0:0.###} (S per mm/min)", FillExposure);
+
+                double ratio = FillExposure / Exposure;
+
+                return string.Format("exposure {0:0.###} = {1:0.##}x the outline{2}", FillExposure, ratio,
+                                     ratio <= 1d ? " - lighter than the edge it fills" : string.Empty);
+            }
         }
 
         public string PowerSummary
