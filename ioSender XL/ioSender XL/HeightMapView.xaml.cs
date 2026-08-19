@@ -93,6 +93,16 @@ namespace GCode_Sender
         private const double ProbeVariationMargin = 3d;
 
         /// <summary>
+        /// How far the tool lifts between points: enough for a touch plate to go under it, and no more.
+        ///
+        /// Deliberately a small constant rather than a fraction of the probe's search distance. What this
+        /// height has to clear is the plate, which does not get thicker because the probe searches further -
+        /// and everything above the plate is search range spent before the probe starts looking for the
+        /// board.
+        /// </summary>
+        private const double PlateClearance = 15d;
+
+        /// <summary>
         /// Thickness to take off every probed Z, in mm.
         ///
         /// A touch plate triggers at its OWN top face, so the board is one plate-thickness below where the
@@ -446,9 +456,19 @@ namespace GCode_Sender
             //
             // The retract deliberately sits INSIDE the probe distance (by ProbeVariationMargin) so that a
             // board sitting proud at the next point still triggers rather than being crashed into.
-            // The probe's own search distance is what each later point drops by, and the retract sits inside it.
+            // The probe's own search distance is what each later point drops by.
             double probeDrop = pr.ProbeDistance > 0d ? pr.ProbeDistance : 5d;
-            double hover = Math.Max(2d, probeDrop - ProbeVariationMargin);
+
+            // How far to lift between points. This is a CLEARANCE - just enough for the touch plate to be
+            // slid under the tool - and it must stay a small fraction of the search, because every
+            // millimetre of it is a millimetre the next probe has already spent before it starts looking.
+            //
+            // It was probeDrop - 3, which reads sensibly for a 5mm probe depth and is nonsense for a real
+            // probe definition: with the 50mm search this probe asks for, it lifted 47mm and then searched
+            // 50mm, leaving three millimetres of margin for the whole board's variation plus wherever the
+            // operator set the plate down. It survived fourteen points and missed the fifteenth entirely
+            // (2026-08-19, PRB ...:0 after running the full 50mm without contact).
+            double hover = Math.Max(2d, Math.Min(PlateClearance, probeDrop - ProbeVariationMargin));
 
             // How far the FIRST probe may travel down. It starts at machine Z0 (the top), so the distance
             // available is the drop from there to the safe floor - NOT the axis travel.

@@ -375,6 +375,13 @@ namespace CNC.Controls.Probing
                 if (hasPause)
                     probing.PropertyChanged -= Probing_PropertyChanged;
                 isRunning = Grbl.IsJobRunning = false;
+
+                // Through the same wait as every other dispatch. This restores the distance mode after
+                // probing has run in G91, and it was being dropped by the streamingState gate on exactly the
+                // paths that need it most - a cancelled or failed run - leaving the controller in RELATIVE
+                // mode with nothing on screen saying so, so the next hand-typed move went somewhere nobody
+                // intended (2026-08-19: SendCommand DROPPED "G90").
+                WaitForDispatchable();
                 Grbl.ExecuteCommand(probing.DistanceMode == DistanceMode.Absolute ? "G90" : "G91");
             }
             if (!_isComplete || probing.IsSuccess || force_message)
