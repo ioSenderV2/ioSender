@@ -2124,6 +2124,14 @@ namespace GCode_Sender
             ShowWorkOrder()?.Load();
         }
 
+        // Straight to the laser converter, rather than Load Program plus the right filter. The SVG laser
+        // path emits plain-Grbl and is a different job from the Work Order's SVG carving (grblHAL), which
+        // is why it gets its own entry instead of a mode on an existing one.
+        private void LoadSvgLaser_Click(object sender, RoutedEventArgs e)
+        {
+            GCode.File.OpenLaserSvg();
+        }
+
         /// <summary>
         /// Bring the Work Order composer up, wherever the layout puts it. Work Order ships as a tab, but
         /// the tabs/menu split is the user's to change in Settings > Main Page - so these menu entries
@@ -3499,6 +3507,7 @@ namespace GCode_Sender
             registerMenuAction("Menu.LoadProgram", menuLoadFile, () => LoadFile_Click(null, null));
             registerMenuAction("Menu.LoadWorkOrder", menuLoadWorkOrder, () => LoadWorkOrder_Click(null, null));
             registerMenuAction("Menu.NewWorkOrder", menuNewWorkOrder, () => NewWorkOrder_Click(null, null));
+            registerMenuAction("Menu.LoadSvgLaser", menuLoadSvgLaser, () => LoadSvgLaser_Click(null, null));
             registerMenuAction("Menu.Camera", menuCamera, () => CameraOpen_Click(null, null));
 
             // Help entries are always available, so the per-item enable gate is a formality - but they are

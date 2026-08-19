@@ -1,4 +1,4 @@
-/*
+﻿/*
  * GCode.cs - part of CNC Controls library for Grbl
  *
  * v0.47 / 2026-02-11 / Io Engineering (Terje Io)
@@ -241,6 +241,34 @@ namespace CNC.Controls
                 AppConfig.Settings.Base.LastGCodeFolder = System.IO.Path.GetDirectoryName(filename);
                 AppConfig.Settings.Save();
             }
+
+            Model.Blocks = Blocks;
+        }
+
+        /// <summary>
+        /// Open an SVG straight into the laser converter - the File > Load SVG Laser Job entry point.
+        /// Same as Open() but with one file type instead of the full converter list, so burning a logo
+        /// does not start by picking the right filter out of a combo. LoadViaConverter still routes by
+        /// extension, so this shares the whole path below; it only narrows what the operator is shown.
+        /// </summary>
+        public void OpenLaserSvg()
+        {
+            // Same reason as Open(): an explicit InitialDirectory, or this dialog inherits whatever
+            // folder the Work Order dialogs last pinned.
+            string lastFolder = AppConfig.Settings.Base.LastGCodeFolder;
+            OpenFileDialog file = new OpenFileDialog
+            {
+                Title = "Load SVG Laser Job",
+                Filter = "SVG files (*.svg)|*.svg|All files (*.*)|*.*",
+                InitialDirectory = !string.IsNullOrEmpty(lastFolder) && Directory.Exists(lastFolder) ? lastFolder : string.Empty
+            };
+
+            if (file.ShowDialog() != true)
+                return;
+
+            Load(file.FileName);
+            AppConfig.Settings.Base.LastGCodeFolder = System.IO.Path.GetDirectoryName(file.FileName);
+            AppConfig.Settings.Save();
 
             Model.Blocks = Blocks;
         }

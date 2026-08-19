@@ -236,3 +236,5 @@ ioSender.g.en-US.resources:mainwindow.baml,mnu_exportConfigOverlay:System.Window
 ioSender.g.en-US.resources:mainwindow.baml,mnu_exportConfigOverlay:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Save this profile's screen layout as a .ioconfig fragment that someone else can apply to their own installation. Machine identity (port, network host, machine) is never included."
 ioSender.g.en-US.resources:mainwindow.baml,mnu_undoConfigOverlay:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Undo configuration overlay
 ioSender.g.en-US.resources:mainwindow.baml,mnu_undoConfigOverlay:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Restore the configuration as it was immediately before the last overlay was applied. ioSender restarts.
+ioSender.g.en-US.resources:mainwindow.baml,mnu_loadSvgLaser:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Load SVG Laser _Job...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_loadSvgLaser:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Burn an SVG with the laser: pick the artwork, then set width, power, feed and shading. Settings are remembered between jobs."

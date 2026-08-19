@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ActionKeyBinder.cs - part of CNC Controls library
  *
  * UI-zoom keyboard shortcuts (Settings:App's UI scale). These are dispatched at the MAIN-WINDOW level
@@ -75,6 +75,7 @@ namespace CNC.Controls
             new ActionInfo { Id = "Menu.LoadProgram",    Label = "File > Load Program...",    Group = KeyMapEditor.TopLevelGroup, Description = "Open a g-code file." },
             new ActionInfo { Id = "Menu.LoadWorkOrder",  Label = "File > Load Work Order...", Group = KeyMapEditor.TopLevelGroup, Description = "Open a saved work order." },
             new ActionInfo { Id = "Menu.NewWorkOrder",   Label = "File > New Work Order...",  Group = KeyMapEditor.TopLevelGroup, Description = "Start a new work order." },
+            new ActionInfo { Id = "Menu.LoadSvgLaser",   Label = "File > Load SVG Laser Job...", Group = KeyMapEditor.TopLevelGroup, Description = "Burn an SVG with the laser." },
             new ActionInfo { Id = "Menu.Camera",         Label = "Tools > Camera",            Group = KeyMapEditor.TopLevelGroup, Description = "Open the camera window." },
             new ActionInfo { Id = "Menu.Wiki",           Label = "Help > Wiki",               Group = KeyMapEditor.TopLevelGroup, Description = "Open the online wiki in a browser." },
             new ActionInfo { Id = "Menu.UsageTips",      Label = "Help > Usage tips",         Group = KeyMapEditor.TopLevelGroup, Description = "Open the usage tips page in a browser." },

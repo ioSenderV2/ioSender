@@ -65,6 +65,8 @@
                           ToolTip="Open a saved .workorder file."/>
                 <MenuItem x:Uid="mnu_newWorkOrder" x:Name="menuNewWorkOrder" Header="_New Work Order..." Click="NewWorkOrder_Click"
                           ToolTip="Start composing a new work order."/>
+                <MenuItem x:Uid="mnu_loadSvgLaser" x:Name="menuLoadSvgLaser" Header="Load SVG Laser _Job..." Click="LoadSvgLaser_Click"
+                          ToolTip="Burn an SVG with the laser: pick the artwork, then set width, power, feed and shading. Settings are remembered between jobs."/>
                 <Separator x:Name="menuFileViewSeparator"/>
                 <!-- Machine + Settings appended here -->
             </MenuItem>
