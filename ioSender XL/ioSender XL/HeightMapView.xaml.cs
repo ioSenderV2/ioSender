@@ -86,6 +86,31 @@ namespace GCode_Sender
         }
 
         /// <summary>
+        /// How much of the probe distance is held back as headroom for the board being proud at the next
+        /// point. The retract between points sits this far inside the probe depth, so a high spot still
+        /// triggers instead of being driven into.
+        /// </summary>
+        private const double ProbeVariationMargin = 3d;
+
+        /// <summary>
+        /// Thickness to take off every probed Z, in mm.
+        ///
+        /// A touch plate triggers at its OWN top face, so the board is one plate-thickness below where the
+        /// probe stopped. The relative map does not care - the same constant is in every point, so it cancels
+        /// out of the deltas - but the absolute Z0 this mode sets very much does, and without this it sits a
+        /// whole plate high, which is a surfacing pass that cuts nothing.
+        ///
+        /// Gated on the probe TYPE, not on the number: ProbingViewModel copies PlateThickness off whatever
+        /// definition is selected regardless of type, so a 3D probe would otherwise inherit a plate thickness
+        /// it does not have and be corrected by a plate that is not there. Same test FixtureEditDialog makes.
+        /// </summary>
+        private double PlateThickness()
+        {
+            var p = cbxProbe.SelectedItem as ProbeDefinition;
+            return p != null && p.ProbeType == ProbeType.TouchPlate ? p.PlateThickness : 0d;
+        }
+
+        /// <summary>
         /// The mm spacing that yields exactly <paramref name="points"/> points across <paramref name="span"/>.
         ///
         /// HeightMap's constructor derives its point count as ceil(span / spacing) + 1, so the exact quotient
@@ -380,6 +405,12 @@ namespace GCode_Sender
                 pr.HeightMap.GridSizeX = HeightMap.GridSizeX; pr.HeightMap.GridSizeY = HeightMap.GridSizeY;
             }
 
+            // Full work surface starts its search from the top of travel: the first probe is the one that has
+            // no idea where the board is, and starting from wherever Z happened to be parked would make the
+            // required search distance depend on where the operator left the spindle.
+            if (Area == AreaSource.FullTravel)
+                pr.WaitForIdle("G53G0Z0");
+
             // Map origin = the area's min corner in the current work coordinates (e.g. G54 X0Y0).
             var startpos = new Position(pr.HeightMap.MinX, pr.HeightMap.MinY, 0d);
 
@@ -416,8 +447,26 @@ namespace GCode_Sender
             HeightMap.HasHeightMap = false;
             HeightMap.CanApply = false;
 
-            // Relative probing: probe down, retract to the parked (start) Z, step to the next point. Serpentine
-            // (flip Y direction each column) to minimise travel - matched by the result read-back below.
+            // Relative probing, serpentine (flip Y direction each column) to minimise travel - the read-back
+            // below matches that order.
+            //
+            // Two probe geometries here, and they are different problems.
+            //
+            // The FIRST point is a search: nothing yet knows where the board is, so it starts from the top of
+            // travel and probes the whole way down, the same shape Setup uses for its first Z probe. That is
+            // the only point that has to travel far.
+            //
+            // EVERY LATER point retracts RELATIVE to the height it just triggered at, rather than returning
+            // to the parked Z. That is what lets the bit sit a fixed, small clearance above where the plate
+            // will next be placed instead of climbing back to the top of travel each time - and it means the
+            // subsequent probes are short, so a plate that never gets placed fails fast instead of driving
+            // the full travel into bare board.
+            //
+            // The retract deliberately sits INSIDE the probe distance (by ProbeVariationMargin) so that a
+            // board sitting proud at the next point still triggers rather than being crashed into.
+            double hover = Math.Max(2d, HeightMap.ProbeDepth - ProbeVariationMargin);
+            double searchZ = Math.Max(HeightMap.ProbeDepth, AxisTravel(2));
+
             pr.Program.Add(string.Format("G91F{0}", pr.ProbeFeedRate.ToInvariantString()));
             double dir = 1d;
             int point = 0, points = map.SizeX * map.SizeY;
@@ -429,19 +478,36 @@ namespace GCode_Sender
 
                     // Hold before each point (never the first - the operator is already standing at it) so a
                     // touch plate can be moved to the next spot. Without this the run rapids straight on and
-                    // probes bare board, which on a spoilboard means descending the full probe depth into
-                    // something that will never make contact.
+                    // probes bare board, which on a spoilboard means descending into something that will
+                    // never make contact.
                     //
                     // The mechanism is the Probing library's own: AddPause sets IsPaused and the run resumes
-                    // on Cycle Start. This view had never called it, so the whole movable-plate workflow was
-                    // unavailable here even though the engine and the view model property both existed.
+                    // on Cycle Start (or the Continue button). This view had never called it, so the whole
+                    // movable-plate workflow was unavailable here even though the engine and the view model
+                    // property both existed.
                     if (HeightMap.AddPause && point > 1)
                         pr.Program.AddPause();
 
                     if (HeightMap.SettleDwell > 0d)
                         pr.Program.Add("G4P" + HeightMap.SettleDwell.ToInvariantString());   // let a fragile probe release/settle
-                    pr.Program.AddProbingAction(AxisFlags.Z, true);
-                    pr.Program.AddRapidToMPos(pr.StartPosition, AxisFlags.Z);
+
+                    // AddProbingAction composes the distance into the program text as it is added, so setting
+                    // ProbeDistance here varies it PER POINT even though it is a single view-model property.
+                    if (point == 1)
+                    {
+                        pr.ProbeDistance = searchZ;
+                        pr.Program.AddProbingAction(AxisFlags.Z, true);
+                    }
+                    else
+                    {
+                        pr.ProbeDistance = HeightMap.ProbeDepth;
+                        pr.Program.AddProbingAction(AxisFlags.Z, true);
+                    }
+
+                    // Relative retract from wherever this point triggered - NOT AddRapidToMPos(StartPosition),
+                    // which would climb back to the parked height after every single point.
+                    pr.Program.AddRapid(string.Format("Z{0}", hover.ToInvariantString(model.Format)));
+
                     if (y < map.SizeY - 1)
                         pr.Program.AddRapid(string.Format("Y{0}", (map.GridY * dir).ToInvariantString(model.Format)));
                 }
@@ -540,7 +606,10 @@ namespace GCode_Sender
             if (pr.Positions.Count == 0)
                 return;
 
-            double zHigh = pr.Positions.Max(x => x.Z), zLow = pr.Positions.Min(x => x.Z);
+            // The probe stopped on the plate's top face; the board is a plate-thickness below that. See
+            // PlateThickness() - zero for a 3D probe, which touches the surface itself.
+            double plate = PlateThickness();
+            double zHigh = pr.Positions.Max(x => x.Z) - plate, zLow = pr.Positions.Min(x => x.Z) - plate;
             string wcs = ActiveWcs();
 
             model.ExecuteCommand(string.Format(CultureInfo.InvariantCulture, "G10L2P{0}Z{1:0.###}", ActiveWcsP(), zHigh));

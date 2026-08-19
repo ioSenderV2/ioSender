@@ -172,10 +172,10 @@
                     <Run Text=" Points per axis across the whole table - 4 x 4 is 16 probes, which is plenty to find the high and low spots of a gently-dished board. Every extra division costs you probes, and you are placing the plate for each one by hand."/>
                     <LineBreak/>
                     <Run FontWeight="Bold" Text="3. Have the touch plate ready."/>
-                    <Run Text=" MDF will not close a circuit, so the plate has to travel with the probe. The machine positions over each point and holds; put the plate under the bit, press Continue (or Cycle Start), and it probes Z and moves on. It holds before every point except the first, where you are already standing."/>
+                    <Run Text=" MDF will not close a circuit, so the plate has to travel with the probe. The machine positions over each point and holds; put the plate under the bit, press Continue (or Cycle Start), and it probes Z and moves on. It holds before every point except the first, where you are already standing. The plate's thickness is taken off automatically - a 3D probe has none taken off, since it touches the surface itself."/>
                     <LineBreak/>
-                    <Run FontWeight="Bold" Text="4. Jog Z to a safe clearance, then Start."/>
-                    <Run Text=" The probe descends from wherever Z is parked and retracts back to it between points, so park a few mm above the plate. Probe depth must cover that clearance plus how much the board varies. Stop cancels."/>
+                    <Run FontWeight="Bold" Text="4. Start - Z parks itself."/>
+                    <Run Text=" The first point is a search: it goes to the top of travel and probes the whole way down, because nothing yet knows where the board is. After that the bit stays just above the plate between points rather than climbing back up, so each remaining probe is short - which also means a point where you forget the plate stops almost immediately instead of diving. Probe depth is what has to cover how much the board varies. Stop cancels."/>
                     <LineBreak/>
                     <Run FontWeight="Bold" Text="5. Then surface."/>
                     <Run Text=" It reports the highest and lowest points and sets Z0 to the highest. In Work Order's Surface operation tick 'Entire spoilboard' and 'Use the work origin already set', give it a depth, and run - the range it reported is how deep you must go to clean up the whole board rather than only the high spots."/>
