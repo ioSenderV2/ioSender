@@ -365,6 +365,17 @@ namespace GCode_Sender
             pr.ProbeOffsetY = 0d;
             pr.HeightMap.MinX = HeightMap.MinX; pr.HeightMap.MaxX = HeightMap.MaxX;
             pr.HeightMap.MinY = HeightMap.MinY; pr.HeightMap.MaxY = HeightMap.MaxY;
+            // Break the X/Y grid-size lock on the ENGINE's copy before assigning. HeightMapViewModel couples
+            // the two: setting GridSizeY writes GridSizeX as well while the lock is on, so assigning X then Y
+            // left BOTH holding the Y value and the X axis silently gained a point - a 4x4 asked for came back
+            // as 5x4, 20 probes (2026-08-19). The lock is a convenience for the operator typing one number
+            // into two mm fields; it is meaningless for per-axis divisions, and for a spacing computed
+            // separately for each axis it is actively wrong.
+            //
+            // Only the engine's instance, which nothing binds - the view's own HeightMap keeps the operator's
+            // lock exactly as they set it.
+            pr.HeightMap.GridSizeLockXY = false;
+
             // Divisions -> spacing for the full-table mode; the program-extent mode keeps its mm spacing.
             if (Area == AreaSource.FullTravel)
             {
@@ -431,7 +442,22 @@ namespace GCode_Sender
             // The retract deliberately sits INSIDE the probe distance (by ProbeVariationMargin) so that a
             // board sitting proud at the next point still triggers rather than being crashed into.
             double hover = Math.Max(2d, HeightMap.ProbeDepth - ProbeVariationMargin);
-            double searchZ = Math.Max(HeightMap.ProbeDepth, WorkSurface.AxisTravel(2));
+
+            // How far the FIRST probe may travel down. It starts at machine Z0 (the top), so the distance
+            // available is the drop from there to the safe floor - NOT the axis travel.
+            //
+            // It was the axis travel (135 on this machine), which from Z0 targets exactly Z-135: the far
+            // limit itself. grblHAL rejects a target ON the boundary as readily as one past it, so the very
+            // first probe of every run died with ALARM:2 before touching anything (2026-08-19,
+            // "G38.3F70Z-135" from MPos Z 0.000). The full travel is the one distance that is guaranteed
+            // unusable from the top of that travel.
+            double searchZ = Math.Max(1d, -(WorkSurface.TravelMin(2) + WorkSurface.Inset()));
+
+            CNC.Core.DebugLog.Write("heightmap", string.Format(CultureInfo.InvariantCulture,
+                "run: {0} points ({1}x{2}), first probe searches {3:0.###} mm from machine Z0 (Z travel {4:0.###}, inset {5:0.###}), " +
+                "later probes {6:0.###} mm with {7:0.###} mm retract, feed {8:0.###}",
+                map.TotalPoints, map.SizeX, map.SizeY, searchZ, WorkSurface.AxisTravel(2), WorkSurface.Inset(),
+                HeightMap.ProbeDepth, hover, pr.ProbeFeedRate));
 
             pr.Program.Add(string.Format("G91F{0}", pr.ProbeFeedRate.ToInvariantString()));
             double dir = 1d;
@@ -440,7 +466,25 @@ namespace GCode_Sender
             {
                 for (int y = 0; y < map.SizeY; y++)
                 {
-                    pr.Program.AddMessage(string.Format("Probing point {0} of {1}...", ++point, points));
+                    ++point;
+
+                    // Target of THIS point in the work frame, so the log names where it is going rather than
+                    // the relative step that gets it there - a serpentine of G91 increments is unreadable
+                    // after the fact, and "which point was it on" is the first question every failure asks.
+                    double tx = HeightMap.MinX + x * map.GridX;
+                    double ty = HeightMap.MinY + (dir > 0d ? y : map.SizeY - 1 - y) * map.GridY;
+                    double thisSearch = point == 1 ? searchZ : HeightMap.ProbeDepth;
+
+                    pr.Program.AddMessage(string.Format(CultureInfo.InvariantCulture,
+                        "Probing point {0} of {1} at X{2:0.###} Y{3:0.###}, searching {4:0.###} mm down...",
+                        point, points, tx, ty, thisSearch));
+
+                    // Same three facts to the log, where they survive the next status message overwriting
+                    // the line above. The search distance in particular is not visible anywhere else, and it
+                    // is what a soft-limit alarm on a probe is almost always about.
+                    CNC.Core.DebugLog.Write("heightmap", string.Format(CultureInfo.InvariantCulture,
+                        "point {0}/{1}: target X{2:0.###} Y{3:0.###} (work), probe down {4:0.###} mm, retract {5:0.###} mm",
+                        point, points, tx, ty, thisSearch, hover));
 
                     // Hold before each point (never the first - the operator is already standing at it) so a
                     // touch plate can be moved to the next spot. Without this the run rapids straight on and
@@ -459,16 +503,8 @@ namespace GCode_Sender
 
                     // AddProbingAction composes the distance into the program text as it is added, so setting
                     // ProbeDistance here varies it PER POINT even though it is a single view-model property.
-                    if (point == 1)
-                    {
-                        pr.ProbeDistance = searchZ;
-                        pr.Program.AddProbingAction(AxisFlags.Z, true);
-                    }
-                    else
-                    {
-                        pr.ProbeDistance = HeightMap.ProbeDepth;
-                        pr.Program.AddProbingAction(AxisFlags.Z, true);
-                    }
+                    pr.ProbeDistance = thisSearch;
+                    pr.Program.AddProbingAction(AxisFlags.Z, true);
 
                     // Relative retract from wherever this point triggered - NOT AddRapidToMPos(StartPosition),
                     // which would climb back to the parked height after every single point.
