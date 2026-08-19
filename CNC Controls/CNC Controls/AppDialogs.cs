@@ -1,4 +1,4 @@
-/*
+﻿/*
  * AppDialogs.cs - part of CNC Core library
  *
  * One funnel for the app's message boxes. In a normal run it is exactly MessageBox.Show. When the UI test
@@ -183,20 +183,47 @@ namespace CNC.Controls
             return result;
         }
 
+        /// <summary>
+        /// Record a dialog and the answer it got.
+        ///
+        /// Everything else the operator is told lands in a log - console lines, wire traffic, alarms - but a
+        /// message box did not, so the single most explicit statement the app ever makes ("nothing has been
+        /// probed", "this will overwrite your work origin") was the one thing that could not be recovered
+        /// afterwards. Diagnosing from logs meant reconstructing which dialogs must have appeared.
+        ///
+        /// The ANSWER matters as much as the question: "asked, and the operator said No" and "asked, and the
+        /// operator said Yes" are different histories, and only one of them explains what happened next.
+        ///
+        /// Newlines are flattened so one dialog is one line - these are read by eye alongside timestamped
+        /// traffic, where a multi-line entry hides the lines around it.
+        /// </summary>
+        private static MessageBoxResult Logged(string caption, string message, MessageBoxResult result)
+        {
+            try
+            {
+                CNC.Core.DebugLog.Write("dialog", string.Format("[{0}] {1} -> {2}",
+                    string.IsNullOrEmpty(caption) ? "-" : caption,
+                    (message ?? string.Empty).Replace("\r", " ").Replace("\n", " "),
+                    result));
+            }
+            catch { }   // logging a dialog must never be the reason a dialog fails to appear
+            return result;
+        }
+
         public static MessageBoxResult Show(string message, string caption = "",
             MessageBoxButton buttons = MessageBoxButton.OK, MessageBoxImage icon = MessageBoxImage.None,
             MessageBoxResult defaultResult = MessageBoxResult.None, string id = null, string yesText = null, string noText = null)
         {
             string answer = Ask(id ?? caption, caption, message, buttons, defaultResult);
             if (answer != null)
-                return ParseResult(answer, buttons);
+                return Logged(caption, message, ParseResult(answer, buttons));
             if (ApplicationShuttingDown)
-                return ShutdownAnswer(message, buttons, defaultResult);
+                return Logged(caption, message, ShutdownAnswer(message, buttons, defaultResult));
             try
             {
-                return CustomMessageBox != null
+                return Logged(caption, message, CustomMessageBox != null
                     ? CustomMessageBox(null, message, caption, buttons, icon, DefaultOrNone(defaultResult), yesText, noText)
-                    : MessageBox.Show(message, caption, buttons, icon, DefaultOrNone(defaultResult));
+                    : MessageBox.Show(message, caption, buttons, icon, DefaultOrNone(defaultResult)));
             }
             // Belt and braces for the race the pre-check can lose (shutdown starting between the check
             // and the construction). Filtered on the shutdown flag ON PURPOSE: an unfiltered catch here
@@ -204,7 +231,7 @@ namespace CNC.Controls
             // is the same exception type) that must keep failing loudly.
             catch (InvalidOperationException) when (ApplicationShuttingDown)
             {
-                return ShutdownAnswer(message, buttons, defaultResult);
+                return Logged(caption, message, ShutdownAnswer(message, buttons, defaultResult));
             }
         }
 
@@ -214,20 +241,20 @@ namespace CNC.Controls
         {
             string answer = Ask(id ?? caption, caption, message, buttons, defaultResult);
             if (answer != null)
-                return ParseResult(answer, buttons);
+                return Logged(caption, message, ParseResult(answer, buttons));
             if (ApplicationShuttingDown)
-                return ShutdownAnswer(message, buttons, defaultResult);
+                return Logged(caption, message, ShutdownAnswer(message, buttons, defaultResult));
             try
             {
                 if (CustomMessageBox != null)
-                    return CustomMessageBox(owner, message, caption, buttons, icon, DefaultOrNone(defaultResult), yesText, noText);
-                return owner != null
+                    return Logged(caption, message, CustomMessageBox(owner, message, caption, buttons, icon, DefaultOrNone(defaultResult), yesText, noText));
+                return Logged(caption, message, owner != null
                     ? MessageBox.Show(owner, message, caption, buttons, icon, DefaultOrNone(defaultResult))
-                    : MessageBox.Show(message, caption, buttons, icon, DefaultOrNone(defaultResult));
+                    : MessageBox.Show(message, caption, buttons, icon, DefaultOrNone(defaultResult)));
             }
             catch (InvalidOperationException) when (ApplicationShuttingDown)   // see the parameterless overload
             {
-                return ShutdownAnswer(message, buttons, defaultResult);
+                return Logged(caption, message, ShutdownAnswer(message, buttons, defaultResult));
             }
         }
 
