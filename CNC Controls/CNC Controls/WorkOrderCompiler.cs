@@ -1361,9 +1361,15 @@ namespace CNC.Controls
             var lines = new List<string>();
             double stepover = Math.Max(0.5d, op.BitDiameter * (op.Stepover / 100d));
             double inset = EnvelopeInset();
-            double w = Math.Max(0d, AxisTravel(0) - 2d * inset);
-            double h = Math.Max(0d, AxisTravel(1) - 2d * inset);
-            double ox = EnvMin(0) + inset, oy = EnvMin(1) + inset;
+
+            // The BOARD's extent, not the machine's reach. These were derived from $130/$131, which is only
+            // the same thing when the spoilboard fills the table - on a machine with the toolsetter mounted
+            // off the front of the board it sent the raster out over the toolsetter with the cutter running.
+            // See WorkSurface: undefined still means "the whole table", so nothing changes where that is true.
+            var surface = WorkSurface.Current;
+            double ox = surface.UsableMin(0), oy = surface.UsableMin(1);
+            double w = surface.UsableSpan(0);
+            double h = surface.UsableSpan(1);
             double zTop = EnvMin(2) + AxisTravel(2) - inset;
             double z = -TrueDepth(op);
             // G10 L2's P-number addresses a WCS by slot index (P1=G54 ... P6=G59), not by G-code - has to

@@ -94,6 +94,7 @@
     <Compile Include="Fixture.cs" />
     <Compile Include="TabOrderConfig.cs" />
     <Compile Include="SvgLaserSettings.cs" />
+    <Compile Include="WorkSurface.cs" />
     <Compile Include="SettingsPanelRegistry.cs" />
     <Compile Include="SettingsNavNode.cs" />
     <Compile Include="SettingsSearchIndex.cs" />

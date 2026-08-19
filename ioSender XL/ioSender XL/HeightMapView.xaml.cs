@@ -209,39 +209,9 @@ namespace GCode_Sender
             return probing;
         }
 
-        // ---- machine travel envelope (for the "Full travel" area, expressed in the current work frame) ----
-
-        private const double Margin = 5d;
-
-        private static double AxisTravel(int axis)
-        {
-            double t = GrblSettings.GetDouble(GrblSetting.MaxTravelBase + axis);
-            return double.IsNaN(t) ? 0d : Math.Abs(t);
-        }
-
-        private static double AxisDir(int axis)
-        {
-            if (GrblInfo.ForceSetOrigin)
-                return GrblInfo.HomingDirection.HasFlag(GrblInfo.AxisIndexToFlag(axis)) ? 1d : -1d;
-            return -1d;
-        }
-
-        private static double EnvMin(int axis)
-        {
-            return AxisDir(axis) > 0d ? 0d : -AxisTravel(axis);
-        }
-
-        private static double Inset()
-        {
-            double pulloff = GrblSettings.GetDouble(GrblSetting.HomingPulloff);
-            if (double.IsNaN(pulloff)) pulloff = 0d;
-            return Math.Max(Margin, pulloff + 1d);
-        }
-
-        private static double MaxArea(int axis)
-        {
-            return Math.Max(0d, AxisTravel(axis) - 2d * Inset());
-        }
+        // The travel envelope and the board's extent both live in WorkSurface now - this view had its own
+        // copy of the envelope maths, and so did WorkOrderCompiler, which is part of how the two came to
+        // disagree about what area they were covering.
 
         // Size/position the probe area for the current source. Both are work-coordinate regions (the engine
         // probes in work coordinates); Full travel converts the machine envelope via the current work offset.
@@ -249,12 +219,13 @@ namespace GCode_Sender
         {
             if (Area == AreaSource.FullTravel)
             {
-                double inset = Inset(), w = MaxArea(0), h = MaxArea(1);
+                var surface = WorkSurface.Current;
+                double w = surface.UsableSpan(0), h = surface.UsableSpan(1);
                 if (w > 0d && h > 0d && model != null)
                 {
-                    HeightMap.MinX = EnvMin(0) + inset - model.WorkPositionOffset.X;
+                    HeightMap.MinX = surface.UsableMin(0) - model.WorkPositionOffset.X;
                     HeightMap.MaxX = HeightMap.MinX + w;
-                    HeightMap.MinY = EnvMin(1) + inset - model.WorkPositionOffset.Y;
+                    HeightMap.MinY = surface.UsableMin(1) - model.WorkPositionOffset.Y;
                     HeightMap.MaxY = HeightMap.MinY + h;
                 }
             }
@@ -465,7 +436,7 @@ namespace GCode_Sender
             // The retract deliberately sits INSIDE the probe distance (by ProbeVariationMargin) so that a
             // board sitting proud at the next point still triggers rather than being crashed into.
             double hover = Math.Max(2d, HeightMap.ProbeDepth - ProbeVariationMargin);
-            double searchZ = Math.Max(HeightMap.ProbeDepth, AxisTravel(2));
+            double searchZ = Math.Max(HeightMap.ProbeDepth, WorkSurface.AxisTravel(2));
 
             pr.Program.Add(string.Format("G91F{0}", pr.ProbeFeedRate.ToInvariantString()));
             double dir = 1d;
@@ -560,15 +531,18 @@ namespace GCode_Sender
         /// </summary>
         private bool AnchorWorkOriginToTable()
         {
-            double inset = Inset(), w = MaxArea(0), h = MaxArea(1);
+            // The BOARD's extent, which is not the machine's reach whenever something (a toolsetter) is
+            // mounted off the edge of the board - see WorkSurface. Undefined means the whole table.
+            var surface = WorkSurface.Current;
+            double w = surface.UsableSpan(0), h = surface.UsableSpan(1);
             if (w <= 0d || h <= 0d)
             {
-                AppDialogs.Show("The machine travel limits ($130-$132) do not describe a usable area, so the table corner cannot be found.",
+                AppDialogs.Show("The work surface does not describe a usable area. Check the machine travel limits ($130-$132), and the work surface size in Machine Setup if one is set.",
                                 "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return false;
             }
 
-            double ox = EnvMin(0) + inset, oy = EnvMin(1) + inset;
+            double ox = surface.UsableMin(0), oy = surface.UsableMin(1);
             string wcs = ActiveWcs();
 
             if (AppDialogs.Show(string.Format(CultureInfo.InvariantCulture,

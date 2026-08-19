@@ -528,6 +528,7 @@ namespace CNC.Controls
 
                 BuildAxes();
                 LoadCurrentSettings();
+                LoadWorkSurface();   // board extent - config, not controller settings (see WorkSurface.cs)
 
                 // Machine choice is required input - restore the last machine the user picked (persisted across
                 // runs), else default to a generic 3-axis CNC. Restoring only re-selects the dropdowns; it does
@@ -906,6 +907,78 @@ namespace CNC.Controls
         #endregion
 
         #region Home corner picker
+
+        // ---- work surface (spoilboard extent) ----
+        //
+        // Deliberately NOT expressed by shrinking $130/$131: the machine really can reach past the board to
+        // the toolsetter, and must keep being allowed to or tc.macro can never drive there. See WorkSurface.cs.
+
+        private bool loadingWorkSurface = false;
+
+        private void LoadWorkSurface()
+        {
+            var ws = WorkSurface.Current;
+            loadingWorkSurface = true;
+            chkWorkSurfaceDefined.IsChecked = ws.Defined;
+            txtWsMinX.Text = ws.MinX.ToString("0.###", CultureInfo.InvariantCulture);
+            txtWsMaxX.Text = ws.MaxX.ToString("0.###", CultureInfo.InvariantCulture);
+            txtWsMinY.Text = ws.MinY.ToString("0.###", CultureInfo.InvariantCulture);
+            txtWsMaxY.Text = ws.MaxY.ToString("0.###", CultureInfo.InvariantCulture);
+            loadingWorkSurface = false;
+            ShowWorkSurfaceSummary();
+        }
+
+        private static double ParseOr(string text, double fallback)
+        {
+            double v;
+            return double.TryParse((text ?? string.Empty).Trim(), NumberStyles.Float | NumberStyles.AllowLeadingSign,
+                                   CultureInfo.InvariantCulture, out v) ? v : fallback;
+        }
+
+        private void WorkSurface_Changed(object sender, RoutedEventArgs e)
+        {
+            if (loadingWorkSurface)
+                return;
+
+            var ws = WorkSurface.Current;
+            ws.Defined = chkWorkSurfaceDefined.IsChecked == true;
+            ws.MinX = ParseOr(txtWsMinX.Text, ws.MinX);
+            ws.MaxX = ParseOr(txtWsMaxX.Text, ws.MaxX);
+            ws.MinY = ParseOr(txtWsMinY.Text, ws.MinY);
+            ws.MaxY = ParseOr(txtWsMaxY.Text, ws.MaxY);
+            AppConfig.Settings.Save();
+            ShowWorkSurfaceSummary();
+        }
+
+        /// <summary>
+        /// State what the numbers actually mean once clamped, rather than echoing them back. A board typed
+        /// larger than the machine is silently held inside the travel limits (WorkSurface.UsableMin/Max), and
+        /// an operator who cannot see that would be left believing an extent that will not be used.
+        /// </summary>
+        private void ShowWorkSurfaceSummary()
+        {
+            if (txtWorkSurfaceSummary == null)
+                return;
+
+            var ws = WorkSurface.Current;
+            string text = ws.Summary;
+
+            if (ws.Defined && (ws.UsableSpan(0) <= 0d || ws.UsableSpan(1) <= 0d))
+                text = "These numbers do not describe a usable area - check that 'from' is less than 'to' on both axes.";
+
+            txtWorkSurfaceSummary.Text = text;
+        }
+
+        /// <summary>Fill the near corner from the spindle's current machine position - jog there, then click.</summary>
+        private void WorkSurfaceHere_Click(object sender, RoutedEventArgs e)
+        {
+            if (model == null)
+                return;
+
+            txtWsMinX.Text = model.MachinePosition.X.ToString("0.###", CultureInfo.InvariantCulture);
+            txtWsMinY.Text = model.MachinePosition.Y.ToString("0.###", CultureInfo.InvariantCulture);
+            WorkSurface_Changed(sender, e);
+        }
 
         private void Corner_Click(object sender, RoutedEventArgs e)
         {

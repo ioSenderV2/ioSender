@@ -773,6 +773,10 @@ namespace CNC.Controls
             // GCode.LoadViaConverter constructs the converter fresh each time.
             ConfigStore.Register(new OwnedSection<SvgLaserSettings>("SvgLaser"));
 
+            // How much of the table is actually spoilboard. Kept apart from the travel limits on purpose -
+            // the gantry can reach past the board to the toolsetter and must keep being allowed to.
+            ConfigStore.Register(new OwnedSection<WorkSurface>("WorkSurface"));
+
             // Workholding fixture library (Machine Setup: Fixture definitions; selected by Start Job) -
             // replaces the retired G28 named-position combo. Needs the ObservableCollection-mirror callback
             // (for the wizard's DataGrid), so it registers via XmlObjectSection directly rather than

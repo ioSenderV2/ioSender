@@ -211,6 +211,36 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </StackPanel>
+
+                        <!-- The board is not the gantry. Travel above says how far the machine can reach;
+                             this says how much of that is spoilboard. They differ whenever anything (a
+                             toolsetter) is mounted off the edge of the board - see WorkSurface.cs. -->
+                        <GroupBox x:Uid="grp_worksurface" Header="Work surface (spoilboard)" Margin="0,10,0,0">
+                            <StackPanel Margin="6">
+                                <CheckBox x:Uid="chk_wsDefined" x:Name="chkWorkSurfaceDefined" Content="The spoilboard is smaller than the machine's travel" Click="WorkSurface_Changed"
+                                          ToolTip="Tick when the machine can reach past the board - typically to a toolsetter mounted off the front. Left unticked, the whole travel envelope is treated as board, which is what surfacing and height mapping assumed before this existed."/>
+                                <StackPanel x:Name="pnlWorkSurface" Margin="18,6,0,0" IsEnabled="{Binding IsChecked, ElementName=chkWorkSurfaceDefined}">
+                                    <TextBlock x:Uid="txt_wsHelp" TextWrapping="Wrap" FontSize="11" Foreground="#586069" Margin="0,0,0,6"
+                                               Text="The board's edges in MACHINE coordinates - the same numbers the DRO shows when the spindle is over each corner. Jog to a corner and read them off."/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock x:Uid="lbl_wsMinX" Text="X from:" Width="60" VerticalAlignment="Center"/>
+                                        <TextBox x:Uid="txt_wsMinX" x:Name="txtWsMinX" Width="80" LostFocus="WorkSurface_Changed" VerticalContentAlignment="Center" HorizontalContentAlignment="Right"/>
+                                        <TextBlock x:Uid="lbl_wsMaxX" Text="to:" Width="26" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                        <TextBox x:Uid="txt_wsMaxX" x:Name="txtWsMaxX" Width="80" LostFocus="WorkSurface_Changed" VerticalContentAlignment="Center" HorizontalContentAlignment="Right"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                        <TextBlock x:Uid="lbl_wsMinY" Text="Y from:" Width="60" VerticalAlignment="Center"/>
+                                        <TextBox x:Uid="txt_wsMinY" x:Name="txtWsMinY" Width="80" LostFocus="WorkSurface_Changed" VerticalContentAlignment="Center" HorizontalContentAlignment="Right"/>
+                                        <TextBlock x:Uid="lbl_wsMaxY" Text="to:" Width="26" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                        <TextBox x:Uid="txt_wsMaxY" x:Name="txtWsMaxY" Width="80" LostFocus="WorkSurface_Changed" VerticalContentAlignment="Center" HorizontalContentAlignment="Right"/>
+                                    </StackPanel>
+                                    <Button x:Uid="btn_wsHere" x:Name="btnWorkSurfaceHere" Content="Set the near corner from where the spindle is now" Margin="0,8,0,0" Padding="6,2"
+                                            HorizontalAlignment="Left" Click="WorkSurfaceHere_Click"
+                                            ToolTip="Jog the spindle over the corner of the board nearest the machine origin, then click this to fill X from / Y from with the current machine position."/>
+                                </StackPanel>
+                                <TextBlock x:Name="txtWorkSurfaceSummary" TextWrapping="Wrap" FontSize="11" Foreground="#586069" Margin="0,8,0,0"/>
+                            </StackPanel>
+                        </GroupBox>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
