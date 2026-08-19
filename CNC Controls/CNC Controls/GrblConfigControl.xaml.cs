@@ -1,4 +1,4 @@
-/*
+﻿/*
  * GrblConfigControl.xaml.cs - part of CNC Controls library for Grbl
  *
  * v0.46 / 2025-05-23 / Io Engineering (Terje Io)
@@ -460,20 +460,45 @@ namespace CNC.Controls
                 retval = data;
         }
 
-        // Restore settings from a chosen restore point / backup file. Public: shared footer.
+        // Restore from a chosen restore point. Public: shared footer.
+        //
+        // A restore point is a MOMENT, and may carry the controller's settings, ioSender's own
+        // configuration, or both - the dialog shows which and lets the operator pick what to put back. See
+        // RestorePoint.cs for why the two were paired back together.
         public void RestoreSettings()
         {
-            // Pick a restore point (auto-snapshot written on each Save), newest first; the dialog's
-            // Browse... button falls back to choosing an arbitrary backup file.
             RestorePointDialog dlg = new RestorePointDialog { Owner = Window.GetWindow(this) };
 
-            if (dlg.ShowDialog() == true && !string.IsNullOrEmpty(dlg.SelectedFile))
+            if (dlg.ShowDialog() != true)
+                return;
+
+            // Controller settings first: it is the part that takes effect immediately and without a
+            // restart, so if the operator declines the restart below they still have the machine back.
+            if (!string.IsNullOrEmpty(dlg.SelectedFile))
             {
                 using (new UIUtils.WaitCursor())
-                {
                     LoadFile(dlg.SelectedFile);
-                }
             }
+
+            if (string.IsNullOrEmpty(dlg.SelectedConfigFile))
+                return;
+
+            if (!AppConfig.StageConfigRestore(dlg.SelectedConfigFile))
+            {
+                AppDialogs.Show("The app configuration could not be staged for restore, so it has been left alone." +
+                                (string.IsNullOrEmpty(dlg.SelectedFile) ? "" : " The machine settings were restored."),
+                                "Restore", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // Say what has and has not happened yet BEFORE asking about the restart, so declining it leaves
+            // the operator knowing exactly where they stand rather than guessing which half took.
+            if (AppDialogs.Show((string.IsNullOrEmpty(dlg.SelectedFile)
+                                    ? "The app configuration will be restored when ioSender restarts."
+                                    : "The machine settings have been restored.\n\nThe app configuration will be restored when ioSender restarts.") +
+                                "\n\nRestart now?",
+                                "Restore", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
+                GrblConfigView.DoRestart();
         }
 
         private void dgrSettings_SelectionChanged(object sender, SelectionChangedEventArgs e)

@@ -3018,15 +3018,6 @@ namespace CNC.Core
         }
     }
 
-    // One settings restore point (an auto-snapshot written on Save). See GrblSettings.GetSnapshots().
-    public class SettingsSnapshot
-    {
-        public string FilePath { get; set; }
-        public DateTime Saved { get; set; }
-
-        public string SavedText { get { return Saved.ToString("yyyy-MM-dd HH:mm:ss"); } }
-    }
-
     public static class GrblSettings
     {
         private static List<string> responses = new List<string>();
@@ -3574,35 +3565,10 @@ namespace CNC.Core
             catch { }   // snapshots are a convenience; failure must not affect connect
         }
 
-        // Restore points (newest first) for the Restore picker - scanned across all day-of-week
-        // subfolders so the picker shows the whole rolling week's history, not just today's.
-        public static List<SettingsSnapshot> GetSnapshots()
-        {
-            var list = new List<SettingsSnapshot>();
-
-            try
-            {
-                foreach (var dir in RotatingFileStore.ExistingDayDirectories(SnapshotFolder))
-                {
-                    foreach (var path in Directory.GetFiles(dir, "Grbl_*.txt"))
-                    {
-                        string stamp = System.IO.Path.GetFileNameWithoutExtension(path).Substring("Grbl_".Length);
-
-                        if (!DateTime.TryParseExact(stamp, RotatingFileStore.TimestampFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime saved))
-                            saved = File.GetLastWriteTime(path);
-
-                        list.Add(new SettingsSnapshot
-                        {
-                            FilePath = path,
-                            Saved = saved
-                        });
-                    }
-                }
-            }
-            catch { }
-
-            return list.OrderByDescending(s => s.Saved).ToList();
-        }
+        // Restore points are built by CNC.Controls.RestorePoint.All(), which pairs these Grbl_*.txt
+        // snapshots with the App.config_* ones written beside them. There was a second, Grbl-only listing
+        // here (GetSnapshots); it is gone rather than left alongside, because two independent scans of the
+        // same folder is how the two kinds came to be treated as unrelated in the first place.
 
         public static string FormatFloat(string value, string format)
         {

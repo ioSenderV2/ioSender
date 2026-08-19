@@ -1871,3 +1871,11 @@ CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,lbl_wsMinY:System.Win
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,lbl_wsMaxY:System.Windows.Controls.TextBlock.Text,Text,True,True,,to:
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_wsHere:System.Windows.Controls.ContentControl.Content,Button,True,True,,Set the near corner from where the spindle is now
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_wsHere:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Jog the spindle over the corner of the board nearest the machine origin, then click this to fill X from / Y from with the current machine position."
+CNC.Controls.WPF.g.en-US.resources:restorepointdialog.baml,grp_rpWhat:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Restore
+CNC.Controls.WPF.g.en-US.resources:restorepointdialog.baml,rb_rpBoth:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Both
+CNC.Controls.WPF.g.en-US.resources:restorepointdialog.baml,rb_rpBoth:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Put back the machine's settings and ioSender's configuration as they were at this moment.
+CNC.Controls.WPF.g.en-US.resources:restorepointdialog.baml,rb_rpGrbl:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Machine settings only (the controller's $ values)
+CNC.Controls.WPF.g.en-US.resources:restorepointdialog.baml,rb_rpGrbl:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Homing, limits, travel, feeds - everything stored in the controller itself."
+CNC.Controls.WPF.g.en-US.resources:restorepointdialog.baml,rb_rpConfig:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,"App configuration only (profiles, probes, fixtures, layout)"
+CNC.Controls.WPF.g.en-US.resources:restorepointdialog.baml,rb_rpConfig:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"ioSender's own settings. Restoring these restarts ioSender, because the configuration is read once at startup."
+CNC.Controls.WPF.g.en-US.resources:restorepointdialog.baml,btn_rpBrowse:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Choose a controller settings file directly, if what you want is not listed above."

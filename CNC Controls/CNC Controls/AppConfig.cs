@@ -1128,6 +1128,35 @@ namespace CNC.Controls
             }
         }
 
+        /// <summary>
+        /// Stage a chosen App.config snapshot to be swapped in at the next startup, and report whether it
+        /// was staged. The caller restarts; ConsumePendingRestore below does the swap before Load() runs.
+        ///
+        /// Staged rather than applied in place because the live config is READ ONCE at startup and held in
+        /// memory: overwriting the file under a running session would be undone by the next Save, which
+        /// would write the in-memory copy straight back over it. The restore has to happen before anything
+        /// has loaded, and that means a restart.
+        ///
+        /// This is the same mechanism the overlay undo uses - one staging slot, consumed once.
+        /// </summary>
+        public static bool StageConfigRestore(string backupPath)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(backupPath) || !File.Exists(backupPath))
+                    return false;
+
+                File.Copy(backupPath, PendingRestorePath, true);
+                CNC.Core.DebugLog.Write("config", "config restore staged from " + Path.GetFileName(backupPath));
+                return true;
+            }
+            catch (Exception ex)
+            {
+                CNC.Core.DebugLog.Write("config", "StageConfigRestore failed - " + ex.Message);
+                return false;
+            }
+        }
+
         // Consume a staged restore: swap the backup over App.config before anything reads it. Runs at
         // startup, before Load(), so the restored file is simply the config this session loads.
         private static void ConsumePendingRestore()
