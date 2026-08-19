@@ -1,4 +1,4 @@
-/*
+﻿/*
  * HeightMapView.xaml.cs - part of ioSender XL
  *
  * "Height Map" top-level tab. Probe a grid over the work surface and apply the resulting map to the loaded
@@ -12,6 +12,7 @@
 
 using System;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -40,7 +41,48 @@ namespace GCode_Sender
         public AreaSource Area
         {
             get { return _area; }
-            set { if (value != _area) { _area = value; DefaultArea(); RefreshPreview(); } }
+            set { if (value != _area) { _area = value; DefaultArea(); RefreshPreview(); UpdateAreaModeUi(); } }
+        }
+
+        // ---- Full work surface: grid stated as DIVISIONS, not millimetres ----
+        //
+        // Over a whole table a spacing in mm is the wrong unit to think in: what you want to say is "sample it
+        // four by four", and the spacing that implies depends on a table size you should not have to look up.
+        // Divisions are POINTS PER AXIS - 4 x 4 is 16 probes, not 25 - so the number typed is the number of
+        // probes per side, which is what is actually being decided.
+        //
+        // Only used when Area is FullTravel; the program-extent path keeps the mm spacing, where the job's
+        // size is known and the spacing is the thing that matters to the surface.
+        //
+        // Plain CLR properties, deliberately: the bindings are TwoWay and driven by the operator typing, so
+        // they need no change notification back the other way, and this view is not an INotifyPropertyChanged
+        // (its bindings otherwise go through the HeightMap sub-VM, which is).
+
+        private int _divX = 4, _divY = 4;
+
+        public int DivisionsX
+        {
+            get { return _divX; }
+            set { _divX = Math.Max(2, value); UpdateAreaModeUi(); }
+        }
+
+        public int DivisionsY
+        {
+            get { return _divY; }
+            set { _divY = Math.Max(2, value); UpdateAreaModeUi(); }
+        }
+
+        /// <summary>
+        /// The mm spacing that yields exactly <paramref name="points"/> points across <paramref name="span"/>.
+        ///
+        /// HeightMap's constructor derives its point count as ceil(span / spacing) + 1, so the exact quotient
+        /// span/(points-1) sits one floating-point rounding away from producing an extra row: any result a
+        /// hair above the true value makes that ceil round up. Shrinking the spacing very slightly biases the
+        /// ceil downward, so the count comes out as asked rather than occasionally one too many.
+        /// </summary>
+        private static double SpacingFor(double span, int points)
+        {
+            return span / (points - 1) * 1.000001d;
         }
 
         public HeightMapView()
@@ -73,6 +115,7 @@ namespace GCode_Sender
                 RefreshProbes();
                 DefaultArea();
                 RefreshPreview();
+                UpdateAreaModeUi();
                 UpdateWarnings();
             }
         }
@@ -262,6 +305,19 @@ namespace GCode_Sender
             if (pr == null)
                 return;
 
+            // ---- Full work surface: anchor the origin FIRST, then map in it ----
+            //
+            // This is what makes the mode need no Setup. The probing engine works in work coordinates, so
+            // rather than forking a machine-referenced copy of it, the work origin is planted at the table
+            // corner up front - which is where this mode is going to leave it anyway. After that the grid is
+            // simply 0..W by 0..H and the ordinary probe path below runs unchanged.
+            //
+            // Placing the XY origin before probing rather than after is not just convenience: the probed
+            // points are recorded as machine coordinates (PRB:), so anchoring afterwards would mean holding
+            // the grid in one frame and the results in another for the whole run.
+            if (Area == AreaSource.FullTravel && !AnchorWorkOriginToTable())
+                return;
+
             // Watch the correct probe input for the chosen probe (main probe for height mapping), the same rule the
             // Probing page uses. Guards against a stale tool-setter selection (G65 P5 Q1 left by an interrupted
             // tc.macro) sending the descent to the wrong input. Only when the controller has a tool setter.
@@ -282,7 +338,16 @@ namespace GCode_Sender
             pr.ProbeOffsetY = 0d;
             pr.HeightMap.MinX = HeightMap.MinX; pr.HeightMap.MaxX = HeightMap.MaxX;
             pr.HeightMap.MinY = HeightMap.MinY; pr.HeightMap.MaxY = HeightMap.MaxY;
-            pr.HeightMap.GridSizeX = HeightMap.GridSizeX; pr.HeightMap.GridSizeY = HeightMap.GridSizeY;
+            // Divisions -> spacing for the full-table mode; the program-extent mode keeps its mm spacing.
+            if (Area == AreaSource.FullTravel)
+            {
+                pr.HeightMap.GridSizeX = SpacingFor(HeightMap.MaxX - HeightMap.MinX, DivisionsX);
+                pr.HeightMap.GridSizeY = SpacingFor(HeightMap.MaxY - HeightMap.MinY, DivisionsY);
+            }
+            else
+            {
+                pr.HeightMap.GridSizeX = HeightMap.GridSizeX; pr.HeightMap.GridSizeY = HeightMap.GridSizeY;
+            }
 
             // Map origin = the area's min corner in the current work coordinates (e.g. G54 X0Y0).
             var startpos = new Position(pr.HeightMap.MinX, pr.HeightMap.MinY, 0d);
@@ -350,6 +415,136 @@ namespace GCode_Sender
             // IsJobRunning (UI was left locked), unsubscribes, and restores absolute mode (probing ran in G91).
             BuildMap(pr, map);
             pr.Program.End(string.Empty);
+
+            // Full work surface finishes the job it started: the origin it planted at the corner now gets its
+            // Z, taken from the HIGHEST point measured. Surfacing can then be asked for a depth and run - the
+            // thing this mode exists to make possible without a Setup pass or a touch-off.
+            if (Area == AreaSource.FullTravel && HeightMap.HasHeightMap)
+                SetWorkZeroToHighest(pr);
+        }
+
+        // ---- full work surface: origin handling ----
+
+        /// <summary>The WCS the controller currently has active, e.g. "G54"; G54 if it has not reported one.</summary>
+        private string ActiveWcs()
+        {
+            string wcs = model?.WorkCoordinateSystem;
+            return string.IsNullOrEmpty(wcs) ? "G54" : wcs;
+        }
+
+        /// <summary>G10 L2's P number for a WCS code - P1 is G54 ... P6 is G59.</summary>
+        private int ActiveWcsP()
+        {
+            int n;
+            string wcs = ActiveWcs();
+            if (!int.TryParse(wcs.Length >= 3 ? wcs.Substring(1, 2) : "54", out n) || n < 54 || n > 59)
+                n = 54;
+            return n - 53;
+        }
+
+        /// <summary>
+        /// Put the active WCS's XY origin on the spoilboard corner - the in-bounds minimum of the travel
+        /// envelope - and re-express the probe area as 0..W by 0..H in that new frame.
+        ///
+        /// Asks first. This overwrites a stored work origin, which for anyone who has a workpiece set up is
+        /// the most destructive thing this tab can do, and it is not recoverable by undo.
+        /// </summary>
+        private bool AnchorWorkOriginToTable()
+        {
+            double inset = Inset(), w = MaxArea(0), h = MaxArea(1);
+            if (w <= 0d || h <= 0d)
+            {
+                AppDialogs.Show("The machine travel limits ($130-$132) do not describe a usable area, so the table corner cannot be found.",
+                                "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return false;
+            }
+
+            double ox = EnvMin(0) + inset, oy = EnvMin(1) + inset;
+            string wcs = ActiveWcs();
+
+            if (AppDialogs.Show(string.Format(CultureInfo.InvariantCulture,
+                    "Full work surface will set the {0} work origin.\n\n" +
+                    "X0 Y0 moves to the table corner (machine X{1:0.###} Y{2:0.###}), and after probing, Z0 is set to the " +
+                    "highest point found.\n\n" +
+                    "Any work origin {0} is holding now will be overwritten. Continue?",
+                    wcs, ox, oy),
+                    "Height map", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
+                return false;
+
+            model.ExecuteCommand(string.Format(CultureInfo.InvariantCulture, "G10L2P{0}X{1:0.###}Y{2:0.###}", ActiveWcsP(), ox, oy));
+
+            // The offset has to be in effect before the area below is read in the new frame - a grid computed
+            // against the OLD offset would be placed off the table by however far the origin just moved.
+            var pr = EnsureProbing();
+            if (pr != null && !pr.WaitForWcoUpdate())
+            {
+                AppDialogs.Show("The controller did not report the new work offset, so the probe area cannot be trusted. Nothing has been probed.",
+                                "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return false;
+            }
+
+            HeightMap.MinX = 0d; HeightMap.MaxX = w;
+            HeightMap.MinY = 0d; HeightMap.MaxY = h;
+            return true;
+        }
+
+        /// <summary>
+        /// Set work Z0 to the highest point probed. The probed positions are machine coordinates (PRB:), so
+        /// G10 L2 can place the offset directly - no need to drive the tool back to that point to zero on it.
+        /// </summary>
+        private void SetWorkZeroToHighest(ProbingViewModel pr)
+        {
+            if (pr.Positions.Count == 0)
+                return;
+
+            double zHigh = pr.Positions.Max(x => x.Z), zLow = pr.Positions.Min(x => x.Z);
+            string wcs = ActiveWcs();
+
+            model.ExecuteCommand(string.Format(CultureInfo.InvariantCulture, "G10L2P{0}Z{1:0.###}", ActiveWcsP(), zHigh));
+            model.ResponseLog.Add(string.Format(CultureInfo.InvariantCulture,
+                "HeightMap: {0} origin set - XY at the table corner, Z0 at machine Z {1:0.###} (highest of {2} points, range {3:0.###})",
+                wcs, zHigh, pr.Positions.Count, zHigh - zLow));
+
+            // The range is the number that decides the surfacing pass, and the one a single touch-off can
+            // never tell you: a cutting plane only flattens the board where it sits BELOW the existing
+            // surface, so this is how deep the job has to go to clean up the whole table rather than just
+            // skim the high spots.
+            AppDialogs.Show(string.Format(CultureInfo.InvariantCulture,
+                    "{0} points probed.\n\n" +
+                    "Work origin {1} is now set:\n" +
+                    "    X0 Y0 at the table corner\n" +
+                    "    Z0 at the highest point (machine Z {2:0.###})\n\n" +
+                    "Lowest point is {3:0.###} mm below that, so a surfacing pass has to go at least that deep " +
+                    "to clean up the whole board rather than only the high spots.",
+                    pr.Positions.Count, wcs, zHigh, zHigh - zLow),
+                "Height map", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        /// <summary>
+        /// Show the inputs the chosen area actually uses: divisions for the full table (its extent is derived,
+        /// so the X/W/Y/H boxes would be describing something the operator cannot change), mm spacing and the
+        /// explicit area for the program extent.
+        /// </summary>
+        private void UpdateAreaModeUi()
+        {
+            if (txtAreaNote == null || pnlDivisions == null)
+                return;
+
+            bool full = Area == AreaSource.FullTravel;
+
+            pnlDivisions.Visibility = full ? Visibility.Visible : Visibility.Collapsed;
+            pnlGridMm.Visibility = full ? Visibility.Collapsed : Visibility.Visible;
+            pnlAreaXW.Visibility = full ? Visibility.Collapsed : Visibility.Visible;
+            pnlAreaYH.Visibility = full ? Visibility.Collapsed : Visibility.Visible;
+            btnFromLimits.Visibility = full ? Visibility.Collapsed : Visibility.Visible;
+
+            txtAreaNote.Text = full
+                ? "No Setup needed. The origin is set from the table: X0 Y0 at the corner before probing, Z0 at the highest point after."
+                : string.Empty;
+
+            txtDivisionsNote.Text = full
+                ? string.Format("{0} probes ({1} x {2} points across the table).", DivisionsX * DivisionsY, DivisionsX, DivisionsY)
+                : string.Empty;
         }
 
         private void Stop_Click(object sender, RoutedEventArgs e)

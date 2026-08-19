@@ -1,4 +1,4 @@
-<UserControl x:Class="GCode_Sender.HeightMapView"
+﻿<UserControl x:Class="GCode_Sender.HeightMapView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -45,30 +45,40 @@
                                 <RadioButton x:Uid="hm_areaProgram" x:Name="rbAreaProgram" Content="From program" GroupName="hmarea" IsChecked="True"
                                              VerticalAlignment="Center" Checked="AreaProgram_Checked"
                                              ToolTip="Probe over the loaded job's XY extent, in the current work coordinates."/>
-                                <RadioButton x:Uid="hm_areaTable" x:Name="rbAreaTable" Content="Full table" GroupName="hmarea" Margin="18,0,0,0"
+                                <RadioButton x:Uid="hm_areaTable" x:Name="rbAreaTable" Content="Full work surface" GroupName="hmarea" Margin="18,0,0,0"
                                              VerticalAlignment="Center" Checked="AreaTable_Checked"
-                                             ToolTip="Probe the whole in-bounds machine travel envelope (referenced to the homed corner, like Surface spoilboard)."/>
+                                             ToolTip="Map the whole table, and set the work origin from it - no Setup and no existing work origin needed. The XY origin is placed at the spoilboard corner before probing, and work Z0 is set to the highest point probed, ready to surface from."/>
                             </StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <StackPanel x:Name="pnlAreaXW" Orientation="Horizontal" Margin="0,6,0,0">
                                 <cnccontrols:NumericField Label="X:" ColonAt="20" Format="-####0.0##"
                                     Value="{Binding HeightMap.MinX, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                                 <cnccontrols:NumericField x:Uid="hm_width" Label="W:" ColonAt="25" Format="-####0.0##" Margin="8,0,0,0"
                                     Value="{Binding HeightMap.Width, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                             </StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                            <StackPanel x:Name="pnlAreaYH" Orientation="Horizontal" Margin="0,5,0,0">
                                 <cnccontrols:NumericField Label="Y:" ColonAt="20" Format="-####0.0##"
                                     Value="{Binding HeightMap.MinY, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                                 <cnccontrols:NumericField x:Uid="hm_height" Label="H:" ColonAt="25" Format="-####0.0##" Margin="8,0,0,0"
                                     Value="{Binding HeightMap.Height, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                             </StackPanel>
-                            <Button x:Uid="hm_fromLimits" Content="Set from program limits" Margin="0,6,0,0" Padding="5,0"
+                            <Button x:Uid="hm_fromLimits" x:Name="btnFromLimits" Content="Set from program limits" Margin="0,6,0,0" Padding="5,0"
                                     HorizontalAlignment="Left" IsEnabled="{Binding IsFileLoaded}" Click="Limits_Click"/>
+                            <TextBlock x:Name="txtAreaNote" Foreground="#586069" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
                         </StackPanel>
                     </GroupBox>
 
                     <GroupBox x:Uid="hm_grpGrid" Header="Grid size" Margin="0,6,0,0">
                         <StackPanel Margin="6">
-                            <StackPanel Orientation="Horizontal">
+                            <StackPanel x:Name="pnlDivisions">
+                                <StackPanel Orientation="Horizontal">
+                                    <cnccontrols:NumericField x:Uid="hm_divX" Label="Divisions X:" ColonAt="80" Format="##0"
+                                        Value="{Binding DivisionsX, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                                    <cnccontrols:NumericField x:Uid="hm_divY" Label="Y:" ColonAt="20" Format="##0" Margin="8,0,0,0"
+                                        Value="{Binding DivisionsY, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                                </StackPanel>
+                                <TextBlock x:Name="txtDivisionsNote" Foreground="#586069" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            </StackPanel>
+                            <StackPanel x:Name="pnlGridMm" Orientation="Horizontal">
                                 <cnccontrols:NumericField Label="X:" ColonAt="25" Format="###0.0##"
                                     Value="{Binding HeightMap.GridSizeX, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                                 <cnccontrols:NumericField Label="Y:" ColonAt="25" Format="###0.0##" Margin="8,0,0,0"
