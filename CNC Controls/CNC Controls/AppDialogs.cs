@@ -197,6 +197,25 @@ namespace CNC.Controls
         /// Newlines are flattened so one dialog is one line - these are read by eye alongside timestamped
         /// traffic, where a multi-line entry hides the lines around it.
         /// </summary>
+        /// <summary>
+        /// Record that a dialog is going UP, before it blocks.
+        ///
+        /// Logging only the answer leaves the most interesting case invisible: a dialog still open. That is
+        /// exactly the state worth diagnosing - the app looks hung, refuses to shut down, and the log's last
+        /// word is whatever happened before the box appeared. Logged on both sides, an unanswered prompt
+        /// shows as a "shown" with no matching answer, which names the thing the app is waiting on.
+        /// </summary>
+        private static void LogShown(string caption, string message)
+        {
+            try
+            {
+                CNC.Core.DebugLog.Write("dialog", string.Format("[{0}] shown: {1}",
+                    string.IsNullOrEmpty(caption) ? "-" : caption,
+                    (message ?? string.Empty).Replace("\r", " ").Replace("\n", " ")));
+            }
+            catch { }
+        }
+
         private static MessageBoxResult Logged(string caption, string message, MessageBoxResult result)
         {
             try
@@ -214,6 +233,8 @@ namespace CNC.Controls
             MessageBoxButton buttons = MessageBoxButton.OK, MessageBoxImage icon = MessageBoxImage.None,
             MessageBoxResult defaultResult = MessageBoxResult.None, string id = null, string yesText = null, string noText = null)
         {
+            LogShown(caption, message);
+
             string answer = Ask(id ?? caption, caption, message, buttons, defaultResult);
             if (answer != null)
                 return Logged(caption, message, ParseResult(answer, buttons));
@@ -239,6 +260,8 @@ namespace CNC.Controls
             MessageBoxButton buttons = MessageBoxButton.OK, MessageBoxImage icon = MessageBoxImage.None,
             MessageBoxResult defaultResult = MessageBoxResult.None, string id = null, string yesText = null, string noText = null)
         {
+            LogShown(caption, message);
+
             string answer = Ask(id ?? caption, caption, message, buttons, defaultResult);
             if (answer != null)
                 return Logged(caption, message, ParseResult(answer, buttons));

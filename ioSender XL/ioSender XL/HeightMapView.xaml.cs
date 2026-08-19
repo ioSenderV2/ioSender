@@ -524,8 +524,18 @@ namespace GCode_Sender
             // Build the map BEFORE End(): End() unsubscribes the engine's probe handlers, and doing it first could
             // drop the final captured point. End() afterwards does the cleanup the engine skips on success - clears
             // IsJobRunning (UI was left locked), unsubscribes, and restores absolute mode (probing ran in G91).
-            BuildMap(pr, map);
+            //
+            // BuildMap must not TALK to the operator while that is still pending, though. It used to raise the
+            // short-capture warning itself, which is modal - so a cancelled run sat with a dialog up, End()
+            // unreached and IsJobRunning still set, and the app then refused to shut down for the build script
+            // ("asked to close gracefully and is still up after 60s") long after the machine had gone idle.
+            // A dialog nobody has dismissed is not a reason to still be busy.
+            string mapWarning;
+            BuildMap(pr, map, out mapWarning);
             pr.Program.End(string.Empty);
+
+            if (mapWarning != null)
+                AppDialogs.Show(mapWarning, "Height map", MessageBoxButton.OK, MessageBoxImage.Warning);
 
             // Full work surface finishes the job it started: the origin it planted at the corner now gets its
             // Z, taken from the HIGHEST point measured. Surfacing can then be asked for a depth and run - the
@@ -715,17 +725,19 @@ namespace GCode_Sender
 
         // Build the height map from the probed positions (delta from the first point). The read-back order
         // mirrors the serpentine probe order above so each result lands in the right grid cell.
-        private void BuildMap(ProbingViewModel pr, CNC.Controls.Probing.HeightMap map)
+        private void BuildMap(ProbingViewModel pr, CNC.Controls.Probing.HeightMap map, out string warning)
         {
+            warning = null;
             model.ResponseLog.Add(string.Format("HeightMap: captured {0} of {1} points", pr.Positions.Count, map.TotalPoints));
 
             // Build from the probed points as long as we captured one per grid point - tolerate IsSuccess being
             // cleared by a late probe-release event after the final point. Report clearly either way.
             if (pr.Positions.Count != map.TotalPoints)
             {
-                AppDialogs.Show(string.Format(Loc("HmCaptureShort"),
-                    pr.Positions.Count, map.TotalPoints, string.IsNullOrEmpty(pr.Message) ? "" : "\r\n\r\n" + pr.Message),
-                    "Height map", MessageBoxButton.OK, MessageBoxImage.Warning);
+                // Handed back rather than shown - see the call site. Telling the operator has to wait until
+                // the run has actually been ended.
+                warning = string.Format(Loc("HmCaptureShort"),
+                    pr.Positions.Count, map.TotalPoints, string.IsNullOrEmpty(pr.Message) ? "" : "\r\n\r\n" + pr.Message);
                 return;
             }
 
