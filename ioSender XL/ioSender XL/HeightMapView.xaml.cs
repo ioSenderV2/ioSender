@@ -11,6 +11,7 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
@@ -665,6 +666,25 @@ namespace GCode_Sender
                    Math.Abs(model.WorkPositionOffset.Y - oy) < 0.001d;
         }
 
+        /// <summary>
+        /// One probed point, as a line worth reading months later: where it is on the grid, where it is on
+        /// the table, the board height there, and how far that sits below the highest point.
+        ///
+        /// The height has the touch plate taken off, so it is the BOARD, matching the Z0 this run sets - a
+        /// log that disagreed with the origin by a plate thickness would be worse than no log.
+        /// </summary>
+        private string DescribeProbedPoint(int n, int col, int row, CNC.Controls.Probing.HeightMap map,
+                                           double machineZ, double firstZ, double plateOff)
+        {
+            return string.Format(CultureInfo.InvariantCulture,
+                "point {0,2} [{1},{2}] X{3,8:0.###} Y{4,8:0.###}   Z {5,9:0.###}   {6,+7:0.###} vs first",
+                n, col, row,
+                HeightMap.MinX + col * map.GridX,
+                HeightMap.MinY + row * map.GridY,
+                machineZ - plateOff,
+                machineZ - firstZ);
+        }
+
         /// <summary>The WCS the controller currently has active, e.g. "G54"; G54 if it has not reported one.</summary>
         private string ActiveWcs()
         {
@@ -847,14 +867,43 @@ namespace GCode_Sender
 
             double z0 = pr.Positions[0].Z;
             int i = 0;
+
+            // Grid cell each reading landed in, in probe order, so the log can name a point by where it is
+            // rather than by when it happened. Filled by the same serpentine walk that populates the map, so
+            // the two cannot disagree about which reading belongs where.
+            var probed = new List<string>();
+            double plateOff = PlateThickness();
+
             for (int x = 0; x < map.SizeX; x++)
             {
                 for (int y = 0; y < map.SizeY; y++)
+                {
+                    probed.Add(DescribeProbedPoint(probed.Count + 1, x, y, map, pr.Positions[i].Z, z0, plateOff));
                     map.AddPoint(x, y, Math.Round(pr.Positions[i++].Z - z0, model.Precision));
+                }
                 if (++x < map.SizeX)
                     for (int y = map.SizeY - 1; y >= 0; y--)
+                    {
+                        probed.Add(DescribeProbedPoint(probed.Count + 1, x, y, map, pr.Positions[i].Z, z0, plateOff));
                         map.AddPoint(x, y, Math.Round(pr.Positions[i++].Z - z0, model.Precision));
+                    }
             }
+
+            // Every reading into the status log, not just the range. The range answers "how much has to come
+            // off"; the individual heights answer "where is it high", which is the question you have as soon
+            // as a surfacing pass leaves something behind - and the map's 3D view cannot be read to a
+            // hundredth. Written straight to StatusLog rather than through Message, which would flash sixteen
+            // lines through the status line to say them.
+            double hi = pr.Positions.Max(q => q.Z) - plateOff, lo = pr.Positions.Min(q => q.Z) - plateOff;
+            CNC.Core.StatusLog.Write("info", "heightmap", string.Format(CultureInfo.InvariantCulture,
+                "{0} points probed, {1} x {2} grid{3}", map.TotalPoints, map.SizeX, map.SizeY,
+                plateOff > 0d ? string.Format(CultureInfo.InvariantCulture, " (touch plate {0:0.###} mm removed from every reading)", plateOff) : string.Empty));
+
+            foreach (var line in probed)
+                CNC.Core.StatusLog.Write("info", "heightmap", line);
+
+            CNC.Core.StatusLog.Write("info", "heightmap", string.Format(CultureInfo.InvariantCulture,
+                "highest {0:0.###}, lowest {1:0.###}, range {2:0.###} mm", hi, lo, hi - lo));
 
             HeightMap.Map = map;
             HeightMap.HasHeightMap = true;
