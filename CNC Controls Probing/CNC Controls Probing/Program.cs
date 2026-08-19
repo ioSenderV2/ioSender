@@ -470,6 +470,7 @@ namespace CNC.Controls.Probing
                                     //if ((isProbing = _program[step].Contains("G38")) && !IsProbeReady())
                                     //    response = "probe!";
                                     //else
+                                        WaitForDispatchable();
                                         Grbl.ExecuteCommand(_program[step]);
                                 }
                             }
@@ -506,6 +507,35 @@ namespace CNC.Controls.Probing
             probing.Program.AddProbingAction(AxisFlags.Z, true);
 
             return probing.Program.Execute(true) && probing.Positions.Count == 1;
+        }
+
+        /// <summary>
+        /// Hold until the dispatcher will actually accept a command.
+        ///
+        /// JobRunner.SendCommand DROPS g-code, silently and without queueing, whenever streamingState is
+        /// Send - and this engine dispatches its next step the instant the previous "ok" arrives, which for
+        /// a long move is milliseconds before the streaming state has finished transitioning back. So the
+        /// step after a probe went nowhere: no wire traffic, no error, and a run that sat waiting for the
+        /// reply to a command that was never sent (2026-08-19, "SendCommand DROPPED G0Z2 -
+        /// streamingState=Send is not in the allowed set" - the retract after a successful probe).
+        ///
+        /// Waiting here rather than widening SendCommand's allowed set: the gate exists to keep typed
+        /// commands out of an active stream, which is right, and this engine is simply faster off the ack
+        /// than the state machine is. The race is ours, so the wait is ours.
+        ///
+        /// Bounded, and it pumps: a state that never clears must not become a frozen UI. Falling through on
+        /// timeout leaves the pre-existing behaviour (the command is dropped and the run stalls), which is no
+        /// worse than before and still visible in the log.
+        /// </summary>
+        private void WaitForDispatchable()
+        {
+            var until = DateTime.Now.AddMilliseconds(2000d);
+
+            while (Grbl.StreamingState == StreamingState.Send && DateTime.Now < until)
+                EventUtils.DoEvents();
+
+            if (Grbl.StreamingState == StreamingState.Send && Grbl.ResponseLogVerbose)
+                Grbl.ResponseLog.Add("PM: still streaming after 2s - the next command may be dropped");
         }
 
         private void ResponseReceived(string response)
