@@ -711,11 +711,64 @@ namespace CNC.Controls
             AppConfig.Settings.Save();
         }
 
+        // Set by LoadCurrentSettingsCore when any value it wanted had not arrived yet.
+        private bool settingsIncomplete;
+
+        // How many times a load may reschedule itself before giving up. Bounded so a controller that never
+        // answers cannot leave a timer running for the life of the session.
+        private int settingsRetries;
+
         private void LoadCurrentSettings()
         {
             _loading = true;
+            settingsIncomplete = false;
             try { LoadCurrentSettingsCore(); }
             finally { _loading = false; _userEdited = false; }   // fields now mirror the controller again
+
+            if (settingsIncomplete)
+                ScheduleSettingsReload();
+            else
+                settingsRetries = 0;
+        }
+
+        /// <summary>
+        /// Come back for the settings that had not arrived.
+        ///
+        /// The page reads GrblSettings synchronously on activation, and a $$ reply can land after that -
+        /// measured at 441ms on real hardware. There is a SettingsReloaded event for exactly this, but it
+        /// did not repair the case above, and a page showing invented numbers for the machine's travel is
+        /// not something to leave resting on one mechanism.
+        ///
+        /// Gives up rather than retrying for ever, and never runs over the operator's own typing.
+        /// </summary>
+        private void ScheduleSettingsReload()
+        {
+            if (settingsRetries >= 6)
+            {
+                CNC.Core.DebugLog.Write("setup", "settings still incomplete after 6 attempts - giving up; fields left as they were");
+                return;
+            }
+
+            settingsRetries++;
+
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400d) };
+            timer.Tick += (s2, e2) =>
+            {
+                timer.Stop();
+
+                // Same guards the SettingsReloaded handler applies: not if the page has been left, and never
+                // over edits the operator has made in the meantime.
+                if (!_settingsHookAttached || _userEdited)
+                    return;
+
+                CNC.Core.DebugLog.Write("setup", string.Format("re-reading settings (attempt {0})", settingsRetries));
+                BuildAxes();
+                LoadCurrentSettings();
+                BuildReview();
+                UpdateApplyState();
+                RefreshStepColors();
+            };
+            timer.Start();
         }
 
         // Re-read the controller's settings into the page when they change underneath it - the wizard used to
@@ -806,22 +859,39 @@ namespace CNC.Controls
 
             foreach (var axis in Setup.Axes)
             {
+                // NaN means the setting has not arrived, which is NOT the same as a machine with no travel -
+                // and overwriting a good value with 0 because the answer is still in flight is how this page
+                // came to show a "trashed" setup while the controller was perfectly fine.
+                //
+                // Observed 2026-08-20: the page read $130-$132 at 00:55:46.328 and the controller's reply
+                // landed at 00:55:46.769, 441ms later. The read is synchronous, the dump is not.
+                //
+                // So an absent value leaves the field ALONE. Whatever was there - a real value from a
+                // previous load, or the untouched default - is a better answer than a fabricated zero,
+                // because zero is a number the operator cannot distinguish from a measurement.
                 double stored = GrblSettings.GetDouble(GrblSetting.MaxTravelBase + axis.Index);
 
-                // Say so when the controller's travel does not come back. The page shows 0 in that case,
-                // which looks exactly like a machine configured with no travel - and the operator cannot
-                // tell the two apart from the table. Logged with the axis index and the setting id actually
-                // asked for, because a wrong index would produce the same empty answer as a missing value.
-                if (!(stored > 0d))
+                if (double.IsNaN(stored))
+                {
+                    settingsIncomplete = true;
                     CNC.Core.DebugLog.Write("setup", string.Format(
-                        "axis {0} (index {1}): ${2} read back as '{3}' - travel shown as 0 and NOT written by Apply",
-                        axis.Letter, axis.Index, (int)(GrblSetting.MaxTravelBase + axis.Index), stored));
+                        "axis {0} (index {1}): ${2} has not arrived yet - field left as it was, re-read scheduled",
+                        axis.Letter, axis.Index, (int)(GrblSetting.MaxTravelBase + axis.Index)));
+                }
+                else
+                    axis.MaxTravel = stored > 0d ? stored : 0d;   // table value IS $13x (max travel); no pull-off fudge
 
-                axis.MaxTravel = stored > 0d ? stored : 0d;   // table value IS $13x (max travel); no pull-off fudge
                 double rate = GrblSettings.GetDouble(GrblSetting.MaxFeedRateBase + axis.Index);
-                axis.MaxRate = rate > 0d ? rate : axis.DefaultMaxRate;   // keep an existing rate, else a stepper-friendly default
+                if (double.IsNaN(rate))
+                    settingsIncomplete = true;
+                else
+                    axis.MaxRate = rate > 0d ? rate : axis.DefaultMaxRate;   // keep an existing rate, else a stepper-friendly default
+
                 double steps = GrblSettings.GetDouble(GrblSetting.TravelResolutionBase + axis.Index);
-                axis.StepsPerMm = steps > 0d ? steps : 0d;   // 0 = unknown; a preset (or the calibration tab) can fill it
+                if (double.IsNaN(steps))
+                    settingsIncomplete = true;
+                else
+                    axis.StepsPerMm = steps > 0d ? steps : 0d;   // 0 = unknown; a preset (or the calibration tab) can fill it
                 axis.InvertDirection = (dirMask & axis.Bit) != 0;
                 axis.LimitNormallyClosed = (limitMask & axis.Bit) != 0;
                 axis.HomeAtMin = (homeMask & axis.Bit) != 0;
