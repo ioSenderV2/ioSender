@@ -372,9 +372,45 @@ namespace GCode_Sender
                     viewport == null ? -1 : viewport.Children.Count,
                     sized ? "zooming to extents" : "NOT sized - nothing to frame yet"));
 
-                if (sized)
-                    viewport.ZoomExtents();
+                if (!sized)
+                    return;
+
+                ZoomAndReport("first");
+
+                // Again, later. The first attempt can run before the mesh visual has picked up its geometry:
+                // the binding is only evaluated once the tab's content enters the visual tree, which on the
+                // first showing of the tab happens in the SAME layout pass this callback belongs to. Zooming
+                // to the extents of a scene whose geometry has not landed yet frames nothing, and leaves the
+                // camera pointing at empty space when it does land moments later.
+                //
+                // ContextIdle runs after layout and rendering have finished, so by then the bounds are real.
+                // Cheap enough to do unconditionally rather than trying to detect which case this was.
+                Dispatcher.BeginInvoke(new System.Action(() => ZoomAndReport("settled")),
+                                       System.Windows.Threading.DispatcherPriority.ContextIdle);
             }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        /// <summary>
+        /// Zoom to the scene, recording where the camera ended up.
+        ///
+        /// The camera position is the tell: ZoomExtents on a scene with no bounds leaves it exactly where it
+        /// was (0,0,100 from the XAML), while a real zoom moves it out to frame an 839 x 773 board. Two
+        /// identical "zooming to extents" log lines could not distinguish those; the position can.
+        /// </summary>
+        private void ZoomAndReport(string when)
+        {
+            if (viewport == null)
+                return;
+
+            viewport.ZoomExtents();
+
+            var cam = viewport.Camera as System.Windows.Media.Media3D.ProjectionCamera;
+            CNC.Core.DebugLog.Write("heightmap", string.Format(CultureInfo.InvariantCulture,
+                "frame ({0}): camera now at {1:0.###},{2:0.###},{3:0.###}",
+                when,
+                cam == null ? 0d : cam.Position.X,
+                cam == null ? 0d : cam.Position.Y,
+                cam == null ? 0d : cam.Position.Z));
         }
 
         /// <summary>
