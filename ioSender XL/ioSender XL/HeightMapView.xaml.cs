@@ -72,18 +72,55 @@ namespace GCode_Sender
         // they need no change notification back the other way, and this view is not an INotifyPropertyChanged
         // (its bindings otherwise go through the HeightMap sub-VM, which is).
 
-        private int _divX = 4, _divY = 4;
-
+        // Straight through to the persisted section - see HeightMapConfig. Held there rather than in fields
+        // so a choice made once survives the session, and so the Area radio cannot end up disagreeing with
+        // the numbers beside it.
         public int DivisionsX
         {
-            get { return _divX; }
-            set { _divX = Math.Max(2, value); UpdateAreaModeUi(); }
+            get { return HeightMapConfig.Current.DivisionsX; }
+            set { HeightMapConfig.Current.DivisionsX = Math.Max(2, value); SaveConfig(); UpdateAreaModeUi(); }
         }
 
         public int DivisionsY
         {
-            get { return _divY; }
-            set { _divY = Math.Max(2, value); UpdateAreaModeUi(); }
+            get { return HeightMapConfig.Current.DivisionsY; }
+            set { HeightMapConfig.Current.DivisionsY = Math.Max(2, value); SaveConfig(); UpdateAreaModeUi(); }
+        }
+
+        private void SaveConfig()
+        {
+            if (!loadingConfig)
+                AppConfig.Settings.Save();
+        }
+
+        private bool loadingConfig;
+
+        /// <summary>
+        /// Put the page back the way it was left, including the Area radio - which is the one control here
+        /// that XAML re-asserts on every build, and so the one that silently reverted while everything
+        /// beside it appeared to be remembered.
+        /// </summary>
+        private void LoadConfig()
+        {
+            var cfg = HeightMapConfig.Current;
+
+            loadingConfig = true;
+            try
+            {
+                HeightMap.AddPause = cfg.HoldAtEachPoint;
+
+                if (cfg.FullWorkSurface)
+                {
+                    rbAreaTable.IsChecked = true;   // drives Area through its Checked handler
+                    Area = AreaSource.FullTravel;
+                }
+                else
+                {
+                    rbAreaProgram.IsChecked = true;
+                    Area = AreaSource.Program;
+                }
+            }
+            finally { loadingConfig = false; }
         }
 
         /// <summary>
@@ -119,12 +156,10 @@ namespace GCode_Sender
         /// measured at 0.884mm across its whole width is roughly a five-fold margin, and every millimetre of
         /// it costs only travel at search speed.
         /// </summary>
-        private double _dropAllowance = 5d;
-
         public double DropAllowance
         {
-            get { return _dropAllowance; }
-            set { _dropAllowance = Math.Max(0.5d, value); UpdateAreaModeUi(); }
+            get { return HeightMapConfig.Current.DropAllowance; }
+            set { HeightMapConfig.Current.DropAllowance = Math.Max(0.5d, value); SaveConfig(); UpdateAreaModeUi(); }
         }
 
         /// <summary>
@@ -186,6 +221,7 @@ namespace GCode_Sender
                 // realtime reports, and the DRO/preview want them too - so turn it back on while this tab is up.
                 model?.Poller.SetState(AppConfig.Settings.Base.PollInterval);
                 RefreshProbes();
+                LoadConfig();
                 DefaultArea();
                 RefreshPreview();
                 if (primaryStyle == null)
@@ -341,7 +377,41 @@ namespace GCode_Sender
                 points.Points == null ? -1 : points.Points.Count,
                 HeightMap.Map.SizeX, HeightMap.Map.SizeY, HeightMap.Map.MinHeight, HeightMap.Map.MaxHeight));
 
+            UpdateLegend();
             FrameSurface();
+        }
+
+        /// <summary>
+        /// Label the colour ramp with the heights it actually represents.
+        ///
+        /// The ramp is relative to THIS map - blue is always its lowest point and purple its highest - so
+        /// without the numbers a colour says nothing about how far anything is from anything. On a board
+        /// flat to under a millimetre the full spread of colour is genuinely alarming until the labels
+        /// show it spans 0.8mm.
+        ///
+        /// Stated as depth BELOW the highest point, because that is the number that matters when surfacing:
+        /// the high point is where the cutter touches first, and everything else is how much further it has
+        /// to go.
+        /// </summary>
+        private void UpdateLegend()
+        {
+            if (pnlLegend == null)
+                return;
+
+            var map = HeightMap.Map;
+            if (map == null)
+            {
+                pnlLegend.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            double range = map.MaxHeight - map.MinHeight;
+
+            txtLegendHigh.Text = "0.000 (high)";
+            txtLegendLow.Text = string.Format(CultureInfo.InvariantCulture, "{0:0.###} (low)", -range);
+            txtLegendRange.Text = string.Format(CultureInfo.InvariantCulture, "range{0}{1:0.###} mm",
+                                                char.ConvertFromUtf32(10), range);
+            pnlLegend.Visibility = Visibility.Visible;
         }
 
         /// <summary>
@@ -1329,8 +1399,17 @@ namespace GCode_Sender
             RefreshPreview();
         }
 
-        private void AreaProgram_Checked(object sender, RoutedEventArgs e) { Area = AreaSource.Program; }
-        private void AreaTable_Checked(object sender, RoutedEventArgs e) { Area = AreaSource.FullTravel; }
+        private void AreaProgram_Checked(object sender, RoutedEventArgs e) { Area = AreaSource.Program; RememberArea(false); }
+        private void AreaTable_Checked(object sender, RoutedEventArgs e) { Area = AreaSource.FullTravel; RememberArea(true); }
+
+        private void RememberArea(bool full)
+        {
+            if (loadingConfig)
+                return;
+            HeightMapConfig.Current.FullWorkSurface = full;
+            HeightMapConfig.Current.HoldAtEachPoint = HeightMap.AddPause;
+            AppConfig.Settings.Save();
+        }
 
         private void cbxProbe_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {

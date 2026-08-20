@@ -775,6 +775,10 @@ namespace CNC.Controls
             // the gantry can reach past the board to the toolsetter and must keep being allowed to.
             ConfigStore.Register(new OwnedSection<WorkSurface>("WorkSurface"));
 
+            // Height Map tab choices - notably which area the grid covers, which decides whether the run
+            // sets the work origin from the table or trusts one that is already there.
+            ConfigStore.Register(new OwnedSection<HeightMapConfig>("HeightMap"));
+
             // Workholding fixture library (Machine Setup: Fixture definitions; selected by Start Job) -
             // replaces the retired G28 named-position combo. Needs the ObservableCollection-mirror callback
             // (for the wizard's DataGrid), so it registers via XmlObjectSection directly rather than

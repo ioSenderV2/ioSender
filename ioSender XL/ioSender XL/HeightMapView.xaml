@@ -186,6 +186,7 @@
             </TabItem>
 
             <TabItem x:Uid="hm_tabSurface" x:Name="tabSurface" Header="Surface Map">
+              <Grid>
             <!-- DataContext pinned to this view so the Visual3D children below can bind at all.
                  RelativeSource FindAncestor walks the FrameworkElement tree, and a Visual3D is not in it -
                  those bindings failed silently, the mesh never reached the visual, and the scene therefore
@@ -221,6 +222,37 @@
                 <helix:LinesVisual3D Thickness="1" Color="Lime" Points="{Binding Path=HeightMap.BoundaryPoints}"/>
                 <helix:PointsVisual3D Size="4" Color="Red" Points="{Binding Path=HeightMap.MapPoints}"/>
             </helix:HelixViewport3D>
+
+                <!-- Legend. The bar's gradient is the SAME ramp the mesh material uses, in the same order,
+                     so the two cannot drift apart into saying different things about the same colour.
+                     Bottom-up (StartPoint 0,1) because low belongs at the bottom. -->
+                <Border x:Name="pnlLegend" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0"
+                        Background="#CCFFFFFF" BorderBrush="#40000000" BorderThickness="1" CornerRadius="3"
+                        Padding="6,5" Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock x:Uid="hm_legendTitle" Text="Height" FontWeight="SemiBold" FontSize="11" Margin="0,0,0,4"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Border Width="14" Height="110" BorderBrush="#60000000" BorderThickness="1">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
+                                        <GradientStop Color="Blue" Offset="0"/>
+                                        <GradientStop Color="Cyan" Offset="0.2"/>
+                                        <GradientStop Color="Green" Offset="0.4"/>
+                                        <GradientStop Color="Yellow" Offset="0.6"/>
+                                        <GradientStop Color="Red" Offset="0.8"/>
+                                        <GradientStop Color="Purple" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                            <Grid Margin="5,0,0,0" Height="110">
+                                <TextBlock x:Name="txtLegendHigh" FontSize="11" VerticalAlignment="Top"/>
+                                <TextBlock x:Name="txtLegendRange" FontSize="10" Foreground="#586069" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="txtLegendLow" FontSize="11" VerticalAlignment="Bottom"/>
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+              </Grid>
             </TabItem>
             </TabControl>
         </Grid>

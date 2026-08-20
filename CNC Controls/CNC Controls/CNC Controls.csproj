@@ -95,6 +95,7 @@
     <Compile Include="TabOrderConfig.cs" />
     <Compile Include="SvgLaserSettings.cs" />
     <Compile Include="WorkSurface.cs" />
+    <Compile Include="HeightMapConfig.cs" />
     <Compile Include="RestorePoint.cs" />
     <Compile Include="SettingsPanelRegistry.cs" />
     <Compile Include="SettingsNavNode.cs" />
