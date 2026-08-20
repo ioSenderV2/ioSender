@@ -98,22 +98,27 @@ namespace GCode_Sender
         ///
         /// Deliberately a small constant rather than a fraction of the probe's search distance. What this
         /// height has to clear is the plate, which does not get thicker because the probe searches further -
-        /// and everything above the plate is search range spent before the probe starts looking for the
-        /// board.
+        /// and everything above the plate is search range spent before the probe starts looking.
+        ///
+        /// The gap the plate actually slides through is this PLUS its own thickness, because the plate was
+        /// what held the tool up at the previous point.
         /// </summary>
-        private const double PlateClearance = 15d;
+        private const double PlateClearance = 10d;
 
         /// <summary>
-        /// How much LOWER than the previous point the next one is allowed to be and still be found.
+        /// How much LOWER than the previous point the next one may be and still be found.
         ///
-        /// After the first probe the surface height is known, so every later probe only has to cover the lift
-        /// off the last point plus however much the board falls away between the two. Using the probe
-        /// definition's full search distance instead is both pointless and dangerous: from a start already
-        /// most of the way down the Z axis, a 50mm search targets a depth past the soft limit and alarms
-        /// before it moves (2026-08-19, G38.3 Z-50 from Z-81.8 targeting -131.8 against a floor near -129 -
-        /// travel less the homing pull-off, which grblHAL reserves).
+        /// This is the ONLY margin a later probe has. Its search is the lift plus this, so setting it to
+        /// zero - making the search equal the lift - means the probe stops exactly at the height the last
+        /// point triggered and finds nothing the moment the board falls away at all. Point 15 of 16 failed
+        /// on 2026-08-19 with 3mm of margin; zero would fail on the first downward slope.
+        ///
+        /// It has to absorb two things, not one: how far the board drops between adjacent points, and how
+        /// differently the operator seats the plate from one point to the next. 5mm against a board measured
+        /// at 0.884mm across its whole width is roughly a five-fold margin, and every millimetre of it costs
+        /// only probe travel at search speed.
         /// </summary>
-        private const double BoardVariation = 10d;
+        private const double BoardVariation = 5d;
 
         /// <summary>
         /// Thickness to take off every probed Z, in mm.
@@ -682,6 +687,8 @@ namespace GCode_Sender
 
                 // The first point of ANY attempt searches long: on a fresh run nothing knows where the board
                 // is, and on a resume the relative chain that knew has been broken by whatever stopped it.
+                // Search is the lift PLUS an allowance, never just the lift: a probe that stops exactly where
+                // the last one triggered cannot find a point that is any lower at all.
                 double thisSearch = i == startIndex ? searchZ : Math.Min(probeDrop, hover + BoardVariation);
 
                 pr.Program.AddMessage(string.Format(CultureInfo.InvariantCulture,
