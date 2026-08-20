@@ -186,13 +186,19 @@
             </TabItem>
 
             <TabItem x:Uid="hm_tabSurface" x:Name="tabSurface" Header="Surface Map">
+            <!-- DataContext pinned to this view so the Visual3D children below can bind at all.
+                 RelativeSource FindAncestor walks the FrameworkElement tree, and a Visual3D is not in it -
+                 those bindings failed silently, the mesh never reached the visual, and the scene therefore
+                 had no bounds for ZoomExtents to find. The Probing tab's copy of this viewport always bound
+                 through DataContext, which is why it renders and this one never did. -->
             <helix:HelixViewport3D x:Name="viewport" ZoomExtentsWhenLoaded="True"
+                                   DataContext="{Binding RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
                                    RotateAroundMouseDownPoint="True" ZoomAroundMouseDownPoint="True">
                 <helix:HelixViewport3D.Camera>
                     <PerspectiveCamera Position="0,0,100" LookDirection="0,0,-100" UpDirection="0,1,0.5" FieldOfView="61" NearPlaneDistance="0.001"/>
                 </helix:HelixViewport3D.Camera>
                 <helix:DefaultLights/>
-                <helix:MeshGeometryVisual3D MeshGeometry="{Binding HeightMap.MeshGeometry, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}">
+                <helix:MeshGeometryVisual3D MeshGeometry="{Binding Path=HeightMap.MeshGeometry}">
                     <helix:MeshGeometryVisual3D.Material>
                         <MaterialGroup>
                             <DiffuseMaterial>
@@ -212,8 +218,8 @@
                         </MaterialGroup>
                     </helix:MeshGeometryVisual3D.Material>
                 </helix:MeshGeometryVisual3D>
-                <helix:LinesVisual3D Thickness="1" Color="Lime" Points="{Binding HeightMap.BoundaryPoints, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
-                <helix:PointsVisual3D Size="4" Color="Red" Points="{Binding HeightMap.MapPoints, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
+                <helix:LinesVisual3D Thickness="1" Color="Lime" Points="{Binding Path=HeightMap.BoundaryPoints}"/>
+                <helix:PointsVisual3D Size="4" Color="Red" Points="{Binding Path=HeightMap.MapPoints}"/>
             </helix:HelixViewport3D>
             </TabItem>
             </TabControl>
