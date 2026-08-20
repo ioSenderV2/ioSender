@@ -1397,10 +1397,22 @@ namespace CNC.Controls
             return XY(raster[0]);
         }
 
+        /// <summary>
+        /// Feed for the test plunge, mm/min. Deliberately slow enough to watch and to stop: one plunge of a
+        /// millimetre or so costs a fraction of a second either way, and the whole point of the cut is to be
+        /// observed rather than completed quickly.
+        /// </summary>
+        private const double TestPlungeFeed = 300d;
+
         private static void AppendTestPlunge(List<string> lines, double z, double plungeFeed)
         {
             lines.Add("(test plunge - the cut depth is reached once, then the tool lifts so it can be measured)");
-            lines.Add(string.Format(CultureInfo.InvariantCulture, "G1 Z{0} F{1}", F(z), F(plungeFeed > 0d ? plungeFeed : 200d)));
+            // Genuinely slow, not merely "the plunge feed". A surfacing plunge feed is sized for production -
+            // 7920 mm/min on a real setup, and even clamped to the machine's Z maximum that is ~76 mm/s -
+            // which makes a wrong depth an impact rather than the observable cut this is supposed to be.
+            // Capped so the sentence "it plunges slowly so you can stop it" is actually true.
+            double testFeed = Math.Min(plungeFeed > 0d ? plungeFeed : TestPlungeFeed, TestPlungeFeed);
+            lines.Add(string.Format(CultureInfo.InvariantCulture, "G1 Z{0} F{1}", F(z), F(testFeed)));
             lines.Add("G4 P0.5");
             lines.Add("G0 Z0");
             lines.Add("(WAITIDLE)");
