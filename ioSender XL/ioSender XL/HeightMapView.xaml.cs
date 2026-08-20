@@ -352,6 +352,12 @@ namespace GCode_Sender
             btnStop.IsEnabled = busy;
             btnContinue.IsEnabled = holding;
 
+            // Retry is offered only when there is something to resume INTO and the controller is in a state
+            // it can be brought out of. An unrecoverable alarm - one that lost machine position - must not
+            // be offered a resume: the readings already taken are referenced to an origin the machine can no
+            // longer find, and continuing would build a map out of two different coordinate systems.
+            btnRetry.IsEnabled = !busy && CanResume;
+
             // The blue button is whichever one the operator is meant to press next. Idle, that is Start;
             // holding for the plate to be moved, it is Continue - the one moment in the run where the machine
             // is waiting on a person, and it should be obvious which button ends the wait.
@@ -366,6 +372,11 @@ namespace GCode_Sender
         {
             if (runActive)
                 return;   // a second Start must not stack a run on top of the one already going
+
+            // A fresh Start is a fresh map: readings kept for a Retry belong to the run that was
+            // interrupted, and carrying them into a new one would mix two surveys.
+            savedPositions.Clear();
+            resumeFrom = 1;
 
             runActive = true;
             UpdateRunUi();
@@ -387,7 +398,60 @@ namespace GCode_Sender
             }
         }
 
-        private void StartProbing()
+        // ---- resume state, carried between attempts ----
+        //
+        // A run that dies at point 15 of 16 has fifteen good readings in it. Throwing them away and asking
+        // the operator to place the plate fifteen more times is the difference between a recoverable
+        // interruption and an afternoon.
+
+        /// <summary>Readings kept from earlier attempts at THIS map, in point order.</summary>
+        private readonly List<Position> savedPositions = new List<Position>();
+
+        /// <summary>1-based point the next attempt starts at; 1 means a fresh run.</summary>
+        private int resumeFrom = 1;
+
+        /// <summary>Grid the saved readings belong to - a retry must not resume into a different one.</summary>
+        private int savedSizeX, savedSizeY;
+
+        /// <summary>One grid point: where it is in the map, and where that is on the table.</summary>
+        private struct GridPoint
+        {
+            public int Col, Row;
+            public double X, Y;
+        }
+
+        /// <summary>
+        /// Every point in probe order - serpentine, flipping Y direction each column to keep the traverses
+        /// short.
+        ///
+        /// ONE definition of that order, used by the program builder, the resume logic and the read-back
+        /// alike. It was previously written out as a nested loop in the builder and again in BuildMap, which
+        /// is a standing invitation for the two to disagree about which reading belongs in which cell - and
+        /// a map whose readings are transposed looks entirely plausible right up until it cuts.
+        /// </summary>
+        private List<GridPoint> PointOrder(CNC.Controls.Probing.HeightMap map)
+        {
+            var order = new List<GridPoint>();
+
+            for (int col = 0; col < map.SizeX; col++)
+            {
+                for (int i = 0; i < map.SizeY; i++)
+                {
+                    int row = (col % 2 == 0) ? i : map.SizeY - 1 - i;
+                    order.Add(new GridPoint
+                    {
+                        Col = col,
+                        Row = row,
+                        X = HeightMap.MinX + col * map.GridX,
+                        Y = HeightMap.MinY + row * map.GridY
+                    });
+                }
+            }
+
+            return order;
+        }
+
+        private void StartProbing(int fromPoint = 1)
         {
             if (model == null)
                 model = DataContext as GrblViewModel ?? CNC.Core.Grbl.GrblViewModel;
@@ -418,7 +482,9 @@ namespace GCode_Sender
             // Placing the XY origin before probing rather than after is not just convenience: the probed
             // points are recorded as machine coordinates (PRB:), so anchoring afterwards would mean holding
             // the grid in one frame and the results in another for the whole run.
-            if (Area == AreaSource.FullTravel && !AnchorWorkOriginToTable())
+            // Only on a fresh run: a resume continues in the frame the earlier attempt established, and
+            // re-anchoring would move the origin out from under readings already taken against it.
+            if (fromPoint <= 1 && Area == AreaSource.FullTravel && !AnchorWorkOriginToTable())
                 return;
 
             // Watch the correct probe input for the chosen probe (main probe for height mapping), the same rule the
@@ -474,8 +540,27 @@ namespace GCode_Sender
             if (Area == AreaSource.FullTravel)
                 pr.WaitForIdle("G53G0Z0");
 
-            // Map origin = the area's min corner in the current work coordinates (e.g. G54 X0Y0).
-            var startpos = new Position(pr.HeightMap.MinX, pr.HeightMap.MinY, 0d);
+            // The map is built HERE, before anything moves: its grid is what says where the first point of
+            // this attempt actually is, and on a resume that is not the map's corner.
+            CNC.Controls.Probing.HeightMap map;
+            try
+            {
+                map = new CNC.Controls.Probing.HeightMap(pr.HeightMap.GridSizeX, pr.HeightMap.GridSizeY,
+                    new Vector2(pr.HeightMap.MinX, pr.HeightMap.MinY), new Vector2(pr.HeightMap.MaxX, pr.HeightMap.MaxY));
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show(ex.Message, "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            // Where this attempt begins: the map's corner for a fresh run, or the point that failed for a
+            // resume. Positioned ABSOLUTELY, which is what makes a resume safe - the relative chain that
+            // carries the run from point to point is exactly what an alarm breaks, so it is not relied on to
+            // get back.
+            var order = PointOrder(map);
+            int startIndex = Math.Max(0, Math.Min(fromPoint - 1, order.Count - 1));
+            var startpos = new Position(order[startIndex].X, order[startIndex].Y, 0d);
 
             if (!pr.WaitForIdle(string.Format("G90G0X{0}Y{1}", startpos.X.ToInvariantString(model.Format), startpos.Y.ToInvariantString(model.Format))))
             {
@@ -490,17 +575,6 @@ namespace GCode_Sender
                 return;
             }
 
-            CNC.Controls.Probing.HeightMap map;
-            try
-            {
-                map = new CNC.Controls.Probing.HeightMap(pr.HeightMap.GridSizeX, pr.HeightMap.GridSizeY,
-                    new Vector2(pr.HeightMap.MinX, pr.HeightMap.MinY), new Vector2(pr.HeightMap.MaxX, pr.HeightMap.MaxY));
-            }
-            catch (Exception ex)
-            {
-                AppDialogs.Show(ex.Message, "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                return;
-            }
             pr.HeightMap.Map = map;
             HeightMap.HasHeightMap = false;
             HeightMap.CanApply = false;
@@ -553,63 +627,48 @@ namespace GCode_Sender
                 probeDrop, hover, pr.ProbeFeedRate));
 
             pr.Program.Add(string.Format("G91F{0}", pr.ProbeFeedRate.ToInvariantString()));
-            double dir = 1d;
-            int point = 0, points = map.SizeX * map.SizeY;
-            for (int x = 0; x < map.SizeX; x++)
+
+            for (int i = startIndex; i < order.Count; i++)
             {
-                for (int y = 0; y < map.SizeY; y++)
+                int point = i + 1;
+                var here = order[i];
+
+                // Traverse from the previous point, as a relative step. Not emitted for the first point of
+                // this attempt: the machine was positioned there absolutely, above.
+                if (i > startIndex)
                 {
-                    ++point;
-
-                    // Target of THIS point in the work frame, so the log names where it is going rather than
-                    // the relative step that gets it there - a serpentine of G91 increments is unreadable
-                    // after the fact, and "which point was it on" is the first question every failure asks.
-                    double tx = HeightMap.MinX + x * map.GridX;
-                    double ty = HeightMap.MinY + (dir > 0d ? y : map.SizeY - 1 - y) * map.GridY;
-                    // The first point searches from the top of travel because nothing knows where the board
-                    // is; every later one starts a known 15mm above it and needs only that plus the board's
-                    // fall-away. Capped by the probe's own search distance, never exceeding it.
-                    double thisSearch = point == 1 ? searchZ : Math.Min(probeDrop, hover + BoardVariation);
-
-                    pr.Program.AddMessage(string.Format(CultureInfo.InvariantCulture,
-                        "Probing point {0} of {1} at X{2:0.###} Y{3:0.###}, searching {4:0.###} mm down...",
-                        point, points, tx, ty, thisSearch));
-
-                    // Same three facts to the log, where they survive the next status message overwriting
-                    // the line above. The search distance in particular is not visible anywhere else, and it
-                    // is what a soft-limit alarm on a probe is almost always about.
-                    CNC.Core.DebugLog.Write("heightmap", string.Format(CultureInfo.InvariantCulture,
-                        "point {0}/{1}: target X{2:0.###} Y{3:0.###} (work), probe down {4:0.###} mm, retract {5:0.###} mm",
-                        point, points, tx, ty, thisSearch, hover));
-
-                    // Hold before each point (never the first - the operator is already standing at it) so a
-                    // touch plate can be moved to the next spot. Without this the run rapids straight on and
-                    // probes bare board, which on a spoilboard means descending into something that will
-                    // never make contact.
-                    //
-                    // The mechanism is the Probing library's own: AddPause sets IsPaused and the run resumes
-                    // on Cycle Start (or the Continue button). This view had never called it, so the whole
-                    // movable-plate workflow was unavailable here even though the engine and the view model
-                    // property both existed.
-                    if (HeightMap.AddPause && point > 1)
-                        pr.Program.AddPause();
-
-
-                    // AddProbingAction composes the distance into the program text as it is added, so setting
-                    // ProbeDistance here varies it PER POINT even though it is a single view-model property.
-                    pr.ProbeDistance = thisSearch;
-                    pr.Program.AddProbingAction(AxisFlags.Z, true);
-
-                    // Relative retract from wherever this point triggered - NOT AddRapidToMPos(StartPosition),
-                    // which would climb back to the parked height after every single point.
-                    pr.Program.AddRapid(string.Format("Z{0}", hover.ToInvariantString(model.Format)));
-
-                    if (y < map.SizeY - 1)
-                        pr.Program.AddRapid(string.Format("Y{0}", (map.GridY * dir).ToInvariantString(model.Format)));
+                    double dx = here.X - order[i - 1].X, dy = here.Y - order[i - 1].Y;
+                    if (Math.Abs(dx) > 0.0005d)
+                        pr.Program.AddRapid(string.Format("X{0}", dx.ToInvariantString(model.Format)));
+                    if (Math.Abs(dy) > 0.0005d)
+                        pr.Program.AddRapid(string.Format("Y{0}", dy.ToInvariantString(model.Format)));
                 }
-                if (x < map.SizeX - 1)
-                    pr.Program.AddRapid(string.Format("X{0}", map.GridX.ToInvariantString(model.Format)));
-                dir *= -1d;
+
+                // The first point of ANY attempt searches long: on a fresh run nothing knows where the board
+                // is, and on a resume the relative chain that knew has been broken by whatever stopped it.
+                double thisSearch = i == startIndex ? searchZ : Math.Min(probeDrop, hover + BoardVariation);
+
+                pr.Program.AddMessage(string.Format(CultureInfo.InvariantCulture,
+                    "Probing point {0} of {1} at X{2:0.###} Y{3:0.###}, searching {4:0.###} mm down...",
+                    point, order.Count, here.X, here.Y, thisSearch));
+
+                CNC.Core.DebugLog.Write("heightmap", string.Format(CultureInfo.InvariantCulture,
+                    "point {0}/{1}: grid [{2},{3}] target X{4:0.###} Y{5:0.###} (work), probe down {6:0.###} mm, retract {7:0.###} mm",
+                    point, order.Count, here.Col, here.Row, here.X, here.Y, thisSearch, hover));
+
+                // Hold so the plate can be moved - never before the first point of an attempt, where the
+                // operator is already standing at it.
+                if (HeightMap.AddPause && i > startIndex)
+                    pr.Program.AddPause();
+
+                // AddProbingAction composes the distance into the program text as it is added, so setting
+                // ProbeDistance here varies it PER POINT even though it is a single view-model property.
+                pr.ProbeDistance = thisSearch;
+                pr.Program.AddProbingAction(AxisFlags.Z, true);
+
+                // Relative retract from wherever this point triggered - NOT AddRapidToMPos(StartPosition),
+                // which would climb back to the parked height after every single point.
+                pr.Program.AddRapid(string.Format("Z{0}", hover.ToInvariantString(model.Format)));
             }
 
             // Publish the program so it can be READ before it moves anything - the Generate half of the
@@ -650,9 +709,22 @@ namespace GCode_Sender
             // unreached and IsJobRunning still set, and the app then refused to shut down for the build script
             // ("asked to close gracefully and is still up after 60s") long after the machine had gone idle.
             // A dialog nobody has dismissed is not a reason to still be busy.
+            // Everything this map has, across every attempt: earlier readings first, this attempt's after.
+            // The order list is the single authority on which cell each one belongs to, so a resumed run
+            // cannot land its readings anywhere but where the interrupted one left off.
+            var all = new List<Position>(savedPositions);
+            all.AddRange(pr.Positions);
+
             string mapWarning;
-            BuildMap(pr, map, out mapWarning);
+            BuildMap(all, order, map, out mapWarning);
             pr.Program.End(string.Empty);
+
+            // Keep what was gathered, so a Retry resumes instead of starting over.
+            savedPositions.Clear();
+            savedPositions.AddRange(all);
+            savedSizeX = map.SizeX;
+            savedSizeY = map.SizeY;
+            resumeFrom = all.Count + 1;
 
             if (mapWarning != null)
                 AppDialogs.Show(mapWarning, "Height map", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -688,26 +760,18 @@ namespace GCode_Sender
         /// The height has the touch plate taken off, so it is the BOARD, matching the Z0 this run sets - a
         /// log that disagreed with the origin by a plate thickness would be worse than no log.
         /// </summary>
-        private string DescribeProbedPoint(int n, int col, int row, CNC.Controls.Probing.HeightMap map,
-                                           double machineZ, double firstZ, double plateOff)
+        private string DescribeProbedPoint(int n, GridPoint at, double machineZ, double firstZ, double plateOff)
         {
             return string.Format(CultureInfo.InvariantCulture,
-                "point {0,2} [{1},{2}] X{3,8:0.###} Y{4,8:0.###}   Z {5,9:0.###}   {6,+7:0.###} vs first",
-                n, col, row,
-                HeightMap.MinX + col * map.GridX,
-                HeightMap.MinY + row * map.GridY,
-                machineZ - plateOff,
-                machineZ - firstZ);
+                "point {0,2} [{1},{2}] X{3,8:0.###} Y{4,8:0.###}   Z {5,9:0.###}   {6,7:0.###} vs first",
+                n, at.Col, at.Row, at.X, at.Y, machineZ - plateOff, machineZ - firstZ);
         }
 
         // Hosted in this page's own Program tab, NOT through MacroProcessor.PublishGenerated.
         //
         // PublishGenerated routes to MainWindow's overlay, which is right for a tab that lives in the main
         // window and wrong for this one: Height Map is menu-hostable, and when it opens in its own
-        // ViewHostWindow the overlay renders on the main window - behind the window being looked at. The
-        // program was published correctly and simply could not be seen (2026-08-19).
-        //
-        // AutoShow off for the same reason: nothing here should try to pop the main window's overlay.
+        // ViewHostWindow the overlay renders on the main window - behind the window being looked at.
         private CNC.Controls.ProgramView programView;
 
         private void ShowProgram(string text)
@@ -723,8 +787,8 @@ namespace GCode_Sender
 
             programView.SetProgramText(text);
 
-            // Keep a generated copy alongside the other tabs' programs. Worth having on its own: a probing
-            // run that drives the length of the Z axis should leave a record of exactly what it sent.
+            // Keep a generated copy alongside the other tabs' programs: a probing run that drives the length
+            // of the Z axis should leave a record of exactly what it sent.
             CNC.Core.MacroRunner.SaveGeneratedCopy("Height map", text);
         }
 
@@ -732,7 +796,7 @@ namespace GCode_Sender
         /// Render the probing engine's program as readable g-code.
         ///
         /// Three of its lines are engine markers rather than g-code, and handing them to a g-code viewer
-        /// would get them dropped or misparsed - which in a PREVIEW is the worst possible failure, because
+        /// would get them dropped or misparsed - which in a PREVIEW is the worst failure available, because
         /// the operator reads it as "this is what will run":
         ///
         ///   "#text"   a status message      -&gt; shown as a comment
@@ -763,6 +827,114 @@ namespace GCode_Sender
             }
 
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Whether a stopped run can be picked up where it left off.
+        ///
+        /// Three things have to hold: readings exist, the map they belong to is the one still configured,
+        /// and the machine has not lost its position. The last is the one that matters - grblHAL's own alarm
+        /// text says which alarms retain position ("Machine position retained") and which recommend
+        /// re-homing, and a resume across a lost position would merge readings from two different frames
+        /// into one map that looks entirely plausible.
+        /// </summary>
+        private bool CanResume
+        {
+            get
+            {
+                if (savedPositions.Count == 0 || HeightMap.Map == null)
+                    return false;
+                if (savedSizeX != DivisionsX || savedSizeY != DivisionsY)
+                    return false;   // the grid was changed after the failure - those readings are of another map
+                if (savedPositions.Count >= savedSizeX * savedSizeY)
+                    return false;   // nothing left to do
+
+                return PositionIsTrusted;
+            }
+        }
+
+        /// <summary>
+        /// True when the machine still knows where it is: either no alarm at all, or one of the alarms
+        /// grblHAL retains position through. Soft limit (2) is the one this run hits; door (7) and the
+        /// probe-fail pair (4, 5) also stop without moving the machine anywhere it did not know about.
+        /// </summary>
+        private bool PositionIsTrusted
+        {
+            get
+            {
+                // Deliberately NOT gated on IsMachinePosition: that reports whether the status line carries
+                // MPos, not whether the machine still knows where it is, and it stays true through a hard
+                // limit. The alarm code is the documented signal - grblHAL's own text distinguishes
+                // "Machine position retained" from "position is likely lost".
+                if (model == null)
+                    return false;
+                if (model.GrblState.State != GrblStates.Alarm)
+                    return true;
+
+                switch (model.GrblState.LastAlarm)
+                {
+                    case 2:     // soft limit - "Machine position retained"
+                    case 4:     // probe not in expected initial state
+                    case 5:     // probe did not contact
+                    case 7:     // safety door
+                        return true;
+                    default:
+                        return false;   // hard limit, reset while moving, homing faults - position is suspect
+                }
+            }
+        }
+
+        /// <summary>
+        /// Clear the alarm and carry on from where the run stopped.
+        ///
+        /// The resumed attempt re-parks Z at the top and positions ABSOLUTELY over the point that failed, so
+        /// nothing depends on the relative chain the interruption broke - see StartProbing.
+        /// </summary>
+        private void Retry_Click(object sender, RoutedEventArgs e)
+        {
+            if (runActive || !CanResume)
+                return;
+
+            int from = savedPositions.Count + 1;
+
+            if (AppDialogs.Show(string.Format(CultureInfo.InvariantCulture,
+                    "Carry on from point {0} of {1}?\n\n" +
+                    "The {2} readings already taken are kept. The alarm is cleared first, then Z lifts to the top and " +
+                    "the machine moves over point {0} before probing again.\n\n" +
+                    "Make sure the touch plate is at point {0} before continuing.",
+                    from, savedSizeX * savedSizeY, savedPositions.Count),
+                    "Height map", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) != MessageBoxResult.Yes)
+                return;
+
+            if (model.GrblState.State == GrblStates.Alarm)
+            {
+                model.ExecuteCommand(GrblConstants.CMD_UNLOCK);
+                if (probing != null)
+                    probing.WaitForIdle(string.Empty);
+            }
+
+            if (model.GrblState.State == GrblStates.Alarm)
+            {
+                AppDialogs.Show("The alarm did not clear, so nothing has been probed. Clear it from the Grbl tab and try again.",
+                                "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            runActive = true;
+            UpdateRunUi();
+            try
+            {
+                StartProbing(from);
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show(Loc("HmStartError") + "\r\n\r\n" + ex.Message, "Height map", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                runActive = false;
+                UpdateRunUi();
+            }
         }
 
         /// <summary>The WCS the controller currently has active, e.g. "G54"; G54 if it has not reported one.</summary>
@@ -929,52 +1101,36 @@ namespace GCode_Sender
 
         // Build the height map from the probed positions (delta from the first point). The read-back order
         // mirrors the serpentine probe order above so each result lands in the right grid cell.
-        private void BuildMap(ProbingViewModel pr, CNC.Controls.Probing.HeightMap map, out string warning)
+        private void BuildMap(List<Position> readings, List<GridPoint> order,
+                              CNC.Controls.Probing.HeightMap map, out string warning)
         {
             warning = null;
-            model.ResponseLog.Add(string.Format("HeightMap: captured {0} of {1} points", pr.Positions.Count, map.TotalPoints));
+            model.ResponseLog.Add(string.Format("HeightMap: {0} of {1} points captured", readings.Count, map.TotalPoints));
 
-            // Build from the probed points as long as we captured one per grid point - tolerate IsSuccess being
-            // cleared by a late probe-release event after the final point. Report clearly either way.
-            if (pr.Positions.Count != map.TotalPoints)
+            if (readings.Count != map.TotalPoints)
             {
                 // Handed back rather than shown - see the call site. Telling the operator has to wait until
                 // the run has actually been ended.
                 warning = string.Format(Loc("HmCaptureShort"),
-                    pr.Positions.Count, map.TotalPoints, string.IsNullOrEmpty(pr.Message) ? "" : "\r\n\r\n" + pr.Message);
+                    readings.Count, map.TotalPoints, string.Empty);
                 return;
             }
 
-            double z0 = pr.Positions[0].Z;
-            int i = 0;
-
-            // Grid cell each reading landed in, in probe order, so the log can name a point by where it is
-            // rather than by when it happened. Filled by the same serpentine walk that populates the map, so
-            // the two cannot disagree about which reading belongs where.
-            var probed = new List<string>();
+            // Readings are in probe order and so is the order list, so index i of one IS cell order[i] of the
+            // other. That is the whole reason the order exists in one place: the previous version walked the
+            // serpentine a second time here, and two independent walks agreeing is a thing you have to keep
+            // being lucky about.
+            double z0 = readings[0].Z;
             double plateOff = PlateThickness();
+            var probed = new List<string>();
 
-            for (int x = 0; x < map.SizeX; x++)
+            for (int i = 0; i < order.Count; i++)
             {
-                for (int y = 0; y < map.SizeY; y++)
-                {
-                    probed.Add(DescribeProbedPoint(probed.Count + 1, x, y, map, pr.Positions[i].Z, z0, plateOff));
-                    map.AddPoint(x, y, Math.Round(pr.Positions[i++].Z - z0, model.Precision));
-                }
-                if (++x < map.SizeX)
-                    for (int y = map.SizeY - 1; y >= 0; y--)
-                    {
-                        probed.Add(DescribeProbedPoint(probed.Count + 1, x, y, map, pr.Positions[i].Z, z0, plateOff));
-                        map.AddPoint(x, y, Math.Round(pr.Positions[i++].Z - z0, model.Precision));
-                    }
+                probed.Add(DescribeProbedPoint(i + 1, order[i], readings[i].Z, z0, plateOff));
+                map.AddPoint(order[i].Col, order[i].Row, Math.Round(readings[i].Z - z0, model.Precision));
             }
 
-            // Every reading into the status log, not just the range. The range answers "how much has to come
-            // off"; the individual heights answer "where is it high", which is the question you have as soon
-            // as a surfacing pass leaves something behind - and the map's 3D view cannot be read to a
-            // hundredth. Written straight to StatusLog rather than through Message, which would flash sixteen
-            // lines through the status line to say them.
-            double hi = pr.Positions.Max(q => q.Z) - plateOff, lo = pr.Positions.Min(q => q.Z) - plateOff;
+            double hi = readings.Max(q => q.Z) - plateOff, lo = readings.Min(q => q.Z) - plateOff;
             CNC.Core.StatusLog.Write("info", "heightmap", string.Format(CultureInfo.InvariantCulture,
                 "{0} points probed, {1} x {2} grid{3}", map.TotalPoints, map.SizeX, map.SizeY,
                 plateOff > 0d ? string.Format(CultureInfo.InvariantCulture, " (touch plate {0:0.###} mm removed from every reading)", plateOff) : string.Empty));

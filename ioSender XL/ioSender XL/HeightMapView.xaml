@@ -104,6 +104,8 @@
                             ToolTip="Start probing the height map grid."/>
                     <Button x:Uid="hm_continue" x:Name="btnContinue" Content="Continue" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Continue_Click" IsEnabled="False"
                             ToolTip="Resume a run that is holding for the touch plate to be moved. Cycle Start does the same thing."/>
+                    <Button x:Uid="hm_retry" x:Name="btnRetry" Content="Retry" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Retry_Click" IsEnabled="False"
+                            ToolTip="Clear the alarm and carry on from the point that failed, keeping the readings already taken. Only offered when the controller reports the alarm as recoverable."/>
                     <Button x:Uid="hm_stop" x:Name="btnStop" Content="Stop" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Stop_Click"
                             IsEnabled="False"
                             ToolTip="Cancel the height map probing in progress."/>
