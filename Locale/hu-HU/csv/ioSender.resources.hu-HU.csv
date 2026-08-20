@@ -255,3 +255,5 @@ ioSender.g.en-US.resources:heightmapview.baml,hm_tabProgram:System.Windows.Frame
 ioSender.g.en-US.resources:heightmapview.baml,hm_tabSteps:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Steps
 ioSender.g.en-US.resources:heightmapview.baml,hm_retry:System.Windows.Controls.ContentControl.Content,Button,True,True,,Retry
 ioSender.g.en-US.resources:heightmapview.baml,hm_retry:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Clear the alarm and carry on from the point that failed, keeping the readings already taken. Only offered when the controller reports the alarm as recoverable."
+ioSender.g.en-US.resources:heightmapview.baml,hm_allowance:CNC.Controls.NumericField.Label,None,False,True,,Drop allowance:
+ioSender.g.en-US.resources:heightmapview.baml,hm_allowance:CNC.Controls.NumericField.Unit,None,False,True,,mm

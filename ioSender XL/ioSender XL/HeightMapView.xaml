@@ -89,6 +89,10 @@
                                 <CheckBox x:Uid="hm_lock" Content="Lock" Margin="12,0,0,0" VerticalAlignment="Center"
                                     IsChecked="{Binding HeightMap.GridSizeLockXY, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                             </StackPanel>
+
+                            <cnccontrols:NumericField x:Uid="hm_allowance" Label="Drop allowance:" ColonAt="100" Unit="mm" Format="##0.0##" Margin="0,6,0,0"
+                                Value="{Binding DropAllowance, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                            <TextBlock x:Name="txtAllowanceNote" Foreground="#586069" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
                         </StackPanel>
                     </GroupBox>
 

@@ -106,19 +106,26 @@ namespace GCode_Sender
         private const double PlateClearance = 10d;
 
         /// <summary>
-        /// How much LOWER than the previous point the next one may be and still be found.
+        /// How much LOWER than the previous point the next one may be and still be found, in mm.
         ///
-        /// This is the ONLY margin a later probe has. Its search is the lift plus this, so setting it to
-        /// zero - making the search equal the lift - means the probe stops exactly at the height the last
-        /// point triggered and finds nothing the moment the board falls away at all. Point 15 of 16 failed
-        /// on 2026-08-19 with 3mm of margin; zero would fail on the first downward slope.
+        /// This is the ONLY margin a later probe has. Its search is the lift plus this, so an allowance of
+        /// zero - a search equal to the lift - stops the probe exactly at the height the last point triggered
+        /// and finds nothing the moment the board falls away at all. Point 15 of 16 failed on 2026-08-19 with
+        /// 3mm of it; zero would fail on the first downward slope. Floored at 0.5mm for that reason: it is an
+        /// operator input, and the one value it must never take is the one that guarantees a miss.
         ///
-        /// It has to absorb two things, not one: how far the board drops between adjacent points, and how
-        /// differently the operator seats the plate from one point to the next. 5mm against a board measured
-        /// at 0.884mm across its whole width is roughly a five-fold margin, and every millimetre of it costs
-        /// only probe travel at search speed.
+        /// It absorbs two things, and the board is the smaller: how far the surface drops between adjacent
+        /// points, and how differently the plate is seated from one point to the next. 5mm against a board
+        /// measured at 0.884mm across its whole width is roughly a five-fold margin, and every millimetre of
+        /// it costs only travel at search speed.
         /// </summary>
-        private const double BoardVariation = 5d;
+        private double _dropAllowance = 5d;
+
+        public double DropAllowance
+        {
+            get { return _dropAllowance; }
+            set { _dropAllowance = Math.Max(0.5d, value); UpdateAreaModeUi(); }
+        }
 
         /// <summary>
         /// Thickness to take off every probed Z, in mm.
@@ -689,7 +696,7 @@ namespace GCode_Sender
                 // is, and on a resume the relative chain that knew has been broken by whatever stopped it.
                 // Search is the lift PLUS an allowance, never just the lift: a probe that stops exactly where
                 // the last one triggered cannot find a point that is any lower at all.
-                double thisSearch = i == startIndex ? searchZ : Math.Min(probeDrop, hover + BoardVariation);
+                double thisSearch = i == startIndex ? searchZ : Math.Min(probeDrop, hover + DropAllowance);
 
                 pr.Program.AddMessage(string.Format(CultureInfo.InvariantCulture,
                     "Probing point {0} of {1} at X{2:0.###} Y{3:0.###}, searching {4:0.###} mm down...",
@@ -1124,6 +1131,11 @@ namespace GCode_Sender
                 stepsProgram.Visibility = full ? Visibility.Collapsed : Visibility.Visible;
             if (stepsFullSurface != null)
                 stepsFullSurface.Visibility = full ? Visibility.Visible : Visibility.Collapsed;
+
+            if (txtAllowanceNote != null)
+                txtAllowanceNote.Text = string.Format(CultureInfo.InvariantCulture,
+                    "Between points the tool lifts {0:0.###} mm and then searches {1:0.###} mm, so a point up to {2:0.###} mm lower than the one before it is still found.",
+                    PlateClearance, PlateClearance + DropAllowance, DropAllowance);
 
             txtDivisionsNote.Text = full
                 ? string.Format("{0} probes ({1} x {2} points across the table).", DivisionsX * DivisionsY, DivisionsX, DivisionsY)
