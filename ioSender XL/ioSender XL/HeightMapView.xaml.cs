@@ -330,6 +330,17 @@ namespace GCode_Sender
             HeightMap.BoundaryPoints = border.Points;
             HeightMap.MapPoints = points.Points;
 
+            // What the surface actually amounts to. Written because "the tab is empty" is the one report
+            // that cannot be told apart from "the tab is fine and the camera is elsewhere" without knowing
+            // whether any geometry was built at all.
+            CNC.Core.DebugLog.Write("heightmap", string.Format(CultureInfo.InvariantCulture,
+                "surface: mesh {0} positions / {1} triangle indices, {2} boundary points, {3} map points; map {4}x{5}, height {6:0.###} to {7:0.###}",
+                mesh.MeshGeometry == null ? -1 : mesh.MeshGeometry.Positions.Count,
+                mesh.MeshGeometry == null ? -1 : mesh.MeshGeometry.TriangleIndices.Count,
+                border.Points == null ? -1 : border.Points.Count,
+                points.Points == null ? -1 : points.Points.Count,
+                HeightMap.Map.SizeX, HeightMap.Map.SizeY, HeightMap.Map.MinHeight, HeightMap.Map.MaxHeight));
+
             FrameSurface();
         }
 
@@ -352,7 +363,16 @@ namespace GCode_Sender
 
             Dispatcher.BeginInvoke(new System.Action(() =>
             {
-                if (viewport != null && viewport.ActualWidth > 0d && viewport.ActualHeight > 0d)
+                bool sized = viewport != null && viewport.ActualWidth > 0d && viewport.ActualHeight > 0d;
+
+                CNC.Core.DebugLog.Write("heightmap", string.Format(CultureInfo.InvariantCulture,
+                    "frame: viewport {0:0} x {1:0}, children {2}, {3}",
+                    viewport == null ? 0d : viewport.ActualWidth,
+                    viewport == null ? 0d : viewport.ActualHeight,
+                    viewport == null ? -1 : viewport.Children.Count,
+                    sized ? "zooming to extents" : "NOT sized - nothing to frame yet"));
+
+                if (sized)
                     viewport.ZoomExtents();
             }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
