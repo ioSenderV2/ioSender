@@ -1,4 +1,4 @@
-/*
+﻿/*
  * HeightMapConfig.cs - part of CNC Controls library
  *
  * What the operator chose on the Height Map tab, kept between sessions.
@@ -38,6 +38,23 @@ namespace CNC.Controls
 
         /// <summary>Hold at each point so a touch plate can be moved.</summary>
         public bool HoldAtEachPoint { get; set; } = true;
+
+        /// <summary>
+        /// Where the highest point of the last map was, in WORK coordinates, and whether there is one.
+        ///
+        /// Carried as two doubles rather than the map itself because CNC Controls cannot reference the
+        /// probing library that owns the HeightMap type - and because this is the only fact anything outside
+        /// the Height Map tab needs from a survey. Surfacing uses it to decide where to take its test cut,
+        /// which is a question about where to LOOK, not about the toolpath: nothing here bends the cut to
+        /// follow the surface, which for flattening would reproduce the very dips being removed.
+        ///
+        /// Only meaningful while the work origin is the one the map was taken against. The consumer checks
+        /// the point falls inside the area it is about to cut and ignores it otherwise, which is what makes
+        /// a stale value harmless rather than a plunge somewhere unintended.
+        /// </summary>
+        public bool HasHighPoint { get; set; } = false;
+        public double HighPointX { get; set; } = 0d;
+        public double HighPointY { get; set; } = 0d;
 
         /// <summary>The live instance from the config store; never null so callers need no guard.</summary>
         [XmlIgnore]

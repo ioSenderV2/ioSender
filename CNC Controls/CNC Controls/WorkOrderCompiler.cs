@@ -1373,6 +1373,30 @@ namespace CNC.Controls
         /// the prompt up, and the operator can jog away to look, jog back, and then answer. Cancel abandons
         /// the run with nothing cut but the test pocket.
         /// </summary>
+        /// <summary>
+        /// Where to take the test cut: the high point of the last height map when there is one inside the
+        /// area about to be surfaced, else wherever the raster happens to begin.
+        ///
+        /// The high point is the only place the test is fully informative. It is where the cutter takes the
+        /// most material and where Z0 was defined, so the pocket measures exactly what the pass will remove.
+        /// At a low point a shallow pass can miss the board entirely and prove nothing either way.
+        ///
+        /// Bounds-checked rather than trusted: the stored point is only meaningful while the work origin is
+        /// the one the map was taken against, and a point from another setup would put the plunge somewhere
+        /// nobody chose. Outside the area, it is ignored and the raster's own start is used.
+        /// </summary>
+        private static string TestPlungeAt(List<double[]> raster, double w, double h)
+        {
+            var cfg = HeightMapConfig.Current;
+
+            if (cfg.HasHighPoint &&
+                cfg.HighPointX >= 0d && cfg.HighPointX <= w &&
+                cfg.HighPointY >= 0d && cfg.HighPointY <= h)
+                return string.Format(CultureInfo.InvariantCulture, "X{0} Y{1}", F(cfg.HighPointX), F(cfg.HighPointY));
+
+            return XY(raster[0]);
+        }
+
         private static void AppendTestPlunge(List<string> lines, double z, double plungeFeed)
         {
             lines.Add("(test plunge - the cut depth is reached once, then the tool lifts so it can be measured)");
@@ -1427,8 +1451,9 @@ namespace CNC.Controls
                     lines.Add("S" + N(r0) + " M3");
 
                 var path0 = RasterPath(w, h, stepover);
-                lines.Add("G0 " + XY(path0[0]));
+                lines.Add("G0 " + TestPlungeAt(path0, w, h));
                 AppendTestPlunge(lines, z, op.PlungeFeed);
+                lines.Add("G0 " + XY(path0[0]));            // back to where the pass actually starts
                 AppendPlunge(lines, z, 0d, op.PlungeFeed);
                 for (int i = 1; i < path0.Count; i++)
                     lines.Add("G1 " + XY(path0[i]) + " F" + F(op.Feed));
@@ -1473,8 +1498,9 @@ namespace CNC.Controls
             // G10 L2 P1 above already anchored G54's origin at (ox,oy), so the raster is walked directly in
             // G54-relative coordinates starting at (0,0) - no further offset needed.
             var raster = RasterPath(w, h, stepover);
-            lines.Add("G0 " + XY(raster[0]));
+            lines.Add("G0 " + TestPlungeAt(raster, w, h));
             AppendTestPlunge(lines, z, op.PlungeFeed);
+            lines.Add("G0 " + XY(raster[0]));               // back to where the pass actually starts
             AppendPlunge(lines, z, 0d, op.PlungeFeed);
             for (int i = 1; i < raster.Count; i++)
                 lines.Add("G1 " + XY(raster[i]) + " F" + F(op.Feed));

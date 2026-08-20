@@ -377,8 +377,52 @@ namespace GCode_Sender
                 points.Points == null ? -1 : points.Points.Count,
                 HeightMap.Map.SizeX, HeightMap.Map.SizeY, HeightMap.Map.MinHeight, HeightMap.Map.MaxHeight));
 
+            RememberHighPoint();
             UpdateLegend();
             FrameSurface();
+        }
+
+        /// <summary>
+        /// Record where the board is highest, so surfacing can take its test cut there.
+        ///
+        /// Here rather than in the probe run because it must cover a map that was LOADED as well as one just
+        /// measured - both arrive through this method, and a map read back from a file describes the board
+        /// just as well as one probed a minute ago.
+        ///
+        /// The high point is the interesting place to test a depth of cut: it is where the cutter takes the
+        /// most material, and where Z0 is defined, so a plunge there measures exactly what the pass will
+        /// remove. A plunge at a low point can fail to touch the board at all on a shallow pass and prove
+        /// nothing either way.
+        /// </summary>
+        private void RememberHighPoint()
+        {
+            var map = HeightMap.Map;
+            if (map == null || map.SizeX < 1 || map.SizeY < 1)
+                return;
+
+            double best = double.MinValue;
+            int bx = 0, by = 0;
+
+            for (int x = 0; x < map.SizeX; x++)
+                for (int y = 0; y < map.SizeY; y++)
+                    if (map.Points[x, y].HasValue && map.Points[x, y].Value > best)
+                    {
+                        best = map.Points[x, y].Value;
+                        bx = x; by = y;
+                    }
+
+            if (best == double.MinValue)
+                return;
+
+            var cfg = HeightMapConfig.Current;
+            cfg.HighPointX = map.Min.X + (map.SizeX > 1 ? bx * (map.Max.X - map.Min.X) / (map.SizeX - 1) : 0d);
+            cfg.HighPointY = map.Min.Y + (map.SizeY > 1 ? by * (map.Max.Y - map.Min.Y) / (map.SizeY - 1) : 0d);
+            cfg.HasHighPoint = true;
+            AppConfig.Settings.Save();
+
+            CNC.Core.DebugLog.Write("heightmap", string.Format(CultureInfo.InvariantCulture,
+                "high point [{0},{1}] at work X{2:0.###} Y{3:0.###} - surfacing will test-cut there",
+                bx, by, cfg.HighPointX, cfg.HighPointY));
         }
 
         /// <summary>
