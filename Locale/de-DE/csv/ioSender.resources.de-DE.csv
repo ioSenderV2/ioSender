@@ -252,3 +252,4 @@ ioSender.g.en-US.resources:heightmapview.baml,hm_continue:System.Windows.Framewo
 ioSender.g.en-US.resources:heightmapview.baml,hm_tabSurface:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Surface
 ioSender.g.en-US.resources:heightmapview.baml,hm_tabProgram:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Program
 ioSender.g.en-US.resources:heightmapview.baml,hm_tabProgram:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The probing program this run will send, listed before it moves anything. Rebuilt each time Start is pressed."
+ioSender.g.en-US.resources:heightmapview.baml,hm_tabSteps:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Steps

@@ -622,6 +622,11 @@ namespace GCode_Sender
             // is worse than none. See PreviewText.
             ShowProgram(PreviewText(pr.Program.ToString()));
 
+            // Show what is about to be sent, at the moment it is about to be sent. The operator pressed
+            // Start looking at the Steps text; what matters from here is the program.
+            if (tabView != null && tabProgram != null)
+                tabView.SelectedItem = tabProgram;
+
             // The whole program, numbered, before a byte of it goes out.
             //
             // Written after being unable to say from the logs WHICH step a stalled run was sitting on: the
@@ -984,6 +989,11 @@ namespace GCode_Sender
             HeightMap.HasHeightMap = true;
             HeightMap.CanApply = model.IsFileLoaded;
             RefreshSurface();
+
+            // A finished run has nothing more to say about the program - the result is the surface. Only on
+            // SUCCESS: a run that fell short leaves the program up, which is where the failure is legible.
+            if (tabView != null && tabSurface != null)
+                tabView.SelectedItem = tabSurface;
             model.Message = string.Format(Loc("HmComplete"),
                 map.TotalPoints, Math.Round(map.MinHeight, model.Precision).ToInvariantString(), Math.Round(map.MaxHeight, model.Precision).ToInvariantString());
         }

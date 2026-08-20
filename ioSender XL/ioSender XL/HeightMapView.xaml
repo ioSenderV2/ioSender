@@ -121,11 +121,15 @@
         <!-- Right: steps/help on top, 3D view of the planned grid / probed surface (blue low -> red high) below -->
         <Grid Grid.Column="2" Margin="8,0,0,0">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <GroupBox x:Uid="hm_grpSteps" Header="Steps" Grid.Row="0" Margin="0,0,0,8">
+            <!-- Steps, Program and Surface share the whole right-hand pane. Start switches to Program (what
+                 is about to be sent) and a completed run switches to Surface Map (what came back), so the
+                 pane always shows the stage the run is actually at. -->
+            <TabControl x:Name="tabView" Grid.Row="0">
+            <TabItem x:Uid="hm_tabSteps" x:Name="tabSteps" Header="Steps">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel>
                 <TextBlock x:Uid="hm_steps" x:Name="stepsProgram" Margin="8" TextWrapping="Wrap" LineHeight="18">
                     <Run FontWeight="Bold" Text="1. Set the work origin on the stock."/>
@@ -167,13 +171,15 @@
                     <Run Text=" It reports the highest and lowest points and sets Z0 to the highest. In Work Order's Surface operation tick 'Entire spoilboard' and 'Use the work origin already set', give it a depth, and run - the range it reported is how deep you must go to clean up the whole board rather than only the high spots."/>
                 </TextBlock>
                 </StackPanel>
-            </GroupBox>
+              </ScrollViewer>
+            </TabItem>
 
-            <!-- Surface and Program share this space rather than the program borrowing MainWindow's
-                 overlay: this view is menu-hostable, and when it opens in its own ViewHostWindow that
-                 overlay renders on the main window, behind the window the operator is actually looking at. -->
-            <TabControl x:Name="tabView" Grid.Row="1">
-            <TabItem x:Uid="hm_tabSurface" Header="Surface">
+            <TabItem x:Uid="hm_tabProgram" x:Name="tabProgram" Header="Program"
+                     ToolTip="The probing program this run will send, listed before it moves anything. Rebuilt each time Start is pressed.">
+                <ContentControl x:Name="programHost"/>
+            </TabItem>
+
+            <TabItem x:Uid="hm_tabSurface" x:Name="tabSurface" Header="Surface Map">
             <helix:HelixViewport3D x:Name="viewport" ZoomExtentsWhenLoaded="True"
                                    RotateAroundMouseDownPoint="True" ZoomAroundMouseDownPoint="True">
                 <helix:HelixViewport3D.Camera>
@@ -203,10 +209,6 @@
                 <helix:LinesVisual3D Thickness="1" Color="Lime" Points="{Binding HeightMap.BoundaryPoints, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
                 <helix:PointsVisual3D Size="4" Color="Red" Points="{Binding HeightMap.MapPoints, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
             </helix:HelixViewport3D>
-            </TabItem>
-            <TabItem x:Uid="hm_tabProgram" x:Name="tabProgram" Header="Program"
-                     ToolTip="The probing program this run will send, listed before it moves anything. Rebuilt each time Start is pressed.">
-                <ContentControl x:Name="programHost"/>
             </TabItem>
             </TabControl>
         </Grid>
