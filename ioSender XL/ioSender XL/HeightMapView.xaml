@@ -129,7 +129,7 @@
             <!-- Steps, Program and Surface share the whole right-hand pane. Start switches to Program (what
                  is about to be sent) and a completed run switches to Surface Map (what came back), so the
                  pane always shows the stage the run is actually at. -->
-            <TabControl x:Name="tabView" Grid.Row="0">
+            <TabControl x:Name="tabView" Grid.Row="0" SelectionChanged="tabView_SelectionChanged">
             <TabItem x:Uid="hm_tabSteps" x:Name="tabSteps" Header="Steps">
               <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel>

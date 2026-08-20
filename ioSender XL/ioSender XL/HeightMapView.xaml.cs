@@ -317,6 +317,42 @@ namespace GCode_Sender
             HeightMap.MeshGeometry = mesh.MeshGeometry;
             HeightMap.BoundaryPoints = border.Points;
             HeightMap.MapPoints = points.Points;
+
+            FrameSurface();
+        }
+
+        /// <summary>
+        /// Point the camera at the surface that was just built.
+        ///
+        /// ZoomExtentsWhenLoaded only fires when the viewport loads, which happens once and long before any
+        /// geometry exists - so a freshly built surface sits wherever the default camera is not looking. It
+        /// went unnoticed while the viewport was always on screen and became obvious the moment it moved
+        /// into a tab: a completed run showed an empty view with only Helix's coordinate indicator in it.
+        ///
+        /// Deferred to Loaded priority because a tab's content is not measured until the tab is shown, and
+        /// zooming to the extents of something with no size does nothing at all. Guarded rather than
+        /// assumed - this runs on every refresh, including ones where the tab has never been opened.
+        /// </summary>
+        private void FrameSurface()
+        {
+            if (viewport == null || HeightMap.Map == null)
+                return;
+
+            Dispatcher.BeginInvoke(new System.Action(() =>
+            {
+                if (viewport != null && viewport.ActualWidth > 0d && viewport.ActualHeight > 0d)
+                    viewport.ZoomExtents();
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        /// <summary>
+        /// Frame the surface when its tab is opened. A map built while another tab was showing was never
+        /// measured, so this is the first moment the camera can be aimed at it meaningfully.
+        /// </summary>
+        private void tabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.OriginalSource == tabView && tabView.SelectedItem == tabSurface)
+                FrameSurface();
         }
 
         // ---- run: probe the grid through the Probing engine (mirrors the original Height map tab) ----
