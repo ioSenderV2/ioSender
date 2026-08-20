@@ -1356,6 +1356,36 @@ namespace CNC.Controls
         // the work order's own real one, WorkOrderWcs) to hold that touch-off, then restores the real one
         // before returning, since WorkOrderRules.Validate only WARNS this must be the sole enabled operation
         // rather than enforcing it structurally.
+        /// <summary>
+        /// Cut the depth once, lift, and wait to be told to carry on.
+        ///
+        /// Surfacing commits the whole table to a number that was arrived at by measurement and arithmetic,
+        /// and the first evidence that the number is right normally arrives when the cutter is already
+        /// several hundred millimetres into the board. One plunge at the first raster point turns that into
+        /// something measurable BEFORE anything is committed: a pocket the operator can put a rule or a
+        /// depth gauge into.
+        ///
+        /// It plunges at the plunge feed rather than a rapid, so a depth that is badly wrong is a slow cut
+        /// rather than a bang, and it lands at the point the raster starts from - so the pocket is inside
+        /// the area about to be surfaced and gets removed by the pass it is checking.
+        ///
+        /// The hold is the ordinary (MBOX) one, which is deliberately non-modal: the machine sits still with
+        /// the prompt up, and the operator can jog away to look, jog back, and then answer. Cancel abandons
+        /// the run with nothing cut but the test pocket.
+        /// </summary>
+        private static void AppendTestPlunge(List<string> lines, double z, double plungeFeed)
+        {
+            lines.Add("(test plunge - the cut depth is reached once, then the tool lifts so it can be measured)");
+            lines.Add(string.Format(CultureInfo.InvariantCulture, "G1 Z{0} F{1}", F(z), F(plungeFeed > 0d ? plungeFeed : 200d)));
+            lines.Add("G4 P0.5");
+            lines.Add("G0 Z0");
+            lines.Add("(WAITIDLE)");
+            lines.Add(string.Format(CultureInfo.InvariantCulture,
+                "(MBOX, OKCANCEL, Test plunge cut {0} mm below the high point of the board. Measure it - jogging is allowed while this is up. OK surfaces the whole board at that depth; Cancel stops with only this pocket cut.)",
+                F(-z)));
+            lines.Add("(WAITIDLE)");
+        }
+
         private static List<string> BuildSurfaceEntireSpoilboard(WorkOrderToolpath tp, WorkOrderOperation op)
         {
             var lines = new List<string>();
@@ -1398,6 +1428,7 @@ namespace CNC.Controls
 
                 var path0 = RasterPath(w, h, stepover);
                 lines.Add("G0 " + XY(path0[0]));
+                AppendTestPlunge(lines, z, op.PlungeFeed);
                 AppendPlunge(lines, z, 0d, op.PlungeFeed);
                 for (int i = 1; i < path0.Count; i++)
                     lines.Add("G1 " + XY(path0[i]) + " F" + F(op.Feed));
@@ -1443,6 +1474,7 @@ namespace CNC.Controls
             // G54-relative coordinates starting at (0,0) - no further offset needed.
             var raster = RasterPath(w, h, stepover);
             lines.Add("G0 " + XY(raster[0]));
+            AppendTestPlunge(lines, z, op.PlungeFeed);
             AppendPlunge(lines, z, 0d, op.PlungeFeed);
             for (int i = 1; i < raster.Count; i++)
                 lines.Add("G1 " + XY(raster[i]) + " F" + F(op.Feed));
