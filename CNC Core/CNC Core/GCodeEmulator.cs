@@ -768,8 +768,21 @@ namespace CNC.Core
                     case Commands.G92:
                         {
                             var cs = token as GCCoordinateSystem;
+
+                            // g92 is FirstOrDefault over the controller's coordinate systems, so it is null
+                            // until those have been read - and stays null when there is no controller at
+                            // all. Machine.cs guards every one of its own uses for exactly that reason;
+                            // these two did not, so loading any file containing a G92 while disconnected
+                            // took the app down in the 3D viewer's toolpath build (2026-08-21).
+                            //
+                            // origin is what the emulator actually needs; g92 is only kept in step for
+                            // whoever reads it later, so the offset is still applied when it is absent.
                             foreach (int i in cs.AxisFlags.ToIndices())
-                                origin[i] = g92.Values[i] = cs.Values[i];
+                            {
+                                origin[i] = cs.Values[i];
+                                if (g92 != null)
+                                    g92.Values[i] = cs.Values[i];
+                            }
                         }
                         break;
 
@@ -777,7 +790,11 @@ namespace CNC.Core
                     case Commands.G92_1:
                         {
                             for (int i = 0; i < origin.Length; i++)
-                                origin[i] = g92.Values[i] = 0d;
+                            {
+                                origin[i] = 0d;
+                                if (g92 != null)
+                                    g92.Values[i] = 0d;   // see the G92 case above
+                            }
                         }
                         break;
 
