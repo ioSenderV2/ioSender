@@ -146,7 +146,7 @@ namespace CNC.Controls
         public double Interval
         {
             get { return _interval; }
-            set { _interval = value; OnPropertyChanged(); OnPropertyChanged("FillSummary"); }
+            set { _interval = value; OnPropertyChanged(); OnPropertyChanged("FillSummary"); OnPropertyChanged("FillExposureSummary"); }
         }
 
         /// <summary>Shading usually wants less power and more speed than an outline - it covers area, not edges.</summary>
@@ -389,6 +389,25 @@ namespace CNC.Controls
             get { return _fillFeed > 0d ? _fillPower / _fillFeed : 0d; }
         }
 
+        /// <summary>
+        /// Energy per unit AREA for the shading pass: power / (feed x interval).
+        ///
+        /// This, not FillExposure, is what sets how deep a fill cuts. A fill is not a line - it is a
+        /// raster of lines a fixed distance apart, so halving the interval puts twice the energy into
+        /// the same square millimetre while every number on the Burn tab stays where it was.
+        ///
+        /// Added after a fill at S600/F800 with a 0.1 mm interval removed nearly 7 mm of cedar. The line
+        /// exposure said "8x the outline", which sounded like a strong engrave rather than a cut, and it
+        /// was not wrong about lines - it simply did not have the interval in it at all. Below roughly a
+        /// beam width the lines also overlap and reheat wood the previous pass already dried, so the real
+        /// curve is steeper than this ratio suggests. Treat it as a relative figure, never a prediction.
+        /// </summary>
+        [XmlIgnore]
+        public double FillArealExposure
+        {
+            get { return _fillFeed > 0d && _interval > 0d ? _fillPower / (_fillFeed * _interval) : 0d; }
+        }
+
         public string ExposureSummary
         {
             get
@@ -416,8 +435,11 @@ namespace CNC.Controls
 
                 double ratio = FillExposure / Exposure;
 
-                return string.Format("exposure {0:0.###} = {1:0.##}x the outline{2}", FillExposure, ratio,
-                                     ratio <= 1d ? " - lighter than the edge it fills" : string.Empty);
+                // Areal first, because it is the one that decides depth, and with the interval named in
+                // the same breath so it is obvious which field moves it.
+                return string.Format("areal {0:0.##} per mm2 at {1:0.###} mm interval - line exposure {2:0.###}, {3:0.##}x the outline{4}",
+                                     FillArealExposure, _interval, FillExposure, ratio,
+                                     ratio <= 1d ? " (lighter than the edge it fills)" : string.Empty);
             }
         }
 
