@@ -1145,10 +1145,20 @@ namespace CNC.Core
         //   06:16:44.119  Restart() -> NoResponse
         private static string startupReport;
 
-        public static string Startup(GrblViewModel model)
+        /// <summary>
+        /// Handshake with the controller, retrying <paramref name="retries"/> times at 250ms apart.
+        ///
+        /// The default is sized for a board that is already up: ten tries, two and a half seconds, and a
+        /// grblHAL controller answers on the first. It is deliberately NOT sized for the slowest board that
+        /// exists, because every connect would then pay for it.
+        ///
+        /// Cheap clone controllers reset when the serial port is opened and can take five or ten seconds to
+        /// come back, which is longer than any default worth having. The caller offers to wait longer rather
+        /// than this guessing - see Controller.Restart.
+        /// </summary>
+        public static string Startup(GrblViewModel model, int retries = 10)
         {
             bool? res = null;
-            int retries = 10;
 
             startupReport = string.Empty;
             PollGrbl.Suspend();

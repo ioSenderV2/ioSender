@@ -2646,6 +2646,32 @@ namespace CNC.Controls
             this.model = model;
         }
 
+        // How many times the operator has been asked to keep waiting on this connect. Bounded so a machine
+        // that will never answer cannot turn into an endless sequence of identical dialogs.
+        private int waitPrompts = 0;
+
+        /// <summary>
+        /// Offer to keep waiting for a controller that has not answered yet.
+        ///
+        /// Defaults to Yes: someone who has just plugged in a board and pressed connect almost always means
+        /// to wait for it, and the cost of a wrong Yes is ten seconds while the cost of a wrong No is doing
+        /// the whole connect again.
+        /// </summary>
+        private bool AskToKeepWaiting()
+        {
+            if (waitPrompts >= 3)
+                return false;
+
+            waitPrompts++;
+
+            return AppDialogs.Show(
+                "The controller has not answered yet.\r\n\r\n" +
+                "Some boards reset when the port is opened and take several seconds to start up. " +
+                "Keep waiting for about ten more seconds?",
+                "ioSender - waiting for the controller",
+                MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes;
+        }
+
         public bool ResetPending { get; private set; } = false;
         public string Message { get; private set; }
 
@@ -2655,6 +2681,20 @@ namespace CNC.Controls
             model.Message = string.Format(LibStrings.FindResource("MsgWaiting"), AppConfig.Settings.Base.PortParams);
 
             string response = GrblInfo.Startup(model);
+
+            // Nothing yet. Before treating that as a failure, offer to go on waiting: a controller that
+            // resets when its port is opened - which cheap boards do - can take five or ten seconds to come
+            // back, and 2.5s of silence says nothing about whether it ever will.
+            //
+            // Asked rather than simply waiting longer, because the two cases are indistinguishable from
+            // here and cost opposite things. A slow board wants patience; a wrong port, a dead board or an
+            // unplugged cable wants to be told promptly rather than after a minute of hopeful silence. The
+            // operator knows which they are looking at.
+            while (response == string.Empty && AskToKeepWaiting())
+            {
+                model.Message = string.Format(LibStrings.FindResource("MsgWaiting"), AppConfig.Settings.Base.PortParams);
+                response = GrblInfo.Startup(model, 40);      // ~10s
+            }
 
             if (response.StartsWith("<"))
             {
