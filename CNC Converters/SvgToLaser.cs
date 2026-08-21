@@ -109,6 +109,18 @@ namespace CNC.Converters
         }
         private static string N(double v) { return v.ToString("0", CultureInfo.InvariantCulture); }
 
+        /// <summary>
+        /// The S word actually emitted, which is 0 for the whole job when the beam is disabled.
+        ///
+        /// Zeroed here rather than by altering the motion, so a dry run rehearses the real thing: same
+        /// path, same feeds, same time on the clock. A rehearsal that moves differently from the job it
+        /// stands in for answers a question nobody asked.
+        /// </summary>
+        private double BeamPower(double configured)
+        {
+            return settings.BeamOn ? configured : 0d;
+        }
+
         public bool LoadFile(CNC.Controls.GCode job, string filename)
         {
             // Aspect first, so the dialog can show the height a chosen width implies without loading and
@@ -122,6 +134,7 @@ namespace CNC.Converters
             }
 
             settings.Aspect = aspect;
+            settings.FilePath = filename;
             settings.LaserModeOn = IsLaserMode();
             settings.MaxPower = MaxPower();
 
@@ -202,6 +215,11 @@ namespace CNC.Converters
                 if (!settings.LaserModeOn)
                     job.AddBlock("(WARNING: $32 laser mode is NOT enabled on this controller)");
 
+                // Recorded in the file, not just shown in the dialog. A dry run that gets saved and opened
+                // next week looks exactly like a real job apart from this line.
+                if (!settings.BeamOn)
+                    job.AddBlock("(BEAM DISABLED - dry run: every S word is 0 and the laser is never enabled.)");
+
                 if (settings.Copies > 1 || settings.OriginX != 0d || settings.OriginY != 0d)
                     job.AddBlock(string.Format(CultureInfo.InvariantCulture,
                         "(placement: origin X{0} Y{1}, {2} cop{3} at pitch X{4} Y{5})",
@@ -223,7 +241,10 @@ namespace CNC.Converters
 
                 job.AddBlock("G21 G90 G17");
                 job.AddBlock("G92 X0 Y0");
-                job.AddBlock((settings.Dynamic ? "M4" : "M3") + " S0");
+                // With the beam disabled the laser is never ENABLED either - belt and braces with the zeroed
+                // S words. Either alone would do; both together means hand-editing one line cannot quietly
+                // turn a rehearsal into a burn.
+                job.AddBlock(settings.BeamOn ? (settings.Dynamic ? "M4" : "M3") + " S0" : "M5");
 
                 if (settings.Fill)
                     EmitFill(job, art);
@@ -265,7 +286,7 @@ namespace CNC.Converters
                         for (int i = 1; i < contour.Points.Count; i++)
                             job.AddBlock(string.Format(CultureInfo.InvariantCulture,
                                 "G1 X{0} Y{1} S{2} F{3}",
-                                FX(contour.Points[i].X), FY(contour.Points[i].Y), N(settings.Power), N(settings.Feed)));
+                                FX(contour.Points[i].X), FY(contour.Points[i].Y), N(BeamPower(settings.Power)), N(settings.Feed)));
 
                         // SvgOutlines returns CLOSED contours, but whether the closing point is repeated in
                         // Points is the loader's business, not this emitter's - so close explicitly when the
@@ -274,7 +295,7 @@ namespace CNC.Converters
                         var pn = contour.Points[contour.Points.Count - 1];
                         if (Math.Abs(pn.X - p0.X) > 1e-6 || Math.Abs(pn.Y - p0.Y) > 1e-6)
                             job.AddBlock(string.Format(CultureInfo.InvariantCulture,
-                                "G1 X{0} Y{1} S{2} F{3}", FX(p0.X), FY(p0.Y), N(settings.Power), N(settings.Feed)));
+                                "G1 X{0} Y{1} S{2} F{3}", FX(p0.X), FY(p0.Y), N(BeamPower(settings.Power)), N(settings.Feed)));
                     }
                   }
                 }
@@ -305,7 +326,7 @@ namespace CNC.Converters
 
             job.AddBlock(string.Format(CultureInfo.InvariantCulture,
                 "(shading: {0} spans at {1} mm interval, S{2} F{3})",
-                spans.Count, F(settings.Interval), N(settings.FillPower), N(settings.FillFeed)));
+                spans.Count, F(settings.Interval), N(BeamPower(settings.FillPower)), N(settings.FillFeed)));
 
             for (int copy = 0; copy < settings.Copies; copy++)
             {
@@ -320,7 +341,7 @@ namespace CNC.Converters
                     job.AddBlock(string.Format(CultureInfo.InvariantCulture,
                         "G0 X{0} Y{1} S0 F{2}", FX(s.X0), FY(s.Y), N(settings.TravelFeed)));
                     job.AddBlock(string.Format(CultureInfo.InvariantCulture,
-                        "G1 X{0} Y{1} S{2} F{3}", FX(s.X1), FY(s.Y), N(settings.FillPower), N(settings.FillFeed)));
+                        "G1 X{0} Y{1} S{2} F{3}", FX(s.X1), FY(s.Y), N(BeamPower(settings.FillPower)), N(settings.FillFeed)));
                 }
             }
             ClearCopyOffset();

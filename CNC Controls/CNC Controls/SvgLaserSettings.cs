@@ -21,6 +21,7 @@
 
 using System;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Xml.Serialization;
 using CNC.Core;
@@ -36,6 +37,8 @@ namespace CNC.Controls
         private double _interval = 0.1d, _fillPower = 120d, _fillFeed = 3000d;
         private double _originX = 0d, _originY = 0d, _pitchX = 0d, _pitchY = 0d;
         private bool _anchorBackLeft = true;
+        private bool _beamOn = true;
+        private string _filePath = string.Empty;
         private int _copies = 1;
 
         /// <summary>
@@ -295,6 +298,67 @@ namespace CNC.Controls
                 return _anchorBackLeft
                     ? "Jog to the artwork's TOP-left corner: from there the job runs toward the front (-Y), which is where the table is on a back-left origin."
                     : "Jog to the artwork's LOWER-left corner: from there the job runs toward the back (+Y).";
+            }
+        }
+
+        /// <summary>
+        /// The SVG being imported. Transient: it names ONE import, where the rest of this section is a
+        /// material recipe meant to outlive it, so persisting it would be remembering the wrong thing.
+        /// </summary>
+        [XmlIgnore]
+        public string FilePath
+        {
+            get { return _filePath; }
+            set
+            {
+                _filePath = value ?? string.Empty;
+                OnPropertyChanged();
+                OnPropertyChanged("FileName");
+            }
+        }
+
+        /// <summary>Just the file name - the dialog has no room for a path, and the path is the tooltip.</summary>
+        [XmlIgnore]
+        public string FileName
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(_filePath))
+                    return "(no file)";
+                try { return Path.GetFileName(_filePath); }
+                catch { return _filePath; }
+            }
+        }
+
+        /// <summary>
+        /// Whether the laser actually fires. Unticked is a dry run: identical motion at identical feeds,
+        /// every S word zero and the laser never enabled, so the path can be watched against the work
+        /// before any material is spent.
+        ///
+        /// NOT persisted, and it comes back ticked on every import. This is an intent about one job, not a
+        /// setting about a material - and a "no burn" that quietly survived into a later session would show
+        /// up as a job that ran perfectly and marked nothing, which is a confusing way to lose an hour.
+        /// The state is stated in the pinned note and written into the .nc header so it is never a mystery
+        /// WHILE it applies.
+        /// </summary>
+        [XmlIgnore]
+        public bool BeamOn
+        {
+            get { return _beamOn; }
+            set { _beamOn = value; OnPropertyChanged(); OnPropertyChanged("BeamSummary"); }
+        }
+
+        /// <summary>
+        /// Said in both directions rather than only when disabled. A note that appears only in the unusual
+        /// case is a note nobody has learned to look for; one that is always there is read.
+        /// </summary>
+        public string BeamSummary
+        {
+            get
+            {
+                return _beamOn
+                    ? "Beam enabled - this job will burn."
+                    : "BEAM DISABLED - the head follows the whole path but the laser never fires.";
             }
         }
 

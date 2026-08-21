@@ -16,10 +16,8 @@ CNC.Converters.g.en-US.resources:jobparametersdialog.baml,grp_scalingFactors:Sys
 CNC.Converters.g.en-US.resources:jobparametersdialog.baml,grp_spindle_feed:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Spindel und Vorschub
 CNC.Converters.g.en-US.resources:jobparametersdialog.baml,grp_tool:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Werkzeug
 CNC.Converters.g.en-US.resources:jobparametersdialog.baml,grp_zPosition:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Z-Positionen (relativ zur Werkstückoberfläche)
-CNC.Converters.g.en-US.resources:svglaserdialog.baml,grp_svglaser_size:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Size
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_width:CNC.Controls.NumericField.Label,None,False,True,,Width:
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_width:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Converters.g.en-US.resources:svglaserdialog.baml,grp_svglaser_burn:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Burn
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_power:CNC.Controls.NumericField.Label,None,False,True,,Power (S):
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_feed:CNC.Controls.NumericField.Label,None,False,True,,Feed:
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_feed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
@@ -42,8 +40,7 @@ CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_fillfeed:CNC.C
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_fillfeed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,chk_svglaser_outlineafter:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Trace outline after shading
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,chk_svglaser_outlineafter:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Burn the boundary once the shading is done, so the edge lands crisp on top of it. Untick to shade only."
-CNC.Converters.g.en-US.resources:svglaserdialog.baml,grp_svglaser_placement:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Placement
-CNC.Converters.g.en-US.resources:svglaserdialog.baml,txt_svglaser_placenote:System.Windows.Controls.TextBlock.Text,Text,True,True,,"The artwork is measured from its own outline, so without an offset it starts exactly at the origin. Set where its anchor corner belongs, and how many copies the fixture holds."
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,txt_svglaser_placenote:System.Windows.Controls.TextBlock.Text,Text,True,True,,The artwork is measured from its own outline, so with no offset it starts exactly at the origin.
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_originx:CNC.Controls.NumericField.Label,None,False,True,,Origin X:
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_originx:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_originy:CNC.Controls.NumericField.Label,None,False,True,,Origin Y:
@@ -56,3 +53,11 @@ CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_pitchy:CNC.Con
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_pitchy:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,chk_svglaser_anchor:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Origin is the back-left corner
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,chk_svglaser_anchor:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Tick for a machine homed to its back-left corner, where the table lies at negative Y - the artwork's TOP-left corner goes on the origin and the job runs toward the front. Clear it for an ordinary work origin at the front-left of the stock, where the job runs toward the back."
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,tab_svglaser_artwork:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Artwork
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,lbl_svglaser_file:System.Windows.Controls.TextBlock.Text,Text,True,True,,File:
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,tab_svglaser_copies:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Copies
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,txt_svglaser_copiesnote:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Repeat the same artwork across a fixture, each copy a pitch further on than the one before. One drawing stays the single source of the shape."
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,txt_svglaser_pitchnote:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Pitch is signed. On a back-left origin the table lies at negative Y, so stacking copies front-to-back needs a negative Pitch Y."
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,tab_svglaser_burn:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Burn
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,chk_svglaser_beam:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Enable beam
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,chk_svglaser_beam:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Untick for a dry run: the head follows the entire path at the same feeds, so you can watch where the job lands, but every S word is 0 and the laser is never enabled. Not remembered between imports - it comes back ticked every time."

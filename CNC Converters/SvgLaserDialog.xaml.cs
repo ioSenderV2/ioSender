@@ -29,6 +29,16 @@ namespace CNC.Converters
         {
             InitializeComponent();
 
+            // SizeToContent grows the window to whatever the content asks for, with no upper bound. On a
+            // short screen that put OK and Cancel below the bottom edge - on a window that could not be
+            // resized, with nothing to scroll, so the dialog was simply unusable and Escape was the only
+            // way out of it.
+            //
+            // Clamping lets SizeToContent do its job where there is room and hands the overflow to the
+            // per-tab ScrollViewers where there is not. WorkArea rather than screen height, so the taskbar
+            // is allowed for; the margin covers the title bar and border, which are outside this measure.
+            MaxHeight = SystemParameters.WorkArea.Height - 60d;
+
             this.settings = settings;
             DataContext = settings;
         }
