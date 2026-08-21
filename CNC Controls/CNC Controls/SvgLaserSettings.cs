@@ -35,6 +35,7 @@ namespace CNC.Controls
         private bool _fill = false, _outlineAfterFill = true;
         private double _interval = 0.1d, _fillPower = 120d, _fillFeed = 3000d;
         private double _originX = 0d, _originY = 0d, _pitchX = 0d, _pitchY = 0d;
+        private bool _anchorBackLeft = true;
         private int _copies = 1;
 
         /// <summary>
@@ -186,7 +187,10 @@ namespace CNC.Controls
         // That is fine for a bench job where you jog to the corner first, and useless for a fixture, where
         // the whole point is that the work sits in a known place and the file has to reach it.
 
-        /// <summary>Where the artwork's lower-left corner sits relative to the origin, mm.</summary>
+        /// <summary>
+        /// Where the artwork's anchor corner sits relative to the origin, mm. WHICH corner that is comes
+        /// from AnchorBackLeft.
+        /// </summary>
         public double OriginX
         {
             get { return _originX; }
@@ -197,6 +201,34 @@ namespace CNC.Controls
         {
             get { return _originY; }
             set { _originY = value; OnPropertyChanged(); OnPropertyChanged("PlacementSummary"); }
+        }
+
+        /// <summary>
+        /// Which corner of the artwork lands on the origin - and so which way the job runs from there.
+        ///
+        /// SvgOutlines hands over artwork normalised to its LOWER-left with Y growing upward, which suits a
+        /// machine whose work origin is the front-left of the stock: the job then runs away from the
+        /// operator, into positive Y. That is the ordinary CNC arrangement and it is what false means.
+        ///
+        /// A diode laser homed to its back-left corner is the mirror of that. Its whole table lies at
+        /// NEGATIVE Y, so artwork placed the ordinary way runs off the back edge into the stop - which is
+        /// not a wrong-looking job, it is a stalled axis. True anchors the artwork's TOP-left corner
+        /// instead, so it occupies Y 0 down to -height and the work is in front of the origin.
+        ///
+        /// Defaults to true because that is the machine this was built for. It is a setting rather than a
+        /// constant because the two conventions are equally real and the same dialog serves both; hard
+        /// coding either one silently misplaces every job on the other kind of machine.
+        /// </summary>
+        public bool AnchorBackLeft
+        {
+            get { return _anchorBackLeft; }
+            set
+            {
+                _anchorBackLeft = value;
+                OnPropertyChanged();
+                OnPropertyChanged("PlacementSummary");
+                OnPropertyChanged("AnchorSummary");
+            }
         }
 
         /// <summary>
@@ -236,13 +268,33 @@ namespace CNC.Controls
             get
             {
                 double spanX = _originX + _width + (_copies - 1) * _pitchX;
-                double spanY = _originY + _width * Aspect + (_copies - 1) * _pitchY;
+
+                // Which way the artwork extends is the anchor's doing, and this summary is read to check
+                // the job against travel - reporting +height on a machine that runs to -Y would name a
+                // corner on the wrong side of the origin.
+                double artH = _width * Aspect;
+                double spanY = _originY + (_anchorBackLeft ? -artH : artH) + (_copies - 1) * _pitchY;
 
                 if (_copies <= 1)
                     return string.Format("one copy, reaching X{0:0.#} Y{1:0.#}", spanX, spanY);
 
                 return string.Format("{0} copies, reaching X{1:0.#} Y{2:0.#} - check that is within travel",
                                      _copies, spanX, spanY);
+            }
+        }
+
+        /// <summary>
+        /// Which corner to jog to before starting, spelled out. The dialog cannot show both conventions at
+        /// once and this is the one instruction that ruins the material if it is followed wrongly, so it is
+        /// derived from the setting rather than written as fixed text that is right half the time.
+        /// </summary>
+        public string AnchorSummary
+        {
+            get
+            {
+                return _anchorBackLeft
+                    ? "Jog to the artwork's TOP-left corner: from there the job runs toward the front (-Y), which is where the table is on a back-left origin."
+                    : "Jog to the artwork's LOWER-left corner: from there the job runs toward the back (+Y).";
             }
         }
 

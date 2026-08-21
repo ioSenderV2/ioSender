@@ -76,8 +76,17 @@ namespace CNC.Converters
         // so there is exactly one place a copy's offset can be forgotten, rather than one per emit site.
         private double offX, offY;
 
+        // Shift that puts the artwork on the correct side of the origin. SvgOutlines normalises to the
+        // artwork's LOWER-left with Y upward; anchoring to the back-left corner means subtracting the
+        // artwork's height so it occupies Y 0 down to -height instead. See SvgLaserSettings.AnchorBackLeft.
+        //
+        // Held here rather than folded into offY because offY is rebuilt per copy by SetCopyOffset, and a
+        // value that has to be re-added every time something else is recalculated is a value that will
+        // eventually be forgotten once.
+        private double anchorY;
+
         private string FX(double v) { return F(v + offX); }
-        private string FY(double v) { return F(v + offY); }
+        private string FY(double v) { return F(v + offY + anchorY); }
 
         /// <summary>Place copy n: the artwork's own origin plus n pitches.</summary>
         private void SetCopyOffset(int n)
@@ -177,6 +186,9 @@ namespace CNC.Converters
             {
                 job.AddBlock(filename, CNC.Core.Action.New);
 
+                // Set before ANY coordinate is formatted - every X and Y below goes through FX/FY.
+                anchorY = settings.AnchorBackLeft ? -art.HeightMm : 0d;
+
                 job.AddBlock(settings.Fill ? "(SVG to laser - shading then outline)" : "(SVG to laser - outlines only)");
                 job.AddBlock(string.Format(CultureInfo.InvariantCulture,
                     "(artwork {0} x {1} mm, {2} outline{3}, {4} pass{5})",
@@ -196,8 +208,17 @@ namespace CNC.Converters
                         F(settings.OriginX), F(settings.OriginY), settings.Copies,
                         settings.Copies == 1 ? "y" : "ies", F(settings.PitchX), F(settings.PitchY)));
 
+                // Named in the file as well as the dialog. The .nc outlives the dialog - it gets loaded on
+                // another day, or streamed by something that never showed one - and "which corner" is not
+                // recoverable by looking at the coordinates unless it is written down.
+                job.AddBlock(string.Format(CultureInfo.InvariantCulture,
+                    "(anchor: {0}-left corner at origin, artwork runs to Y{1})",
+                    settings.AnchorBackLeft ? "TOP" : "LOWER",
+                    F(settings.AnchorBackLeft ? -art.HeightMm : art.HeightMm)));
+
                 job.AddBlock("(Origin: the head's position when this starts becomes 0,0.)");
-                job.AddBlock("(Position it at the artwork's LOWER-LEFT corner before running.)");
+                job.AddBlock(string.Format("(Position it at the artwork's {0}-LEFT corner before running.)",
+                                           settings.AnchorBackLeft ? "TOP" : "LOWER"));
                 job.AddBlock("(If this job is ABORTED the G92 offset stays set - clear it with G92.1.)");
 
                 job.AddBlock("G21 G90 G17");
