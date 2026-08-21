@@ -1,4 +1,4 @@
-/*
+﻿/*
  * JobRunner.cs - part of CNC Core library
  *
  * The streaming state machine: it feeds a g-code program to the controller, tracks what the machine is
@@ -683,6 +683,65 @@ namespace CNC.Core
 
         #endregion
 
+        /// <summary>
+        /// Refuse - or at least ask - when the loaded program is bigger than the machine's travel.
+        ///
+        /// Only the span is checked. An absolute check would need a trustworthy machine origin, and on a
+        /// controller without homing there is not one. The span is enough to catch the case that cannot
+        /// possibly work, and it never gives a false alarm: a program 200mm wider than the axis will hit
+        /// the end wherever it is started from.
+        ///
+        /// Asks rather than refuses outright. A program can legitimately exceed the reported travel when
+        /// $130-$132 are simply not set up - they default to a nominal value on plenty of controllers - and
+        /// this must not become the thing that stops a machine working because a setting was never filled
+        /// in. What it must do is make sure nobody drives into a stop without having been told.
+        /// </summary>
+        private bool ProgramFitsMachine()
+        {
+            var limits = model.ProgramLimits;
+            if (limits == null || !model.IsFileLoaded)
+                return true;
+
+            string over = string.Empty;
+
+            for (int axis = 0; axis < 2 && axis < GrblInfo.NumAxes; axis++)      // X and Y; Z spans are tiny
+            {
+                double travel = GrblSettings.GetDouble(GrblSetting.MaxTravelBase + axis);
+                if (double.IsNaN(travel) || travel <= 0d)
+                    continue;       // not configured - say nothing rather than invent a limit
+
+                double span = axis == 0 ? limits.MaxX - limits.MinX : limits.MaxY - limits.MinY;
+                if (span > travel)
+                    over += string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "{0}{1}: the program spans {2:0.#} mm, the machine travels {3:0.#} mm",
+                        over == string.Empty ? "" : "\n", axis == 0 ? "X" : "Y", span, travel);
+            }
+
+            if (over == string.Empty)
+                return true;
+
+            DebugLog.Write("run", "JobRunner.Run: program exceeds machine travel - " + over.Replace("\n", "; "));
+
+            bool unprotected = GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1;
+
+            var answer = UserPrompt.Show(
+                "This program is larger than the machine can travel.\n\n" + over + "\n\n" +
+                (unprotected
+                    ? "Soft limits are OFF, so the controller will NOT stop it - the axis will run into its end stop and stall there.\n\n"
+                    : "Soft limits should stop it, but the job will not complete.\n\n") +
+                "Run it anyway?",
+                "ioSender - program does not fit",
+                PromptButtons.YesNo, PromptIcon.Warning, PromptResult.No);
+
+            if (answer != PromptResult.Yes)
+            {
+                DebugLog.Write("run", "JobRunner.Run: STOPPED - operator declined an oversized program");
+                return false;
+            }
+
+            return true;
+        }
+
         public void Run(int fromBlock, bool honorActiveProgram = true)
         {
             // One-shot macro-run intent (Step 7): consumed HERE, before any early return can strand it
@@ -704,6 +763,21 @@ namespace CNC.Core
                 DebugLog.Write("run", "JobRunner.Run: STOPPED - PrepareForRun() refused (host could not prepare, e.g. Simulate switch)");
                 return;
             }
+
+            // Will this program physically fit the machine?
+            //
+            // Compared as a SPAN, not against absolute coordinates, because that is the part that is
+            // knowable here. Without homing there is no trustworthy machine origin - $22=0 means position
+            // is whatever the head happened to be at when the controller powered up - so "where will it go"
+            // cannot be answered. "Is it wider than the axis can travel" can be, and a program wider than
+            // the axis cannot complete from ANY starting point.
+            //
+            // Worth stopping for because with soft limits off ($20=0) nothing else will. A 600mm ruler was
+            // run on a 400mm machine on 2026-08-21: it drove 200mm past the end and sat grinding against
+            // the stop. The limits panel showed the program's extents the whole time; nothing compared them
+            // to the machine.
+            if (fromBlock == 0 && !ProgramFitsMachine())
+                return;
 
             // A Generate-first tool tab is focused and hasn't built its program yet: the button reads
             // "Generate" (see UpdateRunButtonLabel) - pressing it only generates, it does NOT also run. A
