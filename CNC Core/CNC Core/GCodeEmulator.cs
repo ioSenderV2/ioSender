@@ -523,7 +523,8 @@ namespace CNC.Core
                     case Commands.G59_3:
                         {
                             string cs = token.Command.ToString().Replace('_', '.');
-                            coordinateSystem = coordinateSystems.Where(x => x.Code == cs).FirstOrDefault();
+                            // Same reason as Machine.Reset: an unknown system must not put a null back.
+                            coordinateSystem = coordinateSystems.Where(x => x.Code == cs).FirstOrDefault() ?? Neutral(cs);
                             foreach (int i in AxisFlags.All.ToIndices()) // GrblInfo.AxisFlags?
                                 offsets[i] = coordinateSystem.Values[i];
                             //    CoordinateSystem = GrblWorkParameters.CoordinateSystems();
