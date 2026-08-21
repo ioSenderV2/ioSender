@@ -51,6 +51,21 @@
                 </StackPanel>
             </GroupBox>
 
+            <GroupBox x:Uid="grp_svglaser_placement" Header="Placement" Margin="5,5,0,0" MinWidth="290">
+                <StackPanel>
+                    <TextBlock x:Uid="txt_svglaser_placenote" TextWrapping="Wrap" Margin="4,2,4,4" FontSize="11" Foreground="#586069"
+                               Text="The artwork is measured from its own outline, so without an offset it starts exactly at the origin. Set where its lower-left corner belongs, and how many copies the fixture holds."/>
+                    <Controls:NumericField x:Uid="fld_svglaser_originx" Label="Origin X:" ColonAt="90" Unit="mm" Format="-####0.0##" Value="{Binding Path=OriginX, Mode=TwoWay}"/>
+                    <Controls:NumericField x:Uid="fld_svglaser_originy" Label="Origin Y:" ColonAt="90" Unit="mm" Format="-####0.0##" Value="{Binding Path=OriginY, Mode=TwoWay}"/>
+                    <Controls:NumericField x:Uid="fld_svglaser_copies" Label="Copies:" ColonAt="90" Unit="" Format="##0" Value="{Binding Path=Copies, Mode=TwoWay}"
+                                           ToolTip="Repeat the same artwork this many times, each one a pitch further on. One drawing stays the single source of the shape."/>
+                    <Controls:NumericField x:Uid="fld_svglaser_pitchx" Label="Pitch X:" ColonAt="90" Unit="mm" Format="-####0.0##" Value="{Binding Path=PitchX, Mode=TwoWay}"/>
+                    <Controls:NumericField x:Uid="fld_svglaser_pitchy" Label="Pitch Y:" ColonAt="90" Unit="mm" Format="-####0.0##" Value="{Binding Path=PitchY, Mode=TwoWay}"/>
+                    <TextBlock x:Name="txtPlacement" Text="{Binding Path=PlacementSummary, Mode=OneWay}" Foreground="#586069" FontSize="11" Margin="94,4,0,4"
+                               ToolTip="Where the far corner of the last copy lands. Check it against the machine travel - a modest pitch can still add up to a reach that does not fit."/>
+                </StackPanel>
+            </GroupBox>
+
             <GroupBox x:Uid="grp_svglaser_origin" Header="Before you run this" Margin="5,5,0,0" MinWidth="290">
                 <StackPanel>
                     <TextBlock x:Uid="txt_svglaser_origin" TextWrapping="Wrap" Margin="4,2,4,2" FontSize="11"

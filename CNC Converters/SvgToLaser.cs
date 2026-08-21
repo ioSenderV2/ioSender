@@ -71,6 +71,33 @@ namespace CNC.Converters
         private SvgLaserSettings settings = SvgLaserSettings.Current;
 
         private static string F(double v) { return v.ToString("0.###", CultureInfo.InvariantCulture); }
+
+        // Where the copy currently being emitted sits. Applied at the point every coordinate is formatted,
+        // so there is exactly one place a copy's offset can be forgotten, rather than one per emit site.
+        private double offX, offY;
+
+        private string FX(double v) { return F(v + offX); }
+        private string FY(double v) { return F(v + offY); }
+
+        /// <summary>Place copy n: the artwork's own origin plus n pitches.</summary>
+        private void SetCopyOffset(int n)
+        {
+            offX = settings.OriginX + n * settings.PitchX;
+            offY = settings.OriginY + n * settings.PitchY;
+        }
+
+        /// <summary>
+        /// Back to no offset before the closing moves.
+        ///
+        /// The program ends with "G0 X0 Y0" to return to where it started, and that has to mean the ORIGIN -
+        /// not the origin plus wherever the last copy happened to be. Leaving the offset applied would send
+        /// the head to the last copy's corner instead, which on a fixture that expects the machine parked at
+        /// its start position is a wrong answer that looks like a right one.
+        /// </summary>
+        private void ClearCopyOffset()
+        {
+            offX = offY = 0d;
+        }
         private static string N(double v) { return v.ToString("0", CultureInfo.InvariantCulture); }
 
         public bool LoadFile(CNC.Controls.GCode job, string filename)
@@ -163,6 +190,12 @@ namespace CNC.Converters
                 if (!settings.LaserModeOn)
                     job.AddBlock("(WARNING: $32 laser mode is NOT enabled on this controller)");
 
+                if (settings.Copies > 1 || settings.OriginX != 0d || settings.OriginY != 0d)
+                    job.AddBlock(string.Format(CultureInfo.InvariantCulture,
+                        "(placement: origin X{0} Y{1}, {2} cop{3} at pitch X{4} Y{5})",
+                        F(settings.OriginX), F(settings.OriginY), settings.Copies,
+                        settings.Copies == 1 ? "y" : "ies", F(settings.PitchX), F(settings.PitchY)));
+
                 job.AddBlock("(Origin: the head's position when this starts becomes 0,0.)");
                 job.AddBlock("(Position it at the artwork's LOWER-LEFT corner before running.)");
                 job.AddBlock("(If this job is ABORTED the G92 offset stays set - clear it with G92.1.)");
@@ -176,6 +209,7 @@ namespace CNC.Converters
 
                 if (settings.Fill && !settings.OutlineAfterFill)
                 {
+                    ClearCopyOffset();
                     job.AddBlock("M5");
                     job.AddBlock(string.Format(CultureInfo.InvariantCulture, "G0 X0 Y0 F{0}", N(settings.TravelFeed)));
                     job.AddBlock("G92.1");
@@ -183,8 +217,15 @@ namespace CNC.Converters
                     return;
                 }
 
-                for (int pass = 0; pass < settings.Passes; pass++)
+                for (int copy = 0; copy < settings.Copies; copy++)
                 {
+                  SetCopyOffset(copy);
+                  if (settings.Copies > 1)
+                      job.AddBlock(string.Format(CultureInfo.InvariantCulture,
+                          "(copy {0} of {1} at X{2} Y{3})", copy + 1, settings.Copies, F(offX), F(offY)));
+
+                  for (int pass = 0; pass < settings.Passes; pass++)
+                  {
                     if (settings.Passes > 1)
                         job.AddBlock(string.Format("(pass {0} of {1})", pass + 1, settings.Passes));
 
@@ -198,12 +239,12 @@ namespace CNC.Converters
                         // Rapid to the start with the beam commanded off. Laser mode already blanks a G0;
                         // the S0 costs one word and makes the same file safe where it is switched off.
                         job.AddBlock(string.Format(CultureInfo.InvariantCulture,
-                            "G0 X{0} Y{1} S0 F{2}", F(p0.X), F(p0.Y), N(settings.TravelFeed)));
+                            "G0 X{0} Y{1} S0 F{2}", FX(p0.X), FY(p0.Y), N(settings.TravelFeed)));
 
                         for (int i = 1; i < contour.Points.Count; i++)
                             job.AddBlock(string.Format(CultureInfo.InvariantCulture,
                                 "G1 X{0} Y{1} S{2} F{3}",
-                                F(contour.Points[i].X), F(contour.Points[i].Y), N(settings.Power), N(settings.Feed)));
+                                FX(contour.Points[i].X), FY(contour.Points[i].Y), N(settings.Power), N(settings.Feed)));
 
                         // SvgOutlines returns CLOSED contours, but whether the closing point is repeated in
                         // Points is the loader's business, not this emitter's - so close explicitly when the
@@ -212,10 +253,12 @@ namespace CNC.Converters
                         var pn = contour.Points[contour.Points.Count - 1];
                         if (Math.Abs(pn.X - p0.X) > 1e-6 || Math.Abs(pn.Y - p0.Y) > 1e-6)
                             job.AddBlock(string.Format(CultureInfo.InvariantCulture,
-                                "G1 X{0} Y{1} S{2} F{3}", F(p0.X), F(p0.Y), N(settings.Power), N(settings.Feed)));
+                                "G1 X{0} Y{1} S{2} F{3}", FX(p0.X), FY(p0.Y), N(settings.Power), N(settings.Feed)));
                     }
+                  }
                 }
 
+                ClearCopyOffset();
                 job.AddBlock("M5");
                 job.AddBlock(string.Format(CultureInfo.InvariantCulture, "G0 X0 Y0 F{0}", N(settings.TravelFeed)));
                 job.AddBlock("G92.1");
@@ -243,13 +286,23 @@ namespace CNC.Converters
                 "(shading: {0} spans at {1} mm interval, S{2} F{3})",
                 spans.Count, F(settings.Interval), N(settings.FillPower), N(settings.FillFeed)));
 
-            foreach (var s in spans)
+            for (int copy = 0; copy < settings.Copies; copy++)
             {
-                job.AddBlock(string.Format(CultureInfo.InvariantCulture,
-                    "G0 X{0} Y{1} S0 F{2}", F(s.X0), F(s.Y), N(settings.TravelFeed)));
-                job.AddBlock(string.Format(CultureInfo.InvariantCulture,
-                    "G1 X{0} Y{1} S{2} F{3}", F(s.X1), F(s.Y), N(settings.FillPower), N(settings.FillFeed)));
+                SetCopyOffset(copy);
+
+                if (settings.Copies > 1)
+                    job.AddBlock(string.Format(CultureInfo.InvariantCulture,
+                        "(shading copy {0} of {1})", copy + 1, settings.Copies));
+
+                foreach (var s in spans)
+                {
+                    job.AddBlock(string.Format(CultureInfo.InvariantCulture,
+                        "G0 X{0} Y{1} S0 F{2}", FX(s.X0), FY(s.Y), N(settings.TravelFeed)));
+                    job.AddBlock(string.Format(CultureInfo.InvariantCulture,
+                        "G1 X{0} Y{1} S{2} F{3}", FX(s.X1), FY(s.Y), N(settings.FillPower), N(settings.FillFeed)));
+                }
             }
+            ClearCopyOffset();
 
             if (settings.OutlineAfterFill)
                 job.AddBlock("(outline follows the shading, so the edge lands crisp over it)");

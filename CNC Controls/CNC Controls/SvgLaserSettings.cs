@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SvgLaserSettings.cs - part of CNC Controls library
  *
  * What the operator chose for an SVG-to-laser conversion. See SvgToLaser for what is done with it.
@@ -34,6 +34,8 @@ namespace CNC.Controls
         private bool _dynamic = true;
         private bool _fill = false, _outlineAfterFill = true;
         private double _interval = 0.1d, _fillPower = 120d, _fillFeed = 3000d;
+        private double _originX = 0d, _originY = 0d, _pitchX = 0d, _pitchY = 0d;
+        private int _copies = 1;
 
         /// <summary>
         /// The live instance from the config store - the one the dialog edits and AppConfig saves.
@@ -171,6 +173,76 @@ namespace CNC.Controls
                 double lines = _width * Aspect / _interval;
                 double minutes = lines * _width / _fillFeed;
                 return string.Format("~{0:0} scan lines, {1:0} min or less", lines, minutes);
+            }
+        }
+
+        // ---- placement: where the artwork goes, and how many of it ----
+        //
+        // SvgOutlines normalises artwork to its own BOUNDING BOX - the lower-left of the drawn geometry
+        // becomes 0,0 and empty canvas around it is discarded. So without these the logo can only ever
+        // start exactly at the origin, and no amount of editing the SVG will move it: adding whitespace
+        // changes nothing because nothing was drawn in it.
+        //
+        // That is fine for a bench job where you jog to the corner first, and useless for a fixture, where
+        // the whole point is that the work sits in a known place and the file has to reach it.
+
+        /// <summary>Where the artwork's lower-left corner sits relative to the origin, mm.</summary>
+        public double OriginX
+        {
+            get { return _originX; }
+            set { _originX = value; OnPropertyChanged(); OnPropertyChanged("PlacementSummary"); }
+        }
+
+        public double OriginY
+        {
+            get { return _originY; }
+            set { _originY = value; OnPropertyChanged(); OnPropertyChanged("PlacementSummary"); }
+        }
+
+        /// <summary>
+        /// How many times to repeat the artwork, each offset by the pitch from the one before.
+        ///
+        /// For a fixture holding several identical parts this is the whole difference between one file and
+        /// four: the same SVG, engraved once or three times at the pocket spacing. Doing the repetition here
+        /// rather than by duplicating the art in the SVG keeps one drawing as the single source of the shape,
+        /// so a change to the logo does not have to be made three times and cannot be made inconsistently.
+        /// </summary>
+        public int Copies
+        {
+            get { return _copies; }
+            set { _copies = Math.Max(1, value); OnPropertyChanged(); OnPropertyChanged("PlacementSummary"); }
+        }
+
+        /// <summary>Spacing between copies. Both axes, because a row of parts may run either way.</summary>
+        public double PitchX
+        {
+            get { return _pitchX; }
+            set { _pitchX = value; OnPropertyChanged(); OnPropertyChanged("PlacementSummary"); }
+        }
+
+        public double PitchY
+        {
+            get { return _pitchY; }
+            set { _pitchY = value; OnPropertyChanged(); OnPropertyChanged("PlacementSummary"); }
+        }
+
+        /// <summary>
+        /// What the placement actually amounts to on the machine: where the far corner of the last copy
+        /// lands. That is the number worth checking against the travel, and it is not obvious from four
+        /// separate boxes - a pitch that looks modest becomes a reach that does not fit.
+        /// </summary>
+        public string PlacementSummary
+        {
+            get
+            {
+                double spanX = _originX + _width + (_copies - 1) * _pitchX;
+                double spanY = _originY + _width * Aspect + (_copies - 1) * _pitchY;
+
+                if (_copies <= 1)
+                    return string.Format("one copy, reaching X{0:0.#} Y{1:0.#}", spanX, spanY);
+
+                return string.Format("{0} copies, reaching X{1:0.#} Y{2:0.#} - check that is within travel",
+                                     _copies, spanX, spanY);
             }
         }
 
