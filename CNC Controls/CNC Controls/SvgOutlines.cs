@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SvgOutlines.cs - part of CNC Controls library
  *
  * Turns an .svg file into closed polygon contours, in millimetres, ready for a toolpath - the same
@@ -44,6 +44,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Media;
 using System.Xml.Linq;
@@ -186,29 +187,22 @@ namespace CNC.Controls
                 return result;
             }
 
-            // Anything with a transform is misplaced rather than merely missing, which is worse -
-            // report it as unsupported instead of importing it at the wrong spot.
-            foreach (var el in root.DescendantsAndSelf())
+            var rings = new List<List<Point2D>>();
+
+            // Walk the RENDERED tree with transforms accumulated down it. Both halves of that matter for
+            // exported artwork, and a PDF export needs both at once: it wraps the page in a <clipPath>
+            // whose path is a full-page rectangle, and hangs a matrix(1,0,0,-1,..) off every path to undo
+            // PDF's upward Y. Walking blindly imports the clip box as a frame around the logo and drops
+            // every shape at its untransformed, vertically mirrored position.
+            Matrix rootMatrix = Matrix.Identity;
+            var rootTransform = root.Attribute("transform");
+            if (rootTransform != null && !TryParseTransform(rootTransform.Value, out rootMatrix))
             {
-                string local = el.Name.LocalName;
-                foreach (var name in UnsupportedElements)
-                    if (string.Equals(local, name, StringComparison.OrdinalIgnoreCase))
-                        Bump(result.Unsupported, local);
-                if (el.Attribute("transform") != null)
-                    Bump(result.Unsupported, "transform");
+                rootMatrix = Matrix.Identity;
+                Bump(result.Unsupported, "transform");
             }
 
-            var rings = new List<List<Point2D>>();
-            foreach (var el in root.Descendants())
-            {
-                if (!string.Equals(el.Name.LocalName, "path", StringComparison.OrdinalIgnoreCase))
-                    continue;
-                var d = el.Attribute("d");
-                if (d == null || string.IsNullOrWhiteSpace(d.Value))
-                    continue;
-                if (!Flatten(d.Value, rings))
-                    result.ParseFailures++;
-            }
+            Walk(root, rootMatrix, rings, result);
 
             if (rings.Count == 0)
             {
@@ -221,13 +215,194 @@ namespace CNC.Controls
             return result;
         }
 
+        // ------------------------------------------------------------------ the rendered tree
+
+        // Subtrees that DEFINE something for later reference instead of drawing it. Their contents are
+        // not on the page, so importing them is not "extra detail" - it is geometry the artwork does not
+        // contain. <clipPath> is the one that bites: every PDF and Illustrator export wraps the page in
+        // one, and because its rectangle is the largest thing in the file it also captures the bounding
+        // box, so the logo comes out undersized inside a frame it never had.
+        private static readonly string[] NonRendered =
+            { "defs", "clipPath", "mask", "pattern", "marker", "symbol", "metadata", "title", "desc" };
+
+        private static readonly Regex TransformFunc =
+            new Regex(@"([a-zA-Z]+)\s*\(([^)]*)\)", RegexOptions.Compiled);
+
+        /// <summary>
+        /// Collect flattened outlines from the rendered elements under <paramref name="parent"/>,
+        /// carrying the accumulated transform down with them.
+        /// </summary>
+        private static void Walk(XElement parent, Matrix inherited, List<List<Point2D>> rings, SvgImportResult result)
+        {
+            foreach (var el in parent.Elements())
+            {
+                string local = el.Name.LocalName;
+
+                if (IsNonRendered(local))
+                    continue;
+
+                Matrix here = inherited;
+                var transform = el.Attribute("transform");
+                if (transform != null)
+                {
+                    Matrix own;
+                    if (TryParseTransform(transform.Value, out own))
+                    {
+                        // own maps this element into its PARENT's space; inherited carries that on to the
+                        // root's. WPF matrices are row-vector (p' = p * M), so the child's own transform
+                        // applies first and Append is the right way round.
+                        here = own;
+                        here.Append(inherited);
+                    }
+                    else
+                        // Understood far enough to know something moves this element, not far enough to
+                        // know where to. Reported - treating it as identity would misplace the artwork
+                        // silently, which is the failure this whole path exists to avoid.
+                        Bump(result.Unsupported, "transform");
+                }
+
+                if (string.Equals(local, "path", StringComparison.OrdinalIgnoreCase))
+                {
+                    var d = el.Attribute("d");
+                    if (d != null && !string.IsNullOrWhiteSpace(d.Value) && !Flatten(d.Value, here, rings))
+                        result.ParseFailures++;
+                }
+                else foreach (var name in UnsupportedElements)
+                    if (string.Equals(local, name, StringComparison.OrdinalIgnoreCase))
+                        Bump(result.Unsupported, local);
+
+                Walk(el, here, rings, result);
+            }
+        }
+
+        private static bool IsNonRendered(string local)
+        {
+            foreach (var name in NonRendered)
+                if (string.Equals(local, name, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Parse an SVG transform attribute - a list of matrix/translate/scale/rotate/skew calls applied
+        /// right to left - into a single matrix. False when any part of it is not understood, so the
+        /// caller can report it instead of placing the artwork wrongly.
+        /// </summary>
+        private static bool TryParseTransform(string text, out Matrix result)
+        {
+            result = Matrix.Identity;
+            if (string.IsNullOrWhiteSpace(text))
+                return true;
+
+            var found = TransformFunc.Matches(text);
+            if (found.Count == 0)
+                return false;
+
+            // Everything BETWEEN the recognised calls has to be separator. Without this check a value
+            // that only partly parses still returns true, and half a transform places the artwork more
+            // convincingly wrong than none at all.
+            int pos = 0;
+            foreach (Match m in found)
+            {
+                for (int i = pos; i < m.Index; i++)
+                    if (!char.IsWhiteSpace(text[i]) && text[i] != ',')
+                        return false;
+                pos = m.Index + m.Length;
+            }
+            for (int i = pos; i < text.Length; i++)
+                if (!char.IsWhiteSpace(text[i]) && text[i] != ',')
+                    return false;
+
+            foreach (Match m in found)
+            {
+                double[] a;
+                if (!TryNumbers(m.Groups[2].Value, out a))
+                    return false;
+
+                Matrix t = Matrix.Identity;
+                switch (m.Groups[1].Value)      // SVG function names are case SENSITIVE (skewX, not skewx)
+                {
+                    case "matrix":
+                        if (a.Length != 6) return false;
+                        t = new Matrix(a[0], a[1], a[2], a[3], a[4], a[5]);
+                        break;
+
+                    case "translate":
+                        if (a.Length == 1) t = new Matrix(1d, 0d, 0d, 1d, a[0], 0d);
+                        else if (a.Length == 2) t = new Matrix(1d, 0d, 0d, 1d, a[0], a[1]);
+                        else return false;
+                        break;
+
+                    case "scale":
+                        if (a.Length == 1) t = new Matrix(a[0], 0d, 0d, a[0], 0d, 0d);
+                        else if (a.Length == 2) t = new Matrix(a[0], 0d, 0d, a[1], 0d, 0d);
+                        else return false;
+                        break;
+
+                    case "rotate":
+                        if (a.Length == 1) t.Rotate(a[0]);
+                        else if (a.Length == 3) t.RotateAt(a[0], a[1], a[2]);
+                        else return false;
+                        break;
+
+                    case "skewX":
+                        if (a.Length != 1) return false;
+                        t = new Matrix(1d, 0d, Math.Tan(a[0] * Math.PI / 180d), 1d, 0d, 0d);
+                        break;
+
+                    case "skewY":
+                        if (a.Length != 1) return false;
+                        t = new Matrix(1d, Math.Tan(a[0] * Math.PI / 180d), 0d, 1d, 0d, 0d);
+                        break;
+
+                    default:
+                        return false;
+                }
+
+                // Listed left to right, applied right to left: "translate(..) scale(..)" scales first.
+                // Prepend gives t * result, which builds that order as the list is read forwards.
+                result.Prepend(t);
+            }
+
+            return true;
+        }
+
+        private static bool TryNumbers(string text, out double[] values)
+        {
+            values = null;
+            var parts = text.Split(new[] { ' ', '\t', '\r', '\n', ',' }, StringSplitOptions.RemoveEmptyEntries);
+            var parsed = new double[parts.Length];
+            for (int i = 0; i < parts.Length; i++)
+                if (!double.TryParse(parts[i], NumberStyles.Float, CultureInfo.InvariantCulture, out parsed[i]))
+                    return false;
+            values = parsed;
+            return true;
+        }
+
         // ------------------------------------------------------------------ path -> rings
 
-        private static bool Flatten(string data, List<List<Point2D>> rings)
+        private static bool Flatten(string data, Matrix matrix, List<List<Point2D>> rings)
         {
             Geometry geometry;
             try { geometry = Geometry.Parse(data); }
             catch { return false; }   // not WPF-compatible path data - counted, never swallowed
+
+            // Geometry.Parse hands back a FROZEN instance, so Transform cannot be set on it - it throws
+            // "cannot set a property on object ... because it is in a read-only state". Clone first.
+            //
+            // Applied to the GEOMETRY rather than to the flattened points afterwards, so that flattening
+            // happens in transformed space. That is what keeps FlattenTolerance meaningful: a curve under
+            // a 10x scale needs ten times the segments to stay within 0.01mm of true, and flattening
+            // first would have already thrown that detail away.
+            if (!matrix.IsIdentity)
+            {
+                try
+                {
+                    geometry = geometry.Clone();
+                    geometry.Transform = new MatrixTransform(matrix);
+                }
+                catch { return false; }
+            }
 
             PathGeometry flat;
             try { flat = geometry.GetFlattenedPathGeometry(FlattenTolerance, ToleranceType.Absolute); }
