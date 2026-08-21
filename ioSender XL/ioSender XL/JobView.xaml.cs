@@ -630,6 +630,27 @@ namespace GCode_Sender
                         if (DebugLog.Enabled)
                             DebugLog.Write("connect", "connected but $I never loaded - offering disconnect or check-mode");
 
+                        // A controller ALREADY in check mode is not a mystery to be reported - it is the
+                        // whole explanation. Grbl answers every '$' query with error:8 while in check mode,
+                        // so $I cannot possibly succeed, and neither can the reconnect the dialog offers:
+                        // check mode survives it. Observed 2026-08-21 on a diode laser left in check mode by
+                        // an earlier session - connect, fail, reconnect, fail, indefinitely.
+                        //
+                        // So leave check mode and try again, rather than asking a question whose answers
+                        // both lead back here.
+                        if (model.IsCheckMode)
+                        {
+                            if (DebugLog.Enabled)
+                                DebugLog.Write("connect", "controller was ALREADY in check mode - $ queries return error:8 there; leaving it and reconnecting");
+
+                            model.Message = "Controller was in check mode, which blocks $I - leaving check mode and reconnecting...";
+                            Comms.com.WriteCommand(GrblConstants.CMD_CHECK);    // toggle: this LEAVES check mode
+
+                            Dispatcher.BeginInvoke(new System.Action(() => MainWindow.ui.ReconnectAfterFailedHandshake()),
+                                                   DispatcherPriority.ApplicationIdle);
+                            return;
+                        }
+
                         bool disconnect = AppDialogs.Show(
                             "Could not read this controller's capabilities ($I).\r\n\r\n" +
                             "Nothing is wrong with the controller - the query went unanswered during connect, and " +
@@ -661,7 +682,14 @@ namespace GCode_Sender
                             // controller's own guarantee of that - it parses and acknowledges but never
                             // executes motion - and it is enforced below rather than merely entered, because
                             // an unenforced safety mode is one stray toggle away from not being one.
-                            Comms.com.WriteCommand(GrblConstants.CMD_CHECK);
+                            // $C TOGGLES check mode; it does not set it. Sending it while the controller is
+                            // already in check mode LEAVES check mode - and the enforcement below then sees
+                            // that and sends $C again, putting it back. That oscillation is visible in the
+                            // wire log as two $C a couple of seconds apart with nothing achieved between
+                            // them (2026-08-21).
+                            if (!model.IsCheckMode)
+                                Comms.com.WriteCommand(GrblConstants.CMD_CHECK);
+
                             lockedInCheckMode = true;
                             if (DebugLog.Enabled)
                                 DebugLog.Write("connect", "DEGRADED - staying connected, locking check mode until reconnect");
