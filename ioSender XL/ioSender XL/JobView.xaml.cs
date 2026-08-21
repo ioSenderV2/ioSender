@@ -1,4 +1,4 @@
-/*
+﻿/*
  * JobView.xaml.cs - part of ioSender
  *
  * v0.47 / 2026-04-29 / Io Engineering (Terje Io)
@@ -735,7 +735,19 @@ namespace GCode_Sender
                 Task.Delay(500).ContinueWith(t => _dro?.EnableFocus());
                 Application.Current.Dispatcher.BeginInvoke(new System.Action(() =>
                 {
-                    focusedControl.Focus();
+                    // focusedControl is only ever assigned on the DEACTIVATE path above, where it records
+                    // what had focus so it can be given back. On the activate path - including the very
+                    // first activation, from CompleteStartup - nothing has assigned it and the field is
+                    // still its null initialiser.
+                    //
+                    // It normally survives because RunControl.Activate returns false on that first call and
+                    // this block is skipped; when it returns true instead, startup dies with a
+                    // NullReferenceException before the window is usable (crash logs 2026-08-21, and the
+                    // same method on 2026-07-14).
+                    //
+                    // Falling back to the view is what the deactivate path already does when there is no MDI
+                    // box to restore - focus belongs somewhere, and here is the sensible somewhere.
+                    (focusedControl ?? this).Focus();
                 }), DispatcherPriority.Render);
             }
         }
