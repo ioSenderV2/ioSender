@@ -702,6 +702,17 @@ namespace CNC.Core
             if (limits == null || !model.IsFileLoaded)
                 return true;
 
+            // The span is only meaningful if every point in the box is in the SAME frame. A G53 point that
+            // reached the box without having its WCS offset subtracted lands in machine coordinates next to
+            // work-frame ones, and the resulting "span" is the distance between two different origins -
+            // which is how a 32 mm program reported an 858 mm Y span (2026-08-24). Log the box so a bogus
+            // warning can be told from a real one without re-deriving it from the generated copy.
+            if (DebugLog.Enabled)
+                DebugLog.Write("run", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "ProgramFitsMachine: box X {0:0.###}..{1:0.###} (span {2:0.###})  Y {3:0.###}..{4:0.###} (span {5:0.###})",
+                    limits.MinX, limits.MaxX, limits.MaxX - limits.MinX,
+                    limits.MinY, limits.MaxY, limits.MaxY - limits.MinY));
+
             string over = string.Empty;
 
             for (int axis = 0; axis < 2 && axis < GrblInfo.NumAxes; axis++)      // X and Y; Z spans are tiny

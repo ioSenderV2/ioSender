@@ -502,7 +502,19 @@ namespace CNC.Core
                             if (action.IsInMachineCoord)
                             {
                                 foreach (int i in motion.AxisFlags.ToIndices())
+                                {
+                                    // offsets[] is the active WCS origin, set by the G54..G59.3 case from
+                                    // coordinateSystems ($#). If it is still 0 here the subtraction is a
+                                    // no-op and this machine coordinate enters the bounding box RAW, in a
+                                    // different frame from every work-frame point - see ProgramFitsMachine.
+                                    if (DebugLog.Enabled)
+                                        DebugLog.Write("gcode", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                                            "G53 axis {0}: raw={1:0.###} offsets={2:0.###} origin={3:0.###} -> {4:0.###}{5}",
+                                            i, motion.Values[i], offsets[i], origin[i],
+                                            motion.Values[i] - offsets[i] - origin[i],
+                                            offsets[i] == 0d ? "   <-- WCS offset is ZERO" : ""));
                                     machinePos[i] = motion.Values[i] - offsets[i] - origin[i];
+                                }
                                 action.End = machinePos.Point3D;
                             }
                             action.Token = new GCLinearMotion(motion.Motion, token.LineNumber, machinePos.Array, motion.AxisFlags, token.BlockDelete);
@@ -524,9 +536,21 @@ namespace CNC.Core
                         {
                             string cs = token.Command.ToString().Replace('_', '.');
                             // Same reason as Machine.Reset: an unknown system must not put a null back.
-                            coordinateSystem = coordinateSystems.Where(x => x.Code == cs).FirstOrDefault() ?? Neutral(cs);
+                            var found = coordinateSystems.Where(x => x.Code == cs).FirstOrDefault();
+                            coordinateSystem = found ?? Neutral(cs);
                             foreach (int i in AxisFlags.All.ToIndices()) // GrblInfo.AxisFlags?
                                 offsets[i] = coordinateSystem.Values[i];
+
+                            // A Neutral() fallback silently zeroes offsets[], which makes every later G53
+                            // land in the bounding box unconverted. Say which one happened, and how many
+                            // systems $# actually gave us.
+                            if (DebugLog.Enabled)
+                                DebugLog.Write("gcode", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                                    "select {0}: {1} (coordinateSystems={2} [{3}]) -> offsets X{4:0.###} Y{5:0.###} Z{6:0.###}",
+                                    cs, found == null ? "NOT FOUND - using Neutral(zeros)" : "found",
+                                    coordinateSystems.Count,
+                                    string.Join(",", coordinateSystems.Select(x => x.Code).ToArray()),
+                                    offsets[0], offsets[1], offsets[2]));
                             //    CoordinateSystem = GrblWorkParameters.CoordinateSystems();
                             //GCCoordinateSystem cs = (GCCoordinateSystem)token;
                             // TODO: handle offsets... Need to read current from grbl
