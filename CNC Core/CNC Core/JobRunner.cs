@@ -643,6 +643,10 @@ namespace CNC.Core
         public void OnGrblReset()
         {
             AbortPump();
+            if (JobTimer.IsRunning)
+                model.LogDetail(string.Format("Program ABORTED by controller reset - {0}, after {1}",
+                    string.IsNullOrEmpty(model.FileName) ? "(unnamed)" : System.IO.Path.GetFileName(model.FileName),
+                    JobTimer.RunTime), true);
             JobTimer.Stop();
             // A soft reset answers nothing that was outstanding and executes nothing that was queued -
             // drop both rather than let a stale $J record (or a stale queued jog) survive the reset.
@@ -656,6 +660,12 @@ namespace CNC.Core
         public void Stop()
         {
             AbortPump();
+            // Logged as an error so it is marked "!" - a job that did not finish is the thing worth
+            // finding when reading back why a part came out wrong.
+            if (JobTimer.IsRunning)
+                model.LogDetail(string.Format("Program STOPPED by operator - {0}, after {1}",
+                    string.IsNullOrEmpty(model.FileName) ? "(unnamed)" : System.IO.Path.GetFileName(model.FileName),
+                    JobTimer.RunTime), true);
             JobTimer.Stop();
             job.Stopped = true;
             streamingHandler.Call(StreamingState.Stop, true);
@@ -1005,6 +1015,17 @@ namespace CNC.Core
                         model.FileName, Source.Data?.Count ?? -1, model.IsDryRunMode, model.GrblState.State == GrblStates.Check));
 
                     JobTimer.Start();
+
+                    // status.log is the operator's record of what this machine was asked to do, and until
+                    // now a run left no mark in it at all. The mode qualifier is not decoration: a dry run
+                    // and a real one look identical afterwards, and mistaking one for the other in a log is
+                    // how "it ran fine yesterday" gets said about a run that never cut anything.
+                    model.LogDetail(string.Format("Program start - {0}{1}{2}",
+                        string.IsNullOrEmpty(model.FileName) ? "(unnamed)" : System.IO.Path.GetFileName(model.FileName),
+                        Source.Data == null ? string.Empty : string.Format(", {0} lines", Source.Data.Count),
+                        model.GrblState.State == GrblStates.Check ? "  [CHECK MODE - nothing moves]"
+                                                                  : dryRunActive ? "  [DRY RUN - not cutting]" : string.Empty));
+
                     streamingHandler.Call(StreamingState.Send, false);
                     if ((job.IsChecking = model.GrblState.State == GrblStates.Check))
                         model.Message = Localize("Checking");
@@ -1598,6 +1619,13 @@ namespace CNC.Core
                 {
                     case StreamingState.Idle:
                         model.RunTime = JobTimer.RunTime;
+                        // Guarded on IsRunning: this case is also reached on transitions where no run was
+                        // ever started, and a "Program end" for a program that never began is worse than
+                        // no line at all.
+                        if (JobTimer.IsRunning)
+                            model.LogDetail(string.Format("Program end - {0}, runtime {1}",
+                                string.IsNullOrEmpty(model.FileName) ? "(unnamed)" : System.IO.Path.GetFileName(model.FileName),
+                                JobTimer.RunTime));
                         JobTimer.Stop();
                         RewindFile();
                         SetStreamingHandler(StreamingHandler.Idle);
