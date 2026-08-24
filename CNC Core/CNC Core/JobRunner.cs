@@ -757,6 +757,7 @@ namespace CNC.Core
             if (answer != PromptResult.Yes)
             {
                 DebugLog.Write("run", "JobRunner.Run: STOPPED - operator declined an oversized program");
+                model.LogDetail("Program refused - larger than the machine travel: " + over.Replace('\n', ';'), true);
                 return false;
             }
 
@@ -904,6 +905,9 @@ namespace CNC.Core
                         if (unmet.Count > 0)
                         {
                             DebugLog.Write("run", "JobRunner: REFUSED - prerequisites unmet, nothing started");
+                            // Also in the operator's own log: this refusal is a dialog that leaves no other
+                            // trace, and "why did it not start" is unanswerable afterwards without it.
+                            model.LogDetail("Program refused - prerequisites unmet: " + string.Join("; ", unmet), true);
                             UserPrompt.Show(string.Format("Cannot start this program:\r\n\r\n• {0}", string.Join("\r\n• ", unmet)),
                                 "ioSender", PromptButtons.OK, PromptIcon.Warning);
                             return;

@@ -2706,6 +2706,19 @@ namespace CNC.Controls
         // file's first line - "(WOCACHE <sha1> stats=<line>)" - an ordinary g-code comment, so a stamped
         // file is still a valid, runnable/inspectable program. A file from before stamping existed (or a
         // hand-edited one) simply misses.
+        /// <summary>
+        /// What to call this work order in the log. The saved .workorder filename when there is one, the
+        /// name typed at New before the first Save, otherwise an explicit "(unsaved work order)" - never a
+        /// blank, which would read as though the line had failed to record anything.
+        /// </summary>
+        private string WorkOrderIdentity()
+        {
+            if (!string.IsNullOrEmpty(currentFilePath))
+                return System.IO.Path.GetFileName(currentFilePath);
+
+            return string.IsNullOrEmpty(pendingName) ? "(unsaved work order)" : pendingName;
+        }
+
         private static bool TryReadCachedProgram(string fp, out string text, out string stats)
         {
             text = stats = null;
@@ -2860,6 +2873,9 @@ namespace CNC.Controls
                 if (hitText != null)
                 {
                     program = hitText;
+                    // Named here too: a cache hit skips the compile entirely, so without this the log would
+                    // show a run of a program nothing in the file ever recorded generating.
+                    model.LogDetail("Generate for " + WorkOrderIdentity() + " - reused from cache");
                     MacroProcessor.ActiveProgramStats = string.IsNullOrEmpty(hitStats) ? "cached" : hitStats + " (cached)";
                     model.Message = string.Format("Work order program reused from cache - {0}.", MacroProcessor.ActiveProgramStats);
                     DebugLog.Write("workorder", string.Format("Generate: cache hit (fp {0})", fp.Substring(0, 8)));
@@ -2870,6 +2886,11 @@ namespace CNC.Controls
             // The compile is synchronous on the UI thread and noticeably long for a V-carve, so say so -
             // and the render flush is not optional: without it the "Compiling..." message and the wait
             // cursor would only ever paint AFTER the work they announce is already done.
+            // Name what is being generated. The "compiled - N lines in T s" message below already reaches
+            // status.log (every Message assignment does), but it never said WHICH work order produced it -
+            // so a log with several generates in it could not be matched to the parts they made.
+            model.LogDetail("Generate for " + WorkOrderIdentity());
+
             model.Message = "Compiling work order...";
             Mouse.OverrideCursor = Cursors.Wait;
             Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render);
