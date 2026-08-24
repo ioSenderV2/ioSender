@@ -3285,9 +3285,24 @@ namespace CNC.Core
                 GrblSettingGroups.Get(model);
             }
 
+            // Load() can complete "successfully" and leave Settings EMPTY, and nothing downstream can tell:
+            // GetInteger then answers -1 for every id (a MISS, not a value) and GetDouble parses null, so
+            // GrblInfo.MaxTravel derives as 0. Observed on hardware 2026-08-24 - $ES/$EG/$+ all went out at
+            // connect, the controller answered, and Settings.Count was still 0 a minute later. Downstream:
+            // the stored-position guard skipped silently, the jog clamp and the program-fit check switched
+            // off, and StartJobView emitted its "#<_bottom> = -9999" sentinel into pcorner.macro, which
+            // turned it into "G38.2 Z-9998" and alarmed. Log each stage so the one that drops it is named.
+            if (DebugLog.Enabled)
+                DebugLog.Write("settings", string.Format(
+                    "Load: detailsPath={0} HasEnums={1} needMeta={2} getExtended={3} -> detail responses={4}, Settings={5}",
+                    load, GrblInfo.HasEnums, needMeta, getExtended, responses.Count, Settings.Count));
+
             foreach (var response in responses)
                 lock (settingsLock)
                     Settings.Add(new GrblSettingDetails(response));
+
+            if (DebugLog.Enabled)
+                DebugLog.Write("settings", "Load: after adding details, Settings=" + Settings.Count);
 
             res = null;
             responses.Clear();
@@ -3301,6 +3316,13 @@ namespace CNC.Core
                     a => model.OnResponseReceived -= a,
                     1000, () => Comms.com.WriteCommand(getExtended ? GrblConstants.CMD_GETSETTINGS_ALL : GrblConstants.CMD_GETSETTINGS));
             });
+
+            // Process() creates a missing entry and queues the Add through UiContext.Post, so the count here
+            // can legitimately lag - which is itself worth seeing. res is WaitFor's verdict: false/null means
+            // the dump was never acked inside the 1000 ms window.
+            if (DebugLog.Enabled)
+                DebugLog.Write("settings", string.Format("Load: after $+/$$ dump, ack={0}, Settings={1}",
+                    res == null ? "(null)" : res.ToString(), Settings.Count));
 
             model.Silent = false;
             PollGrbl.Resume();
