@@ -3238,6 +3238,12 @@ namespace CNC.Core
                 if (detail == null || detail.Value == value)
                     return;
 
+                // Logged for the same reason Save() logs: this is a real change to the machine's
+                // configuration. It matters MORE here - a $131 typed at the MDI leaves no dialog, no
+                // Apply, and no trace anywhere else, so nothing but this line will ever say it happened.
+                Grbl.GrblViewModel?.LogDetail(string.Format("Controller setting changed from the console - ${0} {1}: {2} -> {3}",
+                                                            id, detail.Name, detail.Value, value));
+
                 detail.Value = value;
                 detail.SetLoadedBaseline();   // the controller holds this now - not a pending local edit
 
@@ -3502,6 +3508,12 @@ namespace CNC.Core
 
             var changed = Settings.Where(x => x.IsDirty).ToList();
 
+            // Captured BEFORE the writes: SetLoadedBaseline() in the loop moves LoadedValue on to the new
+            // value as each ack arrives, so reading it afterwards would report "845.000 -> 845.000".
+            var wasValue = new Dictionary<int, string>();
+            foreach (var s in changed)
+                wasValue[s.Id] = s.LoadedValue;
+
             if (changed.Count > 0)
             {
                 foreach (var setting in changed)
@@ -3548,9 +3560,49 @@ namespace CNC.Core
                 // where any other view that saves a setting lands. Anything holding a copy is out of date the
                 // moment this returns, whoever did the writing.
                 RaiseSettingsReloaded();
+
+                LogSaved(changed, wasValue);
             }
 
             return ok;
+        }
+
+        /// <summary>
+        /// Record a settings write in status.log - the count, then one line per setting with its OLD and
+        /// NEW value.
+        ///
+        /// A controller setting is the most consequential thing an operator can change from in here: $131
+        /// decides the travel envelope, $20 whether soft limits exist at all, $27 the pull-off that
+        /// determines whether a taught G30/G59.3 is still reachable. Until now none of it was recorded, so
+        /// "it used to work" had nothing to check against - and $131 840 -> 845, made mid-session on
+        /// 2026-08-24, is exactly the kind of change that explains the next day's symptom.
+        ///
+        /// Failures are named individually rather than folded into a count: a partial save leaves the
+        /// controller holding SOME of what was asked for, which is the state most likely to be
+        /// misremembered as "I changed that".
+        /// </summary>
+        private static void LogSaved(List<GrblSettingDetails> changed, Dictionary<int, string> wasValue)
+        {
+            var model = Grbl.GrblViewModel;
+            if (model == null || changed == null || changed.Count == 0)
+                return;
+
+            int failed = changed.Count(s => s.HasErrors);
+            model.LogDetail(failed == 0
+                ? string.Format("Controller settings saved - {0} changed", changed.Count)
+                : string.Format("Controller settings saved - {0} of {1} changed, {2} FAILED",
+                                changed.Count - failed, changed.Count, failed), failed > 0);
+
+            foreach (var s in changed)
+            {
+                string was;
+                if (!wasValue.TryGetValue(s.Id, out was) || was == null)
+                    was = "(unset)";
+
+                model.LogDetail(string.Format("  ${0} {1}: {2} -> {3}{4}",
+                    s.Id, s.Name, was, s.Value,
+                    s.HasErrors ? "  FAILED - not written" : string.Empty), s.HasErrors);
+            }
         }
 
         private static List<string> Export ()
