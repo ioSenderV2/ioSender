@@ -459,8 +459,20 @@ namespace CNC.Core
             if (GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1)
             {
                 if (DebugLog.Enabled)
-                    DebugLog.Write("run", string.Format("StoredPositionUnreachable({0}): SKIP - $20 reads {1}, not 1",
-                        code, GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable)));
+                {
+                    // -1 means the LOOKUP missed, not that soft limits are off - GetInteger returns -1 for
+                    // "no such entry". Say which it is, because the two have completely different causes:
+                    // an operator who turned $20 off, versus a settings collection that never got populated
+                    // (or got cleared) - the latter silently disables this guard AND the jog clamp.
+                    var d = GrblSettings.Get(GrblSetting.SoftLimitsEnable);
+                    DebugLog.Write("run", string.Format(
+                        "StoredPositionUnreachable({0}): SKIP - $20 reads {1}; GrblSettings.Count={2} IsLoaded={3} entry={4} ids near 20=[{5}]",
+                        code, GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable),
+                        GrblSettings.Settings.Count, GrblSettings.IsLoaded,
+                        d == null ? "MISSING" : ("Id=" + d.Id + " Value='" + d.Value + "'"),
+                        string.Join(",", GrblSettings.Settings.Where(s => s.Id >= 18 && s.Id <= 32)
+                                                             .Select(s => s.Id + "=" + s.Value).ToArray())));
+                }
                 return null;
             }
 
