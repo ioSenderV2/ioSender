@@ -2677,7 +2677,18 @@ namespace CNC.Controls
 
         public RestartResult Restart ()
         {
-            Message = model.Message;
+            // Start EMPTY, not from model.Message. JobView reads this as "a message Restart set for
+            // itself" and gives it precedence over the connect outcome - so carrying the pre-connect
+            // status line in here made "nothing to report" indistinguishable from a deliberate message,
+            // and every connect after the first re-announced whatever the last one had left on screen.
+            //
+            // Observed 2026-08-24: a connect to COM6 logged "Connected: 192.168.1.247:23" - the previous
+            // network session's line - and, because that branch won, skipped LogConnectionDetail
+            // entirely, so the settings count and capabilities were never reported. The first connect of
+            // a session looked right only because model.Message happened to be empty at startup.
+            //
+            // MsgHome below is the one thing Restart genuinely has to say for itself, and it still wins.
+            Message = string.Empty;
             model.Message = string.Format(LibStrings.FindResource("MsgWaiting"), AppConfig.Settings.Base.PortParams);
 
             string response = GrblInfo.Startup(model);

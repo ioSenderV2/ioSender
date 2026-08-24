@@ -706,7 +706,12 @@ namespace GCode_Sender
                     else if (restartResult == Controller.RestartResult.NoResponse)
                         model.Message = string.Format((string)FindResource("MsgNotConnected"), AppConfig.Settings.Base.PortParams);
                     else
-                        model.Message = Controller.Message;
+                        // Controller.Message is empty unless Restart had something specific to say, so
+                        // state the outcome rather than assigning nothing - silence here is precisely the
+                        // "connected or not?" ambiguity the block above exists to close.
+                        model.Message = string.IsNullOrEmpty(Controller.Message)
+                            ? string.Format("Connect to {0} did not complete ({1})", AppConfig.Settings.Base.PortParams, restartResult)
+                            : Controller.Message;
                 }
                 
                 if (initOK == null)
