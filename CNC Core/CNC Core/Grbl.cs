@@ -2274,6 +2274,8 @@ namespace CNC.Core
                 dataReceived += process;
 
                 PollGrbl.Suspend();
+                // Do not issue into the tail of the previous query's reply - see GrblHandshake.
+                GrblHandshake.DrainToQuiet(model);
                 CancellationToken cancellationToken = new CancellationToken();
 
                 EventUtils.RunPumped(() =>
@@ -2328,6 +2330,61 @@ namespace CNC.Core
         }
     }
 
+    /// <summary>
+    /// Barrier for the connect-time query chain.
+    ///
+    /// WaitFor.AckResponse returns on the FIRST literal "ok" it sees, and it subscribes before writing its
+    /// command - so if the PREVIOUS query's reply is still streaming, it harvests that command's "ok" and
+    /// returns having collected nothing of its own. The whole handshake then runs one command behind
+    /// itself, and every query reports success. Confirmed on real hardware 2026-08-24:
+    ///
+    ///     09:52:34.053  > $EE          sent while $EA's ALARMCODE stream was still running
+    ///     09:52:34.056  < ok           $EA's ok - GrblErrors.Get() takes it and returns
+    ///     09:52:34.061  < [ERRORCODE:0||]      $EE's real answer, now unwatched
+    ///     09:52:34.064  > $ES          GrblSettings.Load() fires into it
+    ///     09:52:34.099  < ok           $EE's ok - ends ProcessDetail's wait
+    ///     09:52:34.099  < [SETTING:0|...]      $ES's real answer, ONE LINE too late
+    ///
+    /// so Settings came out EMPTY while Load() returned ack=True. Downstream, GrblInfo.MaxTravel derives
+    /// from that collection and became 0, StartJobView emitted its "#<_bottom> = -9999" sentinel, and
+    /// pcorner.macro turned it into "G38.2 Z-9998" - caught only by soft limits, as ALARM:2.
+    ///
+    /// Pure timing, which is why it is intermittent: 90 ms between $EE and $ES collected 104 settings, 11 ms
+    /// collected none - same build, same machine, minutes apart. Possible since the chained $EA/$EE/$ES
+    /// connect sequence landed upstream in e097540b (2021-12-26).
+    ///
+    /// This does not make AckResponse correct - it still cannot tell whose "ok" it is reading. It removes
+    /// the condition that lets it read the wrong one, at the one place the chain is issued back-to-back.
+    /// </summary>
+    public static class GrblHandshake
+    {
+        /// <summary>
+        /// Pump until the link has produced nothing for <paramref name="quietMs"/>, giving up after
+        /// <paramref name="maxMs"/>. Call before issuing a connect-time query whose reply is terminated by
+        /// a bare "ok". Costs quietMs per call by design - a handshake is not a hot path, and the
+        /// alternative is a machine that silently does not know its own travel limits.
+        /// </summary>
+        public static void DrainToQuiet(GrblViewModel model, int quietMs = 40, int maxMs = 1000)
+        {
+            if (model == null || Comms.com == null || !Comms.com.IsOpen)
+                return;
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            long lastSeen = 0;
+            Action<string> seen = _ => lastSeen = sw.ElapsedMilliseconds;
+
+            model.OnResponseReceived += seen;
+            try
+            {
+                bool quiet = EventUtils.WaitWhile(() => sw.ElapsedMilliseconds - lastSeen < quietMs, maxMs);
+                if (DebugLog.Enabled && !quiet)
+                    DebugLog.Write("connect", string.Format(
+                        "DrainToQuiet: link still talking after {0} ms - issuing the next query anyway", maxMs));
+            }
+            finally { model.OnResponseReceived -= seen; }
+        }
+    }
+
     public class GrblErrors
     {
         private static Dictionary<int, string> messages = new Dictionary<int, string>();
@@ -2347,6 +2404,8 @@ namespace CNC.Core
             if (GrblInfo.HasEnums && messages.Count == 0)
             {
                 PollGrbl.Suspend();
+                // Do not issue into the tail of the previous query's reply - see GrblHandshake.
+                GrblHandshake.DrainToQuiet(model);
                 CancellationToken cancellationToken = new CancellationToken();
 
                 EventUtils.RunPumped(() =>
@@ -2465,6 +2524,8 @@ namespace CNC.Core
             if (GrblInfo.HasEnums && messages.Count == 0)
             {
                 PollGrbl.Suspend();
+                // Do not issue into the tail of the previous query's reply - see GrblHandshake.
+                GrblHandshake.DrainToQuiet(model);
                 CancellationToken cancellationToken = new CancellationToken();
 
                 EventUtils.RunPumped(() =>
@@ -2615,6 +2676,8 @@ namespace CNC.Core
             if (GrblInfo.HasEnums && Groups.Count == 0)
             {
                 PollGrbl.Suspend();
+                // Do not issue into the tail of the previous query's reply - see GrblHandshake.
+                GrblHandshake.DrainToQuiet(model);
                 CancellationToken cancellationToken = new CancellationToken();
 
                 EventUtils.RunPumped(() =>
@@ -3257,6 +3320,9 @@ namespace CNC.Core
             CancellationToken cancellationToken = new CancellationToken();
 
             PollGrbl.Suspend();
+            // Do not issue into the tail of the previous query's reply - see GrblHandshake. This is the
+            // one that hurt: $ES landing behind $EE's ok collected ZERO settings and still reported success.
+            GrblHandshake.DrainToQuiet(model);
             model.Silent = true;
 
             // The grblHAL setting-enum metadata (per-setting name/type/group + the group tree) is fetched only on
