@@ -449,18 +449,38 @@ namespace CNC.Core
         // a false refusal here blocks a job that would have run perfectly well.
         public static string StoredPositionUnreachable(string code)
         {
-            if (!StoredMachinePositionCodes.Contains(code) || GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1)
+            if (!StoredMachinePositionCodes.Contains(code))
+            {
+                if (DebugLog.Enabled)
+                    DebugLog.Write("run", "StoredPositionUnreachable(" + code + "): SKIP - not a checked code");
                 return null;
+            }
+
+            if (GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1)
+            {
+                if (DebugLog.Enabled)
+                    DebugLog.Write("run", string.Format("StoredPositionUnreachable({0}): SKIP - $20 reads {1}, not 1",
+                        code, GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable)));
+                return null;
+            }
 
             // The firmware only envelope-checks axes it considers homed; -1 = the $# read gave us no
             // [HOME:] line at all, so we know nothing and must not guess.
             int homed = GrblWorkParameters.HomedMask;
             if (homed <= 0)
+            {
+                if (DebugLog.Enabled)
+                    DebugLog.Write("run", string.Format("StoredPositionUnreachable({0}): SKIP - HomedMask {1}", code, homed));
                 return null;
+            }
 
             var cs = GrblWorkParameters.GetCoordinateSystem(code);
             if (cs == null)
+            {
+                if (DebugLog.Enabled)
+                    DebugLog.Write("run", "StoredPositionUnreachable(" + code + "): SKIP - GetCoordinateSystem returned null");
                 return null;
+            }
 
             double pulloff = GrblSettings.GetInteger(GrblSetting.HardLimitsEnable) == 1
                               ? GrblSettings.GetDouble(GrblSetting.HomingPulloff) : 0d;
@@ -472,7 +492,12 @@ namespace CNC.Core
 
                 double travel = Math.Abs(GrblInfo.MaxTravel.Values[i]);
                 if (travel <= 0d)
+                {
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("run", string.Format("StoredPositionUnreachable({0}): {1} SKIP - $13x travel reads {2}",
+                            code, AxisLetter(i), travel));
                     continue;   // $13x not configured for this axis - no envelope to check against
+                }
 
                 double lo, hi;
                 if (GrblInfo.ForceSetOrigin)
@@ -483,6 +508,12 @@ namespace CNC.Core
                 else { lo = -(travel - pulloff); hi = -pulloff; }
 
                 double pos = cs.Values[i], limit = pos < lo ? lo : hi;
+
+                if (DebugLog.Enabled)
+                    DebugLog.Write("run", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "StoredPositionUnreachable({0}): {1} pos={2:0.###} envelope={3:0.###}..{4:0.###} travel={5:0.###} pulloff={6:0.###} fso={7} homingdir={8} -> {9}",
+                        code, AxisLetter(i), pos, lo, hi, travel, pulloff, GrblInfo.ForceSetOrigin,
+                        GrblInfo.HomingDirection, (pos < lo || pos > hi) ? "OUTSIDE" : "inside"));
                 if (pos < lo || pos > hi)
                     return string.Format(System.Globalization.CultureInfo.CurrentCulture,
                         "{0} is stored outside the machine's soft-limit travel: {1} {2:0.###} is {3:0.###} mm beyond the limit of {4:0.###}. " +
