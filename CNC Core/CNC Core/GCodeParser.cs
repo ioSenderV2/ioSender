@@ -1570,13 +1570,28 @@ namespace CNC.GCode
                         case Commands.G53:
                             if (motionMode == MotionMode.G0 || motionMode == MotionMode.G1)
                             {
-                                if (modalGroups.HasFlag(ModalGroups.G1))
-                                    Tokens.Add(new GCAbsLinearMotion(cmdNonModal, motionMode == MotionMode.G0 ? Commands.G0 : Commands.G1, gcValues.N, gcValues.XYZ, AxisFlags.None, blockDelete));
-                                else
-                                {
-                                    Tokens.Add(new GCAbsLinearMotion(cmdNonModal, motionMode == MotionMode.G0 ? Commands.G0 : Commands.G1, gcValues.N, gcValues.XYZ, axisWords, blockDelete));
-                                    axisWords = AxisFlags.None;
-                                }
+                                // The axis words belong to the G53 token whether or not the block also
+                                // restates G0/G1 - they are the whole point of it, and GCodeEmulator's G53
+                                // case is the only thing that converts them out of the machine frame.
+                                //
+                                // Since 824b8f18 (2021-05-17) a block that restated the motion word took a
+                                // branch passing AxisFlags.None and leaving axisWords set, so "G53 G0 X.. Y.."
+                                // - every generated park line - produced an axis-less G53 marker plus an
+                                // ORDINARY G0 emitted by the fall-through below, carrying machine coordinates
+                                // with nothing left to say they were machine coordinates. The emulator then
+                                // treated them as work coordinates: the 3D view drew park moves in the wrong
+                                // place, and ProgramLimits mixed frames. Observed 2026-08-24 as a 32 mm job
+                                // refusing to start with "Y: the program spans 858 mm" - 858 being 38 (work)
+                                // minus -820.001 (G30's MACHINE Y, via #5182).
+                                Tokens.Add(new GCAbsLinearMotion(cmdNonModal, motionMode == MotionMode.G0 ? Commands.G0 : Commands.G1, gcValues.N, gcValues.XYZ, axisWords, blockDelete));
+                                axisWords = AxisFlags.None;
+
+                                // G53 has consumed this block's motion. Clearing the modal-group flag stops
+                                // the fall-through at "20. Motion modes" emitting a second, axis-less motion
+                                // token for the same block - its condition fires on this flag alone.
+                                // motionMode itself is deliberately left alone: G0/G1 stays modally active
+                                // for the blocks that follow, exactly as on the controller.
+                                modalGroups &= ~ModalGroups.G1;
                             }
                             else
                                 throw new GCodeException(LibStrings.FindResource("ParserNoG0orG1"));
