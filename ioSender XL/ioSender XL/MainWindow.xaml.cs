@@ -1333,11 +1333,11 @@ namespace GCode_Sender
                 System.Threading.Thread.Sleep(50);
             }
 
-            // Shutdown does not go through Disconnect(), so say so here or the log's last connection
-            // simply stops with no closing line - indistinguishable from a crash or a dropped link when
-            // the file is read back later.
-            (DataContext as GrblViewModel)?.LogDetail(string.Format("Disconnected from controller ({0}) - reason: application closing",
-                                                                    AppConfig.Settings.Base.PortParams));
+            // Shutdown does not go through Disconnect() - that also clears ConnectionTarget, resets
+            // IsReady and rebuilds the job view for a reconnect that is never coming - but the log still
+            // needs its closing line, or the last connection in the file simply stops, which reads
+            // identically to a crash or a dropped link.
+            LogDisconnect("application closing");
 
             using (new UIUtils.WaitCursor())
             {
@@ -2218,20 +2218,31 @@ namespace GCode_Sender
         /// <paramref name="reason"/> is required rather than defaulted: a new call site that has not
         /// thought about it should not silently log "unknown".
         /// </summary>
+        /// <summary>
+        /// The one place the disconnect line is worded. Callers supply only the reason - they each know
+        /// why, and none of them should have to know how the sentence reads.
+        ///
+        /// Must be called BEFORE the port is closed: it reads the target from PortParams, which whatever
+        /// connects next rewrites - migration and the simulator switch both do exactly that - so naming
+        /// it afterwards would put the NEW target in the OLD connection's disconnect line.
+        /// </summary>
+        private void LogDisconnect(string reason)
+        {
+            (DataContext as GrblViewModel)?.LogDetail(
+                string.Format("Disconnected from controller ({0}) - reason: {1}",
+                              AppConfig.Settings.Base.PortParams, reason));
+        }
+
         private void Disconnect(string reason)
         {
             if (Comms.com == null || !Comms.com.IsOpen)
                 return;
 
-            // Captured before the close: ConnectionTarget is cleared below, and PortParams is rewritten
-            // by whatever connects next - migration and the simulator switch both do exactly that, so
-            // reading it afterwards names the NEW target in the disconnect line for the old one.
-            string target = AppConfig.Settings.Base.PortParams;
+            LogDisconnect(reason);
 
             Comms.com.Close(); // explicit close - cancels auto-reconnect (see StreamComms.Close)
 
             var model = (GrblViewModel)DataContext;
-            model.LogDetail(string.Format("Disconnected from controller ({0}) - reason: {1}", target, reason));
             model.ConnectionTarget = null; // status bar -> "Not connected"
             model.IsReady = false;
 
