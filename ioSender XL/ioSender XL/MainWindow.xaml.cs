@@ -1333,6 +1333,12 @@ namespace GCode_Sender
                 System.Threading.Thread.Sleep(50);
             }
 
+            // Shutdown does not go through Disconnect(), so say so here or the log's last connection
+            // simply stops with no closing line - indistinguishable from a crash or a dropped link when
+            // the file is read back later.
+            (DataContext as GrblViewModel)?.LogDetail(string.Format("Disconnected from controller ({0}) - reason: application closing",
+                                                                    AppConfig.Settings.Base.PortParams));
+
             using (new UIUtils.WaitCursor())
             {
                 Comms.com.Close(); // disconnecting from websocket may take some time...
@@ -2167,7 +2173,7 @@ namespace GCode_Sender
         {
             // Reconnect: drop the current connection first so the dialog can switch targets/simulators.
             if (Comms.com != null && Comms.com.IsOpen)
-                Disconnect();
+                Disconnect("reconnecting");
 
             int res = AppConfig.Settings.Connect(Title, (GrblViewModel)DataContext, App.Current.Dispatcher);
             if (res == 0 && Comms.com != null && Comms.com.IsOpen)
@@ -2200,14 +2206,32 @@ namespace GCode_Sender
             connectMenuItem_Click(null, null);
         }
 
-        private void Disconnect()
+        /// <summary>
+        /// Drop the connection, recording WHY in status.log.
+        ///
+        /// Every caller here has a reason and none of them used to state it, so the log showed a
+        /// connection simply ceasing - and since a reconnect logs "Connecting to controller (...)"
+        /// immediately afterwards, an operator-initiated reconnect, a switch to the simulator and a
+        /// migration off serial all left the same trace. Which of those happened decides whether the
+        /// next connect is expected to reach the same machine at all.
+        ///
+        /// <paramref name="reason"/> is required rather than defaulted: a new call site that has not
+        /// thought about it should not silently log "unknown".
+        /// </summary>
+        private void Disconnect(string reason)
         {
             if (Comms.com == null || !Comms.com.IsOpen)
                 return;
 
+            // Captured before the close: ConnectionTarget is cleared below, and PortParams is rewritten
+            // by whatever connects next - migration and the simulator switch both do exactly that, so
+            // reading it afterwards names the NEW target in the disconnect line for the old one.
+            string target = AppConfig.Settings.Base.PortParams;
+
             Comms.com.Close(); // explicit close - cancels auto-reconnect (see StreamComms.Close)
 
             var model = (GrblViewModel)DataContext;
+            model.LogDetail(string.Format("Disconnected from controller ({0}) - reason: {1}", target, reason));
             model.ConnectionTarget = null; // status bar -> "Not connected"
             model.IsReady = false;
 
@@ -2233,7 +2257,7 @@ namespace GCode_Sender
             _preSimulateTarget = (Comms.com != null && Comms.com.IsOpen) ? AppConfig.Settings.Base.PortParams : null;
 
             if (Comms.com != null && Comms.com.IsOpen)
-                Disconnect();
+                Disconnect("switching to the simulator for a simulated run");
 
             var model = (GrblViewModel)DataContext;
             int res = AppConfig.Settings.ConnectToSimulator(Title, model, App.Current.Dispatcher);
@@ -2257,7 +2281,7 @@ namespace GCode_Sender
             _preSimulateTarget = null;
 
             if (Comms.com != null && Comms.com.IsOpen)
-                Disconnect();
+                Disconnect("simulated run finished - restoring the previous connection");
 
             if (string.IsNullOrEmpty(target))
                 return;   // wasn't connected to anything real before Simulate - stay disconnected
@@ -2383,7 +2407,7 @@ namespace GCode_Sender
                         // The link may have dropped or already moved off serial while we were probing.
                         if (reachable && Comms.com != null && Comms.com.IsOpen && cfg.Base.PortParams.ToLower().StartsWith("com"))
                         {
-                            Disconnect();
+                            Disconnect("migrating from serial to the network interface");
                             bool migrated = cfg.ConnectTo(Title, model, App.Current.Dispatcher, ip + ":23") == 0
                                             && Comms.com != null && Comms.com.IsOpen;
                             if (!migrated)   // network connect failed despite the probe - fall back to the serial port
