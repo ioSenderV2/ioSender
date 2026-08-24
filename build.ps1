@@ -19,6 +19,10 @@
     After a successful build, start the built ioSender.exe. Ignored for
     "Both" (ambiguous which to launch); combine with -Configuration Debug.
 
+    This is also what opts the build OUT of scratch (see -Scratch): with -Launch the build goes to
+    the live bin\<Configuration>\ tree and a running instance is asked to close first, because that
+    is the instance you are about to replace. Without it, nothing running is disturbed.
+
 .PARAMETER NoKill
     Skip killing a running ioSender.exe first. Only skips the kill step - it can't release the
     OS file lock a running instance holds on its own DLLs/EXE, so this alone still fails
@@ -26,11 +30,22 @@
     -Scratch for an interim/verification build that must not disturb a running test instance.
 
 .PARAMETER Scratch
-    Build into a side output folder (bin\<Configuration>.scratch\, via MSBuild's OutDir
-    override) instead of the live bin\<Configuration>\ tree, so the rebuild can never collide
-    with a running instance's file lock in the first place - no kill needed, nothing disturbed.
-    This is what an interim/verification build should use. Implies no launch and no kill: a
-    scratch build only proves the code compiles, it isn't the build you're meant to test.
+    THE DEFAULT - you rarely need to type this. Build into a side output folder
+    (bin\<Configuration>.scratch\, via MSBuild's OutDir override) instead of the live
+    bin\<Configuration>\ tree, so the rebuild can never collide with a running instance's file
+    lock in the first place - no kill needed, nothing disturbed. A scratch build only proves the
+    code compiles; it isn't the build you're meant to test.
+
+    Scratch is assumed unless the invocation is going to RUN the app (-Launch, -Shot,
+    -ReviewConfig, -DefaultConfig/-adoptConfig) or -Clean (which deletes the live bin\ tree and
+    would otherwise leave it empty). Typing -Scratch explicitly still works, and is the only way
+    to get a conflict error out of combining it with one of those - the default never conflicts,
+    it just steps aside.
+
+    It used to be opt-in, and the asymmetry is why that changed: forgetting -Scratch on an
+    interim compile-check killed the operator's running instance and replaced the binaries
+    underneath the run being diagnosed, so the next log came from a different build than the
+    symptom did. Forgetting -Launch merely costs a re-run.
 
 .PARAMETER Headless
     Launch with -headless forwarded to ioSender.exe, so an unhandled exception dumps to
@@ -74,9 +89,10 @@
     off (see CmdletBinding below) so it can't be mis-bound to -Configuration either.
 
 .EXAMPLE
-    .\build.ps1 -Scratch
+    .\build.ps1
     Verify-only build into bin\Debug.scratch\ - doesn't touch bin\Debug\, so a running test
-    instance launched from there keeps running untouched.
+    instance launched from there keeps running untouched. This is the default; -Scratch is
+    only worth typing to say so out loud.
 
 .PARAMETER DefaultConfig
     Run this build against a brand-new config instead of yours. Your
@@ -168,6 +184,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Whether -Scratch was TYPED, as opposed to defaulted on below. The conflict guards further down
+# ("-Shot runs the app; -Scratch is a verify-only build") must only fire on a real contradiction the
+# caller wrote, never on the default this script applied for them.
+$scratchExplicit = $PSBoundParameters.ContainsKey('Scratch')
+
 $root = $PSScriptRoot
 $solution = Join-Path $root 'ioSender XL\ioSender XL.sln'
 $exeRel = 'ioSender XL\ioSender XL\bin\{0}\ioSender.exe'
@@ -347,6 +369,23 @@ if ($DefaultConfig) {
 
 if (-not (Test-Path $solution)) { throw "Solution not found: $solution" }
 $msbuild = Find-MSBuild
+
+# Scratch is the DEFAULT. Only a build that is going to RUN the app (or -Clean, which deletes the live
+# bin\ tree and would otherwise leave it empty) touches bin\<Configuration>\ and kills what's running.
+#
+# It used to be opt-in, and the failure mode was entirely one-sided: forgetting -Scratch on an interim
+# compile-check silently killed the operator's running instance and replaced the binaries underneath the
+# very run being diagnosed - so the next log came from a different build than the symptom did. Forgetting
+# -Launch, by contrast, costs a re-run. Defaulting to the harmless one makes the dangerous case the
+# explicit one. Resolved HERE, after -ReviewConfig/-AdoptConfig have applied their implications
+# (-Launch / -DefaultConfig respectively), so those are seen.
+if (-not $scratchExplicit) {
+    $Scratch = -not ($Launch -or $DefaultConfig -or $Shot -or $Clean)
+    if ($Scratch) {
+        Write-Host "==> Verify-only build (no -Launch): building to bin\$Configuration.scratch\ - a running instance is left alone." -ForegroundColor DarkGray
+        Write-Host "    Pass -Launch to build bin\$Configuration\ and start it." -ForegroundColor DarkGray
+    }
+}
 
 # Ask a running instance to close itself over the single-instance pipe (PipeServer.ShutdownRequested,
 # added 2026-08-08) before ever force-killing it - a blind Stop-Process is exactly how a rebuild killed
