@@ -407,12 +407,24 @@ namespace CNC.Core
             return false;
         }
 
-        // The stored positions PREREQ can require that are MACHINE positions - i.e. ones a program
-        // actually rapids to (G53 G0 X[#5181]...). G54..G59.3/G92 are work OFFSETS, not targets, so
-        // the envelope check below deliberately does not apply to them.
-        private static readonly HashSet<string> StoredMachinePositionCodes = new HashSet<string> { "G28", "G30" };
+        // The stored positions PREREQ can require that a program actually rapids to, so the envelope
+        // check below applies to them.
+        //
+        // This deliberately includes the work coordinate systems. It used to be G28/G30 only, on the
+        // reasoning that "G54..G59.3 are work OFFSETS, not targets". That was wrong: selecting a WCS
+        // and going to its origin makes the stored offset a target in machine coordinates, which is
+        // exactly what tc.macro does - "G59.3" followed by "G0 X0 Y0". A G59.3 taught 4 mm inside the
+        // Y pull-off band passed the "is it set" half of the PREREQ, started the job, prompted the
+        // operator to fit the probe, and only THEN threw Alarm:2 on the move to X0 Y0.
+        //
+        // False positives are not a concern: this only ever runs for a code a macro NAMES in its
+        // PREREQ line, and naming one is declaring the macro will go there. G92 stays out - it is a
+        // transient offset applied on top of the active WCS, not a position anything rapids to.
+        private static readonly HashSet<string> StoredMachinePositionCodes = new HashSet<string> {
+            "G28", "G30", "G54", "G55", "G56", "G57", "G58", "G59", "G59.1", "G59.2", "G59.3"
+        };
 
-        // Is a stored machine position (G28/G30) actually REACHABLE under the controller's soft limits?
+        // Is a stored position (G28/G30, or a WCS origin) actually REACHABLE under the soft limits?
         // Returns null when it is (or when the question doesn't apply), otherwise the failure text.
         //
         // Being "set" is not enough. A G30 recorded when the pull-off was smaller - or with soft limits
