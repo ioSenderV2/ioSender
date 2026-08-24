@@ -31,7 +31,7 @@ ioSender.g.en-US.resources:jobview.baml,str_msgNoCommAlarm:System.String.$Conten
 ioSender.g.en-US.resources:jobview.baml,str_msgNoResponse:System.String.$Content,None,True,True,,Controller is not responding!
 ioSender.g.en-US.resources:jobview.baml,str_msgResetExit:System.String.$Content,None,True,True,,"Controller soft reset failed, exiting."
 ioSender.g.en-US.resources:jobview.baml,str_msgResetFailed:System.String.$Content,None,True,True,,"Controller soft reset failed, exiting."
-ioSender.g.en-US.resources:jobview.baml,str_msgWait:System.String.$Content,None,True,True,,Waiting for controller ({0})...
+ioSender.g.en-US.resources:jobview.baml,str_msgWait:System.String.$Content,None,True,True,,Connecting to controller ({0})...
 ioSender.g.en-US.resources:mainwindow.baml,str_runTime:System.String.$Content,None,True,True,,Run time: {0}
 ioSender.g.en-US.resources:jobview.baml,tab_3DView:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,3D View
 ioSender.g.en-US.resources:mainwindow.baml,tab_3DView:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,3D View

@@ -15,7 +15,7 @@
              FocusVisualStyle="{x:Null}"
              SizeChanged="JobView_SizeChanged">
     <UserControl.Resources>
-        <system:String x:Uid="str_msgWait" x:Key="MsgWaiting">Waiting for controller ({0})...</system:String>
+        <system:String x:Uid="str_msgWait" x:Key="MsgWaiting">Connecting to controller ({0})...</system:String>
         <system:String x:Uid="str_msgNoCommAlarm" x:Key="MsgNoCommAlarm">Controller is not able to communicate due to alarm {0}, attempting a soft reset.</system:String>
         <system:String x:Uid="str_msgResetFailed" x:Key="MsgResetFailed">Controller soft reset failed, exiting.</system:String>
         <system:String x:Uid="str_msgEStop" x:Key="MsgEStop">E-Stop active! - clear before continuing...</system:String>

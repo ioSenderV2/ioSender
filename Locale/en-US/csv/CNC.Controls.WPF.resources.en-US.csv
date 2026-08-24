@@ -283,7 +283,7 @@ CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_msgNoResponse:System.Stri
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_msgNoResponseExit:System.String.$Content,None,True,True,,"No response received from controller, exiting."
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_msgResetExit:System.String.$Content,None,True,True,,"Controller soft reset failed, exiting."
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_msgResetFailed:System.String.$Content,None,True,True,,"Controller soft reset failed, exiting."
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_msgWait:System.String.$Content,None,True,True,,Waiting for controller ({0})...
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_msgWait:System.String.$Content,None,True,True,,Connecting to controller ({0})...
 CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,str_noCard:System.String.$Content,None,True,True,,No card mounted.
 CNC.Controls.WPF.g.en-US.resources:sdcardview.baml,str_notConnection:System.String.$Content,None,True,True,,No connection.
 CNC.Controls.WPF.g.en-US.resources:outlineflyout.baml,str_outlineFlyout:System.String.$Content,None,True,True,,_Outline

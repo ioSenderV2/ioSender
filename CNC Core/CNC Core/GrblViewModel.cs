@@ -902,6 +902,25 @@ namespace CNC.Core
         // status log's source column, so "what did the MACHINE actually say" stays greppable.
         private string _messageSource = "app";
 
+        /// <summary>
+        /// Append a line to the status log (and the on-screen message list) WITHOUT touching Message.
+        ///
+        /// Assigning Message is the usual way a line reaches the log, but it also replaces the one-line
+        /// status readout - so a connect that wants to report four facts can only leave the last one on
+        /// screen, and the first three read as though they were overwritten by something more important.
+        /// This is for the supporting detail under a headline that Message already set: the settings
+        /// count, the firmware's capabilities, an alarm that is already latched.
+        ///
+        /// Worth having because status.log is the ONLY log an operator sees. The empty-settings fault of
+        /// 2026-08-24 sat in front of one for hours reading as a perfectly ordinary connect; it took
+        /// debug-only instrumentation to find that GrblSettings.Count was 0. A connect that says how many
+        /// settings it actually read makes that self-evident to whoever is standing at the machine.
+        /// </summary>
+        public void LogDetail(string message, bool isError = false)
+        {
+            LogMessage(message, isError);
+        }
+
         private void LogMessage(string message, bool isError)
         {
             if (!IsLoggableMessage(message))

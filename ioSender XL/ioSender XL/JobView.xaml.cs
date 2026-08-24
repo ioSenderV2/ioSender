@@ -699,7 +699,10 @@ namespace GCode_Sender
                     else if (!string.IsNullOrEmpty(Controller.Message))
                         model.Message = Controller.Message;
                     else if (restartResult == Controller.RestartResult.Ok && initOK == true)
+                    {
                         model.Message = string.Format((string)FindResource("MsgConnected"), AppConfig.Settings.Base.PortParams);
+                        LogConnectionDetail();
+                    }
                     else if (restartResult == Controller.RestartResult.NoResponse)
                         model.Message = string.Format((string)FindResource("MsgNotConnected"), AppConfig.Settings.Base.PortParams);
                     else
@@ -863,6 +866,41 @@ namespace GCode_Sender
             // (a file-open argument wins), and never in an automation instance.
             if (App.TestServerPort < 0)
                 CNC.Controls.WorkOrderView.TryAutoRestoreCachedProgram(model);
+        }
+
+        /// <summary>
+        /// What the connect actually established, written under the "Connected: ..." headline.
+        ///
+        /// status.log is the only log an operator sees, and it recorded a connect as a single line that
+        /// looked identical whether the handshake had read everything or nothing. On 2026-08-24 a
+        /// GrblSettings collection that came back EMPTY (see GrblHandshake) sat behind an ordinary-looking
+        /// "Connected:" for hours - GrblInfo.MaxTravel derived as 0, the sender emitted a -9999 probe floor,
+        /// and the machine alarmed. Finding it needed debug-only instrumentation the operator cannot see.
+        ///
+        /// So state the facts that decide whether this connection is usable: how many settings were read
+        /// (0 is the failure, and it says so), what the firmware says it is and supports, and whether the
+        /// controller is already sitting in an alarm that has to be cleared before anything will run.
+        /// </summary>
+        private void LogConnectionDetail()
+        {
+            int settings = GrblSettings.Settings.Count;
+            model.LogDetail(settings > 0
+                ? string.Format("- {0} controller settings read", settings)
+                : "- NO controller settings were read - travel limits and soft-limit checks are unavailable. Reconnect.",
+                settings == 0);
+
+            var caps = string.IsNullOrWhiteSpace(GrblInfo.NewOptions) ? "(none reported)" : GrblInfo.NewOptions;
+            model.LogDetail(string.Format("- {0} {1}{2} - options: {3}",
+                string.IsNullOrWhiteSpace(GrblInfo.Identity) ? "controller" : GrblInfo.Identity,
+                GrblInfo.Version,
+                GrblInfo.Build > 0 ? " build " + GrblInfo.Build : string.Empty,
+                caps));
+
+            // An alarm latched before we connected is not reported anywhere else at connect time, and it
+            // blocks g-code AND filesystem access ($F answers error:79) until it is cleared - which reads
+            // as "the ATC macros are missing" rather than "the machine is in alarm".
+            if (model.GrblState.State == GrblStates.Alarm)
+                model.LogDetail("- Controller is in ALARM - <Reset> then <Unlock> before running anything", true);
         }
 
         private bool InitSystem()
