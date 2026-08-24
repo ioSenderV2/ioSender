@@ -894,7 +894,14 @@ namespace CNC.Core
         public static bool IsLoggableMessage(string message)
         {
             return !string.IsNullOrWhiteSpace(message)
-                && message.IndexOf("STREAM ACTIVE", StringComparison.OrdinalIgnoreCase) < 0;
+                && message.IndexOf("STREAM ACTIVE", StringComparison.OrdinalIgnoreCase) < 0
+                // "Pgm End" is grblHAL's own [MSG:] at M2/M30 - the controller noting it reached the end
+                // of the program. JobRunner logs the same event with everything an operator actually wants
+                // ("Program end - <file>, runtime 00:00:23"), so keeping this too puts two lines in the log
+                // for one event, the terser of which says neither what ended nor how long it took. Still
+                // assigned to Message, so the status line and the ProgramEnd flag are unaffected - this
+                // only keeps it out of the log.
+                && !message.Equals("Pgm End", StringComparison.OrdinalIgnoreCase);
         }
 
         // "firmware" while the [MSG:...] parse case is assigning Message - the one place that
