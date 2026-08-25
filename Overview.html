@@ -160,7 +160,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>276 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>282 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -259,6 +259,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>With no configured target the Connect dialog lands on Serial, and a serial link is no longer handed over to the network behind your back.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr249">249</a></td></tr>
 <tr><td>A <code>$n=</code> typed at the MDI never reached ioSender's own copy, so Machine Setup &mdash; and the jog envelope &mdash; kept working from superseded numbers.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr251">251</a></td></tr>
 <tr><td>Pick a page from the filtered settings list and the matching controls on it are marked and scrolled to &mdash; dashed when the hit is in a tooltip.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr257">257</a></td></tr>
+<tr><td>A connect could finish with none of the controller&rsquo;s settings read &mdash; and say nothing. Travel limits, the soft-limit checks and the jog clamp all went quiet, and a probe was told to seek to Z&nbsp;&minus;9998.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr277">277</a></td></tr>
+<tr><td>A fixture origin taught too close to a limit was accepted, then refused mid-job &mdash; after the tool had parked and the operator had been asked to fit the probe.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr278">278</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -389,6 +391,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>The board is drawn at its declared size, and says so plainly when nothing declares one.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr237">237</a></td></tr>
 <tr><td>Show the program listing and the 3D view side by side on the Job tab.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr238">238</a></td></tr>
 <tr><td>SVG artwork becomes laser g-code &mdash; outlines, or shaded &mdash; for a plain Grbl diode machine.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr273">273</a></td></tr>
+<tr><td>A 32&nbsp;mm job was refused for spanning 858&nbsp;mm. Machine-coordinate park moves were being measured as if they were work coordinates.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr279">279</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -411,6 +414,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Find-in-console highlights every match, with the current one picked out &mdash; previously it marked one, and that one frequently did not render at all.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr256">256</a></td></tr>
 <tr><td>Keyboard jogging worked on the Job tab and nowhere else; shortcuts worked on the top-level tabs and nowhere else. Both now work in every window, dialogs included, and stop only when you are typing.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr260">260</a></td></tr>
 <tr><td>status_&lt;stamp&gt;.log + latest_status.log, with each line tagged app or firmware.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr263">263</a></td></tr>
+<tr><td>The one log an operator can read now says what a connect established, what a run did, and what a settings change altered &mdash; old value and new.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr280">280</a></td></tr>
+<tr><td>From the second connect onward the log repeated the last connection&rsquo;s line &mdash; a serial connect could report a network address &mdash; and the new connect detail never appeared.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr281">281</a></td></tr>
+<tr><td>Settings &gt; Keyboard listed fifteen File and Help commands interleaved with the tabs. They now sit in their own group directly above.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr282">282</a></td></tr>
 </table>
 
 <h3>Polish, onboarding &amp; docs</h3>
@@ -789,7 +795,13 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">274</td><td><a href="#pr274">Depth of cut now drives the V-carve step, instead of cutting each groove six times over</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+45</span> <span class="del">-22</span></td></tr>
 <tr><td class="n">275</td><td><a href="#pr275">A disabled Generate now says why, and a 4.2&nbsp;mm drill is a drill</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+108</span> <span class="del">-8</span></td></tr>
 <tr><td class="n">276</td><td><a href="#pr276">A fix could appear to do nothing: the program cache keyed on version, not build</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+17</span> <span class="del">-0</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (276 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">2500</span> <span class="del">30</span> <span class="add">+260</span><br><span class="k">Lines:</span> <span class="add">+108166</span> <span class="del">-25926</span></td></tr>
+<tr><td class="n">277</td><td><a href="#pr277">The connect handshake could read the wrong reply, and the controller&rsquo;s settings came back empty</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+134</span> <span class="del">-3</span></td></tr>
+<tr><td class="n">278</td><td><a href="#pr278">A stored WCS origin is checked against the travel envelope before the job starts</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+17</span> <span class="del">-5</span></td></tr>
+<tr><td class="n">279</td><td><a href="#pr279">A G53 move kept its axis words &mdash; the 3D view and the travel check were mixing frames</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+58</span> <span class="del">-8</span></td></tr>
+<tr><td class="n">280</td><td><a href="#pr280">The status log now records what actually happened: connects, jobs, generates and setting changes</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">11</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+225</span> <span class="del">-21</span></td></tr>
+<tr><td class="n">281</td><td><a href="#pr281">A connect announced the previous connect&rsquo;s result, and skipped its own report</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+18</span> <span class="del">-2</span></td></tr>
+<tr><td class="n">282</td><td><a href="#pr282">Menu commands get their own keyboard group, apart from the tab destinations</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+116</span> <span class="del">-41</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (282 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">2523</span> <span class="del">30</span> <span class="add">+261</span><br><span class="k">Lines:</span> <span class="add">+108734</span> <span class="del">-26006</span></td></tr>
 </table>
 </div>
 
@@ -5393,6 +5405,82 @@ clear an error message; loading a file containing #-expressions failed.</li>
 </table>
 <div class="desc"><p>After a change to the compiler, rebuilding and regenerating produced <strong>the previous build's program</strong>. Generate never ran: the cache fingerprint covered the work order, the stock and the controller settings &mdash; and the assembly <em>version</em>, which is identical across every development build. The stamp on the cached file still matched, so it was handed straight back.</p><p>A fix appears to do nothing. Worse, a line that had been <em>reverted</em> came back, because the file predating the revert still matched.</p><ul><li>The fingerprint now includes the module version identifier of the two assemblies that shape the output &mdash; a value the compiler stamps afresh on every build.</li><li>Within one run of a released build these never change, so the cache still avoids the multi-minute carve rebuild it exists for. It invalidates across a rebuild, which is the one time it must.</li></ul><p class="foot">The same method's comment already recorded this happening once before, when a cached program missing a stock declaration kept being restored after the compiler had started emitting one &mdash; &quot;which read as <em>the fix did nothing</em>&quot;. That was repaired by adding the missing input to the key. The input still missing was the code itself.</p></div>
 </div>
+<!-- ===== #277 ===== -->
+<div class="pr">
+<h2 id="pr277"><span class="badge">#277</span>The connect handshake could read the wrong reply, and the controller&rsquo;s settings came back empty</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">88</td><td class="num">0</td></tr><tr><td class="mono">CNC Core/CNC Core/MacroRunner.cs</td><td class="num add">46</td><td class="num del">3</td></tr>
+</table>
+<div class="desc"><p>The connect sequence asks the controller several questions in a row &mdash; the alarm codes, the error codes, the setting descriptions, then the settings themselves. Each wait ends on the first literal <code>ok</code> it sees, and each one subscribes <em>before</em> sending its own command. So when the previous reply is still streaming, a wait takes <strong>that</strong> command&rsquo;s <code>ok</code> and returns having collected nothing of its own, and the whole handshake runs one command behind itself.</p><pre>09:52:34.053  &gt; $EE            sent while $EA's replies are still arriving
+09:52:34.056  &lt; ok             $EA's ok - the error-code read takes it and returns
+09:52:34.061  &lt; [ERRORCODE:0||]        its real answer, now unwatched
+09:52:34.064  &gt; $ES            the settings read fires into it
+09:52:34.099  &lt; ok             $EE's ok - ends the settings-detail wait
+09:52:34.099  &lt; [SETTING:0|...]        its real answer, ONE LINE too late</pre><p>The settings collection came out <strong>empty</strong> while the load reported success. Nothing downstream could tell, because none of the accessors can express &ldquo;not loaded&rdquo;: a lookup miss reads as &minus;1, a missing number parses as 0, and the cached travel limits derive from those.</p><ul><li>The stored-position check skipped every code &mdash; it reads <code>$20</code>, which answered &minus;1.</li><li>The oversized-program check skipped every axis, because the travel read as 0.</li><li>The jog soft-limit clamp and Go&nbsp;To bounds read soft limits as switched off.</li><li>Setup generated <code>#&lt;_bottom&gt; = -9999</code> as a probe floor from that zero travel, the controller-side corner macro turned it into <code>G38.2 Z-9998</code>, and the job stopped on <code>ALARM:2</code>.</li></ul><p>Each connect query now waits for the link to fall quiet before it speaks, so no wait can be listening while someone else&rsquo;s reply is still arriving.</p><p class="foot">Pure timing, which is why it came and went: 90&nbsp;ms between two of those queries collected 104 settings, 11&nbsp;ms collected none &mdash; same build, same machine, minutes apart. Possible since the chained query sequence landed upstream in December 2021. This does not make the underlying wait correct &mdash; it still cannot tell whose <code>ok</code> it is reading &mdash; it removes the condition that lets it read the wrong one. Soft limits caught the <code>-9999</code> probe; with them off it would have been a full-depth plunge.</p></div>
+</div>
+
+<!-- ===== #278 ===== -->
+<div class="pr">
+<h2 id="pr278"><span class="badge">#278</span>A stored WCS origin is checked against the travel envelope before the job starts</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/MacroRunner.cs</td><td class="num add">17</td><td class="num del">5</td></tr>
+</table>
+<div class="desc"><p>A generated program declares what it needs before it runs &mdash; homed, a tool-length reference, <code>G30</code>, <code>G59.3</code>. Each of those was checked for being <em>set</em>. For the stored machine positions <code>G28</code> and <code>G30</code> it was also checked for being <em>reachable</em>, because a position recorded when the pull-off was smaller stays in the controller at a coordinate the parser will now refuse.</p><p>The work coordinate systems were deliberately left out of that second check, on the reasoning that <code>G54</code>&hellip;<code>G59.3</code> are offsets rather than targets. Selecting one and moving to its origin makes it a target, which is exactly what the tool-change macro does:</p><pre>G59.3
+G0 X0 Y0        &rarr; ALARM:2</pre><p>With the Y envelope running to &minus;834&nbsp;mm and <code>G59.3</code> stored at &minus;837.996, the move was refused at planning &mdash; after the program had parked at <code>G30</code> and prompted for the touch plate. The check now covers the work coordinate systems too, so it is caught before anything moves:</p><p><em>G59.3 is stored outside the machine&rsquo;s soft-limit travel: Y &minus;837.996 is 3.996&nbsp;mm beyond the limit of &minus;834. Move the machine inside its travel and set G59.3 again.</em></p><p class="foot">No false alarms: this only runs for a coordinate system a program explicitly names as a prerequisite, and naming one is declaring it will go there. <code>G92</code> stays out &mdash; it is a transient offset applied on top of the active system, not somewhere anything rapids to.</p></div>
+</div>
+
+<!-- ===== #279 ===== -->
+<div class="pr">
+<h2 id="pr279"><span class="badge">#279</span>A <code>G53</code> move kept its axis words &mdash; the 3D view and the travel check were mixing frames</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeEmulator.cs</td><td class="num add">25</td><td class="num del">1</td></tr><tr><td class="mono">CNC Core/CNC Core/GCodeParser.cs</td><td class="num add">22</td><td class="num del">7</td></tr><tr><td class="mono">CNC Core/CNC Core/JobRunner.cs</td><td class="num add">11</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p><code>G53 G0 X&hellip; Y&hellip;</code> &mdash; the park line every generated program ends with &mdash; was parsed into <strong>two</strong> tokens: a <code>G53</code> marker carrying no axis words at all, and an ordinary <code>G0</code> carrying the machine coordinates with nothing left to mark them as machine coordinates.</p><p>Only the <code>G53</code> case converts those out of the machine frame. Handed a token with no axes it converted nothing, and the real motion arrived as a plain rapid that was taken for work coordinates. Machine points then landed in the program&rsquo;s bounding box beside work-frame ones:</p><pre>box  X 0..742.589   Y -820.001..38   (span 858.001)
+&ldquo;Y: the program spans 858 mm, the machine travels 845 mm&rdquo;</pre><p>858.001 is 38 &mdash; a work-frame Y &mdash; minus &minus;820.001, which is <code>G30</code>&rsquo;s <em>machine</em> Y. The program held exactly two distinct Y values, 6.000 and 38.000.</p><ul><li>The <code>G53</code> token now keeps its axis words whether or not the block also restates <code>G0</code>/<code>G1</code>, and the modal-motion flag is cleared so the fall-through cannot emit a second, axis-less move for the same block.</li><li>The same mis-framing drew park moves in the wrong place in the 3D view, for every program that parks.</li></ul><p class="foot">Parsing only &mdash; the controller is streamed the raw lines and never saw this. Introduced upstream in May 2021; before then the case was a single line that always passed the axis words along.</p></div>
+</div>
+
+<!-- ===== #280 ===== -->
+<div class="pr">
+<h2 id="pr280"><span class="badge">#280</span>The status log now records what actually happened: connects, jobs, generates and setting changes</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/LibStrings.xaml</td><td class="num add">1</td><td class="num del">1</td></tr><tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml.cs</td><td class="num add">21</td><td class="num">0</td></tr><tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">52</td><td class="num">0</td></tr><tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">27</td><td class="num del">1</td></tr><tr><td class="mono">CNC Core/CNC Core/JobRunner.cs</td><td class="num add">32</td><td class="num">0</td></tr><tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml</td><td class="num add">1</td><td class="num del">1</td></tr><tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">38</td><td class="num">0</td></tr><tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">50</td><td class="num del">15</td></tr><tr><td class="mono">Locale/*/csv (3 locales)</td><td class="num add">3</td><td class="num del">3</td></tr>
+</table>
+<div class="desc"><p>A connect was one line that read the same whether the handshake had read everything or nothing. A run left no mark at all. A settings change left none either. Everything that would have explained a later symptom lived in a developer-only log the operator has no access to.</p><pre>Connecting to controller (192.168.1.247:23)...
+Connected: 192.168.1.247:23
+- 104 controller settings read
+- grblHAL 1.1f.20260712 build 20260712 - options: ENUMS,RT+,HOME,PROBES=3,EXPR,ATC=1,SD
+Generate for LeftZRailSpacer.workorder
+Work order compiled - 77 lines in 0.5 s, est. run 00:02:14.
+Program start - LeftZRailSpacer.workorder, 77 lines
+Program end - LeftZRailSpacer.workorder, runtime 00:01:23
+Disconnected from controller (192.168.1.247:23) - reason: reconnecting</pre><ul><li><strong>Connect</strong> reports how many settings were read &mdash; <em>0</em> is the failure above, and it now says so in plain words &mdash; the firmware&rsquo;s options, and whether the controller is already sitting in an alarm. That last one blocks g-code <em>and</em> filesystem access, which otherwise reads as &ldquo;the ATC macros are missing&rdquo;.</li><li><strong>Disconnect</strong> states its reason: reconnecting, switching to the simulator, restoring afterwards, migrating from serial to the network, or the application closing.</li><li><strong>Runs</strong> log start with the file and line count, end with the runtime, and mark themselves <code>[DRY RUN]</code> or <code>[CHECK MODE]</code> &mdash; a dry run and a real one were indistinguishable afterwards. A run stopped by the operator or aborted by a reset is recorded as an error, with the elapsed time.</li><li><strong>Generate</strong> names the work order it was for, on the cached path too.</li><li><strong>Refusals</strong> are recorded &mdash; prerequisites unmet, or a program larger than the travel. These were dialogs that left no trace, so &ldquo;why did it not start&rdquo; was unanswerable afterwards.</li><li><strong>Controller settings</strong> log one line per change with old and new value, including a <code>$n=</code> typed at the MDI, which bypasses the settings editor entirely and otherwise leaves no record anywhere.</li></ul><p class="foot">&ldquo;Waiting for controller&rdquo; is now &ldquo;Connecting to controller&rdquo; &mdash; it describes what is happening rather than what the sender is doing about it, and no longer reads as a stall. The controller&rsquo;s own terse <code>Pgm End</code> is filtered now that the end of a run is reported properly.</p></div>
+</div>
+
+<!-- ===== #281 ===== -->
+<div class="pr">
+<h2 id="pr281"><span class="badge">#281</span>A connect announced the previous connect&rsquo;s result, and skipped its own report</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">12</td><td class="num del">1</td></tr><tr><td class="mono">ioSender XL/ioSender XL/JobView.xaml.cs</td><td class="num add">6</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><pre>Connecting to controller (COM6:115200,N,8,1)...
+Connected: 192.168.1.247:23</pre><p>The connect routine opened by saving whatever status line happened to be on screen, and the caller treats that saved text as &ldquo;a message the connect set for itself&rdquo; &mdash; giving it precedence over the connect&rsquo;s own outcome. So &ldquo;nothing to report&rdquo; was represented by the <em>previous</em> message, and every connect after the first re-announced it.</p><p>Worse than the wrong target: taking that branch skipped the outcome branch, and with it the settings count, the firmware options and the already-in-alarm warning. The one situation where &ldquo;how many settings did this connect read&rdquo; matters most &mdash; a reconnect after trouble &mdash; is the one that silently omitted it. The first connect of a session looked right only because the status line happens to start empty.</p><p class="foot">It now starts empty each time, so only a message the connect deliberately sets &mdash; the homing-required notice &mdash; takes precedence. An outcome that is neither success nor no-response states itself rather than assigning nothing, since silence there is the &ldquo;connected or not?&rdquo; ambiguity the block exists to close.</p></div>
+</div>
+
+<!-- ===== #282 ===== -->
+<div class="pr">
+<h2 id="pr282"><span class="badge">#282</span>Menu commands get their own keyboard group, apart from the tab destinations</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ActionKeyBinder.cs</td><td class="num add">29</td><td class="num del">16</td></tr><tr><td class="mono">CNC Controls/CNC Controls/CNC Controls.csproj</td><td class="num add">1</td><td class="num">0</td></tr><tr><td class="mono">CNC Controls/CNC Controls/Features.cs</td><td class="num add">34</td><td class="num">0</td></tr><tr><td class="mono">CNC Controls/CNC Controls/KeyMapEditor.xaml.cs</td><td class="num add">31</td><td class="num del">10</td></tr><tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">21</td><td class="num del">15</td></tr>
+</table>
+<div class="desc"><p>The built-in menu commands shared the <em>Top Level Tabs</em> group with the views, on the reasoning that both are just destinations. In practice it read as clutter: a list of tabs you can rearrange, with fifteen menu commands you cannot, interleaved among them.</p><ul><li>A new <strong>Top Level Menu Items</strong> group holds <code>Connect</code>, the <code>File&nbsp;&gt;</code> and <code>Help&nbsp;&gt;</code> commands, ordered immediately above the tabs &mdash; adjacent because they are related, separate because a tab can be moved on and off the strip and a File command cannot.</li><li>Both group descriptions were corrected; the old one claimed the tabs group contained the menus.</li><li>Existing bindings are unaffected &mdash; the action ids did not change, only the group they display under.</li></ul><p class="foot">Also adds a small feature-flag holder so a command held back from a build disappears from the menu, its shortcut registration <em>and</em> its row in Settings&nbsp;&gt;&nbsp;Keyboard together. Hiding the menu item alone had left the command listed and bindable to a key that would then do nothing.</p></div>
+</div>
+
 </section>
 
 </body>
