@@ -240,6 +240,7 @@
     <Compile Include="Converters.cs" />
     <Compile Include="TabKeyBinder.cs" />
     <Compile Include="ActionKeyBinder.cs" />
+    <Compile Include="Features.cs" />
     <Compile Include="CoolantControl.xaml.cs">
       <DependentUpon>CoolantControl.xaml</DependentUpon>
     </Compile>

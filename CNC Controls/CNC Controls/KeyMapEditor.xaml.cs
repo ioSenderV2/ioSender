@@ -702,22 +702,42 @@ namespace CNC.Controls
 
         // ---- categories (outline groups) ------------------------------------------------------
 
-        /// <summary>The single group holding every top-level destination - tab strip entries and menu
-        /// entries alike. ActionKeyBinder's main-menu catalog entries name it too, so the two halves of the
-        /// list can't drift into separate groups.</summary>
+        /// <summary>The top-level VIEWS - what can sit on the tab strip (or be reached from the menu that
+        /// hosts it when it is not on the bar). Tab.* ids.</summary>
         public const string TopLevelGroup = "Top Level Tabs";
-        private const int TopLevelOrder = 13;
+
+        /// <summary>The built-in main-menu COMMANDS - Connect, File &gt; ..., Help &gt; ... - which are not
+        /// views at all and cannot be placed on the tab strip.
+        ///
+        /// These used to share TopLevelGroup, on the reasoning that to the operator both are just
+        /// "destinations". In practice it read as clutter: a list of tabs you can rearrange, with fifteen
+        /// menu commands you cannot, interleaved alphabetically among them. Ordered immediately BEFORE the
+        /// tabs so the two stay adjacent - they are related, just not the same thing.</summary>
+        public const string MenuGroup = "Top Level Menu Items";
+
+        private const int MenuOrder = 13;
+        private const int TopLevelOrder = 14;
+
+        /// <summary>Sort order for a group an ActionKeyBinder row named for itself. Anything unrecognised
+        /// keeps the historical "UI zoom" slot, which is where these rows sat before the field existed.</summary>
+        private static int GroupOrder(string group)
+        {
+            if (group == MenuGroup) return MenuOrder;
+            if (group == TopLevelGroup) return TopLevelOrder;
+            return 9;
+        }
 
         private static void Categorize(BindingRow r)
         {
             if (r.IsJog) { r.Set("Jog", 0); return; }
             // ActionKeyBinder rows carry their own group where they want one (the main-menu commands name
             // TopLevelGroup); the original zoom/OBS entries predate that field and default to "UI zoom".
-            if (r.IsZoomAction) { r.Set(r.ActionGroup ?? "UI zoom", r.ActionGroup == TopLevelGroup ? TopLevelOrder : 9); return; }
-            // One group for everything reachable from the top-level tab strip or the menus - the views
-            // (TabTargets) and the main-menu commands (ActionKeyBinder, handled above) sit together, because
-            // to the operator they are one list of destinations and whether a given one is currently a tab or
-            // a menu entry is their own layout choice, not a category.
+            // An ActionKeyBinder row carries its own group where it wants one (the main-menu commands name
+            // MenuGroup); the original zoom/OBS entries predate that field and default to "UI zoom".
+            if (r.IsZoomAction) { r.Set(r.ActionGroup ?? "UI zoom", GroupOrder(r.ActionGroup)); return; }
+            // The top-level VIEWS. The main-menu commands are handled above and land in MenuGroup, which
+            // sorts immediately before this one - adjacent, because they are related, but distinct, because
+            // a tab can be moved on and off the strip and a File/Help command cannot.
             if (r.IsTabSwitch) { r.Set(TopLevelGroup, TopLevelOrder); return; }
 
             string m = r.Model.Method ?? string.Empty;
@@ -755,7 +775,8 @@ namespace CNC.Controls
             { "Program", "Program-level toggles (optional stop, single block, probe state), the console window, and the run strip's MDI and Status buttons." },
             { "Probing", "Start or stop probing and toggle the probe-connected state." },
             { "3D view", "Control the 3D tool-path viewer." },
-            { TopLevelGroup, "Everything on the top-level tab strip and in the menus, in one list. A key reaches its target wherever that target currently lives - as a tab or as a menu entry - so moving something in Settings > Top-level tabs never costs it its shortcut. All unbound by default; a menu command that is greyed out does nothing." },
+            { MenuGroup, "The built-in main-menu commands - Connect, File and Help. These are not views and cannot be placed on the tab strip. All unbound by default; a menu command that is greyed out does nothing when its key is pressed." },
+            { TopLevelGroup, "The views that can sit on the top-level tab strip. A key reaches its target wherever that target currently lives - as a tab, or on the menu that hosts it when it is off the bar - so moving something in Settings > Top-level tabs never costs it its shortcut. All unbound by default." },
             { "Other", "Additional actions." }
         };
 

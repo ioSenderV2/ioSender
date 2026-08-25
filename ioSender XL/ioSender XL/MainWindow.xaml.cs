@@ -3536,17 +3536,6 @@ namespace GCode_Sender
         // so there is exactly one implementation of "Load Program" and the shortcut cannot drift from it. The
         // views that MOVED into these menus are not here - they keep their "Tab.*" ids (see showBoundView), so
         // a key bound while a view was a tab still reaches it now that it is a menu entry.
-        /// <summary>
-        /// Whether "File > Load SVG Laser Job..." is offered. FALSE on the shared branch.
-        ///
-        /// The feature is complete and builds - the converter, the dialog, its persisted settings and the
-        /// artwork placement are all in the branch and unchanged. What it has not had is time on a real
-        /// machine, and a laser job that reaches the table with the wrong exposure is not a defect anyone
-        /// wants to discover for us. Hidden rather than reverted so it stays one line from coming back,
-        /// and so the code keeps getting compiled instead of rotting behind an #if.
-        /// </summary>
-        internal const bool SvgLaserJobEnabled = false;
-
         private void registerMenuActions()
         {
             registerMenuAction("Menu.Connect", menuConnect, () => connectMenuItem_Click(null, null));
@@ -3554,11 +3543,11 @@ namespace GCode_Sender
             registerMenuAction("Menu.LoadWorkOrder", menuLoadWorkOrder, () => LoadWorkOrder_Click(null, null));
             registerMenuAction("Menu.NewWorkOrder", menuNewWorkOrder, () => NewWorkOrder_Click(null, null));
             // SVG laser job loading is held back from the shared branch until it has had more time on a
-            // real machine - see SvgLaserJobEnabled. Collapsing the menu item is not enough on its own:
+            // real machine - see Features.SvgLaserJob. Collapsing the menu item is not enough on its own:
             // registering the action would still list it in the keymap editor as something to bind, which
             // is the same exposure by another route. One switch governs both.
-            menuLoadSvgLaser.Visibility = SvgLaserJobEnabled ? Visibility.Visible : Visibility.Collapsed;
-            if (SvgLaserJobEnabled)
+            menuLoadSvgLaser.Visibility = Features.SvgLaserJob ? Visibility.Visible : Visibility.Collapsed;
+            if (Features.SvgLaserJob)
                 registerMenuAction("Menu.LoadSvgLaser", menuLoadSvgLaser, () => LoadSvgLaser_Click(null, null));
             registerMenuAction("Menu.Camera", menuCamera, () => CameraOpen_Click(null, null));
 

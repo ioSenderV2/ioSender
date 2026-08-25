@@ -33,7 +33,9 @@ namespace CNC.Controls
         }
 
 
-        public static readonly ActionInfo[] Catalog = new ActionInfo[]
+        // Declared BEFORE Catalog on purpose: static field initializers run in declaration order, so
+        // filtering an array that has not been assigned yet throws at type initialization.
+        private static readonly ActionInfo[] catalog = new ActionInfo[]
         {
             new ActionInfo { Id = "UiScaleUp",   Label = "Zoom in (UI scale)",  DefaultKey = Key.OemPlus,  DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
             new ActionInfo { Id = "UiScaleDown", Label = "Zoom out (UI scale)", DefaultKey = Key.OemMinus, DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
@@ -71,22 +73,33 @@ namespace CNC.Controls
             // refuses to act while that item is disabled, so a shortcut can never do what the menu won't.
             // The views that used to be tabs are NOT here - they keep their "Tab.*" ids (KeyMapEditor.TabTargets)
             // so a binding made while they were on the bar still works now that they are menu items.
-            new ActionInfo { Id = "Menu.Connect",        Label = "Connect...",                Group = KeyMapEditor.TopLevelGroup, Description = "Open the connection dialog." },
-            new ActionInfo { Id = "Menu.LoadProgram",    Label = "File > Load Program...",    Group = KeyMapEditor.TopLevelGroup, Description = "Open a g-code file." },
-            new ActionInfo { Id = "Menu.LoadWorkOrder",  Label = "File > Load Work Order...", Group = KeyMapEditor.TopLevelGroup, Description = "Open a saved work order." },
-            new ActionInfo { Id = "Menu.NewWorkOrder",   Label = "File > New Work Order...",  Group = KeyMapEditor.TopLevelGroup, Description = "Start a new work order." },
-            new ActionInfo { Id = "Menu.LoadSvgLaser",   Label = "File > Load SVG Laser Job...", Group = KeyMapEditor.TopLevelGroup, Description = "Burn an SVG with the laser." },
-            new ActionInfo { Id = "Menu.Camera",         Label = "Tools > Camera",            Group = KeyMapEditor.TopLevelGroup, Description = "Open the camera window." },
-            new ActionInfo { Id = "Menu.Wiki",           Label = "Help > Wiki",               Group = KeyMapEditor.TopLevelGroup, Description = "Open the online wiki in a browser." },
-            new ActionInfo { Id = "Menu.UsageTips",      Label = "Help > Usage tips",         Group = KeyMapEditor.TopLevelGroup, Description = "Open the usage tips page in a browser." },
-            new ActionInfo { Id = "Menu.BriefTour",      Label = "Help > A brief tour",       Group = KeyMapEditor.TopLevelGroup, Description = "Open the brief tour." },
-            new ActionInfo { Id = "Menu.VideoTutorials", Label = "Help > Video tutorials",    Group = KeyMapEditor.TopLevelGroup, Description = "Open the video tutorials." },
-            new ActionInfo { Id = "Menu.ErrorCodes",     Label = "Help > Error and alarm codes", Group = KeyMapEditor.TopLevelGroup, Description = "Open the error and alarm code reference." },
-            new ActionInfo { Id = "Menu.CheckForUpdates", Label = "Help > Check for updates...", Group = KeyMapEditor.TopLevelGroup, Description = "Check GitHub for a newer ioSender release." },
-            new ActionInfo { Id = "Menu.RollBack",       Label = "Help > Roll back to previous version...", Group = KeyMapEditor.TopLevelGroup, Description = "Swap back to the build installed before the last update." },
-            new ActionInfo { Id = "Menu.OpenDataFolder", Label = "Help > Open Application data folder", Group = KeyMapEditor.TopLevelGroup, Description = "Open the per-user folder holding App.config, key mappings and backups." },
-            new ActionInfo { Id = "Menu.About",          Label = "Help > About",              Group = KeyMapEditor.TopLevelGroup, Description = "Show the About window." },
+            new ActionInfo { Id = "Menu.Connect",        Label = "Connect...",                Group = KeyMapEditor.MenuGroup, Description = "Open the connection dialog." },
+            new ActionInfo { Id = "Menu.LoadProgram",    Label = "File > Load Program...",    Group = KeyMapEditor.MenuGroup, Description = "Open a g-code file." },
+            new ActionInfo { Id = "Menu.LoadWorkOrder",  Label = "File > Load Work Order...", Group = KeyMapEditor.MenuGroup, Description = "Open a saved work order." },
+            new ActionInfo { Id = "Menu.NewWorkOrder",   Label = "File > New Work Order...",  Group = KeyMapEditor.MenuGroup, Description = "Start a new work order." },
+            new ActionInfo { Id = "Menu.LoadSvgLaser",   Label = "File > Load SVG Laser Job...", Group = KeyMapEditor.MenuGroup, Description = "Burn an SVG with the laser." },
+            new ActionInfo { Id = "Menu.Camera",         Label = "Tools > Camera",            Group = KeyMapEditor.MenuGroup, Description = "Open the camera window." },
+            new ActionInfo { Id = "Menu.Wiki",           Label = "Help > Wiki",               Group = KeyMapEditor.MenuGroup, Description = "Open the online wiki in a browser." },
+            new ActionInfo { Id = "Menu.UsageTips",      Label = "Help > Usage tips",         Group = KeyMapEditor.MenuGroup, Description = "Open the usage tips page in a browser." },
+            new ActionInfo { Id = "Menu.BriefTour",      Label = "Help > A brief tour",       Group = KeyMapEditor.MenuGroup, Description = "Open the brief tour." },
+            new ActionInfo { Id = "Menu.VideoTutorials", Label = "Help > Video tutorials",    Group = KeyMapEditor.MenuGroup, Description = "Open the video tutorials." },
+            new ActionInfo { Id = "Menu.ErrorCodes",     Label = "Help > Error and alarm codes", Group = KeyMapEditor.MenuGroup, Description = "Open the error and alarm code reference." },
+            new ActionInfo { Id = "Menu.CheckForUpdates", Label = "Help > Check for updates...", Group = KeyMapEditor.MenuGroup, Description = "Check GitHub for a newer ioSender release." },
+            new ActionInfo { Id = "Menu.RollBack",       Label = "Help > Roll back to previous version...", Group = KeyMapEditor.MenuGroup, Description = "Swap back to the build installed before the last update." },
+            new ActionInfo { Id = "Menu.OpenDataFolder", Label = "Help > Open Application data folder", Group = KeyMapEditor.MenuGroup, Description = "Open the per-user folder holding App.config, key mappings and backups." },
+            new ActionInfo { Id = "Menu.About",          Label = "Help > About",              Group = KeyMapEditor.MenuGroup, Description = "Show the About window." },
         };
+
+        /// <summary>
+        /// The bindable actions, minus any belonging to a feature that is currently held back.
+        ///
+        /// The filter is the point: THIS catalogue - not the menu, and not registerMenuActions - is what
+        /// Settings &gt; Keyboard lists. Hiding a menu item without hiding its row here leaves the command
+        /// visible and bindable in the editor, which is exactly what e5fe6542 did to "Load SVG Laser Job":
+        /// it collapsed the menu entry and skipped the action registration, and the row stayed on screen.
+        /// </summary>
+        public static readonly ActionInfo[] Catalog =
+            catalog.Where(a => a.Id != "Menu.LoadSvgLaser" || Features.SvgLaserJob).ToArray();
 
         private static readonly Dictionary<string, Func<Key, bool>> handlers = new Dictionary<string, Func<Key, bool>>();
 
