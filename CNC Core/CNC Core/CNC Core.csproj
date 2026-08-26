@@ -138,6 +138,7 @@
     <Compile Include="MeasureViewModel.cs" />
     <Compile Include="NetworkScanner.cs" />
     <Compile Include="NGCExpr.cs" />
+    <Compile Include="PdfDocument.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SerialStream.cs" />
     <Compile Include="UserPrompt.cs" />
