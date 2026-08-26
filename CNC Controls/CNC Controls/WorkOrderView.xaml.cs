@@ -129,7 +129,18 @@ namespace CNC.Controls
         }
 
         private bool placing = false;
+
+        // The transform of the drawing ON SCREEN - what a click on canvasDiagram is measured against.
+        // Kept separate from drawTransform below because "Save Drawing" redraws everything into an
+        // off-screen canvas at the PAPER's aspect ratio, and that must not move where a click lands.
         private OddJobsStockCanvas.Transform stockTransform;
+
+        // Where the current DrawInto pass is drawing, and at what scale. Set for the duration of one
+        // DrawInto call and read by the Add*/DrawEnvelope helpers, so the whole shape-drawing body is
+        // written once and serves both the screen and the exported sheet - the drawing that gets taken
+        // to the machine cannot describe a different arrangement from the one on screen.
+        private Canvas drawTarget;
+        private OddJobsStockCanvas.Transform drawTransform;
 
         // Click/drag on the stock drawing to place the selected toolpath's geometry - works whether the
         // toolpath itself or one of its operations is selected, since the geometry belongs to the toolpath.
@@ -2081,8 +2092,23 @@ namespace CNC.Controls
             if (canvasDiagram == null || canvasDiagram.ActualWidth <= 0 || canvasDiagram.ActualHeight <= 0)
                 return;
 
-            stockTransform = OddJobsStockCanvas.DrawStock(canvasDiagram);
-            double scale = stockTransform.Scale;
+            stockTransform = DrawInto(canvasDiagram, null);
+        }
+
+        /// <summary>
+        /// The whole stock diagram, drawn into <paramref name="target"/> at whatever size that canvas
+        /// is. This is the only place the diagram is built; DrawDiagram() points it at the on-screen
+        /// canvas and "Save Drawing" points it at an off-screen one sized to the paper.
+        ///
+        /// <paramref name="labelPrefix"/> is what the export uses to put the feature-table ID in front
+        /// of each toolpath's name ("(A) Pocket"), so the sheet's drawing and its table are keyed to
+        /// each other. Null on screen, where there is no table to key to.
+        /// </summary>
+        private OddJobsStockCanvas.Transform DrawInto(Canvas target, Func<WorkOrderToolpath, string> labelPrefix)
+        {
+            drawTarget = target;
+            drawTransform = OddJobsStockCanvas.DrawStock(target);
+            double scale = drawTransform.Scale;
 
             // Envelopes first, so the nominal outlines stay legible on top of them.
             // A held-back toolpath gets no envelope: the envelope shows where material WILL be removed, and
@@ -2120,7 +2146,7 @@ namespace CNC.Controls
                     // exactly the overlap this drawing exists to catch.
                     foreach (var pos in geom.PatternPositions(placement.X, placement.Y))
                     {
-                        var center = OddJobsStockCanvas.ToPixel(stockTransform, pos[0], pos[1]);
+                        var center = OddJobsStockCanvas.ToPixel(drawTransform, pos[0], pos[1]);
                         switch (geom.Geometry)
                         {
                             case WorkOrderGeometryKind.Line:
@@ -2153,7 +2179,7 @@ namespace CNC.Controls
 
                         var dot = new Ellipse { Width = 5, Height = 5, Fill = stroke };
                         Canvas.SetLeft(dot, center.X - 2.5); Canvas.SetTop(dot, center.Y - 2.5);
-                        canvasDiagram.Children.Add(dot);
+                        drawTarget.Children.Add(dot);
                         drawn++;
                     }
                 }
@@ -2165,10 +2191,11 @@ namespace CNC.Controls
                 // grey for metals), and a grey or steel-blue label was unreadable against it. Selection is
                 // carried by weight instead of colour.
                 var at = WorkOrderRules.ResolvedCenter(workOrder, tp);
-                var anchor = OddJobsStockCanvas.ToPixel(stockTransform, at[0], at[1]);
+                var anchor = OddJobsStockCanvas.ToPixel(drawTransform, at[0], at[1]);
                 var label = new TextBlock
                 {
-                    Text = drawn > 1 ? string.Format("{0} (x{1})", tp.Name, drawn) : tp.Name,
+                    Text = (labelPrefix == null ? string.Empty : labelPrefix(tp))
+                         + (drawn > 1 ? string.Format("{0} (x{1})", tp.Name, drawn) : tp.Name),
                     FontSize = 13,
                     Foreground = Brushes.Black,
                     FontWeight = isSelected ? FontWeights.Bold : FontWeights.Normal
@@ -2178,7 +2205,76 @@ namespace CNC.Controls
                 // Cleared by the FIRST placement's shape - for a group that is its anchor member, which is
                 // what the resolved center refers to as well, so the label sits over the thing it names.
                 Canvas.SetTop(label, anchor.Y - ShapeHalfHeightPx(placements.Count > 0 ? placements[0].Geometry : tp, scale) - 17d);
-                canvasDiagram.Children.Add(label);
+                drawTarget.Children.Add(label);
+            }
+
+            return drawTransform;
+        }
+
+        // ---- "Save Drawing": the diagram as a dimensioned PDF sheet -----------------------------------
+
+        private void DiagramMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            // Nothing to draw with no toolpaths. Resolved off the menu instance rather than the generated
+            // field for the same reason WorkOrderNameMenu_Opened does - a ContextMenu lives outside the
+            // visual tree and its name scope is the least reliable thing about it.
+            foreach (var item in ((ContextMenu)sender).Items)
+                if (item is MenuItem mi && mi.Name == "miSaveDrawing")
+                    mi.IsEnabled = workOrder != null && workOrder.Toolpaths.Count > 0;
+        }
+
+        private void MenuSaveDrawing_Click(object sender, RoutedEventArgs e)
+        {
+            if (workOrder == null || workOrder.Toolpaths.Count == 0)
+                return;
+
+            string name = currentFilePath != null
+                        ? System.IO.Path.GetFileNameWithoutExtension(currentFilePath)
+                        : "Untitled work order";
+
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = "Save Drawing",
+                Filter = "PDF drawing (*.pdf)|*.pdf",
+                AddExtension = true,
+                DefaultExt = ".pdf",
+                InitialDirectory = currentFilePath != null ? System.IO.Path.GetDirectoryName(currentFilePath) : WorkOrdersFolder(),
+                FileName = name + ".pdf",
+                OverwritePrompt = true
+            };
+            if (dlg.ShowDialog() != true)
+                return;
+
+            // The sheet is a drawing of the work order, not of the current editing session: the selection
+            // highlight is UI state and would print as one arbitrarily bolder feature. Restored straight
+            // after - DrawInto is synchronous, so nothing else can observe the gap.
+            var wasSelected = selectedToolpath;
+            selectedToolpath = null;
+            try
+            {
+                WorkOrderDrawing.Save(dlg.FileName, workOrder, name, DrawInto);
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show("Could not write the drawing:\n\n" + ex.Message, "Save Drawing",
+                                MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            finally
+            {
+                selectedToolpath = wasSelected;
+                DrawDiagram();   // the off-screen pass left drawTarget/drawTransform pointing at the sheet
+            }
+
+            if (AppDialogs.Show("Drawing saved to\n\n" + dlg.FileName + "\n\nOpen it now?", "Save Drawing",
+                                MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
+            {
+                try { System.Diagnostics.Process.Start(dlg.FileName); }
+                catch (Exception ex)
+                {
+                    AppDialogs.Show("The drawing was saved, but Windows would not open it:\n\n" + ex.Message,
+                                    "Save Drawing", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
             }
         }
 
@@ -2225,7 +2321,7 @@ namespace CNC.Controls
             if (tp.Operations.Count == 0)
                 return;
 
-            var center = OddJobsStockCanvas.ToPixel(stockTransform, atX, atY);
+            var center = OddJobsStockCanvas.ToPixel(drawTransform, atX, atY);
             var geomBrushes = OddJobsStockCanvas.GeometryBrushes(StartJobConfig.Section?.Material ?? string.Empty);
             var fill = geomBrushes.EnvelopeFill;
             var edge = geomBrushes.EnvelopeEdge;
@@ -2259,7 +2355,7 @@ namespace CNC.Controls
         {
             double a = tp.Angle * Math.PI / 180d;
             double dx = Math.Cos(a) * tp.Length / 2d * scale, dy = Math.Sin(a) * tp.Length / 2d * scale;
-            canvasDiagram.Children.Add(new Line
+            drawTarget.Children.Add(new Line
             {
                 X1 = center.X - dx, Y1 = center.Y + dy,   // screen Y grows downward
                 X2 = center.X + dx, Y2 = center.Y - dy,
@@ -2323,7 +2419,7 @@ namespace CNC.Controls
                     poly.Points.Add(new Point(center.X + (lx * cos - ly * sin) * scale,
                                               center.Y - (lx * sin + ly * cos) * scale));
                 }
-                canvasDiagram.Children.Add(poly);
+                drawTarget.Children.Add(poly);
             }
         }
 
@@ -2391,21 +2487,21 @@ namespace CNC.Controls
                 }
                 geo.Figures.Add(fig);
             }
-            canvasDiagram.Children.Add(new System.Windows.Shapes.Path { Data = geo, Fill = brush });
+            drawTarget.Children.Add(new System.Windows.Shapes.Path { Data = geo, Fill = brush });
         }
 
         private void AddEllipse(Point center, double rx, double ry, Brush stroke, double thickness, Brush fill)
         {
             var el = new Ellipse { Width = rx * 2, Height = ry * 2, Stroke = stroke, StrokeThickness = thickness, Fill = fill };
             Canvas.SetLeft(el, center.X - rx); Canvas.SetTop(el, center.Y - ry);
-            canvasDiagram.Children.Add(el);
+            drawTarget.Children.Add(el);
         }
 
         private void AddRect(Point center, double hw, double hh, Brush stroke, double thickness, Brush fill)
         {
             var r = new Rectangle { Width = hw * 2, Height = hh * 2, Stroke = stroke, StrokeThickness = thickness, Fill = fill };
             Canvas.SetLeft(r, center.X - hw); Canvas.SetTop(r, center.Y - hh);
-            canvasDiagram.Children.Add(r);
+            drawTarget.Children.Add(r);
         }
 
         #endregion

@@ -308,7 +308,17 @@
             <TextBlock x:Uid="hlp_woBody" Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,6" Foreground="#24292F"
                        Text="Add a toolpath, pick its geometry and place it on the stock, then add the operations that cut it - pocket, contour, finishing passes, chamfer. Run builds every toolpath into one program, in the order listed."/>
             <Border Grid.Row="1" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="4" Margin="0,0,0,6" SnapsToDevicePixels="True">
-                <Canvas x:Name="canvasDiagram" ClipToBounds="True" Background="White" SizeChanged="canvasDiagram_SizeChanged"/>
+                <!-- Right-click: the drawing as a dimensioned PDF sheet, for taking to the machine or
+                     sending to whoever asked for the part. Greyed out with no toolpaths - there is no
+                     drawing to save yet, and hiding it would make the capability undiscoverable. -->
+                <Canvas x:Name="canvasDiagram" ClipToBounds="True" Background="White" SizeChanged="canvasDiagram_SizeChanged">
+                    <Canvas.ContextMenu>
+                        <ContextMenu Opened="DiagramMenu_Opened">
+                            <MenuItem x:Uid="mi_wosavedrawing" x:Name="miSaveDrawing" Header="Save Drawing..." Click="MenuSaveDrawing_Click"
+                                      ToolTip="Write this stock drawing to a PDF, with the stock dimensioned and a table listing every feature - its position, geometry, operations and tooling."/>
+                        </ContextMenu>
+                    </Canvas.ContextMenu>
+                </Canvas>
             </Border>
             <TextBlock x:Name="txtSummary" Grid.Row="2" FontWeight="SemiBold" VerticalAlignment="Top" TextWrapping="Wrap"/>
         </Grid>
