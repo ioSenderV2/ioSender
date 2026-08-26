@@ -135,6 +135,7 @@
     <Compile Include="WorkOrderModel.cs" />
     <Compile Include="WorkOrderCompiler.cs" />
     <Compile Include="WorkOrderDrawing.cs" />
+    <Compile Include="WorkOrderPalette.cs" />
     <Compile Include="OddJobsToolMemory.cs" />
     <Compile Include="CustomTool.cs" />
     <Compile Include="TrueTypeOutlines.cs" />

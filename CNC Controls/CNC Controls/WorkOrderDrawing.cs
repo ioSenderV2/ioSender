@@ -5,7 +5,7 @@
  * a handful of features: a hole chart beats forty leader lines fighting each other. So the drawing
  * itself carries only the dimensions that have nowhere else to live - the stock's overall size, the
  * keep-out margin and the origin - and every feature's position, size, operations and tooling are
- * read off the table, keyed to the drawing by the (A)/(B)/(C) prefix on each toolpath's label.
+ * read off the table, keyed to the drawing by a lettered, colour-matched balloon on each feature.
  *
  * The drawing is NOT redrawn here. WorkOrderView.DrawInto builds it into an off-screen Canvas sized
  * to the paper - the identical code that paints the on-screen preview - and RenderCanvas below walks
@@ -34,19 +34,20 @@ namespace CNC.Controls
     {
         /// <summary>
         /// Draws the whole stock diagram into <paramref name="target"/> and returns the mm-to-pixel
-        /// transform it used. <paramref name="labelPrefix"/> prefixes each toolpath's label, which is
-        /// how the feature-table ID gets onto the drawing. Implemented by WorkOrderView.DrawInto.
+        /// transform it used. Implemented by WorkOrderView.DrawInto - which also puts the lettered
+        /// balloons on, so the drawing and the table below it are keyed to each other without this
+        /// having to say anything about labelling.
         /// </summary>
-        public delegate OddJobsStockCanvas.Transform DiagramDrawer(Canvas target, Func<WorkOrderToolpath, string> labelPrefix);
+        public delegate OddJobsStockCanvas.Transform DiagramDrawer(Canvas target);
 
         // US Letter landscape. The sheet is laid out in PDF points throughout (1/72"), origin bottom-left.
         private const double PageW = 792d, PageH = 612d;
         private const double Margin = 26d;
 
         // Canvas pixels per PDF point when the diagram is drawn off-screen. Above 1 because the diagram
-        // code sizes its labels and markers in fixed pixels (a 13 px toolpath label, a 5 px instance dot);
-        // drawing into a canvas this much larger and scaling down on the way into the PDF lands them at a
-        // drawing-sized 8 pt and 3 pt instead of shouting off the page.
+        // sizes its balloons and markers in fixed pixels (an 18 px balloon, a 5 px instance dot); drawing
+        // into a canvas this much larger and scaling down on the way into the PDF lands them at a
+        // drawing-sized 11 pt and 3 pt instead of shouting off the page.
         private const double CanvasPerPoint = 1.6d;
 
         // Room around the diagram for the dimension lines, which are drawn in PDF space (the canvas'
@@ -171,8 +172,7 @@ namespace CNC.Controls
             canvas.Measure(new Size(canvas.Width, canvas.Height));
             canvas.Arrange(new Rect(0d, 0d, canvas.Width, canvas.Height));
 
-            var ids = Ids(wo);
-            var t = draw(canvas, tp => { string id; return ids.TryGetValue(tp, out id) ? "(" + id + ") " : string.Empty; });
+            var t = draw(canvas);
 
             // Canvas pixels -> points. Canvas Y grows DOWN, PDF Y grows UP, hence the flip about the top.
             Func<double, double> px = cx => innerX + cx / CanvasPerPoint;
@@ -464,6 +464,7 @@ namespace CNC.Controls
         {
             public bool IsOperation;
             public bool Dimmed;              // held back / disabled: shown, but visibly not part of the cut
+            public double[] Color;           // the feature's own colour, for the balloon in the ID column
             public string Id, Name, Detail, X, Y, Qty, Tool;
         }
 
@@ -479,10 +480,10 @@ namespace CNC.Controls
         private static List<Row> BuildRows(WorkOrder wo)
         {
             var rows = new List<Row>();
-            var ids = Ids(wo);
 
-            foreach (var tp in wo.Toolpaths)
+            for (int index = 0; index < wo.Toolpaths.Count; index++)
             {
+                var tp = wo.Toolpaths[index];
                 // The count the sheet prints is what will actually be CUT, which for an Indirect toolpath
                 // is its source's pattern, not its own - the same resolution WorkOrderRules.Summarize
                 // makes for the tree, reused so the two cannot disagree about the same toolpath.
@@ -493,7 +494,12 @@ namespace CNC.Controls
 
                 rows.Add(new Row
                 {
-                    Id = ids[tp],
+                    Id = WorkOrderPalette.Id(index),
+                    // The same colour and the same letter the drawing balloons this feature with - both
+                    // come from WorkOrderPalette by index alone, so the sheet's two halves cannot key
+                    // differently. Deliberately NOT conditioned on whether the toolpath is held back: a
+                    // key that changes colour is not a key. Held back is said by the dimmed row.
+                    Color = Rgb(WorkOrderPalette.ColorFor(index)),
                     Name = tp.Name + (live ? string.Empty : "   (held back)"),
                     Detail = WorkOrderRules.DescribeGeometry(tp),
                     X = at[0].ToString("0.0#", CultureInfo.InvariantCulture),
@@ -521,30 +527,31 @@ namespace CNC.Controls
             return rows;
         }
 
+        private static double[] Rgb(Color c) { return new[] { c.R / 255d, c.G / 255d, c.B / 255d }; }
+
+        /// <summary>
+        /// The feature's balloon, drawn in the ID column exactly as the drawing draws it - same colour,
+        /// same letter, same white text - so finding feature G on the stock is a matter of matching a
+        /// mark, not reading one. The letter carries the identity on its own, which is what keeps this
+        /// working on a mono print or a photocopy; the colour only makes it quicker.
+        /// </summary>
+        private static void Balloon(PdfPage p, double cx, double cy, double[] color, string id)
+        {
+            const double H = 5d;
+            double w = Math.Max(H, p.TextWidth(id, 7d, true) / 2d + 2.2d);
+            p.FillColor(color[0], color[1], color[2]);
+            p.Ellipse(cx, cy, w, H);
+            p.Fill(false);
+            p.FillColor(1d, 1d, 1d);
+            p.TextCentered(cx, cy - 2.5d, 7d, id, true);
+        }
+
         private static string ToolText(WorkOrderOperation op)
         {
             string t = "T" + op.Tool.ToString(CultureInfo.InvariantCulture);
             if (!string.IsNullOrEmpty(op.ToolName))
                 t += " " + op.ToolName;
             return string.Format(CultureInfo.InvariantCulture, "{0}  ·  F{1:0} · S{2:0}", t, op.Feed, op.SpindleRPM);
-        }
-
-        /// <summary>A, B, ... Z, AA, AB - the drawing label and the table row are keyed by this.</summary>
-        private static Dictionary<WorkOrderToolpath, string> Ids(WorkOrder wo)
-        {
-            var d = new Dictionary<WorkOrderToolpath, string>();
-            for (int i = 0; i < wo.Toolpaths.Count; i++)
-            {
-                string s = string.Empty;
-                for (int n = i; ; n = n / 26 - 1)
-                {
-                    s = (char)('A' + n % 26) + s;
-                    if (n < 26)
-                        break;
-                }
-                d[wo.Toolpaths[i]] = s;
-            }
-            return d;
         }
 
         private static double TableHeight(List<Row> rows)
@@ -640,7 +647,8 @@ namespace CNC.Controls
                         p.Line(left, cursor, ColEnd, cursor);
                         p.FillColor(col[0], col[1], col[2]);
                     }
-                    p.Text(ColId, baseline, FontFeature, r.Id, true);
+                    Balloon(p, ColId + 6d, baseline + 2.5d, r.Color ?? Black, r.Id);
+                    p.FillColor(col[0], col[1], col[2]);
                     p.Text(ColName, baseline, FontFeature, p.Ellipsize(r.Name, ColGeom - ColName - 6d, FontFeature, true), true);
                     p.Text(ColGeom, baseline, FontFeature, p.Ellipsize(r.Detail, ColXr - ColGeom - 26d, FontFeature));
                     p.TextRight(ColXr, baseline, FontFeature, r.X);

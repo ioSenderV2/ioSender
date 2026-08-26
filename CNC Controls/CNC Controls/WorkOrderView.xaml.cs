@@ -2092,7 +2092,7 @@ namespace CNC.Controls
             if (canvasDiagram == null || canvasDiagram.ActualWidth <= 0 || canvasDiagram.ActualHeight <= 0)
                 return;
 
-            stockTransform = DrawInto(canvasDiagram, null);
+            stockTransform = DrawInto(canvasDiagram);
         }
 
         /// <summary>
@@ -2100,34 +2100,42 @@ namespace CNC.Controls
         /// is. This is the only place the diagram is built; DrawDiagram() points it at the on-screen
         /// canvas and "Save Drawing" points it at an off-screen one sized to the paper.
         ///
-        /// <paramref name="labelPrefix"/> is what the export uses to put the feature-table ID in front
-        /// of each toolpath's name ("(A) Pocket"), so the sheet's drawing and its table are keyed to
-        /// each other. Null on screen, where there is no table to key to.
+        /// Each toolpath draws in its own colour (WorkOrderPalette) and is named by a lettered balloon
+        /// rather than by its name written across the drawing - the name of a toolpath is many times
+        /// wider than the toolpath, so printing it was what made a busy stock unreadable. The letter is
+        /// the identifier and the colour only reinforces it, which is what keeps the saved drawing
+        /// working in mono; the table on the sheet, and the tree on screen, carry the names.
         /// </summary>
-        private OddJobsStockCanvas.Transform DrawInto(Canvas target, Func<WorkOrderToolpath, string> labelPrefix)
+        private OddJobsStockCanvas.Transform DrawInto(Canvas target)
         {
             drawTarget = target;
             drawTransform = OddJobsStockCanvas.DrawStock(target);
             double scale = drawTransform.Scale;
+            balloons.Clear();
 
             // Envelopes first, so the nominal outlines stay legible on top of them.
             // A held-back toolpath gets no envelope: the envelope shows where material WILL be removed, and
             // this one isn't going to remove any. An Indirect toolpath's "own operations" are borrowed from
             // its source (see WillRun, and WorkOrderRules.Expand) - it has none of its own to check here.
-            foreach (var tp in workOrder.Toolpaths)
-                if (WillRun(tp))
-                    foreach (var placement in WorkOrderRules.Expand(workOrder, tp))
-                        foreach (var pos in placement.Geometry.PatternPositions(placement.X, placement.Y))
-                            DrawEnvelope(placement.Geometry, pos[0], pos[1], scale);
-
-            var geomBrushes = OddJobsStockCanvas.GeometryBrushes(StartJobConfig.Section?.Material ?? string.Empty);
-            foreach (var tp in workOrder.Toolpaths)
+            for (int i = 0; i < workOrder.Toolpaths.Count; i++)
             {
+                var tp = workOrder.Toolpaths[i];
+                if (!WillRun(tp))
+                    continue;
+                foreach (var placement in WorkOrderRules.Expand(workOrder, tp))
+                    foreach (var pos in placement.Geometry.PatternPositions(placement.X, placement.Y))
+                        DrawEnvelope(placement.Geometry, pos[0], pos[1], scale, i);
+            }
+
+            for (int index = 0; index < workOrder.Toolpaths.Count; index++)
+            {
+                var tp = workOrder.Toolpaths[index];
                 bool isSelected = ReferenceEquals(tp, selectedToolpath);
                 // Still drawn when held back - it's geometry you authored and want to see for fit against the
-                // rest - but greyed, so what's actually going to be cut reads at a glance.
+                // rest - but greyed, so what's actually going to be cut reads at a glance. Grey wins over the
+                // feature's own colour here: "this one isn't cutting" matters more than which one it is.
                 bool willRun = WillRun(tp);
-                var stroke = !willRun ? geomBrushes.HeldBack : isSelected ? geomBrushes.Selected : geomBrushes.Normal;
+                var stroke = willRun ? WorkOrderPalette.BrushFor(index) : WorkOrderPalette.BrushFor(WorkOrderPalette.HeldBack);
                 double thickness = isSelected ? 2d : 1d;
 
                 // Everything this toolpath puts on the stock: one placement normally, one per member when it
@@ -2184,31 +2192,120 @@ namespace CNC.Controls
                     }
                 }
 
-                // Named once, on the anchor instance - one label per instance would just be clutter, and for
-                // a group that would be one label per member on top of that. The count is every instance the
-                // toolpath draws, across all its placements.
-                // Black at all times: the labels sit over the stock's own material colour (olive for MDF, tan,
-                // grey for metals), and a grey or steel-blue label was unreadable against it. Selection is
-                // carried by weight instead of colour.
+                // Balloon once, on the anchor instance - one per instance would just be clutter, and for a
+                // group that would be one per member on top of that. The count rides in the balloon's own
+                // suffix rather than a second piece of text.
+                // Sized by the FIRST placement's shape - for a group that is its anchor member, which is
+                // what the resolved center refers to as well, so the balloon points at the thing it names.
                 var at = WorkOrderRules.ResolvedCenter(workOrder, tp);
                 var anchor = OddJobsStockCanvas.ToPixel(drawTransform, at[0], at[1]);
-                var label = new TextBlock
-                {
-                    Text = (labelPrefix == null ? string.Empty : labelPrefix(tp))
-                         + (drawn > 1 ? string.Format("{0} (x{1})", tp.Name, drawn) : tp.Name),
-                    FontSize = 13,
-                    Foreground = Brushes.Black,
-                    FontWeight = isSelected ? FontWeights.Bold : FontWeights.Normal
-                };
-                label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                Canvas.SetLeft(label, anchor.X - label.DesiredSize.Width / 2d);
-                // Cleared by the FIRST placement's shape - for a group that is its anchor member, which is
-                // what the resolved center refers to as well, so the label sits over the thing it names.
-                Canvas.SetTop(label, anchor.Y - ShapeHalfHeightPx(placements.Count > 0 ? placements[0].Geometry : tp, scale) - 17d);
-                drawTarget.Children.Add(label);
+                var shape = placements.Count > 0 ? placements[0].Geometry : tp;
+                // The balloon keeps the feature's OWN colour even when the shape is greyed out. The balloon
+                // is the key that ties the drawing to the table, and a key that changes colour depending on
+                // whether a toolpath happens to be held back is not a key - the saved sheet had feature G
+                // grey on the stock and magenta in the table, naming the same thing twice differently.
+                // "Won't cut" is carried by the greyed geometry and the dimmed table row instead.
+                AddBalloon(anchor, WorkOrderPalette.Id(index) + (drawn > 1 ? "×" + drawn : string.Empty),
+                           WorkOrderPalette.BrushFor(index), ShapeHalfWidthPx(shape, scale),
+                           ShapeHalfHeightPx(shape, scale), isSelected);
             }
 
             return drawTransform;
+        }
+
+        // Where the balloons already placed in this pass ended up, so the next one can avoid them. Bounds
+        // only - a balloon is a circle, but overlapping bounding boxes are close enough to overlapping
+        // balloons that treating them as the same thing costs nothing and keeps this readable.
+        private readonly List<Rect> balloons = new List<Rect>();
+
+        private const double BalloonR = 9d, BalloonGap = 5d;
+
+        /// <summary>
+        /// A filled circle carrying the feature's letter, placed clear of the shape it names and clear of
+        /// every balloon already placed, with a leader line back to the shape's edge.
+        ///
+        /// This replaced writing the toolpath's NAME on the drawing. A name is many times wider than the
+        /// feature it names, so on a busy stock the names collided with each other and buried the geometry
+        /// - the drawing became unreadable exactly when there was most to read. A balloon is a fixed
+        /// ~18 px wide whatever the toolpath is called, which is what makes the collision avoidance below
+        /// able to succeed at all.
+        /// </summary>
+        private void AddBalloon(Point anchor, string id, Brush color, double halfW, double halfH, bool isSelected)
+        {
+            // Preferred first (directly above, where the label used to sit), then around the shape, then
+            // further out. Screen Y grows downward, so "above" is the negative direction.
+            double rx = Math.Max(halfW, 2d) + BalloonR + BalloonGap;
+            double ry = Math.Max(halfH, 2d) + BalloonR + BalloonGap;
+            double[] angles = { -90d, 0d, 180d, 90d, -45d, -135d, 45d, 135d };
+            double[] rings = { 1d, 1.5d, 2.1d, 3d };
+
+            Point at = new Point(anchor.X, anchor.Y - ry);
+            bool found = false;
+            foreach (double ring in rings)
+            {
+                foreach (double a in angles)
+                {
+                    double rad = a * Math.PI / 180d;
+                    var p = new Point(anchor.X + Math.Cos(rad) * rx * ring, anchor.Y + Math.Sin(rad) * ry * ring);
+                    var box = new Rect(p.X - BalloonR, p.Y - BalloonR, BalloonR * 2d, BalloonR * 2d);
+                    if (balloons.Any(b => b.IntersectsWith(box)))
+                        continue;
+                    at = p;
+                    found = true;
+                    break;
+                }
+                if (found)
+                    break;
+            }
+            // Every ring was full: take the preferred spot and overlap. A balloon drawn on top of another
+            // is still readable; silently dropping one would lose a feature off the drawing entirely.
+            balloons.Add(new Rect(at.X - BalloonR, at.Y - BalloonR, BalloonR * 2d, BalloonR * 2d));
+
+            // Leader first, so the balloon's own fill covers the end of it. Drawn from the shape's edge in
+            // the balloon's direction rather than from its centre, so a leader onto a large pocket doesn't
+            // strike a line across the whole thing.
+            double dx = at.X - anchor.X, dy = at.Y - anchor.Y;
+            double len = Math.Sqrt(dx * dx + dy * dy);
+            if (len > 0.5d)
+            {
+                double ux = dx / len, uy = dy / len;
+                // Radius of the shape's bounding ellipse in this direction.
+                double ex = Math.Max(halfW, 1d), ey = Math.Max(halfH, 1d);
+                double edge = 1d / Math.Sqrt(ux * ux / (ex * ex) + uy * uy / (ey * ey));
+                if (edge < len)
+                    drawTarget.Children.Add(new Line
+                    {
+                        X1 = anchor.X + ux * edge, Y1 = anchor.Y + uy * edge,
+                        X2 = at.X, Y2 = at.Y,
+                        Stroke = color, StrokeThickness = 1d
+                    });
+            }
+
+            var text = new TextBlock
+            {
+                Text = id,
+                FontSize = 11,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White   // every palette colour is dark enough to carry white
+            };
+            text.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+
+            // Widened for a two-character id (AA, AB...) or an instance count, so the letter never spills
+            // out of its own balloon.
+            double half = Math.Max(BalloonR, text.DesiredSize.Width / 2d + 4d);
+            var disc = new Ellipse
+            {
+                Width = half * 2d, Height = BalloonR * 2d,
+                Fill = color,
+                Stroke = Brushes.White,
+                StrokeThickness = isSelected ? 2.5d : 1.25d
+            };
+            Canvas.SetLeft(disc, at.X - half); Canvas.SetTop(disc, at.Y - BalloonR);
+            drawTarget.Children.Add(disc);
+
+            Canvas.SetLeft(text, at.X - text.DesiredSize.Width / 2d);
+            Canvas.SetTop(text, at.Y - text.DesiredSize.Height / 2d);
+            drawTarget.Children.Add(text);
         }
 
         // ---- "Save Drawing": the diagram as a dimensioned PDF sheet -----------------------------------
@@ -2315,16 +2412,35 @@ namespace CNC.Controls
             }
         }
 
-        // The translucent footprint of material this toolpath removes at one instance position.
-        private void DrawEnvelope(WorkOrderToolpath tp, double atX, double atY, double scale)
+        // Horizontal half-extent in pixels - the sibling of ShapeHalfHeightPx, so a balloon placed to the
+        // side of a shape clears it by as much as one placed above does.
+        private static double ShapeHalfWidthPx(WorkOrderToolpath tp, double scale)
+        {
+            switch (tp.Geometry)
+            {
+                case WorkOrderGeometryKind.Line:
+                    return Math.Abs(Math.Cos(tp.Angle * Math.PI / 180d)) * tp.Length / 2d * scale + LineHalfWidthMm(tp) * scale;
+                case WorkOrderGeometryKind.Circle:
+                    return Math.Max(tp.Diameter / 2d, HoleRadiusMm(tp)) * scale;
+                case WorkOrderGeometryKind.Square:
+                    return tp.Size / 2d * scale;
+                default:
+                    return tp.Width / 2d * scale;
+            }
+        }
+
+        // The footprint of material this toolpath removes at one instance position, in a pale wash of the
+        // toolpath's OWN colour so a busy stock still says which envelope belongs to which feature.
+        private void DrawEnvelope(WorkOrderToolpath tp, double atX, double atY, double scale, int index)
         {
             if (tp.Operations.Count == 0)
                 return;
 
             var center = OddJobsStockCanvas.ToPixel(drawTransform, atX, atY);
-            var geomBrushes = OddJobsStockCanvas.GeometryBrushes(StartJobConfig.Section?.Material ?? string.Empty);
-            var fill = geomBrushes.EnvelopeFill;
-            var edge = geomBrushes.EnvelopeEdge;
+            // Pale enough that a full-stock envelope - a through contour around the whole part - tints the
+            // drawing rather than burying it. The edge is darker so the footprint still has a boundary.
+            var fill = WorkOrderPalette.TintFor(index, 0.12d);
+            var edge = WorkOrderPalette.TintFor(index, 0.45d);
             double outside = OutsideReachMm(tp) * scale;
 
             switch (tp.Geometry)
