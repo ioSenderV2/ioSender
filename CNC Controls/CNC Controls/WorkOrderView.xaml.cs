@@ -2429,6 +2429,60 @@ namespace CNC.Controls
             }
         }
 
+        // Whether every operation on this toolpath cuts only its PERIMETER, leaving the interior untouched.
+        //
+        // It matters because the envelope is meant to be the material actually removed, and a contour
+        // removes a band a bit wide along the outline - not the area inside it. Drawing it filled said a
+        // through-contour around a part had cleared the whole part, which on a work order with an outline
+        // toolpath washed the entire stock in one colour and buried everything else on the drawing.
+        //
+        // Enabled is deliberately not consulted, matching OutsideReachMm/LineHalfWidthMm/HoleRadiusMm - the
+        // reach helpers this sits beside all describe what the toolpath is, not what is ticked today.
+        private static bool IsPerimeterOnly(WorkOrderToolpath tp)
+        {
+            if (tp.Operations.Count == 0)
+                return false;
+
+            foreach (var op in tp.Operations)
+                switch (op.Kind)
+                {
+                    case WorkOrderOpKind.Contour:
+                    case WorkOrderOpKind.SideFinish:
+                    case WorkOrderOpKind.Chamfer:
+                        break;
+                    default:
+                        // Pocket/Surface clear the area; Drill/Bore/Countersink make a hole; BottomFinish
+                        // faces a floor; Engrave cuts strokes across the interior. None is a band.
+                        return false;
+                }
+            return true;
+        }
+
+        // How far INSIDE its nominal outline a perimeter pass reaches - the band's inner edge.
+        //
+        // Straight off WorkOrderCompiler: BuildContour runs Outline() with the tool center inset by
+        // BitDiameter/2 + WallLeave, so a contour's cut spans from the nominal line inward by one full bit
+        // diameter (plus whatever a side-finish pass was told to leave for itself). A side finish then cuts
+        // that leave away with its own bit. The envelope wants the union, so this takes the deepest.
+        private static double InsideReachMm(WorkOrderToolpath tp)
+        {
+            double reach = 0d;
+            double wallLeave = tp.Operations
+                                 .Where(o => o.Kind == WorkOrderOpKind.SideFinish)
+                                 .Select(o => o.WallStockToLeave)
+                                 .DefaultIfEmpty(0d)
+                                 .Max();
+
+            foreach (var op in tp.Operations)
+            {
+                if (op.Kind == WorkOrderOpKind.Contour)
+                    reach = Math.Max(reach, op.BitDiameter + wallLeave);
+                else if (op.Kind == WorkOrderOpKind.SideFinish)
+                    reach = Math.Max(reach, op.BitDiameter);
+            }
+            return reach;
+        }
+
         // The footprint of material this toolpath removes at one instance position, in a pale wash of the
         // toolpath's OWN colour so a busy stock still says which envelope belongs to which feature.
         private void DrawEnvelope(WorkOrderToolpath tp, double atX, double atY, double scale, int index)
@@ -2437,32 +2491,71 @@ namespace CNC.Controls
                 return;
 
             var center = OddJobsStockCanvas.ToPixel(drawTransform, atX, atY);
-            // Pale enough that a full-stock envelope - a through contour around the whole part - tints the
-            // drawing rather than burying it. The edge is darker so the footprint still has a boundary.
+            // Pale enough that a large envelope tints the drawing rather than burying it. The edges are
+            // darker so the footprint still has a readable boundary.
             var fill = WorkOrderPalette.TintFor(index, 0.12d);
             var edge = WorkOrderPalette.TintFor(index, 0.45d);
-            double outside = OutsideReachMm(tp) * scale;
+            double outside = OutsideReachMm(tp);
 
+            // A line has no interior to clear or spare: the bit rides the line and sweeps a slot a full
+            // diameter wide, so its envelope was always a band and stays one.
+            if (tp.Geometry == WorkOrderGeometryKind.Line)
+            {
+                AddLine(center, tp, scale, fill, Math.Max(1d, LineHalfWidthMm(tp) * 2d * scale));
+                return;
+            }
+
+            double inside = IsPerimeterOnly(tp) ? InsideReachMm(tp) : 0d;
+
+            // Once the band is as deep as the shape's narrowest half-span there is no interior left for it
+            // to spare - a 8 mm circle contoured with a 6.35 mm bit really does remove the lot - so it goes
+            // back to being drawn filled rather than as a ring turned inside out.
+            if (inside > 0d && inside < tp.MinSpan / 2d)
+            {
+                // Drawn as a thick STROKE along the band's centreline rather than as a filled ring. Same
+                // picture, and it survives the trip into the saved drawing: WorkOrderDrawing's canvas
+                // walker turns Rectangle/Ellipse straight into PDF operators, where a true ring would need
+                // an even-odd path it only builds for line-segment outlines.
+                AddOffsetOutline(center, tp, scale, (outside - inside) / 2d, fill, (outside + inside) * scale, null);
+                AddOffsetOutline(center, tp, scale, outside, edge, 1d, null);
+                AddOffsetOutline(center, tp, scale, -inside, edge, 1d, null);
+                return;
+            }
+
+            // A hole can reach further out than the circle it is centered on, and that is exactly the case
+            // worth seeing before it eats into a neighbour - so the growth is whichever is larger.
+            double grow = tp.Geometry == WorkOrderGeometryKind.Circle
+                        ? Math.Max(outside, HoleRadiusMm(tp) - tp.Diameter / 2d)
+                        : outside;
+            AddOffsetOutline(center, tp, scale, grow, edge, 1d, fill);
+        }
+
+        // This toolpath's outline at one instance, grown outward by offsetMm - negative shrinks it. The one
+        // place the envelope's shape-per-geometry switch lives, so the band's three passes (body, outer
+        // edge, inner edge) and the filled case cannot drift into describing different shapes.
+        private void AddOffsetOutline(Point center, WorkOrderToolpath tp, double scale, double offsetMm,
+                                      Brush stroke, double thickness, Brush fill)
+        {
+            double o = offsetMm * scale;
             switch (tp.Geometry)
             {
-                case WorkOrderGeometryKind.Line:
-                    // Drawn as one thick round-capped line: that IS the slot the bit sweeps.
-                    AddLine(center, tp, scale, fill, Math.Max(1d, LineHalfWidthMm(tp) * 2d * scale));
-                    break;
                 case WorkOrderGeometryKind.Circle:
                 {
-                    double r = Math.Max(tp.Diameter / 2d * scale + outside, HoleRadiusMm(tp) * scale);
-                    AddEllipse(center, r, r, edge, 1d, fill);
+                    double r = Math.Max(0.5d, tp.Diameter / 2d * scale + o);
+                    AddEllipse(center, r, r, stroke, thickness, fill);
                     break;
                 }
                 case WorkOrderGeometryKind.Oval:
-                    AddEllipse(center, tp.Width / 2d * scale + outside, tp.Depth / 2d * scale + outside, edge, 1d, fill);
+                    AddEllipse(center, Math.Max(0.5d, tp.Width / 2d * scale + o),
+                                       Math.Max(0.5d, tp.Depth / 2d * scale + o), stroke, thickness, fill);
                     break;
                 case WorkOrderGeometryKind.Square:
-                    AddRect(center, tp.Size / 2d * scale + outside, tp.Size / 2d * scale + outside, edge, 1d, fill);
+                    AddRect(center, Math.Max(0.5d, tp.Size / 2d * scale + o),
+                                    Math.Max(0.5d, tp.Size / 2d * scale + o), stroke, thickness, fill);
                     break;
                 default:
-                    AddRect(center, tp.Width / 2d * scale + outside, tp.Depth / 2d * scale + outside, edge, 1d, fill);
+                    AddRect(center, Math.Max(0.5d, tp.Width / 2d * scale + o),
+                                    Math.Max(0.5d, tp.Depth / 2d * scale + o), stroke, thickness, fill);
                     break;
             }
         }
