@@ -2071,6 +2071,19 @@ namespace CNC.Controls
             return half;
         }
 
+        // How wide the engraved stroke this toolpath cuts actually is - the width the V-bit's point opens up
+        // at depth, which is what the operator sets and what the envelope should show. Falls back to the
+        // bit's own width for a text toolpath carrying some other operation, which is not a combination the
+        // editor offers but is cheaper to answer than to assume away.
+        private static double EngraveWidthMm(WorkOrderToolpath tp)
+        {
+            double w = 0d;
+            foreach (var op in tp.Operations)
+                if (op.Kind == WorkOrderOpKind.Engrave)
+                    w = Math.Max(w, op.EngraveWidth);
+            return w > 0d ? w : LineHalfWidthMm(tp) * 2d;
+        }
+
         // The widest hole any Drill/Bore on this toolpath makes. These carry their own diameter, so a hole can
         // reach FURTHER out than the circle it's centered on - exactly the case worth seeing before it eats
         // into a neighbour.
@@ -2502,6 +2515,31 @@ namespace CNC.Controls
             if (tp.Geometry == WorkOrderGeometryKind.Line)
             {
                 AddLine(center, tp, scale, fill, Math.Max(1d, LineHalfWidthMm(tp) * 2d * scale));
+                return;
+            }
+
+            // Text and artwork have no rectangle to grow: what they remove is the glyphs themselves. Both
+            // fell through to the Rect default below, which drew a 40 x 25 mm box - the toolpath's UNUSED
+            // Width/Depth defaults, nothing to do with the cut. That is the same fault DescribeGeometry
+            // carried and had fixed ("rect 40x25" in the tree); the envelope was missed in that sweep.
+            //
+            // It matters more here than it did there, because it UNDERSTATES: a 150 mm logo claimed a 40 mm
+            // footprint, so the one thing the envelope exists to show - that this toolpath is about to run
+            // into its neighbour - read as clear.
+            //
+            // Drawn by the same helpers the outline pass uses, at the width the cut actually is: stroke text
+            // as round-capped strokes a full engraving width wide, carved text and artwork as their filled
+            // outlines. Geometry that cannot be resolved (a fit that fails, an SVG that will not import)
+            // draws NOTHING, which is what those helpers already do and is the honest answer - a missing
+            // envelope says "unknown", a rectangle says "this much", and only one of those is true.
+            if (tp.Geometry == WorkOrderGeometryKind.Text)
+            {
+                AddTextStrokes(center, tp, scale, fill, Math.Max(1d, EngraveWidthMm(tp) * scale));
+                return;
+            }
+            if (tp.Geometry == WorkOrderGeometryKind.Svg)
+            {
+                AddSvgOutline(center, tp, scale, fill);
                 return;
             }
 
