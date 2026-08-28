@@ -116,7 +116,8 @@ namespace CNC.Controls
 
             var facts = new List<string>();
             facts.Add(string.Format(CultureInfo.InvariantCulture, "Stock {0:0.#} × {1:0.#} × {2:0.#} mm",
-                                    StockW(), StockD(), s != null ? s.Thickness : 0d));
+                                    StockW(wo), StockD(wo),
+                                    wo.StockThickness > 0d ? wo.StockThickness : (s != null ? s.Thickness : 0d)));
             if (s != null && !string.IsNullOrEmpty(s.Material))
                 facts.Add(s.Material);
             facts.Add("Origin " + WcsName(wo, s));
@@ -143,8 +144,12 @@ namespace CNC.Controls
             return "G" + (53 + Math.Max(1, wcs)).ToString(CultureInfo.InvariantCulture);
         }
 
-        private static double StockW() { var s = StartJobConfig.Section; return s != null && s.Width > 0d ? s.Width : 100d; }
-        private static double StockD() { var s = StartJobConfig.Section; return s != null && s.Height > 0d ? s.Height : 100d; }
+        // The blank the WORK ORDER was authored for - the same size the diagram is drawn against, so the
+        // dimension lines measure the rectangle actually on the sheet. Setup's stock is a different thing
+        // (the material on the machine right now) and is deliberately not consulted here: a drawing that
+        // dimensioned itself from Setup would put a number on the page that does not match its own picture.
+        private static double StockW(WorkOrder wo) { return wo.StockWidth > 0d ? wo.StockWidth : 100d; }
+        private static double StockD(WorkOrder wo) { return wo.StockDepth > 0d ? wo.StockDepth : 100d; }
 
         // ---- the drawing -----------------------------------------------------------------------------
 
@@ -159,7 +164,7 @@ namespace CNC.Controls
             // spends the difference on empty margin INSIDE the drawing - where nothing can use it - and
             // shrinks the stock to boot. Matching the aspect here puts that space outside instead, where
             // centring the box turns it into an even margin.
-            double aspect = StockW() / Math.Max(0.001d, StockD());
+            double aspect = StockW(wo) / Math.Max(0.001d, StockD(wo));
             double innerW = boxW, innerH = boxW / aspect;
             if (innerH > boxH)
             {
@@ -186,14 +191,14 @@ namespace CNC.Controls
             // The stock's own footprint in points, from the transform the diagram actually used - so the
             // dimension lines measure the rectangle that got drawn, not a separately computed one.
             double sx0 = px(t.OriginX), sy0 = py(t.OriginY);
-            double sx1 = px(t.OriginX + StockW() * t.Scale), sy1 = py(t.OriginY - StockD() * t.Scale);
+            double sx1 = px(t.OriginX + StockW(wo) * t.Scale), sy1 = py(t.OriginY - StockD(wo) * t.Scale);
 
             p.StrokeColor(Black[0], Black[1], Black[2]);
             p.FillColor(Black[0], Black[1], Black[2]);
             p.LineWidth(0.5d);
 
-            HorizontalDim(p, sx0, sx1, sy0 - 18d, sy0, Num(StockW()));
-            VerticalDim(p, sy0, sy1, sx0 - 20d, sx0, Num(StockD()));
+            HorizontalDim(p, sx0, sx1, sy0 - 18d, sy0, Num(StockW(wo)));
+            VerticalDim(p, sy0, sy1, sx0 - 20d, sx0, Num(StockD(wo)));
 
             // The origin is the one point on the sheet every number is measured from, so it gets said
             // outright rather than left as the orange dot the preview marks it with.

@@ -553,6 +553,25 @@ namespace CNC.Controls
     {
         public List<WorkOrderToolpath> Toolpaths = new List<WorkOrderToolpath>();
 
+        // The blank this work order was authored for. A work order IS a recipe for a known piece of stock -
+        // you feed it a blank of a given size and run it - so the size belongs in the file, not borrowed
+        // from whatever Setup happens to be showing. Without it the diagram drew every toolpath against
+        // some unrelated stock and the layout looked wrong for no reason the operator could see.
+        //
+        // 0 = NOT RECORDED, which is what an already-saved work order predating these fields gets for free
+        // (XmlSerializer leaves an absent element at its C# default - the same way Wcs below picked up its
+        // default). That case is shown as unknown rather than quietly falling back to Setup's numbers: a
+        // drawing of the right toolpaths on the wrong stock is a drawing that lies.
+        //
+        // Deliberately NOT a material: material is one shared value on StartJobConfig.Section, already
+        // edited from both the Setup tab and this one, and a per-file copy would make a second authority
+        // over it. Size is different - it is a property of the blank this recipe expects.
+        public double StockWidth = 0d;
+        public double StockDepth = 0d;
+        public double StockThickness = 0d;
+
+        public bool HasStock { get { return StockWidth > 0d && StockDepth > 0d; } }
+
         // Which WCS slot this work order's origin/TLO reference lives in - Setup is the only vehicle that
         // ever writes a real origin into a WCS slot (StartJobConfig.Section.Wcs, same 1-6 = G54-G59 range -
         // see StartJobView.WcsCode). 0 = FOLLOW Setup's current selection live, resolved fresh every time a

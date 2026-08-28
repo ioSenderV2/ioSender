@@ -16,6 +16,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Windows;
@@ -150,7 +151,9 @@ namespace CNC.Controls
                 return;
 
             var work = OddJobsStockCanvas.ToWork(stockTransform, p);
-            var clamped = OddJobsStockCanvas.ClampToKeepOut(work.X, work.Y);
+            // Clamped against the stock this work order is drawn on, not Setup's - the drag has to land
+            // inside the rectangle the operator can actually see.
+            var clamped = OddJobsStockCanvas.ClampToKeepOut(work.X, work.Y, workOrder.StockWidth, workOrder.StockDepth);
             selectedToolpath.X = Math.Round(clamped.X, 1);
             selectedToolpath.Y = Math.Round(clamped.Y, 1);
             if (selectedOp == null)
@@ -2106,6 +2109,7 @@ namespace CNC.Controls
                 return;
 
             stockTransform = DrawInto(canvasDiagram);
+            UpdateStockBanner();
         }
 
         /// <summary>
@@ -2122,9 +2126,22 @@ namespace CNC.Controls
         private OddJobsStockCanvas.Transform DrawInto(Canvas target)
         {
             drawTarget = target;
-            drawTransform = OddJobsStockCanvas.DrawStock(target);
-            double scale = drawTransform.Scale;
             balloons.Clear();
+
+            // No stock size in the file: say so and draw NOTHING. Falling back to Setup's size would put
+            // the right toolpaths on the wrong blank, and a layout drawn against stock this work order was
+            // never authored for is worse than no layout - it looks like an answer. The banner above
+            // carries the one-click fix.
+            if (!workOrder.HasStock)
+            {
+                target.Children.Clear();
+                drawTransform = new OddJobsStockCanvas.Transform { Scale = 1d, OriginX = 0d, OriginY = 0d };
+                AddNoStockNotice(target);
+                return drawTransform;
+            }
+
+            drawTransform = OddJobsStockCanvas.DrawStock(target, workOrder.StockWidth, workOrder.StockDepth);
+            double scale = drawTransform.Scale;
 
             // Envelopes first, so the nominal outlines stay legible on top of them.
             // A held-back toolpath gets no envelope: the envelope shows where material WILL be removed, and
@@ -2226,6 +2243,25 @@ namespace CNC.Controls
             return drawTransform;
         }
 
+        // Centred on the empty diagram in place of a stock rectangle nobody has told us the size of.
+        private static void AddNoStockNotice(Canvas target)
+        {
+            var text = new TextBlock
+            {
+                Text = "No stock size recorded for this work order.\nSet it above to see the layout.",
+                TextAlignment = TextAlignment.Center,
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x8A, 0x6D, 0x00)),
+                Width = Math.Max(80d, target.ActualWidth > 0d ? target.ActualWidth - 24d : target.Width - 24d)
+            };
+            text.Measure(new Size(text.Width, double.PositiveInfinity));
+            double h = target.ActualHeight > 0d ? target.ActualHeight : target.Height;
+            Canvas.SetLeft(text, 12d);
+            Canvas.SetTop(text, Math.Max(8d, (h - text.DesiredSize.Height) / 2d));
+            target.Children.Add(text);
+        }
+
         // Where the balloons already placed in this pass ended up, so the next one can avoid them. Bounds
         // only - a balloon is a circle, but overlapping bounding boxes are close enough to overlapping
         // balloons that treating them as the same thing costs nothing and keeps this readable.
@@ -2321,6 +2357,102 @@ namespace CNC.Controls
             drawTarget.Children.Add(text);
         }
 
+        // ---- The stock this work order expects --------------------------------------------------------
+        //
+        // A work order is a recipe for a known blank, so the size lives in the file and the diagram is
+        // drawn against it. Setup's Width/Height/Thickness are a different thing entirely: the operator's
+        // own numbers for the material currently clamped to the table, feeding probing and the keep-out
+        // area. So nothing here writes Setup without a click - StartJobView's own CheckStockAgainstProgram
+        // records that silently applying a loaded job's stock to those fields was tried and confirmed
+        // unwanted, and this is the same situation with a different file format.
+
+        private const double StockMatchToleranceMm = 0.05d;
+
+        private static bool SameStock(double a, double b) { return Math.Abs(a - b) < StockMatchToleranceMm; }
+
+        private static string StockText(double w, double d, double t)
+        {
+            return t > 0d
+                 ? string.Format(CultureInfo.InvariantCulture, "{0:0.#} × {1:0.#} × {2:0.#} mm", w, d, t)
+                 : string.Format(CultureInfo.InvariantCulture, "{0:0.#} × {1:0.#} mm", w, d);
+        }
+
+        private void UpdateStockBanner()
+        {
+            if (pnlStockBanner == null)
+                return;
+
+            var s = StartJobConfig.Section;
+            double sw = s != null ? s.Width : 0d, sd = s != null ? s.Height : 0d, st = s != null ? s.Thickness : 0d;
+            bool setupHasStock = sw > 0d && sd > 0d;
+
+            if (!workOrder.HasStock)
+            {
+                txtStockBanner.Text = setupHasStock
+                    ? "This work order has no stock size recorded, so its layout can't be drawn. Setup currently has "
+                      + StockText(sw, sd, st) + " - take that as the blank this work order expects, or set the size on Setup first."
+                    : "This work order has no stock size recorded, and neither has Setup. Set the stock size on the Setup tab, then take it from here.";
+                btnAdoptSetupStock.IsEnabled = setupHasStock;
+                btnApplyStockToSetup.Visibility = Visibility.Collapsed;
+                btnAdoptSetupStock.Visibility = Visibility.Visible;
+                pnlStockBanner.Visibility = Visibility.Visible;
+                return;
+            }
+
+            // Recorded and Setup agrees: nothing to say. The banner is for a discrepancy, not a status line.
+            if (setupHasStock && SameStock(sw, workOrder.StockWidth) && SameStock(sd, workOrder.StockDepth)
+                && (workOrder.StockThickness <= 0d || SameStock(st, workOrder.StockThickness)))
+            {
+                pnlStockBanner.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            txtStockBanner.Text = "This work order was authored for "
+                + StockText(workOrder.StockWidth, workOrder.StockDepth, workOrder.StockThickness)
+                + " - the drawing shows that blank. Setup has "
+                + (setupHasStock ? StockText(sw, sd, st) : "no stock size")
+                + ", which is what probing and the keep-out area will use.";
+            btnApplyStockToSetup.Visibility = Visibility.Visible;
+            btnAdoptSetupStock.Visibility = setupHasStock ? Visibility.Visible : Visibility.Collapsed;
+            btnAdoptSetupStock.IsEnabled = setupHasStock;
+            pnlStockBanner.Visibility = Visibility.Visible;
+        }
+
+        // File -> Setup. Setup reads these back on its next activation (StartJobView.Activate), the same
+        // way it already re-reads Material, because its own LoadInputs runs once per session and SaveInputs
+        // rebuilds the section wholesale from its controls on the way out.
+        private void btnApplyStockToSetup_Click(object sender, RoutedEventArgs e)
+        {
+            var s = StartJobConfig.Section;
+            if (s == null || !workOrder.HasStock)
+                return;
+
+            s.Width = workOrder.StockWidth;
+            s.Height = workOrder.StockDepth;
+            if (workOrder.StockThickness > 0d)
+                s.Thickness = workOrder.StockThickness;
+            AppConfig.Settings.Save();
+
+            UpdateStockBanner();
+            DrawDiagram();
+            if (model != null)
+                model.Message = "Setup stock size set from this work order: " + StockText(s.Width, s.Height, s.Thickness);
+        }
+
+        // Setup -> file. Also the way to CHANGE a work order's stock: set it on Setup, then take it here.
+        private void btnAdoptSetupStock_Click(object sender, RoutedEventArgs e)
+        {
+            var s = StartJobConfig.Section;
+            if (s == null || s.Width <= 0d || s.Height <= 0d)
+                return;
+
+            workOrder.StockWidth = s.Width;
+            workOrder.StockDepth = s.Height;
+            workOrder.StockThickness = s.Thickness;
+            OnWorkOrderChanged();   // marks dirty, persists, and redraws against the size just adopted
+            UpdateStockBanner();
+        }
+
         // ---- "Save Drawing": the diagram as a dimensioned PDF sheet -----------------------------------
 
         private void DiagramMenu_Opened(object sender, RoutedEventArgs e)
@@ -2328,14 +2460,16 @@ namespace CNC.Controls
             // Nothing to draw with no toolpaths. Resolved off the menu instance rather than the generated
             // field for the same reason WorkOrderNameMenu_Opened does - a ContextMenu lives outside the
             // visual tree and its name scope is the least reliable thing about it.
+            // Also needs a stock size: the sheet dimensions the blank, and a drawing that dimensioned a
+            // placeholder would be worse than no drawing at all.
             foreach (var item in ((ContextMenu)sender).Items)
                 if (item is MenuItem mi && mi.Name == "miSaveDrawing")
-                    mi.IsEnabled = workOrder != null && workOrder.Toolpaths.Count > 0;
+                    mi.IsEnabled = workOrder != null && workOrder.Toolpaths.Count > 0 && workOrder.HasStock;
         }
 
         private void MenuSaveDrawing_Click(object sender, RoutedEventArgs e)
         {
-            if (workOrder == null || workOrder.Toolpaths.Count == 0)
+            if (workOrder == null || workOrder.Toolpaths.Count == 0 || !workOrder.HasStock)
                 return;
 
             string name = currentFilePath != null
@@ -2812,6 +2946,11 @@ namespace CNC.Controls
                 LoadMaterial();
                 loadingFields = false;
                 UpdateValidation();
+                // ...and its stock size, which the banner compares against this work order's own. Redrawing
+                // is what refreshes that comparison, and it also picks up the material just reloaded - the
+                // stock colour is read at draw time, so without this both were stale until something else
+                // happened to trigger a repaint.
+                DrawDiagram();
             }
             else
             {
@@ -3423,6 +3562,22 @@ namespace CNC.Controls
         // Rename). Errors are shown here so no caller can forget to.
         private bool WriteWorkOrderFile(string path)
         {
+            // A work order being saved for the first time takes the blank it was composed against, so
+            // authoring one records its stock without the operator having to think about it. Only when
+            // NOTHING is recorded yet: once a work order names a blank, that is what it was authored for
+            // and a later Setup change must not quietly rewrite it. "Use Setup's size" is the way to
+            // change it, and it says so on the button.
+            if (!workOrder.HasStock)
+            {
+                var s = StartJobConfig.Section;
+                if (s != null && s.Width > 0d && s.Height > 0d)
+                {
+                    workOrder.StockWidth = s.Width;
+                    workOrder.StockDepth = s.Height;
+                    workOrder.StockThickness = s.Thickness;
+                }
+            }
+
             try
             {
                 var serializer = new System.Xml.Serialization.XmlSerializer(typeof(WorkOrder));

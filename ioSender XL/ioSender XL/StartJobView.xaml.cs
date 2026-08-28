@@ -328,6 +328,42 @@ namespace GCode_Sender
         // reveal btnCopyFromStock instead of applying anything - the operator decides. No declared comment,
         // or it matches what's already entered (within rounding), and the button just stays hidden.
         private const double StockMatchToleranceMm = 0.05d;
+
+        // Width/Height/Thickness can now be written from OUTSIDE this tab - the Work Order tab's "Apply to
+        // Setup", which hands over the blank a work order was authored for. That needs the same re-read
+        // Material already gets a few lines up in Activate, and for the same reason: LoadInputs runs ONCE
+        // per session and SaveInputs rebuilds Section wholesale from these controls on the way out, so a
+        // field still holding last session's number would write itself straight back over the applied size.
+        //
+        // Marked touched, because that is exactly what these are: an explicit size for THIS stock, chosen by
+        // the operator clicking Apply. Same reasoning as CopyFromStock_Click, which sets it for the same
+        // reason. A no-op when the values already agree, so merely visiting the tab never sets the flag.
+        private void ReloadStockSizeFromSection()
+        {
+            var s = Section;
+            if (s == null || s.Width <= 0d || s.Height <= 0d)
+                return;
+
+            if (Math.Abs(fldWidth.Value - s.Width) < StockMatchToleranceMm &&
+                Math.Abs(fldHeight.Value - s.Height) < StockMatchToleranceMm &&
+                Math.Abs(fldThickness.Value - s.Thickness) < StockMatchToleranceMm)
+                return;
+
+            loadingInputs = true;
+            try
+            {
+                fldWidth.Value = s.Width;
+                fldHeight.Value = s.Height;
+                fldThickness.Value = s.Thickness;
+                UpdateThicknessWarning();
+            }
+            finally
+            {
+                loadingInputs = false;
+            }
+            sizeFieldsTouched = true;
+        }
+
         private void CheckStockAgainstProgram()
         {
             if (btnCopyFromStock == null)
@@ -842,6 +878,7 @@ namespace GCode_Sender
                 // controls in SaveInputs on the way out - so without re-reading it here, merely visiting and
                 // leaving Setup would write the stale combo value back over an edit made in Work Order.
                 cbxMaterial.SelectedItem = cbxMaterial.Items.Cast<string>().FirstOrDefault(m => m == (Section?.Material ?? string.Empty));
+                ReloadStockSizeFromSection();
                 CheckStockAgainstProgram();
                 RefreshFixtures();
                 UpdateSizeHint();

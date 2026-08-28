@@ -305,8 +305,26 @@
                 <RowDefinition Height="*" MinHeight="120"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <TextBlock x:Uid="hlp_woBody" Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,6" Foreground="#24292F"
-                       Text="Add a toolpath, pick its geometry and place it on the stock, then add the operations that cut it - pocket, contour, finishing passes, chamfer. Run builds every toolpath into one program, in the order listed."/>
+            <StackPanel Grid.Row="0">
+                <TextBlock x:Uid="hlp_woBody" TextWrapping="Wrap" Margin="0,0,0,6" Foreground="#24292F"
+                           Text="Add a toolpath, pick its geometry and place it on the stock, then add the operations that cut it - pocket, contour, finishing passes, chamfer. Run builds every toolpath into one program, in the order listed."/>
+                <!-- The stock this work order was authored for, and what to do when it isn't what Setup says.
+                     Hidden entirely when the two agree, which is the normal case - see UpdateStockBanner. -->
+                <Border x:Name="pnlStockBanner" Visibility="Collapsed" Margin="0,0,0,6" Padding="8,6"
+                        Background="#FFF8E1" BorderBrush="#E6C200" BorderThickness="1" CornerRadius="4">
+                    <StackPanel>
+                        <TextBlock x:Name="txtStockBanner" TextWrapping="Wrap" Foreground="#5D4200" FontSize="11"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <Button x:Uid="btn_woapplystock" x:Name="btnApplyStockToSetup" Content="Apply to Setup" Padding="8,3" Margin="0,0,6,0"
+                                    Click="btnApplyStockToSetup_Click"
+                                    ToolTip="Set the Setup tab's stock size to the size this work order was authored for. Setup's numbers describe the blank actually on the machine, so this is never done for you."/>
+                            <Button x:Uid="btn_woadoptstock" x:Name="btnAdoptSetupStock" Content="Use Setup's size" Padding="8,3"
+                                    Click="btnAdoptSetupStock_Click"
+                                    ToolTip="Record the Setup tab's current stock size in this work order, as the blank it expects. This is also how you change a work order's stock size: set it on Setup, then take it from here."/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
             <Border Grid.Row="1" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="4" Margin="0,0,0,6" SnapsToDevicePixels="True">
                 <!-- Right-click: the drawing as a dimensioned PDF sheet, for taking to the machine or
                      sending to whoever asked for the part. Greyed out with no toolpaths - there is no
