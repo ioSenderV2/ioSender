@@ -1,4 +1,8 @@
-﻿# End-of-session wrap-up
+# End-of-session wrap-up
+
+> **Shadows: `claude-hub/playbooks/end_of_session_wrapup.md`** — that file holds the shared
+> shape (the ordering, and why the conversation-log step is last). This one replaces it for
+> ioSender because every step below names this project's branches, remotes and release tooling.
 
 **When:** work for the session is done and the user is about to `/clear`.
 **Memory context:** `iosender-end-of-session-convolog.md`.
