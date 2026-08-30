@@ -6,7 +6,7 @@
                                                "hooks":  [
                                                              {
                                                                  "type":  "command",
-                                                                 "command":  "powershell.exe",
+                                                                 "command":  "pwsh",
                                                                  "args":  [
                                                                               "-NoProfile",
                                                                               "-ExecutionPolicy",
@@ -28,7 +28,7 @@
                                          "hooks":  [
                                                        {
                                                            "type":  "command",
-                                                           "command":  "powershell.exe",
+                                                           "command":  "pwsh",
                                                            "args":  [
                                                                         "-NoProfile",
                                                                         "-ExecutionPolicy",
@@ -50,7 +50,7 @@
                                           "hooks":  [
                                                         {
                                                             "type":  "command",
-                                                            "command":  "powershell.exe",
+                                                            "command":  "pwsh",
                                                             "args":  [
                                                                          "-NoProfile",
                                                                          "-ExecutionPolicy",
@@ -70,7 +70,7 @@
                                    "hooks":  [
                                                  {
                                                      "type":  "command",
-                                                     "command":  "powershell.exe",
+                                                     "command":  "pwsh",
                                                      "args":  [
                                                                   "-NoProfile",
                                                                   "-ExecutionPolicy",
