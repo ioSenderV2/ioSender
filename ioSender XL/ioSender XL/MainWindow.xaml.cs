@@ -1450,6 +1450,32 @@ namespace GCode_Sender
             GrblConfigView.DoRestart();
         }
 
+        /// <summary>
+        /// Help > Support > Restart ioSender. Relaunches through the same GrblConfigView.DoRestart() the
+        /// settings footer and the config-overlay items use - the -self-relaunch handshake with the
+        /// single-instance probe lives there and must not be duplicated.
+        ///
+        /// Worth having as a menu entry rather than "close it and start it again": some state that wedges
+        /// a session exists only in memory and is cleared by nothing else. The check-mode lock JobView
+        /// takes when $I goes unanswered is the case that prompted this - it re-asserts $C every time the
+        /// controller leaves check mode, and $ queries answer error:8 in check mode, so the lock blocks the
+        /// very query that clears it. A fresh instance is the way out.
+        ///
+        /// No job-running guard here: menuMain is bound IsEnabled to IsJobRunning, so the whole menu bar is
+        /// dead while a job streams and this cannot be reached mid-burn.
+        /// </summary>
+        private void restartIoSender_Click(object sender, RoutedEventArgs e)
+        {
+            if (AppDialogs.Show(this,
+                    "Close and reopen ioSender?\n\n"
+                    + "Your settings are saved first, so nothing is lost. The connection is dropped and "
+                    + "remade, which clears anything held only in memory for this session.",
+                    "Restart ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            GrblConfigView.DoRestart();
+        }
+
         private void undoConfigOverlay_Click(object sender, RoutedEventArgs e)
         {
             if (!AppConfig.CanUndoOverlay)
@@ -3558,6 +3584,7 @@ namespace GCode_Sender
             registerMenuAction("Menu.BriefTour", menuBriefTour, () => briefTour_Click(null, null));
             registerMenuAction("Menu.VideoTutorials", menuVideoTutorials, () => videoTutorials_Click(null, null));
             registerMenuAction("Menu.ErrorCodes", menuErrorsAndAlarms, () => errorAndAlarms_Click(null, null));
+            registerMenuAction("Menu.RestartIoSender", menuRestartIoSender, () => restartIoSender_Click(null, null));
             registerMenuAction("Menu.CheckForUpdates", menuCheckForUpdates, () => checkForUpdates_Click(null, null));
             registerMenuAction("Menu.RollBack", menuRollbackVersion, () => rollbackVersion_Click(null, null));
             registerMenuAction("Menu.OpenDataFolder", menuOpenConfigFolder, () => openConfigFolderMenuItem_Click(null, null));

@@ -84,6 +84,7 @@ namespace CNC.Controls
             new ActionInfo { Id = "Menu.BriefTour",      Label = "Help > A brief tour",       Group = KeyMapEditor.MenuGroup, Description = "Open the brief tour." },
             new ActionInfo { Id = "Menu.VideoTutorials", Label = "Help > Video tutorials",    Group = KeyMapEditor.MenuGroup, Description = "Open the video tutorials." },
             new ActionInfo { Id = "Menu.ErrorCodes",     Label = "Help > Error and alarm codes", Group = KeyMapEditor.MenuGroup, Description = "Open the error and alarm code reference." },
+            new ActionInfo { Id = "Menu.RestartIoSender", Label = "Help > Restart ioSender...", Group = KeyMapEditor.MenuGroup, Description = "Close and reopen ioSender, saving settings first. Asks before restarting." },
             new ActionInfo { Id = "Menu.CheckForUpdates", Label = "Help > Check for updates...", Group = KeyMapEditor.MenuGroup, Description = "Check GitHub for a newer ioSender release." },
             new ActionInfo { Id = "Menu.RollBack",       Label = "Help > Roll back to previous version...", Group = KeyMapEditor.MenuGroup, Description = "Swap back to the build installed before the last update." },
             new ActionInfo { Id = "Menu.OpenDataFolder", Label = "Help > Open Application data folder", Group = KeyMapEditor.MenuGroup, Description = "Open the per-user folder holding App.config, key mappings and backups." },
