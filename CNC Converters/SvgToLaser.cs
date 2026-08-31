@@ -23,12 +23,20 @@
  * what laser mode is for. It would be worth adding if the M3 constant-power path is ever used for
  * shading; it is not needed for the M4 one.
  *
+ *   #<s_line> = 200    exposure as four named constants, so the job can be retuned by
+ *   #<f_line> = 1200   editing four numbers instead of hundreds of cut moves
  *   G21 G90 G17
  *   G92 X0 Y0          the head's CURRENT position becomes the artwork's origin
  *   M4 S0              dynamic power (or M3 constant), beam off
  *   G0 X.. Y.. S0 F<travel>
- *   G1 X.. Y.. S<power> F<feed>
+ *   G1 X.. Y.. S#<s_line> F#<f_line>
  *   ...
+ *
+ * The parameters are an NGC feature this controller class does NOT have - see the note above about
+ * plain Grbl rejecting #<named> parameters. That is deliberate and not a contradiction: the FILE is
+ * canonical and each READER resolves it. ioSender substitutes on load when the controller does not
+ * report EXPR (CNC.Core.NgcConstants), and the EngravingBox appliance does the same when it runs the
+ * file off its SD card. What reaches the wire is always literal S and F words.
  *   M5
  *   G0 X0 Y0
  *   G92.1              clear the temporary origin
@@ -108,6 +116,15 @@ namespace CNC.Converters
             offX = offY = 0d;
         }
         private static string N(double v) { return v.ToString("0", CultureInfo.InvariantCulture); }
+
+        // The S and F words the cut moves carry: references to the four constants declared at the top of
+        // the program, not literals. Spelled through NgcConstants.SvgLaser so the emitter and the resolver
+        // cannot drift apart on a name - a typo here would produce a file that resolves to nothing useful
+        // and still looks like valid g-code.
+        private static readonly string SLine = NgcConstants.SvgLaser.Ref(NgcConstants.SvgLaser.LinePower);
+        private static readonly string SFill = NgcConstants.SvgLaser.Ref(NgcConstants.SvgLaser.FillPower);
+        private static readonly string FLine = NgcConstants.SvgLaser.Ref(NgcConstants.SvgLaser.LineFeed);
+        private static readonly string FFill = NgcConstants.SvgLaser.Ref(NgcConstants.SvgLaser.FillFeed);
 
         /// <summary>
         /// The S word actually emitted, which is 0 for the whole job when the beam is disabled.
@@ -239,6 +256,16 @@ namespace CNC.Converters
                                            settings.AnchorBackLeft ? "TOP" : "LOWER"));
                 job.AddBlock("(If this job is ABORTED the G92 offset stays set - clear it with G92.1.)");
 
+                // Exposure as four named constants at the top, rather than repeated on every one of the
+                // hundreds of cut moves below. Retuning the job is then editing four numbers in the .nc,
+                // which is the difference between a file you can adjust on the machine and one you have to
+                // regenerate. A controller reporting EXPR evaluates them; ioSender substitutes them on load
+                // when it does not (CNC.Core.NgcConstants), and the EngravingBox appliance does the same.
+                foreach (var d in CNC.Core.NgcConstants.SvgLaser.Declarations(
+                             BeamPower(settings.Power), BeamPower(settings.FillPower),
+                             settings.Feed, settings.FillFeed, settings.Fill))
+                    job.AddBlock(d);
+
                 job.AddBlock("G21 G90 G17");
                 job.AddBlock("G92 X0 Y0");
                 // With the beam disabled the laser is never ENABLED either - belt and braces with the zeroed
@@ -286,7 +313,7 @@ namespace CNC.Converters
                         for (int i = 1; i < contour.Points.Count; i++)
                             job.AddBlock(string.Format(CultureInfo.InvariantCulture,
                                 "G1 X{0} Y{1} S{2} F{3}",
-                                FX(contour.Points[i].X), FY(contour.Points[i].Y), N(BeamPower(settings.Power)), N(settings.Feed)));
+                                FX(contour.Points[i].X), FY(contour.Points[i].Y), SLine, FLine));
 
                         // SvgOutlines returns CLOSED contours, but whether the closing point is repeated in
                         // Points is the loader's business, not this emitter's - so close explicitly when the
@@ -295,7 +322,7 @@ namespace CNC.Converters
                         var pn = contour.Points[contour.Points.Count - 1];
                         if (Math.Abs(pn.X - p0.X) > 1e-6 || Math.Abs(pn.Y - p0.Y) > 1e-6)
                             job.AddBlock(string.Format(CultureInfo.InvariantCulture,
-                                "G1 X{0} Y{1} S{2} F{3}", FX(p0.X), FY(p0.Y), N(BeamPower(settings.Power)), N(settings.Feed)));
+                                "G1 X{0} Y{1} S{2} F{3}", FX(p0.X), FY(p0.Y), SLine, FLine));
                     }
                   }
                 }
@@ -325,8 +352,8 @@ namespace CNC.Converters
             }
 
             job.AddBlock(string.Format(CultureInfo.InvariantCulture,
-                "(shading: {0} spans at {1} mm interval, S{2} F{3})",
-                spans.Count, F(settings.Interval), N(BeamPower(settings.FillPower)), N(settings.FillFeed)));
+                "(shading: {0} spans at {1} mm interval, exposure from {2} / {3})",
+                spans.Count, F(settings.Interval), SFill, FFill));
 
             for (int copy = 0; copy < settings.Copies; copy++)
             {
@@ -341,7 +368,7 @@ namespace CNC.Converters
                     job.AddBlock(string.Format(CultureInfo.InvariantCulture,
                         "G0 X{0} Y{1} S0 F{2}", FX(s.X0), FY(s.Y), N(settings.TravelFeed)));
                     job.AddBlock(string.Format(CultureInfo.InvariantCulture,
-                        "G1 X{0} Y{1} S{2} F{3}", FX(s.X1), FY(s.Y), N(BeamPower(settings.FillPower)), N(settings.FillFeed)));
+                        "G1 X{0} Y{1} S{2} F{3}", FX(s.X1), FY(s.Y), SFill, FFill));
                 }
             }
             ClearCopyOffset();

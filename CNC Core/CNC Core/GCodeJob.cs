@@ -74,6 +74,22 @@ namespace CNC.Core
         public int Length { get; set; }
         public string Data { get { return _data; } set { _data = value; RefreshDisplay(); OnPropertyChanged(); } }
 
+        /// <summary>
+        /// The block as it was BEFORE constant #&lt;name&gt; parameters were substituted into it, or null
+        /// when nothing was substituted (the overwhelmingly common case - one null reference per line,
+        /// no second copy of a 220k-line program).
+        ///
+        /// Data is what runs: literals, so it parses, renders in the 3D view and reaches a controller
+        /// that cannot evaluate parameters. Raw is what the file SAID, and is what gets written back out
+        /// by Save - otherwise saving a program with variables in it would quietly flatten them to
+        /// literals and the whole point of putting them there (retuning by editing four numbers) would
+        /// be lost on the first save.
+        /// </summary>
+        public string Raw { get; set; }
+
+        /// <summary>What Save should write: the source form when there was one, else what runs.</summary>
+        public string Source { get { return Raw ?? _data; } }
+
         // Program list display: the Block column shows the program line number and the Data column hides the N
         // word - while Data itself stays intact for streaming (the controller needs the N word for line-number
         // progress reporting). The Block sequence continues across unnumbered lines (previous + 1) and jumps to
@@ -362,6 +378,10 @@ namespace CNC.Core
                     // dialog below then blew up cross-thread from the background loader. Found loading
                     // the unified engine's own prompt-test file, 2026-08-08. Same rules as AddBlock:
                     // verbatim only when the controller evaluates expressions; $-commands always.
+                    // Constants first: a resolved line has no '#' left, so the passthrough test below
+                    // sees the line as it will actually be parsed and streamed.
+                    block = ResolveConstants(block, (int)LineNumber + 1);
+
                     string ts_ = block.TrimStart();
                     bool isOword = ts_.Length > 1 && (ts_[0] == 'o' || ts_[0] == 'O') && ts_[1] == '<';
                     bool isSystemCommand = ts_.Length > 0 && ts_[0] == '$';
@@ -478,6 +498,10 @@ namespace CNC.Core
                 // no separating space isn't recognised as a parameter assignment) - so generated O-word programs
                 // (e.g. Load Stock's corner probe) and their #<_name>=value setup lines can be streamed with flow
                 // control instead of being forced onto the MDI path.
+                // Constants first, for the same reason as ParseFileLines: isParamLine and the
+                // passthrough test below must see the line as it will be parsed and streamed.
+                block = ResolveConstants(block, (int)LineNumber + 1);
+
                 string ts = block.TrimStart();
                 bool isOword = ts.Length > 1 && (ts[0] == 'o' || ts[0] == 'O') && ts[1] == '<';
                 bool isParamLine = ts.Length > 0 && ts[0] == '#';
@@ -642,8 +666,54 @@ namespace CNC.Core
             AddBlock(block, Action.Add);
         }
 
+        // Constant #<name> parameters declared by the program being loaded, in declaration order. Reset
+        // with the rest of the job state when a new program starts.
+        private readonly NgcConstants.Resolver constants = new NgcConstants.Resolver();
+
+        // The source form of the block currently being added, when substitution actually changed it.
+        // Set by ResolveConstants and consumed by AddStamped - every block reaches AddStamped through
+        // one of the two per-line loops, and both call ResolveConstants first.
+        private string pendingRaw;
+
+        /// <summary>
+        /// Substitute constant <c>#&lt;name&gt;</c> parameters when the controller cannot evaluate them.
+        ///
+        /// A controller reporting EXPR gets the line untouched - it does this itself, and better. Without
+        /// EXPR the choice used to be binary: pass a '#' line through unparsed, or throw. Neither is much
+        /// good for a file whose exposure values are declared at the top, so resolve the ones that are
+        /// provably constant and keep refusing everything else.
+        ///
+        /// Throws rather than returning a flag: the per-line handlers in both loops already surface a
+        /// GCodeException with the line number and the offending block, and let the operator abort. A
+        /// program that is half-substituted must never reach the machine.
+        /// </summary>
+        private string ResolveConstants(string block, int lineNumber)
+        {
+            pendingRaw = null;
+
+            if (block == null || block.IndexOf('#') < 0 || GrblInfo.ExpressionsSupported)
+                return block;
+
+            string resolved, reason;
+            if (!constants.TryLine(lineNumber, block, out resolved, out reason))
+                throw new GCodeException(reason);
+
+            // Only remember a source form when there IS one. An unchanged line - a comment mentioning
+            // '#', say - must not get a redundant second copy of itself; on a large program that would
+            // be a string per line for nothing.
+            if (!string.Equals(resolved, block, StringComparison.Ordinal))
+                pendingRaw = block;
+
+            return resolved;
+        }
+
         private void AddStamped(GCodeBlock b)
         {
+            // What the line said before substitution, so Save can write it back out. Cleared either way,
+            // so a block added without going through ResolveConstants cannot inherit the previous line's.
+            b.Raw = pendingRaw;
+            pendingRaw = null;
+
             b.Section = CurrentSection;
             if (sectionStartPending)
             {
@@ -750,6 +820,7 @@ namespace CNC.Core
             HasSections = false;
             AddLineNumbers = true;
             Parser.Reset();
+            constants.Reset();
         }
     }
 

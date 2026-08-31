@@ -295,8 +295,13 @@ namespace CNC.Controls
                     {
                         using (new UIUtils.WaitCursor())
                         {
+                            // Source, not Data: a program whose constants were substituted on load
+                            // writes back the #<name> form it came in with. Saving the resolved
+                            // literals instead would flatten the variables on the first save, which
+                            // is exactly what they exist to avoid. Source falls back to Data, so a
+                            // program that never had parameters is written byte-for-byte as before.
                             foreach (var line in Data)
-                                stream.WriteLine(line.Data);
+                                stream.WriteLine(line.Source);
                         }
                     }
                 }

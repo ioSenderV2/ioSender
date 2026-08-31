@@ -80,7 +80,123 @@ namespace CNC.Core
         }
 
         /// <summary>
-        /// Resolve every <c>#&lt;name&gt;</c> reference to the literal it was assigned.
+        /// Line-at-a-time resolution, holding the values assigned so far.
+        ///
+        /// Both program sources are line-at-a-time - ParseFileLines reads a file block by block, and
+        /// AddBlock is fed one block at a time by the converters - so this is the shape they need.
+        /// A whole-program pass would mean buffering a 220k-line file twice for no gain.
+        ///
+        /// Sequential is not a compromise here, it is the correct reading: a reference takes the value
+        /// in force ABOVE it, which is also how a controller with EXPR would evaluate the same file.
+        /// </summary>
+        public sealed class Resolver
+        {
+            private readonly Dictionary<string, string> values =
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            /// <summary>How many constants have been declared so far - for logging a resolved load.</summary>
+            public int Count { get { return values.Count; } }
+
+            /// <summary>Forget every declared value. Called when a new program starts.</summary>
+            public void Reset()
+            {
+                values.Clear();
+            }
+
+            /// <summary>
+            /// Resolve one block.
+            /// </summary>
+            /// <param name="lineNumber">1-based, for the refusal text only.</param>
+            /// <param name="line">The raw block.</param>
+            /// <param name="resolved">
+            /// The block with references substituted. An assignment becomes a comment, so the caller
+            /// always gets exactly one line out for one line in and raw line N stays resolved line N.
+            /// </param>
+            /// <param name="reason">Why it was refused. Null on success.</param>
+            /// <returns>False if this block carries '#' syntax that cannot be proven constant.</returns>
+            public bool TryLine(int lineNumber, string line, out string resolved, out string reason)
+            {
+                resolved = line ?? string.Empty;
+                reason = null;
+
+                // Untouched unless it actually mentions a parameter. Comments included: a '#' inside a
+                // comment is not a parameter, and rewriting one would change the file for no reason.
+                if (resolved.IndexOf('#') < 0 || IsComment(resolved))
+                    return true;
+
+                var assign = Assignment.Match(resolved);
+                if (assign.Success)
+                {
+                    // A later assignment overrides an earlier one, applied in order.
+                    values[assign.Groups["name"].Value] = assign.Groups["value"].Value;
+
+                    // Kept as a comment, not deleted: resolved line N must stay raw line N, and the
+                    // resolved listing should still show what the value was.
+                    resolved = "(" + resolved.Trim() + ")";
+                    return true;
+                }
+
+                // Looks like an assignment but did not parse as one - i.e. the right-hand side is not a
+                // plain number. Say THAT, rather than letting it fall through and report the name as
+                // "undefined" further down: the operator would go looking for a missing declaration
+                // instead of at the expression they actually wrote.
+                if (AssignmentAttempt.IsMatch(resolved))
+                {
+                    reason = string.Format(CultureInfo.InvariantCulture,
+                        "line {0}: \"{1}\" - only a plain number can be assigned here; anything to evaluate needs a controller with EXPR support",
+                        lineNumber, resolved.Trim());
+                    return false;
+                }
+
+                string raw = resolved;
+                string failure = null;
+
+                string substituted = Reference.Replace(raw, m =>
+                {
+                    string name = m.Groups["name"].Value;
+                    string value;
+                    if (values.TryGetValue(name, out value))
+                        return value;
+
+                    if (failure == null)
+                        failure = name.StartsWith("_", StringComparison.Ordinal)
+                            // A leading underscore is NGC's namespace for read-only system parameters
+                            // (#<_abs_x>, #<_vmajor>, ...). Reporting these as "undefined" would be a lie
+                            // - they can never be declared, and their value is whatever the machine reads
+                            // at PARSE time, which during a streamed program is not where it will be when
+                            // the line runs. Refusing is the only correct answer.
+                            ? string.Format(CultureInfo.InvariantCulture,
+                                "line {0}: #<{1}> is a system parameter - its value depends on machine state and only a controller with EXPR support can read it",
+                                lineNumber, name)
+                            : string.Format(CultureInfo.InvariantCulture,
+                                "line {0}: #<{1}> is used before it is given a value", lineNumber, name);
+                    return m.Value;
+                });
+
+                if (failure != null)
+                {
+                    reason = failure;
+                    return false;
+                }
+
+                // Anything still carrying a '#' is a form this class does not model - a numbered
+                // parameter, an expression, a system parameter. Refuse; do not ship it half-done.
+                if (substituted.IndexOf('#') >= 0)
+                {
+                    reason = string.Format(CultureInfo.InvariantCulture,
+                        "line {0}: \"{1}\" uses parameter syntax this can only pass to a controller with EXPR support",
+                        lineNumber, raw.Trim());
+                    return false;
+                }
+
+                resolved = substituted;
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Resolve a whole program at once. A thin loop over <see cref="Resolver"/> so there is one
+        /// implementation of the rules; this form exists for callers that already hold every line.
         /// </summary>
         /// <param name="lines">The raw program, one block per entry.</param>
         /// <param name="resolved">
@@ -100,99 +216,16 @@ namespace CNC.Core
                 return false;
             }
 
-            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var resolver = new Resolver();
             var output = new List<string>(lines.Count);
 
             for (int i = 0; i < lines.Count; i++)
             {
-                string line = lines[i] ?? string.Empty;
+                string one;
+                if (!resolver.TryLine(i + 1, lines[i], out one, out reason))
+                    return false;               // resolved stays null - nothing partial escapes
 
-                // Untouched unless it actually mentions a parameter. Comments included: a '#' inside a
-                // comment is not a parameter, and rewriting one would change the file for no reason.
-                if (line.IndexOf('#') < 0)
-                {
-                    output.Add(line);
-                    continue;
-                }
-
-                if (IsComment(line))
-                {
-                    output.Add(line);
-                    continue;
-                }
-
-                var assign = Assignment.Match(line);
-                if (assign.Success)
-                {
-                    string name = assign.Groups["name"].Value;
-                    string value = assign.Groups["value"].Value;
-
-                    // A later assignment overrides an earlier one, applied in order, so a reference always
-                    // takes the value in force ABOVE it. That is the only reading that matches how the
-                    // controller would evaluate the same file.
-                    values[name] = value;
-
-                    // Kept as a comment, not deleted: resolved line N must stay raw line N (see header),
-                    // and the resolved listing should still show what the value was.
-                    output.Add("(" + line.Trim() + ")");
-                    continue;
-                }
-
-                // Looks like an assignment but did not parse as one - i.e. the right-hand side is not a
-                // plain number. Say THAT, rather than letting it fall through and report the name as
-                // "undefined" further down: the operator would go looking for a missing declaration
-                // instead of at the expression they actually wrote.
-                var attempted = AssignmentAttempt.Match(line);
-                if (attempted.Success)
-                {
-                    reason = string.Format(CultureInfo.InvariantCulture,
-                        "line {0}: \"{1}\" - only a plain number can be assigned here; anything to evaluate needs a controller with EXPR support",
-                        i + 1, line.Trim());
-                    return false;
-                }
-
-                // Not an assignment. Every '#' left in it must be a reference to something already
-                // assigned - anything else and we stop.
-                string failure = null;
-                string substituted = Reference.Replace(line, m =>
-                {
-                    string name = m.Groups["name"].Value;
-                    string value;
-                    if (values.TryGetValue(name, out value))
-                        return value;
-
-                    if (failure == null)
-                        failure = name.StartsWith("_", StringComparison.Ordinal)
-                            // A leading underscore is NGC's namespace for read-only system parameters
-                            // (#<_abs_x>, #<_vmajor>, ...). Reporting these as "undefined" would be a lie
-                            // - they can never be declared, and their value is whatever the machine reads
-                            // at PARSE time, which during a streamed program is not where it will be when
-                            // the line runs. Refusing is the only correct answer.
-                            ? string.Format(CultureInfo.InvariantCulture,
-                                "line {0}: #<{1}> is a system parameter - its value depends on machine state and only a controller with EXPR support can read it",
-                                i + 1, name)
-                            : string.Format(CultureInfo.InvariantCulture,
-                                "line {0}: #<{1}> is used before it is given a value", i + 1, name);
-                    return m.Value;
-                });
-
-                if (failure != null)
-                {
-                    reason = failure;
-                    return false;
-                }
-
-                // Anything still carrying a '#' is a form this class does not model - a numbered
-                // parameter, an expression, a system parameter. Refuse; do not ship it half-done.
-                if (substituted.IndexOf('#') >= 0)
-                {
-                    reason = string.Format(CultureInfo.InvariantCulture,
-                        "line {0}: \"{1}\" uses parameter syntax this can only pass to a controller with EXPR support",
-                        i + 1, line.Trim());
-                    return false;
-                }
-
-                output.Add(substituted);
+                output.Add(one);
             }
 
             resolved = output;
