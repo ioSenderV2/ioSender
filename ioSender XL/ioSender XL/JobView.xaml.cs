@@ -651,7 +651,14 @@ namespace GCode_Sender
                             return;
                         }
 
+                        // OWNED, not the ownerless overload. An unowned MessageBox still disables every
+                        // window in the app, but nothing keeps it in front - so it can fall BEHIND the main
+                        // window, leaving an app that beeps at every click, refuses to close, and needs Task
+                        // Manager to kill. Observed 2026-08-31 during repeated reconnect attempts. This
+                        // prompt is the one a failing connect shows over and over, so it is the likeliest
+                        // of all of them to land behind something.
                         bool disconnect = AppDialogs.Show(
+                            Window.GetWindow(this),
                             "Could not read this controller's capabilities ($I).\r\n\r\n" +
                             "Nothing is wrong with the controller - the query went unanswered during connect, and " +
                             "connecting again normally fixes it. Until then ioSender cannot tell what this " +
