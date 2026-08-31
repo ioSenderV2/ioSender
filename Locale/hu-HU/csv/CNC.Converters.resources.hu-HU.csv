@@ -61,3 +61,10 @@ CNC.Converters.g.en-US.resources:svglaserdialog.baml,txt_svglaser_pitchnote:Syst
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,tab_svglaser_burn:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Burn
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,chk_svglaser_beam:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Enable beam
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,chk_svglaser_beam:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Untick for a dry run: the head follows the entire path at the same feeds, so you can watch where the job lands, but every S word is 0 and the laser is never enabled. Not remembered between imports - it comes back ticked every time."
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,txt_svglaser_powerrampnote:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Step the power up on each copy to burn a test strip: the same artwork at rising exposure, in one job, on one piece of material. Leave at 0 for every copy the same."
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_pitchpower:CNC.Controls.NumericField.Label,None,False,True,,Power step:
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_pitchpower:CNC.Controls.NumericField.Unit,None,False,True,,S
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_pitchpower:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Added to the outline power for each copy after the first. 50 with a power of 200 gives 200, 250, 300... Negative ramps down."
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_pitchfillpower:CNC.Controls.NumericField.Label,None,False,True,,Fill step:
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_pitchfillpower:CNC.Controls.NumericField.Unit,None,False,True,,S
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_pitchfillpower:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The same for the shading power, stepped independently of the outline. Only matters when shading is on."
