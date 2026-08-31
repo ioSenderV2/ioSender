@@ -103,6 +103,40 @@ namespace NgcRoundTrip
             if (plain != null)
                 Check(plain.Raw == null, "a line with no substitution has Raw == null (no second copy)", plain.Raw);
 
+            // ---- the per-copy power ramp -------------------------------------------------------------
+            // A test strip re-declares the constant before each copy. The whole feature rests on a
+            // redeclaration governing the references BELOW it and nothing above, so prove that through
+            // the real loader rather than trusting the resolver's own unit test for it.
+            Console.WriteLine();
+
+            var ramp = Load(
+                "#<s_line> = 200\n" +
+                "#<f_line> = 1200\n" +
+                "(copy 1)\n" +
+                "G1 X1 S#<s_line> F#<f_line>\n" +
+                "#<s_line> = 250\n" +
+                "(copy 2)\n" +
+                "G1 X2 S#<s_line> F#<f_line>\n" +
+                "#<s_line> = 300\n" +
+                "(copy 3)\n" +
+                "G1 X3 S#<s_line> F#<f_line>\n" +
+                "M30\n", out err, out ok);
+
+            Dump("power ramp", ramp);
+
+            var cuts = ramp.Where(b => b.Data != null && b.Data.StartsWith("G1X")).Select(b => b.Data).ToList();
+            Check(cuts.Count == 3, "three cut moves", string.Join(" | ", cuts));
+            Check(cuts.Count == 3 && cuts[0].Contains("S200") && cuts[1].Contains("S250") && cuts[2].Contains("S300"),
+                  "each copy takes the power declared ABOVE it, not the first or the last",
+                  string.Join(" | ", cuts));
+            Check(cuts.All(c => c.Contains("F1200")),
+                  "a constant that was never re-declared keeps its original value throughout",
+                  string.Join(" | ", cuts));
+
+            var rampSaved = string.Join("\n", ramp.Select(b => b.Source));
+            Check(rampSaved.Contains("#<s_line> = 200") && rampSaved.Contains("#<s_line> = 250") && rampSaved.Contains("#<s_line> = 300"),
+                  "all three declarations survive into what Save would write");
+
             // ---- refusals ---------------------------------------------------------------------------
             // ParseFileLines catches per line and routes the failure through the operator's load-error
             // prompt, so the exception does NOT escape. What must hold either way is that the offending

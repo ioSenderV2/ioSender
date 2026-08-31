@@ -36,6 +36,9 @@ namespace CNC.Controls
         private bool _fill = false, _outlineAfterFill = true;
         private double _interval = 0.1d, _fillPower = 120d, _fillFeed = 3000d;
         private double _originX = 0d, _originY = 0d, _pitchX = 0d, _pitchY = 0d;
+        // Power ramp across copies - 0 means every copy burns the same, which is how it behaved
+        // before this existed and is what an untouched saved config still deserializes to.
+        private double _pitchPower = 0d, _pitchFillPower = 0d;
         private bool _anchorBackLeft = true;
         private bool _beamOn = true;
         private string _filePath = string.Empty;
@@ -87,7 +90,7 @@ namespace CNC.Controls
         public double Power
         {
             get { return _power; }
-            set { _power = value; OnPropertyChanged(); OnPropertyChanged("PowerSummary"); OnPropertyChanged("ExposureSummary"); OnPropertyChanged("FillExposureSummary"); }
+            set { _power = value; OnPropertyChanged(); OnPropertyChanged("PowerSummary"); OnPropertyChanged("ExposureSummary"); OnPropertyChanged("FillExposureSummary"); OnPropertyChanged("PowerRampSummary"); }
         }
 
         public double Feed
@@ -129,7 +132,7 @@ namespace CNC.Controls
         public bool Fill
         {
             get { return _fill; }
-            set { _fill = value; OnPropertyChanged(); }
+            set { _fill = value; OnPropertyChanged(); OnPropertyChanged("PowerRampSummary"); }
         }
 
         /// <summary>Trace the boundary after shading, so the edge is crisp over the fill.</summary>
@@ -153,7 +156,7 @@ namespace CNC.Controls
         public double FillPower
         {
             get { return _fillPower; }
-            set { _fillPower = value; OnPropertyChanged(); OnPropertyChanged("FillExposureSummary"); }
+            set { _fillPower = value; OnPropertyChanged(); OnPropertyChanged("FillExposureSummary"); OnPropertyChanged("PowerRampSummary"); }
         }
 
         public double FillFeed
@@ -245,7 +248,7 @@ namespace CNC.Controls
         public int Copies
         {
             get { return _copies; }
-            set { _copies = Math.Max(1, value); OnPropertyChanged(); OnPropertyChanged("PlacementSummary"); }
+            set { _copies = Math.Max(1, value); OnPropertyChanged(); OnPropertyChanged("PlacementSummary"); OnPropertyChanged("PowerRampSummary"); }
         }
 
         /// <summary>Spacing between copies. Both axes, because a row of parts may run either way.</summary>
@@ -259,6 +262,74 @@ namespace CNC.Controls
         {
             get { return _pitchY; }
             set { _pitchY = value; OnPropertyChanged(); OnPropertyChanged("PlacementSummary"); }
+        }
+
+        /// <summary>
+        /// How much the OUTLINE power changes per copy, as an S value. Copy n burns at Power + n * this.
+        ///
+        /// The point is a test strip: lay five copies of the same artwork down at rising power and pick
+        /// the one that looks right, instead of running five separate jobs and trying to remember which
+        /// was which. Zero (the default) leaves every copy at the same power, exactly as before.
+        ///
+        /// Signed, so a negative value ramps down.
+        /// </summary>
+        public double PitchPower
+        {
+            get { return _pitchPower; }
+            set { _pitchPower = value; OnPropertyChanged(); OnPropertyChanged("PowerRampSummary"); }
+        }
+
+        /// <summary>Same, for the shading power. Independent of <see cref="PitchPower"/>.</summary>
+        public double PitchFillPower
+        {
+            get { return _pitchFillPower; }
+            set { _pitchFillPower = value; OnPropertyChanged(); OnPropertyChanged("PowerRampSummary"); }
+        }
+
+        /// <summary>
+        /// What the ramp actually produces, first copy to last, and whether it runs out of headroom.
+        ///
+        /// The clamp is the part worth showing. Power cannot exceed $30, so a ramp that overshoots
+        /// gives two or more copies burned at the SAME power while the file claims they differ - and a
+        /// test strip that silently compares a value against itself is worse than no test strip.
+        /// </summary>
+        [XmlIgnore]
+        public string PowerRampSummary
+        {
+            get
+            {
+                if (_pitchPower == 0d && _pitchFillPower == 0d)
+                    return "Every copy burns at the same power.";
+
+                var parts = new System.Collections.Generic.List<string>();
+                if (_pitchPower != 0d)
+                    parts.Add(string.Format("outline {0:0} to {1:0}", Ramped(_power, _pitchPower, 0), Ramped(_power, _pitchPower, _copies - 1)));
+                if (_fill && _pitchFillPower != 0d)
+                    parts.Add(string.Format("shading {0:0} to {1:0}", Ramped(_fillPower, _pitchFillPower, 0), Ramped(_fillPower, _pitchFillPower, _copies - 1)));
+
+                string s = "Across " + _copies + (_copies == 1 ? " copy: " : " copies: ") + string.Join(", ", parts.ToArray()) + ".";
+
+                if (Clamps(_power, _pitchPower) || (_fill && Clamps(_fillPower, _pitchFillPower)))
+                    s += string.Format("  CLAMPED at {0:0} - the last copies repeat the same power.", MaxPower);
+
+                return s;
+            }
+        }
+
+        /// <summary>Power for copy n, held inside 0..$30. The emitter uses the same rule.</summary>
+        public double Ramped(double basePower, double pitch, int copy)
+        {
+            double v = basePower + pitch * copy;
+            return v < 0d ? 0d : (MaxPower > 0d && v > MaxPower ? MaxPower : v);
+        }
+
+        private bool Clamps(double basePower, double pitch)
+        {
+            if (pitch == 0d || _copies < 2)
+                return false;
+
+            double last = basePower + pitch * (_copies - 1);
+            return last < 0d || (MaxPower > 0d && last > MaxPower);
         }
 
         /// <summary>

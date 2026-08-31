@@ -31,16 +31,21 @@
  *   G0 X.. Y.. S0 F<travel>
  *   G1 X.. Y.. S#<s_line> F#<f_line>
  *   ...
+ *   M5
+ *   G0 X0 Y0
+ *   G92.1              clear the temporary origin
+ *   M30
  *
  * The parameters are an NGC feature this controller class does NOT have - see the note above about
  * plain Grbl rejecting #<named> parameters. That is deliberate and not a contradiction: the FILE is
  * canonical and each READER resolves it. ioSender substitutes on load when the controller does not
  * report EXPR (CNC.Core.NgcConstants), and the EngravingBox appliance does the same when it runs the
  * file off its SD card. What reaches the wire is always literal S and F words.
- *   M5
- *   G0 X0 Y0
- *   G92.1              clear the temporary origin
- *   M30
+ *
+ * A constant can also be RE-declared part way through, and that is what the per-copy power ramp does:
+ * copy 2 opens with "#<s_line> = 250" and every reference below it takes the new value. Five copies of
+ * one logo at rising power, burned in a single job, is the cheapest way to find the right exposure -
+ * same material, same focus, same session.
  *
  * G92 rather than absolute work coordinates because that is how a diode laser is actually set up:
  * jog the head to the corner of the material and burn from there. There is no fixture and often no
@@ -136,6 +141,40 @@ namespace CNC.Converters
         private double BeamPower(double configured)
         {
             return settings.BeamOn ? configured : 0d;
+        }
+
+        /// <summary>
+        /// Re-declare one exposure constant for this copy, when a power ramp is in effect.
+        ///
+        /// This is what makes a test strip possible: five copies of the same artwork at rising power,
+        /// burned in one job, so the comparison is against the same material, same focus, same session.
+        /// It works because the constants are DECLARED rather than inlined - a redeclaration governs
+        /// every reference below it, which is how a controller with EXPR reads the same file and what
+        /// NgcConstants does when it does not.
+        ///
+        /// Emits nothing when the pitch is zero: the declaration at the top of the program already says
+        /// it, and repeating it per copy would just be noise in the listing.
+        ///
+        /// The CLAMP is announced, never silent. Power cannot exceed $30, so a ramp that overshoots
+        /// burns the last copies at identical power - and a test strip whose last two squares are the
+        /// same while the file says they differ is worse than no test strip, because it reads as a
+        /// result. Same rule as SvgLaserSettings.PowerRampSummary, which warns before the job is built.
+        /// </summary>
+        private void DeclareCopyPower(CNC.Controls.GCode job, string name, double basePower, double pitch, int copy)
+        {
+            if (pitch == 0d)
+                return;
+
+            double wanted = basePower + pitch * copy;
+            double used = settings.Ramped(basePower, pitch, copy);
+
+            job.AddBlock(string.Format(CultureInfo.InvariantCulture, "#<{0}> = {1}",
+                                       name, N(BeamPower(used))));
+
+            if (Math.Abs(wanted - used) > 1e-9)
+                job.AddBlock(string.Format(CultureInfo.InvariantCulture,
+                    "(power ramp CLAMPED: copy {0} asked for {1} and can only have {2})",
+                    copy + 1, N(wanted), N(used)));
         }
 
         public bool LoadFile(CNC.Controls.GCode job, string filename)
@@ -293,6 +332,8 @@ namespace CNC.Converters
                       job.AddBlock(string.Format(CultureInfo.InvariantCulture,
                           "(copy {0} of {1} at X{2} Y{3})", copy + 1, settings.Copies, F(offX), F(offY)));
 
+                  DeclareCopyPower(job, NgcConstants.SvgLaser.LinePower, settings.Power, settings.PitchPower, copy);
+
                   for (int pass = 0; pass < settings.Passes; pass++)
                   {
                     if (settings.Passes > 1)
@@ -362,6 +403,8 @@ namespace CNC.Converters
                 if (settings.Copies > 1)
                     job.AddBlock(string.Format(CultureInfo.InvariantCulture,
                         "(shading copy {0} of {1})", copy + 1, settings.Copies));
+
+                DeclareCopyPower(job, NgcConstants.SvgLaser.FillPower, settings.FillPower, settings.PitchFillPower, copy);
 
                 foreach (var s in spans)
                 {

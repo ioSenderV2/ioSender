@@ -94,6 +94,18 @@
                         <TextBlock x:Uid="txt_svglaser_pitchnote" TextWrapping="Wrap" Margin="6,8,6,4" FontSize="11" Foreground="#586069"
                                    Text="Pitch is signed. On a back-left origin the table lies at negative Y, so stacking copies front-to-back needs a negative Pitch Y."/>
 
+                        <Separator Margin="6,10,6,6"/>
+
+                        <TextBlock x:Uid="txt_svglaser_powerrampnote" TextWrapping="Wrap" Margin="6,2,6,6" FontSize="11" Foreground="#586069"
+                                   Text="Step the power up on each copy to burn a test strip: the same artwork at rising exposure, in one job, on one piece of material. Leave at 0 for every copy the same."/>
+
+                        <Controls:NumericField x:Uid="fld_svglaser_pitchpower" Label="Power step:" ColonAt="90" Unit="S" Format="-####0" Value="{Binding Path=PitchPower, Mode=TwoWay}"
+                                               ToolTip="Added to the outline power for each copy after the first. 50 with a power of 200 gives 200, 250, 300... Negative ramps down."/>
+                        <Controls:NumericField x:Uid="fld_svglaser_pitchfillpower" Label="Fill step:" ColonAt="90" Unit="S" Format="-####0" Value="{Binding Path=PitchFillPower, Mode=TwoWay}"
+                                               ToolTip="The same for the shading power, stepped independently of the outline. Only matters when shading is on."/>
+                        <TextBlock x:Name="txtPowerRamp" Text="{Binding Path=PowerRampSummary, Mode=OneWay}" Foreground="#586069" FontSize="11" Margin="94,6,4,4" TextWrapping="Wrap"
+                                   ToolTip="What the ramp actually produces, first copy to last. Power cannot exceed $30 - if the ramp runs past it the last copies repeat the same power, and this says so."/>
+
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
