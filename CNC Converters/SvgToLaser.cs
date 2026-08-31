@@ -194,8 +194,48 @@ namespace CNC.Converters
             settings.LaserModeOn = IsLaserMode();
             settings.MaxPower = MaxPower();
 
-            if (new SvgLaserDialog(settings) { Owner = Application.Current.MainWindow }.ShowDialog() != true)
-                return false;
+            // Loop, because a rejected placement should put the operator back in the dialog with their
+            // numbers intact rather than dumping them out of the import entirely.
+            while (true)
+            {
+                if (new SvgLaserDialog(settings) { Owner = Application.Current.MainWindow }.ShowDialog() != true)
+                    return false;
+
+                string problem;
+                double fixedPitchY;
+                if (settings.Validate(out problem, out fixedPitchY))
+                    break;
+
+                // A wrong-signed Pitch Y has one obvious correction, so OFFER it. Not applied silently:
+                // flipping a sign the operator typed is inventing intent, and if they really did mean
+                // +Y the job would run and quietly not be the one they pictured. Explicit consent gets
+                // the convenience without the guessing.
+                if (fixedPitchY != 0d)
+                {
+                    var answer = AppDialogs.Show(
+                        problem + "\n\nUse " + fixedPitchY.ToString("0.###", CultureInfo.InvariantCulture)
+                        + " mm instead?\n\nYes corrects it and carries on. No takes you back to the dialog.",
+                        "SVG to laser - placement", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+
+                    if (answer == MessageBoxResult.Cancel)
+                        return false;
+                    if (answer == MessageBoxResult.Yes)
+                    {
+                        settings.PitchY = fixedPitchY;
+                        // Re-validate rather than assume: the sign was only the FIRST fault found, and a
+                        // corrected pitch can still reach past the travel.
+                        if (settings.Validate(out problem, out fixedPitchY))
+                            break;
+                    }
+                    else
+                        continue;
+                }
+
+                if (problem != null && AppDialogs.Show(
+                        problem + "\n\nGo back and change it?\n\nNo abandons this import.",
+                        "SVG to laser - placement", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                    return false;
+            }
 
             SvgImportResult art;
             using (new UIUtils.WaitCursor())

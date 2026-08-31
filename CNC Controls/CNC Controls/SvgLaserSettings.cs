@@ -67,7 +67,9 @@ namespace CNC.Controls
         public double WidthMm
         {
             get { return _width; }
-            set { _width = value; OnPropertyChanged(); OnPropertyChanged("HeightSummary"); OnPropertyChanged("FillSummary"); }
+            // PlacementSummary too: the extent includes the artwork's own size, so resizing it moves the
+            // corner the operator is checking against travel.
+            set { _width = value; OnPropertyChanged(); OnPropertyChanged("HeightSummary"); OnPropertyChanged("FillSummary"); OnPropertyChanged("PlacementSummary"); }
         }
 
         // The three below are read from the artwork and the controller on every open, never from the
@@ -341,20 +343,135 @@ namespace CNC.Controls
         {
             get
             {
-                double spanX = _originX + _width + (_copies - 1) * _pitchX;
+                // The whole occupied rectangle, not one corner of it - see the note on MinX/MaxY.
+                string box = string.Format("X {0:0.#} to {1:0.#}, Y {2:0.#} to {3:0.#}", MinX, MaxX, MinY, MaxY);
 
-                // Which way the artwork extends is the anchor's doing, and this summary is read to check
-                // the job against travel - reporting +height on a machine that runs to -Y would name a
-                // corner on the wrong side of the origin.
-                double artH = _width * Aspect;
-                double spanY = _originY + (_anchorBackLeft ? -artH : artH) + (_copies - 1) * _pitchY;
-
-                if (_copies <= 1)
-                    return string.Format("one copy, reaching X{0:0.#} Y{1:0.#}", spanX, spanY);
-
-                return string.Format("{0} copies, reaching X{1:0.#} Y{2:0.#} - check that is within travel",
-                                     _copies, spanX, spanY);
+                return _copies <= 1 ? "one copy, occupying " + box
+                                    : string.Format("{0} copies, occupying {1}", _copies, box);
             }
+        }
+
+        // The full extent every copy occupies. Shared by the summary above and Validate below ON PURPOSE:
+        // this used to be computed inline in the summary, which then told the operator to "check that is
+        // within travel" and left it there - a number worked out and acted on by nobody.
+        //
+        // It also used to be WRONG, and wrong in the one case that mattered. It read
+        //     origin + (-artHeight) + (copies-1) * pitch
+        // which is the far corner only when the pitch marches the same way the artwork extends. With a
+        // pitch signed the wrong way it named the BOTTOM of the last copy instead of the top, understating
+        // the reach by a whole artwork height: Origin Y -9.125, Pitch Y +100, 2 copies reported Y-9.3 -
+        // comfortably inside a [-400..0] table - while the head actually reaches Y+90.9, into the back
+        // stop. Measured 2026-08-31. Min and max are now tracked separately, which is the only form that
+        // cannot hide a reach behind a sign.
+
+        /// <summary>Distance the last copy's origin is stepped from the first. Signed.</summary>
+        private double StepX { get { return (_copies - 1) * _pitchX; } }
+        private double StepY { get { return (_copies - 1) * _pitchY; } }
+
+        /// <summary>Leftmost X any copy touches.</summary>
+        [XmlIgnore]
+        public double MinX { get { return _originX + Math.Min(0d, StepX); } }
+
+        /// <summary>Rightmost X any copy touches - the artwork always extends +X from its own origin.</summary>
+        [XmlIgnore]
+        public double MaxX { get { return _originX + Math.Max(0d, StepX) + _width; } }
+
+        /// <summary>
+        /// Lowest Y any copy touches. Which way the artwork extends from its origin is the anchor's
+        /// doing: back-left means it hangs DOWN into negative Y.
+        /// </summary>
+        [XmlIgnore]
+        public double MinY
+        {
+            get { return _originY + Math.Min(0d, StepY) - (_anchorBackLeft ? _width * Aspect : 0d); }
+        }
+
+        /// <summary>Highest Y any copy touches.</summary>
+        [XmlIgnore]
+        public double MaxY
+        {
+            get { return _originY + Math.Max(0d, StepY) + (_anchorBackLeft ? 0d : _width * Aspect); }
+        }
+
+        /// <summary>
+        /// Whether the placement actually fits, and if not, what is wrong with it.
+        ///
+        /// WHY THIS IS NOT ADVISORY: the machine this targets runs with $20=0 and $21=0 - soft limits
+        /// AND hard limits both off. Nothing downstream will catch a move outside the envelope; the
+        /// gantry simply drives into the stop. An Origin Y of -9.125 with a Pitch Y of +100 emits
+        /// POSITIVE Y on a table whose whole work area is negative, and every layer below this one will
+        /// happily pass it along.
+        ///
+        /// The sign test comes from the ANCHOR, not from the machine-envelope helpers: those depend on
+        /// $22/$23 and are wrong on a controller that never homes. AnchorBackLeft is the operator's own
+        /// statement of which way the work lies, and it is right by construction.
+        /// </summary>
+        /// <param name="problem">Operator-facing description of what does not fit. Null when it does.</param>
+        /// <param name="fixablePitchY">
+        /// Set to the corrected value when the ONLY fault is a Pitch Y signed the wrong way - so the
+        /// caller can offer it rather than either silently flipping it or just refusing.
+        /// </param>
+        /// <returns>True when the job fits.</returns>
+        public bool Validate(out string problem, out double fixablePitchY)
+        {
+            problem = null;
+            fixablePitchY = 0d;
+
+            // A wrong-signed pitch is the common slip and has an obvious correction, so test it first
+            // and on its own - offering "did you mean -100?" is only honest when that IS the whole fault.
+            if (_copies > 1 && _pitchY != 0d)
+            {
+                bool wantsNegative = _anchorBackLeft;
+                if ((wantsNegative && _pitchY > 0d) || (!wantsNegative && _pitchY < 0d))
+                {
+                    fixablePitchY = -_pitchY;
+                    problem = string.Format(
+                        "Pitch Y is {0:0.###} mm, which steps the copies {1} - away from the table.\n\n"
+                        + "The artwork is anchored {2}, so the work area lies at {3} Y. As typed, the copies reach "
+                        + "Y{4:0.#}, and this machine has neither soft limits nor hard limits to stop it.",
+                        _pitchY, _pitchY > 0d ? "towards +Y" : "towards -Y",
+                        _anchorBackLeft ? "back-left" : "front-left",
+                        _anchorBackLeft ? "negative" : "positive", _anchorBackLeft ? MaxY : MinY);
+                    return false;
+                }
+            }
+
+            // Same for X: a back-left anchor puts the work at +X.
+            if (MinX < 0d)
+            {
+                problem = string.Format("The placement reaches X{0:0.#}. X runs positive from the home corner, "
+                                        + "so a negative X is behind the stop.", MinX);
+                return false;
+            }
+
+            if (_anchorBackLeft ? MaxY > 0d : MinY < 0d)
+            {
+                problem = string.Format("The placement reaches Y{0:0.#}, on the wrong side of the origin for "
+                                        + "artwork anchored {1}.", _anchorBackLeft ? MaxY : MinY,
+                                        _anchorBackLeft ? "back-left" : "front-left");
+                return false;
+            }
+
+            // Magnitude, only when the travel is actually known. Not connected, or settings not read,
+            // means MaxTravel is 0 - and inventing an envelope would be worse than not checking one.
+            double travelX = GrblInfo.MaxTravel.X, travelY = GrblInfo.MaxTravel.Y;
+
+            if (travelX > 0d && MaxX > travelX)
+            {
+                problem = string.Format("The placement reaches X{0:0.#}, past the {1:0.#} mm of X travel this machine reports.",
+                                        MaxX, travelX);
+                return false;
+            }
+
+            double reachY = _anchorBackLeft ? MinY : MaxY;
+            if (travelY > 0d && Math.Abs(reachY) > travelY)
+            {
+                problem = string.Format("The placement reaches Y{0:0.#}, past the {1:0.#} mm of Y travel this machine reports.",
+                                        reachY, travelY);
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>
