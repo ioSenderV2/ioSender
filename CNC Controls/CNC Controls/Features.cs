@@ -29,6 +29,11 @@ namespace CNC.Controls
         /// action registration, and its row in Settings > Keyboard. Grep the symbol before assuming a
         /// new call site is covered.
         /// </summary>
-        public const bool SvgLaserJob = false;
+        // 🔴 TEMPORARILY ON - 2026-08-31, at the user's request, to produce the stave logo .nc files.
+        // This commit is LOCAL AND TEMPORARY and MUST be reverted before this branch is pushed:
+        // pr/portable-core is what vbeta-pr20 is cut from, so pushing it true ships an unproven
+        // laser feature to a second user. The revert is the next commit after the .nc files exist.
+        // If you are reading this on a remote, the revert was missed - set it back to false.
+        public const bool SvgLaserJob = true;
     }
 }
