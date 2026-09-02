@@ -169,6 +169,16 @@ namespace GCode_Sender
                             int tp;
                             TestServerPort = (eq >= 0 && int.TryParse(arg.Substring(eq + 1), out tp)) ? tp : 0;
                         }
+                        // -enableSVGLaserJob  offer "File > Load SVG Laser Job..." for this session.
+                        // Held back by default (CNC.Controls.Features) until the converter has had more
+                        // time on a real machine. Matched case-insensitively: the flag is typed by a human
+                        // and its natural spelling mixes cases, so a case-sensitive switch label would be
+                        // a trap. Set here, at the top of startup, because MainWindow's menu registration
+                        // and the keyboard catalogue both read it - see Features.SvgLaserJob.
+                        else if (string.Equals(arg, "-enableSVGLaserJob", StringComparison.OrdinalIgnoreCase))
+                        {
+                            CNC.Controls.Features.SvgLaserJob = true;
+                        }
                         // -message=text  show an informational popup once the main window is up (see StartupMessage)
                         else if (arg.StartsWith("-message=", StringComparison.OrdinalIgnoreCase))
                         {

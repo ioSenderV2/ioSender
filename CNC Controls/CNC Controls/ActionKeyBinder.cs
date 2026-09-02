@@ -99,8 +99,16 @@ namespace CNC.Controls
         /// visible and bindable in the editor, which is exactly what e5fe6542 did to "Load SVG Laser Job":
         /// it collapsed the menu entry and skipped the action registration, and the row stayed on screen.
         /// </summary>
-        public static readonly ActionInfo[] Catalog =
-            catalog.Where(a => a.Id != "Menu.LoadSvgLaser" || Features.SvgLaserJob).ToArray();
+        /// <remarks>
+        /// Computed on every read, NOT a static readonly array. Features.SvgLaserJob is set from the
+        /// command line during startup, and a static field initializer would freeze whatever the flag
+        /// held the first time this type was touched - which is a race decided by unrelated code, and
+        /// exactly the "right at startup, stale forever after" shape. Two callers, neither hot.
+        /// </remarks>
+        public static ActionInfo[] Catalog
+        {
+            get { return catalog.Where(a => a.Id != "Menu.LoadSvgLaser" || Features.SvgLaserJob).ToArray(); }
+        }
 
         private static readonly Dictionary<string, Func<Key, bool>> handlers = new Dictionary<string, Func<Key, bool>>();
 
