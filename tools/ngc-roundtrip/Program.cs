@@ -171,6 +171,52 @@ namespace NgcRoundTrip
                   "the shading constants resolve to what the header declared",
                   fillCut == null ? "(no cut move)" : fillCut.Data);
 
+            // ---- the placement constants -------------------------------------------------------------
+            // The job reaches its placement by rapiding to #<x_org>/#<y_org> and zeroing there, and comes
+            // home by re-labelling that point with the same two. Substitution is TEXTUAL, so the case that
+            // matters is a NEGATIVE value: "Y#<y_org>" has to become "Y-9.525" and not "Y--9.525" or a
+            // refusal. That is also why the offsets are not carried negated on a single G92 - "Y-#<y_org>"
+            // would be exactly the broken form.
+            Console.WriteLine();
+
+            var place = NgcConstants.SvgLaser.PlacementDeclarations(16.5, -9.525);
+            foreach (var line in place)
+                Console.WriteLine("      " + line);
+
+            Check(place.All(l => balanced(l)),
+                  "the placement block is balanced comments and assignments",
+                  string.Join(" | ", place.Where(l => !balanced(l))));
+            Check(place.Any(l => l.Contains("#<x_org> = 16.5")) && place.Any(l => l.Contains("#<y_org> = -9.525")),
+                  "the constants hold the DIALOG's values, unchanged and un-negated",
+                  string.Join(" | ", place));
+
+            var placed = Load(string.Join("\n", place) +
+                              "\nG92 X0 Y0\n" +
+                              "G0 X#<x_org> Y#<y_org> S0 F3000\n" +
+                              "G92 X0 Y0\n" +
+                              "G1 X10 Y-10 S200 F1200\n" +
+                              "G0 X0 Y0 F3000\n" +
+                              "G92 X#<x_org> Y#<y_org>\n" +
+                              "G0 X0 Y0 F3000\n" +
+                              "G92.1\nM30\n", out err, out ok);
+            Dump("placement", placed);
+
+            Check(ok, "the placed program loads", err ?? "");
+
+            var hop = placed.FirstOrDefault(b => b.Data != null && b.Data.StartsWith("G0X16.5"));
+            Check(hop != null && hop.Data.Contains("Y-9.525"),
+                  "the rapid to the placement resolves, negative Y intact",
+                  hop == null ? "(no hop)" : hop.Data);
+
+            var relabel = placed.FirstOrDefault(b => b.Data != null && b.Data.StartsWith("G92X16.5"));
+            Check(relabel != null && relabel.Data.Contains("Y-9.525"),
+                  "the closing G92 re-label resolves to the same pair",
+                  relabel == null ? "(no re-label)" : relabel.Data);
+
+            Check(!placed.Any(b => b.Data != null && b.Data.Contains("--")),
+                  "no double sign anywhere - textual substitution stayed well formed",
+                  string.Join(" | ", placed.Where(b => b.Data != null && b.Data.Contains("--")).Select(b => b.Data)));
+
             // ---- refusals ---------------------------------------------------------------------------
             // ParseFileLines catches per line and routes the failure through the operator's load-error
             // prompt, so the exception does NOT escape. What must hold either way is that the offending

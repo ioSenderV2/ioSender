@@ -25,16 +25,32 @@
  *
  *   #<s_line> = 200    exposure as four named constants, so the job can be retuned by
  *   #<f_line> = 1200   editing four numbers instead of hundreds of cut moves
+ *   #<x_org> = 16.5    and the placement as two more, exactly as the dialog showed them
+ *   #<y_org> = -9.525
  *   G21 G90 G17
- *   G92 X0 Y0          the head's CURRENT position becomes the artwork's origin
+ *   G92 X0 Y0          the PARKED corner becomes 0,0
  *   M4 S0              dynamic power (or M3 constant), beam off
- *   G0 X.. Y.. S0 F<travel>
+ *   G0 X#<x_org> Y#<y_org> S0 F<travel>   move in by the placement
+ *   G92 X0 Y0          and THAT is the artwork's origin
+ *   G0 X.. Y.. S0 F<travel>               everything below is artwork geometry from 0,0
  *   G1 X.. Y.. S#<s_line> F#<f_line>
  *   ...
  *   M5
- *   G0 X0 Y0
+ *   G0 X0 Y0                              back to the artwork origin
+ *   G92 X#<x_org> Y#<y_org>               re-label it: we are in the parked frame again
+ *   G0 X0 Y0                              back to the parked corner
  *   G92.1              clear the temporary origin
  *   M30
+ *
+ * The placement is applied ONCE, by that rapid, rather than added to every coordinate in the file.
+ * Two constants at the top then say where the job sits, and the geometry below is the artwork's own -
+ * which is what makes the same .nc re-placeable by editing two lines.
+ *
+ * It is a rapid and not "G92 X#<x_org> Y#<y_org>" at the start, which is the shape it first looks like
+ * it should be: G92 LABELS the point the head is standing on, so naming the placement there would call
+ * the parked corner 16.5 and put the artwork the same distance the other way. A single G92 could carry
+ * these only NEGATED, and a file whose constants are the negatives of the numbers the operator typed is
+ * a file that gets hand-edited in the wrong direction exactly once.
  *
  * The parameters are an NGC feature this controller class does NOT have - see the note above about
  * plain Grbl rejecting #<named> parameters. That is deliberate and not a contradiction: the FILE is
@@ -108,11 +124,18 @@ namespace CNC.Converters
         private string FX(double v) { return F(v + offX); }
         private string FY(double v) { return F(v + offY + anchorY); }
 
-        /// <summary>Place copy n: the artwork's own origin plus n pitches.</summary>
+        /// <summary>
+        /// Place copy n: n pitches from the artwork origin.
+        ///
+        /// The PLACEMENT is not in here. It used to be - every coordinate carried settings.OriginX/Y - and
+        /// now it is applied once, by the rapid the program opens with, so what is written below the header
+        /// is the artwork's own geometry. The pitch stays, because that is not placement: it is where copy
+        /// n sits relative to copy 1, and it belongs to the geometry.
+        /// </summary>
         private void SetCopyOffset(int n)
         {
-            offX = settings.OriginX + n * settings.PitchX;
-            offY = settings.OriginY + n * settings.PitchY;
+            offX = n * settings.PitchX;
+            offY = n * settings.PitchY;
         }
 
         /// <summary>
@@ -346,8 +369,8 @@ namespace CNC.Converters
                     settings.AnchorBackLeft ? "TOP" : "LOWER",
                     F(settings.AnchorBackLeft ? -art.HeightMm : art.HeightMm)));
 
-                job.AddBlock("(Origin: the head's position when this starts becomes 0,0.)");
-                job.AddBlock(string.Format("(Position it at the artwork's {0}-LEFT corner before running.)",
+                job.AddBlock("(Origin: the head's position when this starts is the PARKED corner.)");
+                job.AddBlock(string.Format("(Park it at the stock's {0}-LEFT corner; the job moves in by the placement.)",
                                            settings.AnchorBackLeft ? "TOP" : "LOWER"));
                 job.AddBlock("(If this job is ABORTED the G92 offset stays set - clear it with G92.1.)");
 
@@ -373,6 +396,13 @@ namespace CNC.Converters
                 if (settings.Fill)
                     declared[NgcConstants.SvgLaser.FillPower] = BeamPower(settings.FillPower);
 
+                // The placement, as two constants holding exactly what the dialog showed. Everything below
+                // is then the artwork's own geometry from 0,0 - the offsets are applied once, here, rather
+                // than added to every one of the thousands of coordinates in the file.
+                foreach (var d in CNC.Core.NgcConstants.SvgLaser.PlacementDeclarations(
+                             settings.OriginX, settings.OriginY))
+                    job.AddBlock(d);
+
                 job.AddBlock("G21 G90 G17");
                 job.AddBlock("G92 X0 Y0");
                 // With the beam disabled the laser is never ENABLED either - belt and braces with the zeroed
@@ -380,16 +410,24 @@ namespace CNC.Converters
                 // turn a rehearsal into a burn.
                 job.AddBlock(settings.BeamOn ? (settings.Dynamic ? "M4" : "M3") + " S0" : "M5");
 
+                // Park -> placement -> zero. Two zeroing G92s rather than one G92 naming the offsets,
+                // because "G92 X16.5" would declare the PARKED point to be 16.5 and send the artwork the
+                // other way; carrying these constants on a G92 at all would mean storing them negated,
+                // which is not what the dialog said. The rapid is the honest form: move by the offsets in
+                // a frame where the parked corner is 0,0, then call where we landed the artwork origin.
+                job.AddBlock(string.Format(CultureInfo.InvariantCulture,
+                    "G0 X{0} Y{1} S0 F{2}",
+                    NgcConstants.SvgLaser.Ref(NgcConstants.SvgLaser.OriginX),
+                    NgcConstants.SvgLaser.Ref(NgcConstants.SvgLaser.OriginY),
+                    N(settings.TravelFeed)));
+                job.AddBlock("G92 X0 Y0");
+
                 if (settings.Fill)
                     EmitFill(job, art);
 
                 if (settings.Fill && !settings.OutlineAfterFill)
                 {
-                    ClearCopyOffset();
-                    job.AddBlock("M5");
-                    job.AddBlock(string.Format(CultureInfo.InvariantCulture, "G0 X0 Y0 F{0}", N(settings.TravelFeed)));
-                    job.AddBlock("G92.1");
-                    job.AddBlock("M30", CNC.Core.Action.End);
+                    EmitClose(job);
                     return;
                 }
 
@@ -436,12 +474,37 @@ namespace CNC.Converters
                   }
                 }
 
-                ClearCopyOffset();
-                job.AddBlock("M5");
-                job.AddBlock(string.Format(CultureInfo.InvariantCulture, "G0 X0 Y0 F{0}", N(settings.TravelFeed)));
-                job.AddBlock("G92.1");
-                job.AddBlock("M30", CNC.Core.Action.End);
+                EmitClose(job);
             }
+        }
+
+        /// <summary>
+        /// The closing moves: back to the artwork origin, back to the parked corner, offsets cleared.
+        ///
+        /// Both exits emit this - the shading-only one and the full one - and they used to carry their own
+        /// copy of it, which is one edit away from two programs that end differently.
+        ///
+        /// The return to park is why the placement constants appear a second time. After the artwork the
+        /// head is in the ARTWORK's frame, in which the parked corner is at minus the placement; naming
+        /// that as a literal would put a number in the file that no longer tracks x_org when someone edits
+        /// it. Re-declaring the current point AS the placement restores the frame the job started in - the
+        /// one where park is 0,0 - and the return is then a plain G0 X0 Y0.
+        ///
+        /// Order matters and is not interchangeable: return first, THEN G92.1. Clearing the offset while
+        /// still at the artwork sends the following move to wherever the machine's own frame has 0,0,
+        /// which on a machine with no homing and no limits is not somewhere to guess at.
+        /// </summary>
+        private void EmitClose(CNC.Controls.GCode job)
+        {
+            ClearCopyOffset();
+            job.AddBlock("M5");
+            job.AddBlock(string.Format(CultureInfo.InvariantCulture, "G0 X0 Y0 F{0}", N(settings.TravelFeed)));
+            job.AddBlock(string.Format(CultureInfo.InvariantCulture, "G92 X{0} Y{1}",
+                NgcConstants.SvgLaser.Ref(NgcConstants.SvgLaser.OriginX),
+                NgcConstants.SvgLaser.Ref(NgcConstants.SvgLaser.OriginY)));
+            job.AddBlock(string.Format(CultureInfo.InvariantCulture, "G0 X0 Y0 F{0}", N(settings.TravelFeed)));
+            job.AddBlock("G92.1");
+            job.AddBlock("M30", CNC.Core.Action.End);
         }
 
         // The shading pass: horizontal spans across the interior, burned one row at a time.

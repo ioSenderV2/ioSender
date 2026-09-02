@@ -250,6 +250,8 @@ namespace CNC.Core
             public const string FillPower = "s_fill";
             public const string LineFeed = "f_line";
             public const string FillFeed = "f_fill";
+            public const string OriginX = "x_org";
+            public const string OriginY = "y_org";
 
             /// <summary>The assignment block a generated program opens with.</summary>
             public static List<string> Declarations(double linePower, double fillPower, double lineFeed, double fillFeed, bool fill)
@@ -277,6 +279,28 @@ namespace CNC.Core
                 }
 
                 return d;
+            }
+
+            /// <summary>
+            /// Where the artwork sits relative to the corner the head is parked on - the two numbers from
+            /// the dialog, unchanged, so what the file says and what the operator typed are the same thing.
+            ///
+            /// They are DECLARED rather than folded into every coordinate below, which is what lets the
+            /// placement be moved by editing two lines. The program reaches the placement by rapiding to
+            /// them and zeroing there, not by naming them on a G92: "G92 X16.5" labels the point the head
+            /// is standing on as 16.5, which would put the artwork on the wrong side of the park by twice
+            /// the offset. A single G92 could only carry these negated, and a negated constant next to a
+            /// header comment quoting the positive one is the kind of disagreement that gets a stave burnt
+            /// off the edge of the stock.
+            /// </summary>
+            public static List<string> PlacementDeclarations(double originX, double originY)
+            {
+                return new List<string>
+                {
+                    "(Placement: where the artwork sits from the parked corner - edit to move the job.)",
+                    Declare(OriginX, originX),
+                    Declare(OriginY, originY)
+                };
             }
 
             private static string Declare(string name, double value)
