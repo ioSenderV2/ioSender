@@ -137,6 +137,40 @@ namespace NgcRoundTrip
             Check(rampSaved.Contains("#<s_line> = 200") && rampSaved.Contains("#<s_line> = 250") && rampSaved.Contains("#<s_line> = 300"),
                   "all three declarations survive into what Save would write");
 
+            // ---- the header the emitter actually writes ----------------------------------------------
+            // Declarations() is the block every generated laser job opens with, so check the TEXT it
+            // produces and then load it. A comment line that opens '(' and never closes it is not a
+            // comment to anything downstream: IsComment rejects it, the resolver hands it on as code,
+            // and it reaches a controller that has to decide what to do with an unbalanced block.
+            Console.WriteLine();
+
+            var header = NgcConstants.SvgLaser.Declarations(200, 850, 1200, 4000, true);
+            foreach (var line in header)
+                Console.WriteLine("      " + line);
+
+            Func<string, bool> balanced = l =>
+                l.StartsWith("#<") || (l.StartsWith("(") && l.EndsWith(")"));
+
+            Check(header.All(l => balanced(l)),
+                  "every line of the header is a BALANCED comment or an assignment",
+                  string.Join(" | ", header.Where(l => !balanced(l))));
+
+            var hdr = Load(string.Join("\n", header) +
+                           "\nG1 X1 S#<s_fill> F#<f_fill>\nM30\n", out err, out ok);
+            Dump("emitted header", hdr);
+
+            Check(ok, "the emitted header loads", err ?? "");
+            // A declaration legitimately becomes "(#<s_line> = 200)" - a comment that contains '#'. What
+            // must never happen is a '#' surviving into an executable block.
+            Check(!hdr.Any(b => b.Data != null && !b.Data.StartsWith("(") && b.Data.Contains("#")),
+                  "no unresolved reference survives into an executable block",
+                  string.Join(" | ", hdr.Where(b => b.Data != null && !b.Data.StartsWith("(") && b.Data.Contains("#")).Select(b => b.Data)));
+
+            var fillCut = hdr.FirstOrDefault(b => b.Data != null && b.Data.StartsWith("G1X1"));
+            Check(fillCut != null && fillCut.Data.Contains("S850") && fillCut.Data.Contains("F4000"),
+                  "the shading constants resolve to what the header declared",
+                  fillCut == null ? "(no cut move)" : fillCut.Data);
+
             // ---- refusals ---------------------------------------------------------------------------
             // ParseFileLines catches per line and routes the failure through the operator's load-error
             // prompt, so the exception does NOT escape. What must hold either way is that the offending

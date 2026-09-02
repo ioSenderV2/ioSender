@@ -257,8 +257,13 @@ namespace CNC.Core
                 var d = new List<string>
                 {
                     "(Exposure lives in these four values - retune the job by editing them.)",
-                    "(A controller reporting EXPR evaluates them itself; ioSender and the",
-                    "(EngravingBox appliance substitute them on load when it does not.)",
+                    // Each line closes its own parenthesis. A sentence wrapped across two blocks with only
+                    // one ')' at the end leaves an unterminated comment, and that is not cosmetic: the
+                    // shipped form of this bug made ParseFileLines REFUSE the whole file after the first
+                    // block, so a generated job could be streamed but never re-loaded from disk.
+                    // tools/ngc-roundtrip covers it - reintroduce the missing ')' and three checks fail.
+                    "(A controller reporting EXPR evaluates them itself; ioSender and)",
+                    "(the EngravingBox appliance substitute them on load when it does not.)",
                     Declare(LinePower, linePower),
                     Declare(LineFeed, lineFeed)
                 };
