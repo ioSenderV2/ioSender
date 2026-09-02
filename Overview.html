@@ -160,7 +160,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>311 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>315 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -418,6 +418,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Generated laser jobs declare power and feed at the top as #&lt;s_line&gt; etc., so a job is retuned by editing four numbers.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr309">309</a></td></tr>
 <tr><td>Two more pitches on the Copies tab ramp outline and fill power per copy - five exposures of one logo in a single job.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr310">310</a></td></tr>
 <tr><td>A wrong-signed Pitch Y emitted positive Y on a table that only has negative - and the summary understated the reach.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr311">311</a></td></tr>
+<tr><td>One header comment opened '(' and never closed it, and the loader refused the whole saved .nc after the first block.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr312">312</a></td></tr>
+<tr><td>The per-copy power ramp wrote an assignment before copy 1 that set the constant to the value the header had already given it.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr313">313</a></td></tr>
+<tr><td>The dialog's X/Y offsets are declared once as #&lt;x_org&gt; / #&lt;y_org&gt; instead of being added to every coordinate, so a job can be re-placed by editing two lines.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr314">314</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -506,6 +509,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>The pop-up status window stays for a chosen time, takes the screen only for errors, and returns focus on close.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr246">246</a></td></tr>
 <tr><td>Close and reopen ioSender from the menu, settings saved first - some session state clears no other way.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr307">307</a></td></tr>
 <tr><td>An unowned message box left the app beeping at every click and refusing to close - Task Manager was the only way out.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr308">308</a></td></tr>
+<tr><td>Load SVG Laser Job is off by default again and enabled per launch with -enableSVGLaserJob, so nothing has to be remembered and reverted before a push.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr315">315</a></td></tr>
 </table>
 </div>
 
@@ -859,7 +863,11 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">309</td><td><a href="#pr309">SVG laser exposure as named constants</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+3</span><br><span class="k">Lines:</span> <span class="add">+551</span> <span class="del">-7</span></td></tr>
 <tr><td class="n">310</td><td><a href="#pr310">SVG laser power step per copy</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+183</span> <span class="del">-8</span></td></tr>
 <tr><td class="n">311</td><td><a href="#pr311">SVG laser placement checked against travel</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+170</span> <span class="del">-13</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (311 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">2726</span> <span class="del">32</span> <span class="add">+270</span><br><span class="k">Lines:</span> <span class="add">+115673</span> <span class="del">-26944</span></td></tr>
+<tr><td class="n">312</td><td><a href="#pr312">SVG laser header comment left unterminated</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+41</span> <span class="del">-2</span></td></tr>
+<tr><td class="n">313</td><td><a href="#pr313">SVG laser ramp: no redundant re-declaration</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+30</span> <span class="del">-2</span></td></tr>
+<tr><td class="n">314</td><td><a href="#pr314">SVG laser placement as x_org / y_org</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+151</span> <span class="del">-18</span></td></tr>
+<tr><td class="n">315</td><td><a href="#pr315">-enableSVGLaserJob replaces the committed flag</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+36</span> <span class="del">-11</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (315 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">2735</span> <span class="del">32</span> <span class="add">+270</span><br><span class="k">Lines:</span> <span class="add">+115931</span> <span class="del">-26977</span></td></tr>
 </table>
 </div>
 
@@ -5884,6 +5892,61 @@ Connected: 192.168.1.247:23</pre><p>The connect routine opened by saving whateve
 <tr><td class="mono">CNC Converters/SvgToLaser.cs</td><td class="num add">42</td><td class="num del">2</td></tr>
 </table>
 <div class="desc"><p>Reported: an Origin Y of <code>-9.125</code> with a Pitch Y of <code>+100</code> happily emitted <strong>positive Y</strong> on a machine whose entire work area is <code>[-400..0]</code>. That controller runs with <code>$20=0</code> and <code>$21=0</code> - soft limits and hard limits both off - so nothing downstream catches it. The gantry simply drives into the back stop.</p><p>The placement summary already worked out where the copies reach, and then told the operator to &quot;check that is within travel&quot;. <strong>A number computed and acted on by nobody is not a guard.</strong></p><p>It was also <strong>wrong</strong>, in exactly the case that mattered. The far corner was taken as <code>origin + (-artHeight) + (copies-1) &times; pitch</code>, which is correct only when the pitch marches the same way the artwork extends. With the pitch signed the wrong way it named the <em>bottom</em> of the last copy rather than the top, understating the reach by a whole artwork height: at two copies it reported <code>Y-9.3</code> - comfortably inside the table - while the head actually reaches <code>Y+90.9</code>. Minimum and maximum are now tracked separately, which is the only form that cannot hide a reach behind a sign, and the summary reports the whole occupied rectangle.</p><ul><li><strong>Enforced between the dialog and the emit.</strong> Sign comes from the anchor; magnitude from the reported travel, and only when it is actually known - inventing an envelope would be worse than checking none.</li><li><strong>The anchor is used rather than the machine-envelope helpers on purpose</strong> - those read <code>$22</code>/<code>$23</code>, which decide nothing on a controller that never homes.</li><li><strong>A wrong-signed Pitch Y is offered back</strong> as &quot;use -100 instead?&quot;, not silently flipped. Flipping a sign the operator typed is inventing intent, and if they did mean +Y the job would run and quietly not be the one they pictured.</li><li><strong>Answering yes re-validates</strong> rather than assuming: the sign was only the first fault found, and a corrected pitch can still overrun the travel. Rejection returns to the dialog with the numbers intact.</li></ul><p class="foot">The understated reach was measured against the real artwork dimensions, not reasoned about - the old formula and the true extents were tabulated side by side across one to five copies before anything was changed.</p></div>
+</div>
+<!-- ===== #312 ===== -->
+<div class="pr">
+<h2 id="pr312"><span class="badge">#312</span>A generated laser job could be streamed but never re-loaded</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/NgcConstants.cs</td><td class="num add">7</td><td class="num del">2</td></tr>
+<tr><td class="mono">tools/ngc-roundtrip/Program.cs</td><td class="num add">34</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The block of comments every generated laser job opens with wrapped one sentence across two lines and put the closing parenthesis only on the second, leaving line 10 of the file as <code>(A controller reporting EXPR evaluates them itself; ioSender and the</code> - an unterminated comment.</p><p>That reads like a typo and is not one. <code>NgcConstants.IsComment</code> recognises a block only when it both opens <code>(</code> and closes <code>)</code>, so the resolver did not treat the line as a comment - and <code>ParseFileLines</code> then refused the file after the <strong>first block</strong>.</p><ul><li><strong>Why nobody hit it.</strong> A job built by the converter is handed to the Job tab block by block and never re-parsed, so every job burned so far was fine. It bites only when a <strong>saved .nc is loaded back</strong> - which is exactly what happens when the file is taken to a standalone controller and opened again later.</li><li><strong>Each line now closes its own parenthesis</strong>, rather than one sentence spanning two blocks.</li></ul><p>The round-trip harness (<code>tools/ngc-roundtrip</code>) grows a section over the header the emitter actually produces: every line is a balanced comment or an assignment, the header loads, nothing survives as an unresolved reference in an executable block, and the exposure constants resolve to what was declared.</p><p class="foot">Proven by making it fail: with the missing ')' put back, three of those checks go red - including "the emitted header loads".</p></div>
+</div>
+<!-- ===== #313 ===== -->
+<div class="pr">
+<h2 id="pr313"><span class="badge">#313</span>A power ramp restated the value it had just declared</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Converters/SvgToLaser.cs</td><td class="num add">30</td><td class="num del">2</td></tr>
+</table>
+<div class="desc"><p>With a ramp in effect the emitter re-declared the exposure constant before every copy - including the first, whose value is by definition the one declared at the top of the file:</p><pre>#&lt;s_fill&gt; = 850          &lt;- header
+(shading copy 1 of 4)
+#&lt;s_fill&gt; = 850          &lt;- says "this changed here" about nothing</pre><p>The same restatement appeared wherever a ramp had hit the <code>$30</code> ceiling, since consecutive clamped copies share a value.</p><ul><li><strong>The emitter now tracks what each constant currently holds</strong>, seeded from the header's own declarations, and writes an assignment only when the number actually moves.</li><li><strong>The CLAMPED comment still prints per copy.</strong> That one is worth keeping - it is the difference between two squares that read as a result and two squares that are the same burn.</li><li>The map is cleared as it is seeded: it is per-program state on a converter the placement-retry loop can reach more than once, and a value carried over would suppress a declaration the next program needs.</li></ul></div>
+</div>
+<!-- ===== #314 ===== -->
+<div class="pr">
+<h2 id="pr314"><span class="badge">#314</span>SVG laser: the placement as two constants, and the geometry below it 0-based</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Converters/SvgToLaser.cs</td><td class="num add">81</td><td class="num del">18</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/NgcConstants.cs</td><td class="num add">24</td><td class="num">0</td></tr>
+<tr><td class="mono">tools/ngc-roundtrip/Program.cs</td><td class="num add">46</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The placement chosen in the dialog used to be added to every coordinate in the file - tens of thousands of them on a shaded job - so moving the job meant regenerating it. It is now declared once, holding exactly the numbers the dialog showed, and everything below the header is the artwork's own geometry from 0,0:</p><pre>#&lt;x_org&gt; = 16.5
+#&lt;y_org&gt; = -9.525
+G21 G90 G17
+G92 X0 Y0                     the PARKED corner is 0,0
+M4 S0
+G0 X#&lt;x_org&gt; Y#&lt;y_org&gt; S0     move in by the placement
+G92 X0 Y0                     and that is the artwork origin
+...artwork, 0-based...
+M5
+G0 X0 Y0                      back to the artwork origin
+G92 X#&lt;x_org&gt; Y#&lt;y_org&gt;       re-label: the parked frame again
+G0 X0 Y0                      back to the parked corner
+G92.1</pre><ul><li><strong>It is a rapid, not <code>G92 X#&lt;x_org&gt; Y#&lt;y_org&gt;</code> at the top</strong>, which is the shape it first looks like it should be. G92 <em>labels the point the head is standing on</em>: naming the placement there declares the parked corner to be 16.5 and sends the artwork the same distance the other way. A single G92 could carry these only negated - and a file whose constants are the negatives of what the operator typed gets hand-edited in the wrong direction exactly once, on a machine running with soft and hard limits off.</li><li><strong>The same two constants bring the head home.</strong> After the artwork the head is in the artwork's frame, where the parked corner sits at minus the placement; re-declaring the current point as the placement restores the frame the job opened in, so the return is a plain <code>G0 X0 Y0</code> and no literal in the file can drift from <code>x_org</code>. Return first, <em>then</em> <code>G92.1</code> - clearing while still at the artwork would send the next move to whatever the machine calls 0,0.</li><li>Both exits - shading-only and full - now share one closing routine instead of carrying a copy each. The copy <strong>pitch</strong> stays on the coordinates: that is not placement, it is where copy n sits relative to copy 1.</li><li>The off-table guard added in #311 is unaffected - it works from the settings, not from the emitted coordinates.</li></ul><p>The round-trip harness covers the new shape through the real loader, including the case that decided the design: a <strong>negative</strong> <code>y_org</code> substituting into <code>Y#&lt;y_org&gt;</code> gives <code>Y-9.525</code>, where the negated form <code>Y-#&lt;y_org&gt;</code> would have produced the malformed <code>Y--9.525</code>.</p><p class="foot">Verified on the laser: job generated, sent to the engraver, correct result - and the 3D preview is unchanged, so the viewer honours both G92s.</p></div>
+</div>
+<!-- ===== #315 ===== -->
+<div class="pr">
+<h2 id="pr315"><span class="badge">#315</span>A held-back feature turned on by a launch flag instead of a commit</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/Features.cs</td><td class="num add">16</td><td class="num del">9</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ActionKeyBinder.cs</td><td class="num add">10</td><td class="num del">2</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/App.xaml.cs</td><td class="num add">10</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p><code>Features.SvgLaserJob</code> had been committed <strong>true</strong> with a comment saying it must be reverted before the branch was pushed - a note that only works if whoever pushes reads it. The shipped default is now the held-back one, and daily use is a launch flag:</p><pre>.\build.ps1 -Launch -enableSVGLaserJob</pre><ul><li><strong>Matched case-insensitively</strong>, not as a switch label. It is typed by a human, its natural spelling mixes cases, and a flag that silently does nothing when you type <code>-enablesvglaserjob</code> is worse than no flag.</li><li><strong>It is no longer a <code>const</code>.</strong> A const is inlined into every reading assembly at compile time, so no command line could move it - the readers would keep the value they were built against.</li><li><strong><code>ActionKeyBinder.Catalog</code> stopped being a snapshot.</strong> It was a <code>static readonly</code> array that filtered on the flag, which was safe only while the flag was compile-time. Against a value set during startup it becomes a snapshot taken whenever that type is first touched - a race decided by unrelated code. It is computed per read now; two callers, neither hot.</li></ul><p>One switch still governs all three places the feature shows itself: the File menu entry, its keyboard action registration, and its row in Settings &gt; Keyboard.</p></div>
 </div>
 </section>
 
