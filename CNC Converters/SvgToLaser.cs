@@ -65,6 +65,7 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Windows;
 using CNC.Core;
@@ -97,6 +98,12 @@ namespace CNC.Converters
         // value that has to be re-added every time something else is recalculated is a value that will
         // eventually be forgotten once.
         private double anchorY;
+
+        // What each exposure constant currently holds in the emitted program, so a re-declaration that
+        // would change nothing is not written at all. Seeded from the declarations at the top of the file:
+        // without that seed the first copy of a ramp restates the value the header just set, which reads
+        // like the ramp starts one step late. Keyed by constant name (NgcConstants.SvgLaser.*).
+        private readonly Dictionary<string, double> declared = new Dictionary<string, double>();
 
         private string FX(double v) { return F(v + offX); }
         private string FY(double v) { return F(v + offY + anchorY); }
@@ -167,9 +174,18 @@ namespace CNC.Converters
 
             double wanted = basePower + pitch * copy;
             double used = settings.Ramped(basePower, pitch, copy);
+            double value = BeamPower(used);
 
-            job.AddBlock(string.Format(CultureInfo.InvariantCulture, "#<{0}> = {1}",
-                                       name, N(BeamPower(used))));
+            // Only when it actually moves. Copy 1 always lands on the value the header declared, and a
+            // ramp that has hit the clamp repeats the same number for every copy after it - writing those
+            // assignments out says "this changed here" about a line that changed nothing.
+            double current;
+            if (!declared.TryGetValue(name, out current) || Math.Abs(current - value) > 1e-9)
+            {
+                job.AddBlock(string.Format(CultureInfo.InvariantCulture, "#<{0}> = {1}",
+                                           name, N(value)));
+                declared[name] = value;
+            }
 
             if (Math.Abs(wanted - used) > 1e-9)
                 job.AddBlock(string.Format(CultureInfo.InvariantCulture,
@@ -344,6 +360,18 @@ namespace CNC.Converters
                              BeamPower(settings.Power), BeamPower(settings.FillPower),
                              settings.Feed, settings.FillFeed, settings.Fill))
                     job.AddBlock(d);
+
+                // Record what those blocks just set, so DeclareCopyPower can tell a real change from a
+                // restatement. Same expressions as the call above - if either moves, both move.
+                //
+                // Cleared first: this is per-PROGRAM state on an object that outlives one emit (the
+                // dialog loops on a rejected placement), and a value carried over from a previous run
+                // would suppress a declaration the new program needs - silently, and only for the copy
+                // whose power happened to match.
+                declared.Clear();
+                declared[NgcConstants.SvgLaser.LinePower] = BeamPower(settings.Power);
+                if (settings.Fill)
+                    declared[NgcConstants.SvgLaser.FillPower] = BeamPower(settings.FillPower);
 
                 job.AddBlock("G21 G90 G17");
                 job.AddBlock("G92 X0 Y0");
