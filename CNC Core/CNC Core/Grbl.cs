@@ -1892,6 +1892,17 @@ namespace CNC.Core
         public static bool ProbeSuccesful { get; private set; } = false;
         public static int HomedMask { get; private set; } = -1;   // grblHAL sys.homed.mask from the $# [HOME:...] line; -1 = unknown / not fetched
 
+        // Staging for the above. HomedMask used to be cleared to -1 on ENTRY to Get() and set directly by the
+        // [HOME:] parse, which opened a window - from that clear until the report's [HOME:] line was consumed -
+        // in which ANY other reader saw "unknown". Every reader of this field treats -1 as "can't know" and
+        // fails open, so the window silently disabled them. MacroRunner.StoredPositionUnreachable read it
+        // inside that window on every run it ever made (4 for 4 across the whole log history: the soft-limit
+        // guard never once actually evaluated, and a G59.3 taught ON the envelope boundary went through to a
+        // mid-run Alarm:2 on 2026-09-02). Staging here and publishing once the report has been consumed means
+        // a concurrent reader gets the PREVIOUS mask - slightly stale, but a real answer - instead of "unknown",
+        // and -1 goes back to meaning only what it says: the read genuinely failed.
+        private static int homedMaskStaged = -1;
+
         private static Action<string> dataReceived;
 
         public static CoordinateSystem GetCoordinateSystem(string gCode)
@@ -1929,7 +1940,7 @@ namespace CNC.Core
             target = SyncTarget.Capture();
             dataReceived += process;
             LatheMode = GrblParserState.LatheMode;
-            HomedMask = -1;     // fail-closed: only a fresh [HOME:...] line sets it
+            homedMaskStaged = -1;   // only a fresh [HOME:...] line fills this; published below once consumed
 
             model.Silent = true;
 
@@ -1952,6 +1963,17 @@ namespace CNC.Core
 
             model.Silent = false;
             dataReceived -= process;
+
+            // Publish the freshly-read mask (see homedMaskStaged). Logged because the whole point of this
+            // field is to be read by guards that fail OPEN when it is -1: if it ever reads -1 here with
+            // res=True, the [HOME:] line is being missed or arriving after the ack, and every one of those
+            // guards is silently off. That is exactly what was happening before this change.
+            int homedWas = HomedMask;
+            HomedMask = homedMaskStaged;
+            if (DebugLog.Enabled)
+                DebugLog.Write("run", string.Format("GrblWorkParameters.Get: res={0} HomedMask {1} -> {2}{3}",
+                    res, homedWas, HomedMask,
+                    res == true && HomedMask < 0 ? "  (NO [HOME:] IN A COMPLETED $# REPORT - guards that need it will fail open)" : ""));
 
             if (Tools.Count == 1)
             {
@@ -2106,7 +2128,7 @@ namespace CNC.Core
                             int c = parameters.LastIndexOf(':');
                             int mask;
                             if (c >= 0 && int.TryParse(parameters.Substring(c + 1), out mask))
-                                HomedMask = mask;
+                                homedMaskStaged = mask;   // published by Get() once the report is consumed
                         }
                         break;
                 }

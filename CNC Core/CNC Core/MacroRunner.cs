@@ -464,6 +464,10 @@ namespace CNC.Core
         // Fails OPEN in every "can't know" case - soft limits off, travel not configured, homed state
         // unknown, axis not homed - because the firmware itself only checks homed axes with $20 on, and
         // a false refusal here blocks a job that would have run perfectly well.
+        //
+        // "Can't know" is deliberately NARROW, though: a missing $# [HOME:] mask falls back to the live
+        // HomedState rather than skipping. Treating an unanswered query as a reason not to check is what
+        // made this guard dead code for its entire life - see the fallback below.
         public static string StoredPositionUnreachable(string code)
         {
             if (!StoredMachinePositionCodes.Contains(code))
@@ -496,10 +500,33 @@ namespace CNC.Core
             // The firmware only envelope-checks axes it considers homed; -1 = the $# read gave us no
             // [HOME:] line at all, so we know nothing and must not guess.
             int homed = GrblWorkParameters.HomedMask;
+
+            if (homed < 0)
+            {
+                // ...but "no mask" must not mean "no check". This read -1 on every run it ever made - the
+                // guard below never once executed - because GrblWorkParameters.Get() cleared the mask on
+                // entry and a reader landing in that window saw "unknown" (fixed there; this is the belt to
+                // that braces). Falling back to the live homed state mirrors what the "homed" PREREQ above
+                // already does for exactly the same reason. A homed machine has every configured axis homed,
+                // which is the only case this guard cares about; a genuinely unknown homed state still fails
+                // open, as does an unhomed one - the firmware would not envelope-check it either.
+                var m = Grbl.GrblViewModel;
+                if (m != null && m.HomedState == HomedState.Homed)
+                {
+                    homed = (1 << GrblInfo.NumAxes) - 1;
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("run", string.Format(
+                            "StoredPositionUnreachable({0}): HomedMask unknown (-1), but HomedState=Homed - checking all {1} axes",
+                            code, GrblInfo.NumAxes));
+                }
+            }
+
             if (homed <= 0)
             {
                 if (DebugLog.Enabled)
-                    DebugLog.Write("run", string.Format("StoredPositionUnreachable({0}): SKIP - HomedMask {1}", code, homed));
+                    DebugLog.Write("run", string.Format("StoredPositionUnreachable({0}): SKIP - HomedMask {1}, HomedState {2}",
+                        code, GrblWorkParameters.HomedMask,
+                        Grbl.GrblViewModel == null ? "(no model)" : Grbl.GrblViewModel.HomedState.ToString()));
                 return null;
             }
 
