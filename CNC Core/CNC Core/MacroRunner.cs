@@ -102,11 +102,27 @@ namespace CNC.Core
         }
 
         // Shared by every generator that parks at G30 (StartJobView, StepperCalibrationProbeWizard, ...):
-        // lift to machine top, traverse to the G30 X/Y, then descend to G30 Z. #<_abs_x>/#<_abs_y> are grblHAL's
-        // own live current-machine-position named parameters; every G53 move NAMES both axes explicitly (never a
-        // bare "G53 G0 Z0") - a firmware bug sign-flips a homing-direction-inverted ($23) axis's parser base
-        // after a G53 move that leaves it "unmoved", producing a false Alarm:2. 'L' emits one line (a caller's
+        // lift to machine top, traverse to the G30 X/Y, then descend to G30 Z. 'L' emits one line (a caller's
         // own comment-sanitizing/line-numbering wrapper, or a plain StringBuilder.AppendLine).
+        //
+        // The lift is a BARE "G53 G0 Z0" and must stay that way. It used to be
+        // "G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z0", naming X/Y at the live machine position, on the reasoning
+        // that a G53 leaving an axis "unmoved" sign-flips a homing-direction-inverted ($23) axis's parser
+        // base and throws a false Alarm:2. That firmware bug was TESTED AND DISPROVEN on 2026-08-11: an
+        // A/B/C on a matched rig (no-op-then-move / move alone / the same coordinates as LITERALS) alarmed
+        // in all three arms, so the target itself was being refused whatever named it - the real cause was
+        // an uninitialised work envelope (Simulator 55dc91b). Naming X/Y cost twice over:
+        //
+        //   1. #<_abs_x> is read when the block is PARSED, not when the machine gets there. In a STREAMED
+        //      program with a full planner buffer that froze whatever position was current at parse time -
+        //      G30's, during a tool-change park - into a later rapid, producing full-speed diagonals
+        //      mid-job (reverted once in 0166eba6, and it came straight back here).
+        //   2. It made the lift depend on the CURRENT X/Y being inside the soft-limit envelope. grblHAL's
+        //      jog clamp ($40=1) parks an axis exactly ON the envelope boundary, and re-commanding that
+        //      same coordinate is then refused: Alarm:2 on the park line, machine motionless, mid-run.
+        //      Observed 2026-09-02 with Y clamped to -839.004 against a -839.000 floor.
+        //
+        // A bare Z-only G53 holds X/Y by not mentioning them, so neither failure is reachable.
         public static void EmitGotoG30(System.Action<string> L)
         {
             // DO NOT wrap these in an o-word conditional. Tried 2026-08-02 to skip the lift-and-drop when
@@ -122,9 +138,9 @@ namespace CNC.Core
             // If the redundant round trip is worth removing, decide it in C# at generate time - the caller
             // already knows the live position via GrblViewModel.MachinePosition - and just don't emit these
             // lines. Never by asking the controller to branch mid-stream.
-            L("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z0");   // lift Z to machine top, X/Y held at current
+            L("G53 G0 Z0");                             // lift Z to machine top, X/Y held by NOT naming them
             L("G53 G0 X[#5181] Y[#5182]");              // traverse to G30 X/Y at the top
-            L("G53 G0 X[#5181] Y[#5182] Z[#5183]");     // descend to G30 Z (X/Y named to avoid the unmoved-axis bug)
+            L("G53 G0 X[#5181] Y[#5182] Z[#5183]");     // descend to G30 Z (#5181-#5183 = stored G30, static NVS)
         }
 
         // grblHAL rejects a line over its receive-buffer size outright ("Max characters per line exceeded -
@@ -434,7 +450,8 @@ namespace CNC.Core
         // streamed happily and then threw Alarm:2 on the park line, mid-run, with the operator watching.
         // Observed 2026-08-06: [G30:751.428,-836.262,-34.000] against $131=840 / $27=6 puts Y 2.262 mm
         // outside its envelope, so "G53 G0 X[#5181] Y[#5182]" alarmed at Ln:220 - and the failure looked
-        // like a generator bug because the preceding line used #<_abs_x>/#<_abs_y>.
+        // like a generator bug because the preceding line used #<_abs_x>/#<_abs_y> (that lift is a bare
+        // "G53 G0 Z0" now - see EmitGotoG30).
         //
         // The envelope mirrors grblHAL's own limits_set_work_envelope()/check_travel_limits(), which is
         // ALSO exactly what JogController.BuildCommand / JogBaseControl.ClampMachine already clamp jogs

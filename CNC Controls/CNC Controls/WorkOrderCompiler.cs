@@ -1798,16 +1798,17 @@ namespace CNC.Controls
             // with a low work Z origin it is a genuine collision risk rather than just an ugly move.
             //
             // Lift to machine top instead - unambiguous from any starting position, and the same first line
-            // MacroProcessor.EmitGotoG30 uses. X/Y are named explicitly (held at their current machine
-            // position) rather than writing a bare "G53 G0 Z0": see EmitGotoG30's comment - a firmware bug
-            // sign-flips a homing-direction-inverted ($23) axis's parser base after a G53 move that leaves it
-            // "unmoved", producing a false Alarm:2.
+            // MacroProcessor.EmitGotoG30 uses: a BARE "G53 G0 Z0". This line used to name X/Y at the live
+            // position via #<_abs_x>/#<_abs_y>; that was reverted here once already (0166eba6) because a
+            // parse-time read froze G30's coordinates into a mid-job rapid, and it is doubly wrong because it
+            // makes the lift fail whenever the current X/Y sits on the soft-limit boundary. See EmitGotoG30's
+            // comment for the full account, including the firmware bug that was disproven on 2026-08-11.
             //
             // Entire Spoilboard skips this entirely: it doesn't trust the work order's WCS at all (see
             // BuildSurfaceEntireSpoilboard) and its own first line is already a machine-referenced G53 rapid.
             bool entireSpoilboardOnly = wo.Toolpaths.Any(t => t.EntireSpoilboard && wo.EnabledOperations(t).Any());
             if (!entireSpoilboardOnly)
-                lines.Add("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z0");
+                lines.Add("G53 G0 Z0");
 
             // Load the machine-wide TLO-reference baseline (AppConfig.Base.TloRefBaseline, set once via
             // Machine Setup's "Reference TLO" step) as an INPUT to every M6 in this run, the same fix
@@ -1986,9 +1987,10 @@ namespace CNC.Controls
             // Use the shared EmitGotoG30 rather than hand-rolling it. The hand-rolled version here retracted
             // with a work-coordinate "G0 Z{SafeZ}" and then traversed - which is NOT Safe Z: with a work Z
             // origin ~113mm below machine top, "G0 Z20" left the tool ~93mm below machine top and it crossed
-            // the whole table at that height. Confirmed on real hardware 2026-08-02. It also wrote a bare
-            // "G53 G0 Z#5183" with X/Y unmoved, the exact shape of the false-Alarm:2 firmware bug EmitGotoG30
-            // names both axes to avoid.
+            // the whole table at that height. Confirmed on real hardware 2026-08-02. (It also descended with a
+            // bare "G53 G0 Z#5183"; EmitGotoG30 names X/Y on that DESCENT so the tool arrives over the G30 spot
+            // rather than wherever it happened to be - not, as this comment used to say, to dodge a firmware
+            // bug. That bug was disproven on 2026-08-11; see EmitGotoG30.)
             MacroProcessor.EmitGotoG30(lines.Add);
             // Restore whatever #<_tlo_ref> held before this program touched it - same save/restore idiom
             // StartJobView.BuildProgram uses. Only covers a CLEAN finish; an aborted/alarmed run never

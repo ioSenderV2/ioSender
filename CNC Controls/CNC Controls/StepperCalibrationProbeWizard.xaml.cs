@@ -724,14 +724,12 @@ namespace CNC.Controls
             b.AppendLine(string.Format("#<_ls_zfloor> = {0}", (GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 1.0d : -9999d).ToInvariantString("0.0##")));
 
             // Park at G30 and confirm the probe before touching anything - same pattern StartJobView.BuildProgram
-            // uses (EmitGotoG30 + MBOX). #<_abs_x>/#<_abs_y> are grblHAL's own live current-machine-position
-            // named parameters; every G53 move NAMES both axes explicitly (never a bare "G53 G0 Z0") - a firmware
-            // bug sign-flips a homing-direction-inverted ($23) axis's parser base after a G53 move that leaves
-            // it "unmoved", producing a false Alarm:2.
+            // uses (EmitGotoG30 + MBOX). Use the SHARED emitter rather than hand-rolling the three lines: this
+            // copy had drifted (it still named X/Y on the lift via #<_abs_x>/#<_abs_y> long after that was shown
+            // to be both a parse-time read and a soft-limit trap) while the other three call sites in this same
+            // file already went through MacroProcessor.EmitGotoG30. See EmitGotoG30's comment.
             b.AppendLine("(park at G30 - install / confirm the probe)");
-            b.AppendLine("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z0");
-            b.AppendLine("G53 G0 X[#5181] Y[#5182]");
-            b.AppendLine("G53 G0 X[#5181] Y[#5182] Z[#5183]");
+            MacroProcessor.EmitGotoG30(l => b.AppendLine(l));
             b.AppendLine("(WAITIDLE)");
             b.AppendLine(string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. It must MATCH what is in the spindle - the wrong tip silently shifts the work origin by half the diameter difference. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
 

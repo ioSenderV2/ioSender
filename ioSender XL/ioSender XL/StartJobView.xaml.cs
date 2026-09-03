@@ -3323,10 +3323,11 @@ namespace GCode_Sender
         }
 
         // Safe-Z go-to G30 (probe-install / park): lift to machine top, traverse X/Y, descend - never a bare diagonal.
-        // Every G53 SPECIFIES X and Y (held at the current machine position via #<_abs_x>/#<_abs_y>, then at the G30
-        // X/Y) instead of leaving them implicit. A firmware bug sign-flips the parser base of a homing-direction-
-        // inverted ($23) axis after a G53 move, so a G53 with that axis "unmoved" (e.g. a bare "G53 G0 Z0") targets
-        // it from the flipped base -> false Alarm:2. Naming the axis uses the literal value and dodges the bug.
+        // The lift is a BARE "G53 G0 Z0"; the traverse/descend name X/Y from the stored G30 (#5181/#5182/#5183) so
+        // the tool arrives over the G30 spot. This comment used to claim every G53 must name X and Y - via
+        // #<_abs_x>/#<_abs_y> on the lift - to dodge a firmware bug that sign-flips a homing-direction-inverted
+        // ($23) axis's parser base. That bug was tested and DISPROVEN on 2026-08-11, and naming the live position
+        // there caused two real failures of its own. See MacroRunner.EmitGotoG30 for the full account.
         // Bracket only multi-term expressions; a bare param/number is assigned as-is (matches the proven
         // "#<rad>=1" form). grblHAL needs brackets around an expression but not one value.
         private static string Br(string v) { return v.IndexOf(' ') >= 0 ? "[" + v + "]" : v; }
