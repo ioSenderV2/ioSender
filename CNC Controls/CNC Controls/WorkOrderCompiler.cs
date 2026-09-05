@@ -23,6 +23,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using CNC.Core;
+using CNC.Svg;
 
 namespace CNC.Controls
 {

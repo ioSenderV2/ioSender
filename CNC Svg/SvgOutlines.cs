@@ -1,27 +1,32 @@
 ﻿/*
- * SvgOutlines.cs - part of CNC Controls library
+ * SvgOutlines.cs - part of the CNC.Svg library
  *
  * Turns an .svg file into closed polygon contours, in millimetres, ready for a toolpath - the same
  * List<OutlineContour> TrueTypeOutlines produces from a string, so a logo feeds the carve engine
  * exactly the way a word does. See docs/Architecture-SVG-Import.md.
  *
- * ---- Why this sits beside TrueTypeOutlines rather than in Core ----
+ * ---- This used to live in CNC Controls, and why it no longer does ----
  *
- * Same reason that one does: it leans on WPF (Geometry.Parse + GetFlattenedPathGeometry), and Core
- * is WPF-free. The carve engine takes bare polygon lists and has never known where they came from -
- * a glyph, a logo, or something a headless server supplied. This is one more producer for that seam.
+ * It sat beside TrueTypeOutlines because both leaned on WPF (Geometry.Parse +
+ * GetFlattenedPathGeometry). PresentationCore is Windows-only, so the SVG-to-laser converter could
+ * not run on the EngravingBox appliance that actually burns the file. Moved here 2026-09-05 with the
+ * parser and flattener replaced by SvgPath, which implements the SVG 'd' grammar directly and pulls
+ * in no WPF and no native library. Nothing else about the import changed.
  *
- * ---- Why Geometry.Parse rather than a hand-written path parser ----
+ * The carve engine takes bare polygon lists and has never known where they came from - a glyph, a
+ * logo, or something a headless server supplied. This is one more producer for that seam.
  *
- * WPF's path mini-language is derived from SVG's own 'd' grammar and accepts the same commands
- * (M L H V C S Q T A Z, absolute and relative, with implicit repeats). Parsing with it means the
- * flattening below is the IDENTICAL call TrueTypeOutlines makes, at the identical tolerance, so
- * curved artwork and curved glyphs discretise the same way. Writing the grammar by hand - elliptical
- * arc endpoint-to-centre parameterisation especially - would be a lot of code to arrive somewhere
- * slightly different.
+ * ---- The parser is now SVG's grammar, not XAML's ----
  *
- * It is close but not a perfect superset, which is why ParseFailures is reported rather than
- * swallowed: a path this cannot read must be visible, not quietly missing from the cut.
+ * WPF's path mini-language is DERIVED from SVG's 'd' but is not a perfect superset of it, which is
+ * why ParseFailures exists: a path WPF could not read had to be visible rather than quietly missing
+ * from the cut. SvgPath reads the SVG grammar itself, so some artwork that previously counted as a
+ * parse failure now imports. ParseFailures is still reported for anything genuinely malformed - the
+ * requirement was never "WPF said no", it was "do not cut a partial path silently".
+ *
+ * Flattened output is NOT point-for-point what WPF produced; the subdivision differs. Comparisons
+ * against the old path must be geometric (contour count, containment, bounds, area), which is what
+ * tools/svg-compare checks.
  *
  * ---- IsOuter comes from CONTAINMENT, not from winding ----
  *
@@ -45,12 +50,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text.RegularExpressions;
-using System.Windows;
-using System.Windows.Media;
 using System.Xml.Linq;
 using CNC.Core;
 
-namespace CNC.Controls
+namespace CNC.Svg
 {
     /// <summary>What an SVG import produced, and what it could not.</summary>
     public class SvgImportResult
@@ -68,7 +71,7 @@ namespace CNC.Controls
         /// </summary>
         public Dictionary<string, int> Unsupported = new Dictionary<string, int>();
 
-        /// <summary>Paths whose data WPF's parser refused. Never silently dropped.</summary>
+        /// <summary>Paths whose 'd' data would not parse. Never silently dropped.</summary>
         public int ParseFailures;
 
         /// <summary>Null when the file loaded; otherwise why it did not.</summary>
@@ -194,11 +197,11 @@ namespace CNC.Controls
             // whose path is a full-page rectangle, and hangs a matrix(1,0,0,-1,..) off every path to undo
             // PDF's upward Y. Walking blindly imports the clip box as a frame around the logo and drops
             // every shape at its untransformed, vertically mirrored position.
-            Matrix rootMatrix = Matrix.Identity;
+            SvgMatrix rootMatrix = SvgMatrix.Identity;
             var rootTransform = root.Attribute("transform");
             if (rootTransform != null && !TryParseTransform(rootTransform.Value, out rootMatrix))
             {
-                rootMatrix = Matrix.Identity;
+                rootMatrix = SvgMatrix.Identity;
                 Bump(result.Unsupported, "transform");
             }
 
@@ -232,7 +235,7 @@ namespace CNC.Controls
         /// Collect flattened outlines from the rendered elements under <paramref name="parent"/>,
         /// carrying the accumulated transform down with them.
         /// </summary>
-        private static void Walk(XElement parent, Matrix inherited, List<List<Point2D>> rings, SvgImportResult result)
+        private static void Walk(XElement parent, SvgMatrix inherited, List<List<Point2D>> rings, SvgImportResult result)
         {
             foreach (var el in parent.Elements())
             {
@@ -241,11 +244,11 @@ namespace CNC.Controls
                 if (IsNonRendered(local))
                     continue;
 
-                Matrix here = inherited;
+                SvgMatrix here = inherited;
                 var transform = el.Attribute("transform");
                 if (transform != null)
                 {
-                    Matrix own;
+                    SvgMatrix own;
                     if (TryParseTransform(transform.Value, out own))
                     {
                         // own maps this element into its PARENT's space; inherited carries that on to the
@@ -288,9 +291,9 @@ namespace CNC.Controls
         /// right to left - into a single matrix. False when any part of it is not understood, so the
         /// caller can report it instead of placing the artwork wrongly.
         /// </summary>
-        private static bool TryParseTransform(string text, out Matrix result)
+        private static bool TryParseTransform(string text, out SvgMatrix result)
         {
-            result = Matrix.Identity;
+            result = SvgMatrix.Identity;
             if (string.IsNullOrWhiteSpace(text))
                 return true;
 
@@ -319,23 +322,23 @@ namespace CNC.Controls
                 if (!TryNumbers(m.Groups[2].Value, out a))
                     return false;
 
-                Matrix t = Matrix.Identity;
+                SvgMatrix t = SvgMatrix.Identity;
                 switch (m.Groups[1].Value)      // SVG function names are case SENSITIVE (skewX, not skewx)
                 {
                     case "matrix":
                         if (a.Length != 6) return false;
-                        t = new Matrix(a[0], a[1], a[2], a[3], a[4], a[5]);
+                        t = new SvgMatrix(a[0], a[1], a[2], a[3], a[4], a[5]);
                         break;
 
                     case "translate":
-                        if (a.Length == 1) t = new Matrix(1d, 0d, 0d, 1d, a[0], 0d);
-                        else if (a.Length == 2) t = new Matrix(1d, 0d, 0d, 1d, a[0], a[1]);
+                        if (a.Length == 1) t = new SvgMatrix(1d, 0d, 0d, 1d, a[0], 0d);
+                        else if (a.Length == 2) t = new SvgMatrix(1d, 0d, 0d, 1d, a[0], a[1]);
                         else return false;
                         break;
 
                     case "scale":
-                        if (a.Length == 1) t = new Matrix(a[0], 0d, 0d, a[0], 0d, 0d);
-                        else if (a.Length == 2) t = new Matrix(a[0], 0d, 0d, a[1], 0d, 0d);
+                        if (a.Length == 1) t = new SvgMatrix(a[0], 0d, 0d, a[0], 0d, 0d);
+                        else if (a.Length == 2) t = new SvgMatrix(a[0], 0d, 0d, a[1], 0d, 0d);
                         else return false;
                         break;
 
@@ -347,12 +350,12 @@ namespace CNC.Controls
 
                     case "skewX":
                         if (a.Length != 1) return false;
-                        t = new Matrix(1d, 0d, Math.Tan(a[0] * Math.PI / 180d), 1d, 0d, 0d);
+                        t = new SvgMatrix(1d, 0d, Math.Tan(a[0] * Math.PI / 180d), 1d, 0d, 0d);
                         break;
 
                     case "skewY":
                         if (a.Length != 1) return false;
-                        t = new Matrix(1d, Math.Tan(a[0] * Math.PI / 180d), 0d, 1d, 0d, 0d);
+                        t = new SvgMatrix(1d, Math.Tan(a[0] * Math.PI / 180d), 0d, 1d, 0d, 0d);
                         break;
 
                     default:
@@ -381,61 +384,23 @@ namespace CNC.Controls
 
         // ------------------------------------------------------------------ path -> rings
 
-        private static bool Flatten(string data, Matrix matrix, List<List<Point2D>> rings)
+        /// <summary>
+        /// Parse and flatten one path's 'd' data into <paramref name="rings"/>, with
+        /// <paramref name="matrix"/> applied before subdivision so FlattenTolerance keeps its meaning
+        /// under scale. False when the data is not valid path syntax - counted, never swallowed.
+        /// </summary>
+        private static bool Flatten(string data, SvgMatrix matrix, List<List<Point2D>> rings)
         {
-            Geometry geometry;
-            try { geometry = Geometry.Parse(data); }
-            catch { return false; }   // not WPF-compatible path data - counted, never swallowed
-
-            // Geometry.Parse hands back a FROZEN instance, so Transform cannot be set on it - it throws
-            // "cannot set a property on object ... because it is in a read-only state". Clone first.
-            //
-            // Applied to the GEOMETRY rather than to the flattened points afterwards, so that flattening
-            // happens in transformed space. That is what keeps FlattenTolerance meaningful: a curve under
-            // a 10x scale needs ten times the segments to stay within 0.01mm of true, and flattening
-            // first would have already thrown that detail away.
-            if (!matrix.IsIdentity)
-            {
-                try
-                {
-                    geometry = geometry.Clone();
-                    geometry.Transform = new MatrixTransform(matrix);
-                }
-                catch { return false; }
-            }
-
-            PathGeometry flat;
-            try { flat = geometry.GetFlattenedPathGeometry(FlattenTolerance, ToleranceType.Absolute); }
-            catch { return false; }
-            if (flat == null)
+            // Flattened into a scratch list and committed only on success, so a path that parses
+            // halfway contributes NOTHING. The WPF version got this for free - Geometry.Parse either
+            // returned the whole path or threw - and losing it would mean a malformed path both
+            // reporting a failure and quietly adding the part of itself that did parse, which is the
+            // partial-artwork outcome this whole file exists to prevent.
+            var parsed = new List<List<Point2D>>();
+            if (!SvgPath.Flatten(data, matrix, FlattenTolerance, parsed))
                 return false;
 
-            foreach (var figure in flat.Figures)
-            {
-                var pts = new List<Point2D> { new Point2D(figure.StartPoint.X, figure.StartPoint.Y) };
-                foreach (var seg in figure.Segments)
-                {
-                    var poly = seg as PolyLineSegment;
-                    if (poly != null)
-                    {
-                        foreach (var p in poly.Points)
-                            pts.Add(new Point2D(p.X, p.Y));
-                        continue;
-                    }
-                    var line = seg as LineSegment;
-                    if (line != null)
-                        pts.Add(new Point2D(line.Point.X, line.Point.Y));
-                    // Flattening yields only line/polyline segments; anything else did not flatten and
-                    // must not be faked as a straight line between its endpoints.
-                }
-
-                // An OPEN figure is a stroke, not a region. V-carving needs closed rings, so closing it
-                // here would invent material that is not in the artwork. Dropped, and the drop is
-                // reported through IsClosed below rather than passing silently.
-                if (pts.Count < 3)
-                    continue;
-                rings.Add(pts);
-            }
+            rings.AddRange(parsed);
             return true;
         }
 

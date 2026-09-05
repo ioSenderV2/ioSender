@@ -25,6 +25,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using CNC.Core;
+using CNC.Svg;
 
 namespace CNC.Controls
 {

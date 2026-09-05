@@ -20,6 +20,7 @@
  */
 
 using System;
+using System.Collections.Generic;
 
 namespace CNC.Core
 {
@@ -144,5 +145,29 @@ namespace CNC.Core
         {
             return string.Format("{0},{1}", X, Y);
         }
+    }
+
+    /// <summary>One closed contour of an outline, in mm, Y up.</summary>
+    /// <remarks>
+    /// Lives here rather than beside TrueTypeOutlines (where it was defined until 2026-09-05) because
+    /// it is the shared currency between every outline PRODUCER and the carve engine that consumes
+    /// them, and the producers no longer all live in the WPF assembly: CNC.Svg reads artwork with no
+    /// WPF at all so the same type can be used on a Linux appliance. Point2D is here for exactly the
+    /// same reason.
+    /// </remarks>
+    public class OutlineContour
+    {
+        public List<Point2D> Points = new List<Point2D>();
+
+        /// <summary>
+        /// Signed area, mm². Positive and negative contours wind opposite ways. For a TrueType glyph
+        /// that sign distinguishes an outer boundary from a counter; for arbitrary SVG artwork it does
+        /// NOT - see SvgOutlines, which derives IsOuter from containment instead. Magnitude is the
+        /// enclosed area, which is also a cheap way to drop degenerate specks.
+        /// </summary>
+        public double SignedArea;
+
+        /// <summary>True when this contour bounds a solid region rather than a hole in one.</summary>
+        public bool IsOuter;
     }
 }

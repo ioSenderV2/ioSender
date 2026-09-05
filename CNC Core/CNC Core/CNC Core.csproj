@@ -86,7 +86,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ActionCommand.cs" />
-    <Compile Include="NgcConstants.cs" />
     <Compile Include="GCodeRunTime.cs" />
     <Compile Include="GCodeRunTimeIndex.cs" />
     <Compile Include="JogGate.cs" />

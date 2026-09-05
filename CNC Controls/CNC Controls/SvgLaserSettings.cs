@@ -25,6 +25,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Xml.Serialization;
 using CNC.Core;
+using CNC.Svg;
 
 namespace CNC.Controls
 {
@@ -323,6 +324,53 @@ namespace CNC.Controls
         {
             double v = basePower + pitch * copy;
             return v < 0d ? 0d : (MaxPower > 0d && v > MaxPower ? MaxPower : v);
+        }
+
+        /// <summary>
+        /// This object's values as the plain data CNC.Svg's emitter takes.
+        ///
+        /// The emitter moved out of the sender on 2026-09-05 so the EngravingBox appliance could build
+        /// the same file (see CNC.Svg.SvgLaserProgram). It cannot see this class - persisted, dialog-
+        /// bound, INotifyPropertyChanged - so the values are copied across a plain boundary instead.
+        ///
+        /// ⚠️ WidthMm is deliberately NOT here. It scales the ARTWORK and is consumed by
+        /// SvgOutlines.Load before the emitter ever runs; passing it on would imply the emitter could
+        /// still resize something, and it cannot - by then the contours are already in millimetres.
+        ///
+        /// A field added here and forgotten there silently emits the default instead of what the
+        /// operator chose, which is the failure this whole mapping has to be read carefully for.
+        /// SvgLaserOptions.Ramped is a copy of the clamp above for the same reason, and the two must
+        /// stay in step - the dialog warns from one and the file burns from the other.
+        /// </summary>
+        public SvgLaserOptions ToOptions()
+        {
+            return new SvgLaserOptions
+            {
+                Power = Power,
+                FillPower = FillPower,
+                Feed = Feed,
+                FillFeed = FillFeed,
+                TravelFeed = TravelFeed,
+                MaxPower = MaxPower,
+
+                Fill = Fill,
+                Interval = Interval,
+                OutlineAfterFill = OutlineAfterFill,
+                Passes = Passes,
+
+                OriginX = OriginX,
+                OriginY = OriginY,
+                Copies = Copies,
+                PitchX = PitchX,
+                PitchY = PitchY,
+                PitchPower = PitchPower,
+                PitchFillPower = PitchFillPower,
+                AnchorBackLeft = AnchorBackLeft,
+
+                Dynamic = Dynamic,
+                BeamOn = BeamOn,
+                LaserModeOn = LaserModeOn
+            };
         }
 
         private bool Clamps(double basePower, double pitch)

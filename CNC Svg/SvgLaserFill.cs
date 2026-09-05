@@ -1,5 +1,5 @@
 /*
- * SvgLaserFill.cs - part of the CNC Converters library
+ * SvgLaserFill.cs - part of the CNC.Svg library
  *
  * Turns closed contours into horizontal spans to burn - the shading pass for SvgToLaser.
  *
@@ -34,9 +34,8 @@
 using System;
 using System.Collections.Generic;
 using CNC.Core;
-using CNC.Controls;
 
-namespace CNC.Converters
+namespace CNC.Svg
 {
     /// <summary>One horizontal run of material to burn, at a given height.</summary>
     public struct FillSpan

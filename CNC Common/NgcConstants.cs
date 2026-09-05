@@ -1,7 +1,14 @@
 /*
- * NgcConstants.cs - part of CNC Core
+ * NgcConstants.cs - part of CNC.Common
  *
  * Resolve CONSTANT named parameters in a g-code program, for controllers that cannot evaluate them.
+ *
+ * Moved here from CNC Core on 2026-09-05, keeping the CNC.Core namespace so no call site changed -
+ * the same discipline the rest of CNC.Common follows. It had no dependency on Core in the first
+ * place (only System usings, no controller or comms types). The move exists so CNC.Svg can emit the
+ * SvgLaser declarations below WITHOUT referencing CNC Core: that assembly is the machine-comms layer,
+ * and dragging it onto an appliance whose only job is turning artwork into a file would defeat the
+ * point of CNC.Svg being portable. One authority for these parameter names, reachable from both.
  *
  * WHY THIS EXISTS
  * ---------------

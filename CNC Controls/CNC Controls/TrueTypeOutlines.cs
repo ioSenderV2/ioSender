@@ -37,21 +37,10 @@ using CNC.Core;
 
 namespace CNC.Controls
 {
-    /// <summary>One closed contour of a glyph outline, in mm, Y up.</summary>
-    public class OutlineContour
-    {
-        public List<Point2D> Points = new List<Point2D>();
-
-        /// <summary>
-        /// Signed area, mm². Positive and negative contours wind opposite ways; the sign is what
-        /// distinguishes an outer boundary from a counter (see this file's header). Magnitude is the
-        /// enclosed area, which is also a cheap way to drop degenerate specks.
-        /// </summary>
-        public double SignedArea;
-
-        /// <summary>True when this contour winds the same way as the glyph's outer boundary.</summary>
-        public bool IsOuter;
-    }
+    // OutlineContour moved to CNC.Common (Geometry.cs, namespace CNC.Core) on 2026-09-05, beside
+    // Point2D. It is the shared type between outline producers and the carve engine, and the producers
+    // are no longer all WPF: CNC.Svg reads artwork with no WPF so the same contours can be built on a
+    // Linux appliance. Nothing else changed - this file already had "using CNC.Core;".
 
     public static class TrueTypeOutlines
     {
