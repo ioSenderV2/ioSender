@@ -121,17 +121,38 @@ namespace CNC.Controls
             logDirty = true;
         }
 
+        // Set by an MDI Enter: the next flush must land at the END whatever the scroll position was. Typing a
+        // command means "show me what happens", even if the user had scrolled up to read something first.
+        private bool jumpToEnd;
+
         private void FlushLog(bool force)
         {
             if (!logDirty || logModel == null || (!force && !IsVisible))
                 return;
             logDirty = false;
 
+            // Decide "were we at the bottom?" BEFORE the text is replaced, from the TextBox's own scroll state.
+            // Assigning Text snaps the internal ScrollViewer to offset 0, and the AlwaysScrollToEnd behaviour
+            // infers manual scrolling from ScrollChanged events whose extent did not change - which is exactly
+            // what that snap looks like once the 2000-line scrollback is full (a line trimmed off the top for
+            // every line added, so the extent holds still). It then recorded the snap as the user scrolling to
+            // the top and stopped following: every MDI command reset the console to line 0 (reported
+            // 2026-09-06). The behaviour cannot tell the two apart from inside a ScrollChanged handler; this
+            // can, because it knows a replacement is about to happen.
+            bool atBottom = jumpToEnd
+                || txtOutput.VerticalOffset >= txtOutput.ExtentHeight - txtOutput.ViewportHeight - 1.0;
+            jumpToEnd = false;
+
             var log = logModel.ResponseLog;
             var sb = new System.Text.StringBuilder(log.Count * 16);
             foreach (var line in log)
                 sb.AppendLine(line);   // same join the old converter produced, so line-index math holds
             txtOutput.Text = sb.ToString();
+
+            // Restore the follow. The ScrollToEnd raises its own ScrollChanged at the bottom with no extent
+            // change, which re-arms the behaviour's AtBottom flag, so the two mechanisms agree again afterwards.
+            if (atBottom)
+                txtOutput.ScrollToEnd();
 
             // Assigning Text invalidates every match offset we hold: new lines were appended, and once the
             // scrollback hits its cap the trim drops lines off the TOP, which shifts every offset left. Stale
@@ -206,6 +227,10 @@ namespace CNC.Controls
                         {
                             tb.Clear();
                             historyIndex = -1;
+                            // The command's echo and its response are about to land in the log; the console
+                            // should be looking at them, not at wherever it was scrolled. See FlushLog.
+                            jumpToEnd = true;
+                            txtOutput.ScrollToEnd();
                         }
                         e.Handled = true;
                     }
