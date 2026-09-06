@@ -111,5 +111,40 @@ namespace CNC.Svg
             double v = basePower + pitch * copy;
             return v < 0d ? 0d : (MaxPower > 0d && v > MaxPower ? MaxPower : v);
         }
+
+        // ---- machine squareness ----
+
+        /// <summary>
+        /// Skew compensation: millimetres of Y added per millimetre of X, applied to every artwork
+        /// coordinate as Y' = Y + SkewXY * X. 0 = off.
+        ///
+        /// A racked gantry carries the head slightly forward as it travels in X, so a commanded square
+        /// burns as a parallelogram. This is the software correction for a frame that cannot be squared
+        /// mechanically - measured 2026-09-06 on a lightweight aluminium 400x400 diode machine whose
+        /// belt phase would not hold. Sheared in Y by X because that is what a racked gantry physically
+        /// does; the square test cannot distinguish the two shears, and the other one differs only by a
+        /// rotation of the whole job, which a fence built to the machine's own etch absorbs.
+        ///
+        /// Applied to ARTWORK-relative X, not machine X. The placement offset (x_org) is reached by a rapid
+        /// and zeroed with G92, so the shear error there is a constant SkewXY * x_org - a tenth of a
+        /// millimetre at typical placements - that shifts the whole job and distorts nothing.
+        /// </summary>
+        public double SkewXY;
+
+        /// <summary>
+        /// The shear from a burned test square: sides <paramref name="side"/>, diagonal from the parked
+        /// home corner to the far corner <paramref name="d1"/>, the other diagonal <paramref name="d2"/>.
+        ///
+        /// sin(skew) = (d1^2 - d2^2) / (4 side^2). Positive when d1 is the long one, which is a gantry whose
+        /// right end sits forward and needs Y INCREASED (toward the rear) as X grows. Equal diagonals give 0.
+        /// Only the DIFFERENCE of the diagonals matters, so a ruler that reads both a few millimetres short
+        /// - as one does against a charred corner - cancels out.
+        /// </summary>
+        public static double SkewFromSquare(double d1, double d2, double side)
+        {
+            if (side <= 0d || d1 <= 0d || d2 <= 0d)
+                return 0d;
+            return (d1 * d1 - d2 * d2) / (4d * side * side);
+        }
     }
 }

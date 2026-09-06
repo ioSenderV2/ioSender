@@ -198,12 +198,12 @@ namespace CNC.Svg
                         // Rapid to the start with the beam commanded off. Laser mode already blanks a G0;
                         // the S0 costs one word and makes the same file safe where it is switched off.
                         Add(string.Format(CultureInfo.InvariantCulture,
-                            "G0 X{0} Y{1} S0 F{2}", FX(p0.X), FY(p0.Y), N(o.TravelFeed)));
+                            "G0 {0} S0 F{1}", XY(p0.X, p0.Y), N(o.TravelFeed)));
 
                         for (int i = 1; i < contour.Points.Count; i++)
                             Add(string.Format(CultureInfo.InvariantCulture,
-                                "G1 X{0} Y{1} S{2} F{3}",
-                                FX(contour.Points[i].X), FY(contour.Points[i].Y), SLine, FLine));
+                                "G1 {0} S{1} F{2}",
+                                XY(contour.Points[i].X, contour.Points[i].Y), SLine, FLine));
 
                         // SvgOutlines returns CLOSED contours, but whether the closing point is repeated
                         // in Points is the loader's business, not this emitter's - so close explicitly
@@ -212,7 +212,7 @@ namespace CNC.Svg
                         var pn = contour.Points[contour.Points.Count - 1];
                         if (Math.Abs(pn.X - p0.X) > 1e-6 || Math.Abs(pn.Y - p0.Y) > 1e-6)
                             Add(string.Format(CultureInfo.InvariantCulture,
-                                "G1 X{0} Y{1} S{2} F{3}", FX(p0.X), FY(p0.Y), SLine, FLine));
+                                "G1 {0} S{1} F{2}", XY(p0.X, p0.Y), SLine, FLine));
                     }
                 }
             }
@@ -282,10 +282,12 @@ namespace CNC.Svg
 
                 foreach (var s in spans)
                 {
+                    // Each end of a span is sheared by its own X, so a physically horizontal line comes out
+                    // horizontal on a racked gantry - the two Y words differ when SkewXY is non-zero.
                     Add(string.Format(CultureInfo.InvariantCulture,
-                        "G0 X{0} Y{1} S0 F{2}", FX(s.X0), FY(s.Y), N(o.TravelFeed)));
+                        "G0 {0} S0 F{1}", XY(s.X0, s.Y), N(o.TravelFeed)));
                     Add(string.Format(CultureInfo.InvariantCulture,
-                        "G1 X{0} Y{1} S{2} F{3}", FX(s.X1), FY(s.Y), SFill, FFill));
+                        "G1 {0} S{1} F{2}", XY(s.X1, s.Y), SFill, FFill));
                 }
             }
             ClearCopyOffset();
@@ -380,8 +382,18 @@ namespace CNC.Svg
         private static string F(double v) { return v.ToString("0.###", CultureInfo.InvariantCulture); }
         private static string N(double v) { return v.ToString("0", CultureInfo.InvariantCulture); }
 
-        private string FX(double v) { return F(v + offX); }
-        private string FY(double v) { return F(v + offY + anchorY); }
+        /// <summary>
+        /// The one place an artwork coordinate becomes X and Y words. Copy offset, anchor and the skew
+        /// compensation all live here, so there is exactly one place any of them can be forgotten rather
+        /// than one per emit site. Skew needs BOTH coordinates - Y is corrected by X - which is why this
+        /// replaced the separate FX/FY formatters: they could not see each other.
+        /// </summary>
+        private string XY(double x, double y)
+        {
+            double mx = x + offX;
+            double my = y + offY + anchorY;
+            return string.Format(CultureInfo.InvariantCulture, "X{0} Y{1}", F(mx), F(my + o.SkewXY * mx));
+        }
 
         // The S and F words the cut moves carry: references to the four constants declared at the top of
         // the program, not literals. Spelled through NgcConstants.SvgLaser so the emitter and the

@@ -68,3 +68,13 @@ CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_pitchpower:Sys
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_pitchfillpower:CNC.Controls.NumericField.Label,None,False,True,,Fill step:
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_pitchfillpower:CNC.Controls.NumericField.Unit,None,False,True,,S
 CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_pitchfillpower:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The same for the shading power, stepped independently of the outline. Only matters when shading is on."
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,lbl_svglaser_skew:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Squareness, from a test square:"
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_skewd1:CNC.Controls.NumericField.Label,None,False,True,,D1:
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_skewd1:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_skewd1:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Diagonal from the parked home corner to the far corner
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_skewd2:CNC.Controls.NumericField.Label,None,False,True,,D2:
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_skewd2:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_skewd2:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,The other diagonal
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_skewside:CNC.Controls.NumericField.Label,None,False,True,,Side:
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_skewside:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Converters.g.en-US.resources:svglaserdialog.baml,fld_svglaser_skewside:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,The square's side

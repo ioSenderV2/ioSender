@@ -118,6 +118,56 @@ namespace CNC.Controls
             set { _passes = Math.Max(1, value); OnPropertyChanged(); }
         }
 
+        // ---- machine squareness ----
+        //
+        // Persisted as the three numbers the operator actually MEASURES off a burned test square, not as
+        // the derived shear: nobody should have to type 0.0079, and a stored coefficient with no record of
+        // where it came from is exactly the kind of setting that goes stale silently. Zero any of them and
+        // compensation is off. See CNC.Svg.SvgLaserOptions.SkewXY for what the shear does and why it is Y by X.
+        private double _skewD1, _skewD2, _skewSide;
+
+        /// <summary>Test-square diagonal from the parked home corner to the far corner, mm.</summary>
+        public double SkewD1
+        {
+            get { return _skewD1; }
+            set { _skewD1 = Math.Max(0d, value); OnPropertyChanged(); OnPropertyChanged(nameof(SkewXY)); OnPropertyChanged(nameof(SkewSummary)); }
+        }
+
+        /// <summary>The other diagonal of the same square, mm.</summary>
+        public double SkewD2
+        {
+            get { return _skewD2; }
+            set { _skewD2 = Math.Max(0d, value); OnPropertyChanged(); OnPropertyChanged(nameof(SkewXY)); OnPropertyChanged(nameof(SkewSummary)); }
+        }
+
+        /// <summary>The square's side, mm.</summary>
+        public double SkewSide
+        {
+            get { return _skewSide; }
+            set { _skewSide = Math.Max(0d, value); OnPropertyChanged(); OnPropertyChanged(nameof(SkewXY)); OnPropertyChanged(nameof(SkewSummary)); }
+        }
+
+        /// <summary>The derived shear, Y per mm of X. Not persisted - recomputed from the three above.</summary>
+        [XmlIgnore]
+        public double SkewXY
+        {
+            get { return SvgLaserOptions.SkewFromSquare(_skewD1, _skewD2, _skewSide); }
+        }
+
+        /// <summary>What the compensation will do, for the dialog: the correction at the far side of the bed.</summary>
+        [XmlIgnore]
+        public string SkewSummary
+        {
+            get
+            {
+                double s = SkewXY;
+                if (s == 0d)
+                    return "off";
+                return string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                    "{0:0.0000} - {1:+0.00;-0.00} mm of Y at X400", s, s * 400d);
+            }
+        }
+
         /// <summary>
         /// M4 (power scales with speed) rather than M3 (constant). Dynamic is what stops corners
         /// burning dark as the machine decelerates into them, and needs $32=1 to do anything.
@@ -369,7 +419,9 @@ namespace CNC.Controls
 
                 Dynamic = Dynamic,
                 BeamOn = BeamOn,
-                LaserModeOn = LaserModeOn
+                LaserModeOn = LaserModeOn,
+
+                SkewXY = SkewXY
             };
         }
 
