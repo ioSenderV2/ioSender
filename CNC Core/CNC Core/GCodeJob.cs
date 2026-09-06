@@ -691,8 +691,26 @@ namespace CNC.Core
         {
             pendingRaw = null;
 
-            if (block == null || block.IndexOf('#') < 0 || GrblInfo.ExpressionsSupported)
+            if (block == null || block.IndexOf('#') < 0)
                 return block;
+
+            string source = block;
+
+            // A (PROMPT) field answered at load wins over the declaration the file carries, on EVERY
+            // controller: the rewritten "#<_name> = <answer>" is what an EXPR controller is sent and
+            // what a non-EXPR one resolves below. Without this the file's own default would either be
+            // re-declared after the preamble (EXPR) or baked into Data here (non-EXPR), and the answer
+            // would silently never reach the wire - which is exactly what happened on the laser before
+            // 2026-09-06.
+            if (PromptFields != null)
+                block = NgcConstants.RewriteAssignment(block, PromptValueFor);
+
+            if (GrblInfo.ExpressionsSupported)
+            {
+                if (!ReferenceEquals(block, source))
+                    pendingRaw = source;
+                return block;
+            }
 
             string resolved, reason;
             if (!constants.TryLine(lineNumber, block, out resolved, out reason))
@@ -701,10 +719,45 @@ namespace CNC.Core
             // Only remember a source form when there IS one. An unchanged line - a comment mentioning
             // '#', say - must not get a redundant second copy of itself; on a large program that would
             // be a string per line for nothing.
-            if (!string.Equals(resolved, block, StringComparison.Ordinal))
-                pendingRaw = block;
+            if (!string.Equals(resolved, source, StringComparison.Ordinal))
+                pendingRaw = source;
 
             return resolved;
+        }
+
+        // ------------------------------------------------------------------ (PROMPT) fields at load
+
+        /// <summary>
+        /// The (PROMPT param, default[, label]) fields this program declared, with the operator's answers
+        /// (or the declared defaults on an unattended load), as collected by GCodeProgram when the
+        /// program was loaded. Null when the program has none or was not prompted at load. JobRunner
+        /// reads this to skip its own Cycle-Start dialog and, on an EXPR controller, to send the preamble.
+        /// </summary>
+        public List<MacroRunner.PromptField> PromptFields { get; private set; }
+
+        public bool PromptedAtLoad { get { return PromptFields != null; } }
+
+        /// <summary>
+        /// Install the answered fields before the program's lines are parsed: each one seeds the constant
+        /// resolver, so references resolve from line 1 on a non-EXPR controller, and its declaration in
+        /// the file - if it has one - is rewritten to the answer (see ResolveConstants).
+        /// </summary>
+        public void ApplyPromptFields(List<MacroRunner.PromptField> fields)
+        {
+            PromptFields = fields != null && fields.Count > 0 ? fields : null;
+            if (PromptFields != null)
+                foreach (var f in PromptFields)
+                    constants.Seed(f.Inner, f.Value);
+        }
+
+        private string PromptValueFor(string name)
+        {
+            if (PromptFields == null)
+                return null;
+            foreach (var f in PromptFields)
+                if (f.Inner.Equals(name, StringComparison.OrdinalIgnoreCase))
+                    return f.Value;
+            return null;
         }
 
         private void AddStamped(GCodeBlock b)
@@ -821,6 +874,7 @@ namespace CNC.Core
             AddLineNumbers = true;
             Parser.Reset();
             constants.Reset();
+            PromptFields = null;    // a new program starts with no answered fields; ApplyPromptFields re-seeds
         }
     }
 

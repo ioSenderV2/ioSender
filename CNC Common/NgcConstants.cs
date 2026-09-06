@@ -24,8 +24,16 @@
  *
  * WHAT IT DELIBERATELY WILL NOT DO
  * --------------------------------
- * Constant assignments and plain references. Nothing else. No arithmetic, no [expressions], no
- * numbered parameters (#100), no read-only system parameters (#<_abs_x>), no O-words.
+ * Constant assignments, plain references, and - since 2026-09-06 - bracket arithmetic over those
+ * constants: [#<inset> + #<side>], with + - * / and nesting, folded to a number. Nothing else. No
+ * functions (SIN, ATAN, ...), no ** MOD AND OR XOR, no numbered parameters (#100), no read-only
+ * system parameters (#<_abs_x>), no O-words. Folding exists so a parametric program - a test square
+ * whose side is a (PROMPT) field, say - can be RUN on a controller with no expression support, and it
+ * folds only what is provably constant: every name inside the brackets already has a value here.
+ *
+ * Values can also be SEEDED (Resolver.Seed) before the program is read - that is how (PROMPT) fields
+ * collected at load reach the substitution - and an assignment of a seeded name in the program does
+ * NOT override the seed: the operator's answer wins over the file's default (RewriteAssignment).
  *
  * It REFUSES rather than guesses, and that is the whole design. A resolver that silently passed
  * through what it did not understand would be the same failure as the parser gap that once dropped a
@@ -56,10 +64,11 @@ namespace CNC.Core
     /// </summary>
     public static class NgcConstants
     {
-        // #<name> = number   - the only assignment form accepted. Trailing comment allowed.
-        // The value is a plain signed decimal: no leading '+', no exponent, nothing to evaluate.
+        // #<name> = number   or   #<name> = [expression]   - the two assignment forms accepted. Trailing
+        // comment allowed. A number is a plain signed decimal: no leading '+', no exponent. A bracket
+        // expression is folded by TryFold below and must reduce to a number or the line is refused.
         private static readonly Regex Assignment = new Regex(
-            @"^\s*#<(?<name>[A-Za-z_][A-Za-z0-9_]*)>\s*=\s*(?<value>-?\d+(?:\.\d+)?)\s*(?<trail>\(.*\))?\s*$",
+            @"^\s*#<(?<name>[A-Za-z_][A-Za-z0-9_]*)>\s*=\s*(?<value>-?\d+(?:\.\d+)?|\[.*\])\s*(?<trail>\(.*\))?\s*$",
             RegexOptions.Compiled);
 
         // "#<name> =" with anything at all after it. Used ONLY to tell a malformed assignment apart from
@@ -111,6 +120,27 @@ namespace CNC.Core
             }
 
             /// <summary>
+            /// Give a name a value BEFORE the program is read - a (PROMPT) field's answer, collected at
+            /// load. References resolve against it from line 1, and a later assignment of the same name
+            /// in the program is rewritten to it rather than overriding it (see RewriteAssignment): the
+            /// operator's answer wins over the file's own default. Names beginning with '_' are accepted
+            /// here even though an UNDECLARED one is refused as a system parameter - a seeded value is
+            /// known, which is the whole difference.
+            /// </summary>
+            public void Seed(string name, string value)
+            {
+                if (!string.IsNullOrEmpty(name) && value != null)
+                    values[name.TrimStart('#', '<').TrimEnd('>')] = value.Trim();
+            }
+
+            /// <summary>The value a name currently holds, or null.</summary>
+            public string ValueOf(string name)
+            {
+                string v;
+                return name != null && values.TryGetValue(name, out v) ? v : null;
+            }
+
+            /// <summary>
             /// Resolve one block.
             /// </summary>
             /// <param name="lineNumber">1-based, for the refusal text only.</param>
@@ -134,8 +164,22 @@ namespace CNC.Core
                 var assign = Assignment.Match(resolved);
                 if (assign.Success)
                 {
+                    string value = assign.Groups["value"].Value;
+                    if (value.StartsWith("[", StringComparison.Ordinal))
+                    {
+                        // A bracket right-hand side: substitute what it references, then fold. Refused
+                        // the same way a reference line is when anything inside is not a known constant.
+                        string inner, why;
+                        if (!SubstituteReferences(value, lineNumber, out inner, out why) ||
+                            !TryFoldBrackets(inner, lineNumber, out value, out why))
+                        {
+                            reason = why;
+                            return false;
+                        }
+                    }
+
                     // A later assignment overrides an earlier one, applied in order.
-                    values[assign.Groups["name"].Value] = assign.Groups["value"].Value;
+                    values[assign.Groups["name"].Value] = value;
 
                     // Kept as a comment, not deleted: resolved line N must stay raw line N, and the
                     // resolved listing should still show what the value was.
@@ -143,22 +187,51 @@ namespace CNC.Core
                     return true;
                 }
 
-                // Looks like an assignment but did not parse as one - i.e. the right-hand side is not a
-                // plain number. Say THAT, rather than letting it fall through and report the name as
-                // "undefined" further down: the operator would go looking for a missing declaration
-                // instead of at the expression they actually wrote.
+                // Looks like an assignment but did not parse as one - i.e. the right-hand side is neither
+                // a plain number nor a [bracket]. Say THAT, rather than letting it fall through and report
+                // the name as "undefined" further down: the operator would go looking for a missing
+                // declaration instead of at the expression they actually wrote.
                 if (AssignmentAttempt.IsMatch(resolved))
                 {
                     reason = string.Format(CultureInfo.InvariantCulture,
-                        "line {0}: \"{1}\" - only a plain number can be assigned here; anything to evaluate needs a controller with EXPR support",
+                        "line {0}: \"{1}\" - only a plain number or a [bracket expression over constants] can be assigned here; anything else needs a controller with EXPR support",
                         lineNumber, resolved.Trim());
                     return false;
                 }
 
                 string raw = resolved;
+                string substituted;
+                if (!SubstituteReferences(raw, lineNumber, out substituted, out reason))
+                    return false;
+
+                // Anything still carrying a '#' is a form this class does not model - a numbered
+                // parameter, a system parameter. Refuse; do not ship it half-done.
+                if (substituted.IndexOf('#') >= 0)
+                {
+                    reason = string.Format(CultureInfo.InvariantCulture,
+                        "line {0}: \"{1}\" uses parameter syntax this can only pass to a controller with EXPR support",
+                        lineNumber, raw.Trim());
+                    return false;
+                }
+
+                // With every reference now a number, any [brackets] left are pure arithmetic - or they
+                // are something this cannot fold, in which case the line is refused, not guessed at.
+                if (substituted.IndexOf('[') >= 0 && !TryFoldBrackets(substituted, lineNumber, out substituted, out reason))
+                    return false;
+
+                resolved = substituted;
+                return true;
+            }
+
+            /// <summary>
+            /// Replace every #&lt;name&gt; in <paramref name="text"/> with its value. False, with the
+            /// reason, when any name has none - a system parameter or an undeclared one.
+            /// </summary>
+            private bool SubstituteReferences(string text, int lineNumber, out string result, out string reason)
+            {
                 string failure = null;
 
-                string substituted = Reference.Replace(raw, m =>
+                result = Reference.Replace(text, m =>
                 {
                     string name = m.Groups["name"].Value;
                     string value;
@@ -171,7 +244,9 @@ namespace CNC.Core
                             // (#<_abs_x>, #<_vmajor>, ...). Reporting these as "undefined" would be a lie
                             // - they can never be declared, and their value is whatever the machine reads
                             // at PARSE time, which during a streamed program is not where it will be when
-                            // the line runs. Refusing is the only correct answer.
+                            // the line runs. Refusing is the only correct answer. A '_' name that WAS
+                            // given a value - a seeded (PROMPT) field, or an assignment above - is in
+                            // 'values' and never reaches this branch.
                             ? string.Format(CultureInfo.InvariantCulture,
                                 "line {0}: #<{1}> is a system parameter - its value depends on machine state and only a controller with EXPR support can read it",
                                 lineNumber, name)
@@ -180,25 +255,160 @@ namespace CNC.Core
                     return m.Value;
                 });
 
-                if (failure != null)
-                {
-                    reason = failure;
-                    return false;
-                }
+                reason = failure;
+                return failure == null;
+            }
+        }
 
-                // Anything still carrying a '#' is a form this class does not model - a numbered
-                // parameter, an expression, a system parameter. Refuse; do not ship it half-done.
-                if (substituted.IndexOf('#') >= 0)
+        /// <summary>
+        /// Rewrite "#&lt;name&gt; = value" when <paramref name="valueFor"/> has a value for that name - a
+        /// (PROMPT) field's answer replacing the file's own default. Returns the line unchanged (the same
+        /// instance) when it is not such an assignment or the name is not one being overridden, so the
+        /// caller can tell by reference whether anything happened. Works for every controller: on one
+        /// with EXPR the rewritten declaration is what gets sent, on one without it is what gets
+        /// resolved - either way the operator's answer is what the program runs with.
+        /// </summary>
+        public static string RewriteAssignment(string line, Func<string, string> valueFor)
+        {
+            if (line == null || valueFor == null || line.IndexOf('#') < 0 || IsComment(line))
+                return line;
+
+            var m = Assignment.Match(line);
+            if (!m.Success)
+                return line;
+
+            string value = valueFor(m.Groups["name"].Value);
+            if (value == null)
+                return line;
+
+            string trail = m.Groups["trail"].Success ? "   " + m.Groups["trail"].Value : string.Empty;
+            return "#<" + m.Groups["name"].Value + "> = " + value.Trim() + trail;
+        }
+
+        // ------------------------------------------------------------------ bracket folding
+
+        /// <summary>
+        /// Fold every [ ... ] group in <paramref name="text"/> - which must already have no '#' in it -
+        /// to a number. Grammar: + - * / with the usual precedence, unary sign, nested brackets, decimal
+        /// numbers. Anything else (a function name, **, MOD, a stray letter) refuses the whole line with
+        /// a reason naming what it could not fold. NGC evaluates brackets innermost-first; so does this.
+        /// </summary>
+        private static bool TryFoldBrackets(string text, int lineNumber, out string folded, out string reason)
+        {
+            folded = text;
+            reason = null;
+
+            int open;
+            while ((open = folded.IndexOf('[')) >= 0)
+            {
+                int depth = 0, close = -1;
+                for (int i = open; i < folded.Length; i++)
+                {
+                    if (folded[i] == '[') depth++;
+                    else if (folded[i] == ']' && --depth == 0) { close = i; break; }
+                }
+                if (close < 0)
                 {
                     reason = string.Format(CultureInfo.InvariantCulture,
-                        "line {0}: \"{1}\" uses parameter syntax this can only pass to a controller with EXPR support",
-                        lineNumber, raw.Trim());
+                        "line {0}: \"{1}\" has an unclosed [ bracket", lineNumber, text.Trim());
                     return false;
                 }
 
-                resolved = substituted;
+                double value;
+                string inner = folded.Substring(open + 1, close - open - 1);
+                if (!TryEvaluate(inner, out value))
+                {
+                    reason = string.Format(CultureInfo.InvariantCulture,
+                        "line {0}: cannot fold [{1}] - only + - * / and nested brackets over constants can be evaluated without a controller with EXPR support",
+                        lineNumber, inner.Trim());
+                    return false;
+                }
+                folded = folded.Substring(0, open) + Format(value) + folded.Substring(close + 1);
+            }
+            return true;
+        }
+
+        private static string Format(double v)
+        {
+            if (double.IsNaN(v) || double.IsInfinity(v))
+                return "0";
+            string s = v.ToString("0.####", CultureInfo.InvariantCulture);
+            return s == "-0" ? "0" : s;
+        }
+
+        // A tiny recursive-descent evaluator: expr := term (('+'|'-') term)* ; term := factor (('*'|'/')
+        // factor)* ; factor := number | ('+'|'-') factor | '[' expr ']'. Whitespace ignored. Anything the
+        // grammar does not name is a failure, by design.
+        private static bool TryEvaluate(string s, out double value)
+        {
+            int pos = 0;
+            if (!ParseExpr(s, ref pos, out value))
+                return false;
+            SkipWs(s, ref pos);
+            return pos == s.Length;
+        }
+
+        private static void SkipWs(string s, ref int pos)
+        {
+            while (pos < s.Length && char.IsWhiteSpace(s[pos])) pos++;
+        }
+
+        private static bool ParseExpr(string s, ref int pos, out double v)
+        {
+            if (!ParseTerm(s, ref pos, out v)) return false;
+            for (;;)
+            {
+                SkipWs(s, ref pos);
+                if (pos >= s.Length || (s[pos] != '+' && s[pos] != '-')) return true;
+                char op = s[pos++];
+                double r;
+                if (!ParseTerm(s, ref pos, out r)) return false;
+                v = op == '+' ? v + r : v - r;
+            }
+        }
+
+        private static bool ParseTerm(string s, ref int pos, out double v)
+        {
+            if (!ParseFactor(s, ref pos, out v)) return false;
+            for (;;)
+            {
+                SkipWs(s, ref pos);
+                if (pos >= s.Length || (s[pos] != '*' && s[pos] != '/')) return true;
+                char op = s[pos++];
+                double r;
+                if (!ParseFactor(s, ref pos, out r)) return false;
+                if (op == '/' && r == 0d) return false;     // a division by zero is not a constant
+                v = op == '*' ? v * r : v / r;
+            }
+        }
+
+        private static bool ParseFactor(string s, ref int pos, out double v)
+        {
+            v = 0d;
+            SkipWs(s, ref pos);
+            if (pos >= s.Length) return false;
+
+            char c = s[pos];
+            if (c == '+' || c == '-')
+            {
+                pos++;
+                if (!ParseFactor(s, ref pos, out v)) return false;
+                if (c == '-') v = -v;
                 return true;
             }
+            if (c == '[')
+            {
+                pos++;
+                if (!ParseExpr(s, ref pos, out v)) return false;
+                SkipWs(s, ref pos);
+                if (pos >= s.Length || s[pos] != ']') return false;
+                pos++;
+                return true;
+            }
+
+            int start = pos;
+            while (pos < s.Length && (char.IsDigit(s[pos]) || s[pos] == '.')) pos++;
+            return pos > start && double.TryParse(s.Substring(start, pos - start), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out v);
         }
 
         /// <summary>

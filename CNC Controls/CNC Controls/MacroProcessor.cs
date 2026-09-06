@@ -521,7 +521,12 @@ namespace CNC.Controls
                     DebugLog.Write("run", string.Format("Run: caller reported '{0}' already pushed, but the loaded job is '{1}' - pushing anyway", name, model.FileName));
                 GCode.File.Push();
             }
-            GCode.File.LoadText(name, code);
+            // The (PROMPT) field dialog now fires inside LoadText (GCodeProgram.CollectLoadPrompts). An
+            // unattended run has no operator to ask - suppress it and the fields keep their declared
+            // defaults, the same contract JobRunner's own unattended path always had.
+            GCodeProgram.SuppressLoadPrompt = unattended;
+            try { GCode.File.LoadText(name, code); }
+            finally { GCodeProgram.SuppressLoadPrompt = false; }
             model.IsDryRunMode = dryRunArmed;
 
             // Watch the run to its TRUE terminal (Idle/NoFile after a genuine Send) and pop the borrowed

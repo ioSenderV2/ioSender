@@ -925,7 +925,20 @@ namespace CNC.Core
                     // preamble (only when the controller reports EXPR - MacroRunner's own refusal rule
                     // for #-syntax on the wire), and StreamPump substitutes references at send time.
                     List<MacroRunner.PromptField> promptFields = null;
-                    if (Source.Data.Any(b => b.Directive == "PROMPT"))
+                    var loadedProgram = Source as GCodeProgram;
+                    if (loadedProgram != null && loadedProgram.PromptedAtLoad)
+                    {
+                        // Asked when the program was LOADED (GCodeProgram.CollectLoadPrompts, 2026-09-06).
+                        // The answers are already resolved into Data on a non-EXPR controller and
+                        // rewritten into the declarations on an EXPR one - no second dialog. The EXPR
+                        // preamble still rides, for a program that references a field it never declared.
+                        promptFields = loadedProgram.PromptFields;
+                        DebugLog.Write("run", "JobRunner: (PROMPT) fields were answered at load - not asking again");
+                        if (GrblInfo.ExpressionsSupported)
+                            foreach (var field in promptFields)
+                                Source.Commands.Enqueue(field.Param + "=" + field.Value);
+                    }
+                    else if (Source.Data.Any(b => b.Directive == "PROMPT"))
                     {
                         promptFields = MacroRunner.CollectPromptFields(
                             Source.Data.Where(b => b.Directive == "PROMPT").Select(b => (string)b.Data));

@@ -48,6 +48,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using CNC.GCode;
 
 namespace CNC.Core
@@ -284,7 +285,7 @@ namespace CNC.Core
         {
             Program.AddBlock(block, action);
 
-            if(action == Action.End && !_transient)
+            if(action == Action.End && !_transient && Model != null)
                 Model.Blocks = Blocks;   // transient programs don't drive the job's block-count display
         }
 
@@ -378,9 +379,62 @@ namespace CNC.Core
 
             var lines = (program ?? string.Empty).Replace("\r", string.Empty).Split('\n');
             AddBlock(name, Action.New);
+            CollectLoadPrompts(name, lines);
             for (int i = 0; i < lines.Length - 1; i++)
                 AddBlock(lines[i], Action.Add);
             AddBlock(lines[lines.Length - 1], Action.End);
+        }
+
+        // ------------------------------------------------------------------ (PROMPT) fields at load
+
+        /// <summary>
+        /// True while a load must NOT show the (PROMPT) field dialog - an unattended macro run, which has
+        /// no operator to ask. The fields still take their declared defaults, exactly as JobRunner's own
+        /// unattended path did. Set by MacroProcessor.Run around its LoadText.
+        /// </summary>
+        public static bool SuppressLoadPrompt;
+
+        /// <summary>The loaded program's (PROMPT) fields as answered at load, or null. See GCodeJob.PromptFields.</summary>
+        public List<MacroRunner.PromptField> PromptFields { get { return Program.PromptFields; } }
+
+        public bool PromptedAtLoad { get { return Program.PromptedAtLoad; } }
+
+        /// <summary>
+        /// The (PROMPT) field dialog, at LOAD rather than at Cycle Start (user decision 2026-09-06: every
+        /// load takes advantage, not one controller class). Every (PROMPT param, default[, label]) in the
+        /// program is collected into one form, shown once, and the answers installed on the job BEFORE its
+        /// lines are parsed - so on a controller without EXPR the references resolve to the answers and
+        /// the 3D preview shows the real geometry, and on one with EXPR the declarations are rewritten to
+        /// them. JobRunner sees PromptedAtLoad and does not ask again.
+        ///
+        /// Cancel keeps the defaults and still loads - "the defaults are fine" is the common case, and a
+        /// refused load punishes it. Runs on the calling thread, which for Load(file) is the UI thread,
+        /// before the background parse starts.
+        /// </summary>
+        private void CollectLoadPrompts(string title, IEnumerable<string> lines)
+        {
+            var fields = MacroRunner.CollectPromptFields(lines);
+            if (fields.Count == 0)
+                return;
+            if (!SuppressLoadPrompt)
+                MacroRunner.ShowFieldPrompt(title, fields);
+            Program.ApplyPromptFields(fields);
+            DebugLog.Write("load", string.Format("(PROMPT) fields at load: {0} - {1}", fields.Count,
+                string.Join(", ", fields.Select(f => f.Inner + "=" + f.Value))));
+        }
+
+        /// <summary>
+        /// The candidate (PROMPT) rows of a file, without parsing it: comment lines mentioning PROMPT.
+        /// One cheap extra pass over the file; CollectPromptFields does the real recognition.
+        /// </summary>
+        private static IEnumerable<string> PromptCandidates(string filename)
+        {
+            foreach (var line in System.IO.File.ReadLines(filename))
+            {
+                string t = line.TrimStart();
+                if (t.Length > 0 && t[0] == '(' && t.IndexOf("PROMPT", StringComparison.OrdinalIgnoreCase) >= 0)
+                    yield return line;
+            }
         }
 
         // Read + parse a (potentially huge) program on a background thread so the rest of the UI stays
@@ -477,6 +531,9 @@ namespace CNC.Core
             // Read + parse on a background thread (see BackgroundLoad) so a large single file doesn't freeze the
             // UI. Clear + reset on the UI thread first; the per-line parse loop runs on the worker thread.
             Program.AddBlock(filename, Action.New);
+            // (PROMPT) fields are asked for HERE, on the UI thread, before the worker starts: a dialog cannot
+            // be shown from the parse loop, and the answers have to be installed before line 1 is resolved.
+            CollectLoadPrompts(System.IO.Path.GetFileName(filename), PromptCandidates(filename));
             bool addLineNumbers = GrblInfo.UseLinenumbers && NumberLoadedLines;
             bool[] ok = { true };
 

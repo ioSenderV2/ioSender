@@ -26,10 +26,16 @@ namespace NgcRoundTrip
 
         static List<GCodeBlock> Load(string text, out string error, out bool ok)
         {
+            return LoadJob(new GCodeJob(), text, out error, out ok);
+        }
+
+        // Same, on a job the caller has already configured - e.g. with (PROMPT) answers applied, the way
+        // GCodeProgram.CollectLoadPrompts does before it parses.
+        static List<GCodeBlock> LoadJob(GCodeJob job, string text, out string error, out bool ok)
+        {
             string path = Path.Combine(Path.GetTempPath(), "ngc-roundtrip.nc");
             File.WriteAllText(path, text);
 
-            var job = new GCodeJob();
             var got = new List<GCodeBlock>();
             job.BlockConsumer = b => got.Add(b);
             error = null;
@@ -232,6 +238,99 @@ namespace NgcRoundTrip
             Dump("undefined reference", bad2);
             Check(!bad2.Any(b => b.Data != null && b.Data.Contains("#<b>")),
                   "an undefined reference never reaches the program", "err=" + (err ?? "none") + " ok=" + ok);
+
+            // ---- bracket folding (2026-09-06) ------------------------------------------------------
+            // A parametric program on a controller with NO expression support: [brackets] over declared
+            // constants fold to numbers at load. This is what lets one square.nc serve every test size.
+            Console.WriteLine();
+
+            var fold = Load("#<inset> = 5\n" +
+                            "#<side> = 365\n" +
+                            "#<x1> = [#<inset> + #<side>]\n" +
+                            "G0 X#<inset> Y-#<inset> S0\n" +
+                            "G1 X#<x1> Y-[#<inset> + #<side>] S300 F1200\n" +
+                            "G1 X[#<x1> * 2 - [#<side> / 5]] S300 F1200\n" +
+                            "M30\n", out err, out ok);
+            Dump("folding", fold);
+            Check(err == null && ok, "a program with bracket arithmetic loads", err ?? "");
+
+            var x1decl = fold.FirstOrDefault(b => b.Raw != null && b.Raw.Contains("#<x1>"));
+            Check(x1decl != null && x1decl.Data.StartsWith("("),
+                  "a bracket assignment becomes a comment like a plain one", x1decl == null ? "(none)" : x1decl.Data);
+
+            var cut1 = fold.FirstOrDefault(b => b.Data != null && b.Data.StartsWith("G1X370"));
+            Check(cut1 != null && cut1.Data.Contains("Y-370"),
+                  "[#<inset> + #<side>] folds to 370, both as an assignment and inline, sign intact",
+                  cut1 == null ? "(no G1X370)" : cut1.Data);
+
+            Check(fold.Any(b => b.Data != null && b.Data.StartsWith("G1X667")),
+                  "nested brackets with precedence: [370 * 2 - [365 / 5]] = 667",
+                  string.Join(" | ", fold.Where(b => b.Data != null && b.Data.StartsWith("G1")).Select(b => b.Data)));
+
+            Check(!fold.Any(b => b.Data != null && !b.Data.StartsWith("(") && b.Data.Contains("[")),
+                  "no bracket survives into a motion line");
+
+            var bad3 = Load("#<a> = 2\nG1 X[SIN[#<a>]]\nM30\n", out err, out ok);
+            Dump("function refused", bad3);
+            Check(!bad3.Any(b => b.Data != null && b.Data.Contains("SIN")),
+                  "a function inside brackets is refused, never guessed at", "err=" + (err ?? "none") + " ok=" + ok);
+
+            // ---- (PROMPT) answers applied at load ----------------------------------------------------
+            // GCodeProgram collects the fields and calls ApplyPromptFields before parsing; here the job is
+            // seeded directly. The answer must beat the file's own declaration on the wire AND the Raw
+            // must keep what the file said, so Save writes the parametric form back out.
+            Console.WriteLine();
+
+            var seeded = new GCodeJob();
+            seeded.ApplyPromptFields(new List<MacroRunner.PromptField> {
+                new MacroRunner.PromptField { Inner = "_side", Value = "300", Label = "side" } });
+            var prompted = LoadJob(seeded,
+                                   "(PROMPT side, 365, Square side)\n" +
+                                   "#<_side> = 365\n" +
+                                   "G1 X#<_side> Y-[#<_side> / 2] F1200\n" +
+                                   "M30\n", out err, out ok);
+            Dump("prompt answered at load", prompted);
+            Check(err == null && ok, "a prompted program loads on a non-EXPR controller", err ?? "");
+
+            var sideDecl = prompted.FirstOrDefault(b => b.Raw != null && b.Raw.Contains("#<_side> = 365"));
+            Check(sideDecl != null && sideDecl.Data.Contains("300") && !sideDecl.Data.Contains("365"),
+                  "the declaration is rewritten to the ANSWER (300), not the file's default (365)",
+                  sideDecl == null ? "(no declaration block)" : sideDecl.Data);
+            Check(sideDecl != null && sideDecl.Raw.Contains("365"), "...while Raw keeps the file's default for Save");
+
+            var move = prompted.FirstOrDefault(b => b.Data != null && b.Data.StartsWith("G1"));
+            Check(move != null && move.Data.Contains("X300") && move.Data.Contains("Y-150"),
+                  "references resolve to the answer, and fold with it: X300 Y-150",
+                  move == null ? "(no G1)" : move.Data);
+
+            var seededOnly = new GCodeJob();
+            seededOnly.ApplyPromptFields(new List<MacroRunner.PromptField> {
+                new MacroRunner.PromptField { Inner = "_side", Value = "300", Label = "side" } });
+            var undeclared = LoadJob(seededOnly, "(PROMPT side, 365)\nG1 X#<_side> F1200\nM30\n", out err, out ok);
+            Check(err == null && ok && undeclared.Any(b => b.Data != null && b.Data.StartsWith("G1X300")),
+                  "a seeded '_' name resolves even with no declaration line - it is known, not a system parameter",
+                  "err=" + (err ?? "none"));
+
+            // ---- the load-time collection itself, through GCodeProgram.LoadText -------------------
+            // No FieldPrompt is registered here (no host), so the seam takes the declared defaults - the
+            // unattended contract. What this proves is the WIRING: LoadText finds the (PROMPT) rows,
+            // installs them before parsing, and the job reports PromptedAtLoad so JobRunner will not ask
+            // a second time.
+            Console.WriteLine();
+
+            var program = new GCodeProgram();
+            program.LoadText("prompted.nc",
+                             "(PROMPT side, 365, Square side)\n" +
+                             "(PROMPT power, 300, Power)\n" +
+                             "G1 X#<_side> S#<_power> F1200\n" +
+                             "M30\n");
+            Check(program.PromptedAtLoad, "LoadText collected the (PROMPT) fields and marked the job prompted");
+            Check(program.PromptFields != null && program.PromptFields.Count == 2,
+                  "both fields collected", program.PromptFields == null ? "(null)" : program.PromptFields.Count.ToString());
+            var viaText = program.Data.FirstOrDefault(b => b.Data != null && b.Data.StartsWith("G1"));
+            Check(viaText != null && viaText.Data.Contains("X365") && viaText.Data.Contains("S300"),
+                  "with no operator to ask, the defaults were resolved in: X365 S300",
+                  viaText == null ? "(no G1)" : viaText.Data);
 
             Console.WriteLine();
             Console.WriteLine(fail == 0 ? "ALL CHECKS PASSED" : fail + " CHECK(S) FAILED");
