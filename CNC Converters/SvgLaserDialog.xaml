@@ -127,12 +127,13 @@
                         <!-- Machine squareness: the three numbers measured off a burned test square. The shear is
                              derived from them (SvgLaserSettings.SkewXY) and applied by the emitter; zero any one
                              to switch it off. -->
+                        <!-- One field per row, aligned with Power/Feed/Passes above. They were side by side at
+                             first and the third one clipped clean off the 400 px dialog - the operator saw D1
+                             and D2, never found Side, and the skew stayed "off" (2026-09-06). -->
                         <TextBlock x:Uid="lbl_svglaser_skew" Text="Squareness, from a test square:" Margin="0,8,0,2"/>
-                        <StackPanel Orientation="Horizontal">
-                            <Controls:NumericField x:Uid="fld_svglaser_skewd1" Label="D1:" ColonAt="90" Unit="mm" Format="##0.0" Value="{Binding Path=SkewD1, Mode=TwoWay}" ToolTip="Diagonal from the parked home corner to the far corner"/>
-                            <Controls:NumericField x:Uid="fld_svglaser_skewd2" Label="D2:" ColonAt="40" Unit="mm" Format="##0.0" Value="{Binding Path=SkewD2, Mode=TwoWay}" ToolTip="The other diagonal"/>
-                            <Controls:NumericField x:Uid="fld_svglaser_skewside" Label="Side:" ColonAt="50" Unit="mm" Format="##0.0" Value="{Binding Path=SkewSide, Mode=TwoWay}" ToolTip="The square's side"/>
-                        </StackPanel>
+                        <Controls:NumericField x:Uid="fld_svglaser_skewd1" Label="D1:" ColonAt="90" Unit="mm" Format="##0.0" Value="{Binding Path=SkewD1, Mode=TwoWay}" ToolTip="Diagonal from the parked home corner to the far corner"/>
+                        <Controls:NumericField x:Uid="fld_svglaser_skewd2" Label="D2:" ColonAt="90" Unit="mm" Format="##0.0" Value="{Binding Path=SkewD2, Mode=TwoWay}" ToolTip="The other diagonal"/>
+                        <Controls:NumericField x:Uid="fld_svglaser_skewside" Label="Side:" ColonAt="90" Unit="mm" Format="##0.0" Value="{Binding Path=SkewSide, Mode=TwoWay}" ToolTip="The square's side"/>
                         <TextBlock x:Uid="lbl_svglaser_skewsummary" Text="{Binding Path=SkewSummary, StringFormat=Skew: {0}}" Margin="0,2,0,4" Foreground="#FF606060"/>
                         <CheckBox x:Uid="chk_svglaser_dynamic" x:Name="chkDynamic" Content="M4 dynamic power" Margin="8,6,0,2" IsChecked="{Binding Path=Dynamic, Mode=TwoWay}"
                                   ToolTip="Scales power with speed, so corners are not burned dark as the machine decelerates into them. Needs $32=1. Uncheck for M3 constant power, which suits cutting through more than engraving."/>
