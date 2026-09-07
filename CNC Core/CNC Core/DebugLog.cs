@@ -48,6 +48,22 @@ namespace CNC.Core
         {
             lock (_sync)
             {
+#if DEBUG
+                // Debug builds always trace "poll" (the status-report latency instrument - see PollDiag),
+                // with no flag needed: the fault it exists to catch only becomes visible after HOURS of
+                // uptime, so it has to be on for every ordinary development session or it is never running
+                // when the symptom appears. Additive, never subtractive - an explicit -debuglog=<cats> still
+                // gets exactly the categories it asked for, plus this one. Release builds are unaffected and
+                // stay opt-in, so an end user's normal run still writes nothing.
+                if (!enabled)
+                {
+                    enabled = true;
+                    categories = "poll";
+                }
+                else if (!string.IsNullOrWhiteSpace(categories))
+                    categories += ",poll";
+                // enabled with no category filter already means "log everything", which includes poll.
+#endif
                 Enabled = enabled;
                 if (!enabled)
                     return;

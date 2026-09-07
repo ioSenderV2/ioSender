@@ -110,10 +110,8 @@ namespace CNC.Controls
     public class ProbeConfig : ViewModelBase
     {
         private bool _CheckProbeStatus = true;
-        private bool _ValidateProbeConnected = false;
 
         public bool CheckProbeStatus { get { return _CheckProbeStatus; } set { _CheckProbeStatus = value; OnPropertyChanged(); } }
-        public bool ValidateProbeConnected { get { return _ValidateProbeConnected; } set { _ValidateProbeConnected = value; OnPropertyChanged(); } }
     }
 
     [Serializable]
@@ -226,7 +224,9 @@ namespace CNC.Controls
         public Color HighlightColor { get { return _highlight; } set { _highlight = value; OnPropertyChanged(); } }
         public int ViewMode { get; set; } = -1;
         public int ToolVisualizer { get; set; } = 1;
-        public Point3D CameraPosition { get; set; }
+        // Renderer camera state, persisted in App.config - deliberately the WPF Media3D types (this is
+        // view state, not machine geometry), so it must be qualified now that CNC.Core has its own Point3D.
+        public System.Windows.Media.Media3D.Point3D CameraPosition { get; set; }
         public Vector3D CameraLookDirection { get; set; }
         public Vector3D CameraUpDirection { get; set; }
     }
@@ -311,7 +311,14 @@ namespace CNC.Controls
         private bool _useBuffering = false, _keepMdiFocus = true, _filterOkResponse = false, _saveWindowSize = false, _autoCompress = false, _send_comments = false, _addLinenumbers = false;
         private bool _showJogTargetButtons = false;
         private bool _showJobJogPad = true;
-        private bool _preferNetwork = true;
+        private bool _showJobSplitView = false;
+        private int _statusWindowAutoCloseSeconds = 10;
+        private double _jobSplitRatio = 0.5d;
+        // Serial is the default transport (2026-08-12). Off means a serial/USB link is left alone; a user
+        // who wants the automatic hand-off to network turns it on in Settings. Kept in step with
+        // Default-App.config's own PreferNetwork - a config that predates the element falls back to THIS
+        // value, so the two disagreeing would give old and new profiles different behaviour.
+        private bool _preferNetwork = false;
         private double _uiScale = 1d;
         private bool _autoSaveSettings = false, _promptOnSave = false, _safeGotoZ = true;
         private bool _autoSaveGrblSettings = false, _promptOnGrblSave = false;
@@ -328,9 +335,11 @@ namespace CNC.Controls
             get { return _theme; }
             set {
                 _theme = value; //.Substring(0, 1).ToUpper() + value.Substring(1);
-                Properties.Settings.Default.ColorMode = value; // value.Substring(0, 1).ToUpper() + value.Substring(1);
-                Properties.Settings.Default.Save();
                 OnPropertyChanged();
+                // Deliberately no save here: this setter also runs while XmlSerializer deserializes the
+                // Core section, and saving mid-load (Base half-replaced) makes the config unloadable.
+                // Theme lives in Base, so it is persisted by the normal config save.
+                AppConfig.NotifyColorModeChanged();
             }
         }
         public int PollInterval { get { return _pollInterval < 100 ? 100 : _pollInterval; } set { _pollInterval = value; OnPropertyChanged(); } }
@@ -419,6 +428,20 @@ namespace CNC.Controls
         // operators, and the pad is the single largest thing competing with the program view for width.
         // Notifies, so the checkbox takes effect immediately rather than on the layout editor's usual restart.
         public bool ShowJobJogPad { get { return _showJobJogPad; } set { if (_showJobJogPad != value) { _showJobJogPad = value; OnPropertyChanged(); } } }
+        // Job tab split screen: the program view and the 3D view side by side with a splitter, instead of
+        // the bottom tab strip that switches between them. The left panel column stays; everything else on
+        // the tab - the jog pad and the Feed/Spindle/Outline panel columns - gives up its space to the
+        // split, since the point is to see the toolpath and the code at once. The right-edge flyouts are
+        // unaffected: they belong to the main window, not to this tab.
+        //
+        // The Console tab goes with the tab strip, and loses nothing by it - the run strip's MDI button
+        // already opens the real console window (MainWindow.OpenConsoleWindow), independently of the tab.
+        //
+        // Notifies, so the checkbox takes effect immediately rather than on restart.
+        public bool ShowJobSplitView { get { return _showJobSplitView; } set { if (_showJobSplitView != value) { _showJobSplitView = value; OnPropertyChanged(); } } }
+        // Where the splitter sits, as the program view's share of the split (0..1). Persisted so a layout
+        // the operator has dragged to suit their screen survives a restart, like every other placement here.
+        public double JobSplitRatio { get { return _jobSplitRatio < 0.1d || _jobSplitRatio > 0.9d ? 0.5d : _jobSplitRatio; } set { _jobSplitRatio = value; } }
         public bool UseBuffering { get { return _useBuffering; } set { _useBuffering = value; OnPropertyChanged(); } }
         public bool KeepWindowSize { get { return _saveWindowSize; } set { if (_saveWindowSize != value) { _saveWindowSize = value; OnPropertyChanged(); } } }
         public double WindowWidth { get; set; } = 925;
@@ -437,18 +460,20 @@ namespace CNC.Controls
         public bool ConsoleFilterRT { get; set; } = false;
         public bool ConsoleShowRTAll { get; set; } = false;
         public bool ConsoleWindowOpen { get; set; } = false;
-        // F12, NOT Esc (changed 2026-08-03). The console toggle is dispatched from MainWindow's
-        // PreviewKeyDown, which tunnels from the root before any control sees the key - so binding it to Esc
-        // took Esc away from its actual job everywhere inside the main window: cancelling an edit, closing a
-        // popup, backing out of anything. A shortcut that is worth having is not worth that.
-        // ConsoleShortcutEscMigrated moves already-saved profiles off the old default.
-        public string ConsoleShortcut { get; set; } = "F12";
-        // One-shot: see ConsoleShortcut above. Flagged rather than unconditional so someone who genuinely
-        // wants Esc can set it back and keep it.
-        public bool ConsoleShortcutEscMigrated { get; set; } = false;
-        // Point size for the console scrollback + command prompt. Notifies so the console updates live.
+        // ConsoleShortcut / ConsoleShortcutEscMigrated were removed 2026-08-13 along with the "Toggle
+        // console window" action - the run strip's MDI button is bindable now (ActionKeyBinder
+        // "Program.Mdi"), which is the same destination by a route that does not need its own config key
+        // or its own store. A saved profile may still carry both elements; XmlSerializer ignores elements
+        // it has no property for, so they are harmless and disappear on the next save.
+        // Point size for the console scrollback. Notifies so the console updates live.
         private double _consoleFontSize = 10d;
         public double ConsoleFontSize { get { return _consoleFontSize; } set { if (_consoleFontSize != value) { _consoleFontSize = Math.Max(6d, Math.Min(32d, value)); OnPropertyChanged(); } } }
+        // Point size for the MDI input line, sized SEPARATELY from the scrollback above it (2026-08-13).
+        // The scrollback is a log you skim; this is the line you type g-code into and have to read back before
+        // pressing Enter, so it defaults to roughly double and has its own A-/A+ pair. Upper clamp is higher
+        // than the scrollback's for the same reason.
+        private double _consoleInputFontSize = 22d;
+        public double ConsoleInputFontSize { get { return _consoleInputFontSize; } set { if (_consoleInputFontSize != value) { _consoleInputFontSize = Math.Max(8d, Math.Min(48d, value)); OnPropertyChanged(); } } }
         // Last machine picked in the Machine Setup Wizard ("Manufacturer|Product|Model"), restored next run.
         public string LastMachine { get; set; } = string.Empty;
         // One-shot "have they seen it" flag for the Feeds & Speeds tab's Intro sub-tab (FeedsAndSpeedsView) -
@@ -458,6 +483,24 @@ namespace CNC.Controls
         public double ConsoleWindowTop { get; set; } = double.NaN;
         public double ConsoleWindowWidth { get; set; } = double.NaN;
         public double ConsoleWindowHeight { get; set; } = double.NaN;
+        // Status-message log window (MainWindow.ShowMessageLog). It pops itself whenever a message arrives
+        // now that the message strip is gone - and dismisses itself again 10s later unless touched - so
+        // where it lands matters more than for a window you open on purpose, and it lands there repeatedly.
+        // NaN = never saved -> the default 700x440 centred on the owner.
+        public double StatusWindowLeft { get; set; } = double.NaN;
+        public double StatusWindowTop { get; set; } = double.NaN;
+        public double StatusWindowWidth { get; set; } = double.NaN;
+        public double StatusWindowHeight { get; set; } = double.NaN;
+        // How long an AUTO-POPPED status window waits before dismissing itself. Only errors and alarms
+        // pop it now, so this is how long an error stays in front of you. Ten seconds is a comfortable
+        // read; three is enough to notice one and get on with it. Nothing is lost by shortening it -
+        // every message stays in the log behind the Status button regardless. Clamped where it is used,
+        // and read fresh on each message, so a change here applies immediately rather than on restart.
+        public int StatusWindowAutoCloseSeconds
+        {
+            get { return _statusWindowAutoCloseSeconds; }
+            set { if (_statusWindowAutoCloseSeconds != value) { _statusWindowAutoCloseSeconds = value; OnPropertyChanged(); } }
+        }
         // Keyboard shortcuts for switching main-page tabs and Settings sub-tabs, keyed by a stable tab id
         // (e.g. "Tab.Job", "Tab.Settings.Grbl"). Empty by default - no tab has a shortcut out of the box.
         // Edited in the Key Mappings editor; dispatched at the main-window level like the console shortcut.
@@ -720,6 +763,22 @@ namespace CNC.Controls
             // Drag-reorder order for the sub-tab strips that have no other order authority (Probing/Settings).
             ConfigStore.Register(new OwnedSection<TabOrderConfig>("TabOrder"));
 
+            // Jog panel selection, migrated off Properties.Settings/user.config (see UiState.cs).
+            ConfigStore.Register(new OwnedSection<UiState>("UiState", UiState.ImportLegacy));
+
+            // SVG-to-laser dialog values. Power and feed for a material are found by burning test strips;
+            // before this they were rebuilt from the field initializers on every single import, because
+            // GCode.LoadViaConverter constructs the converter fresh each time.
+            ConfigStore.Register(new OwnedSection<SvgLaserSettings>("SvgLaser"));
+
+            // How much of the table is actually spoilboard. Kept apart from the travel limits on purpose -
+            // the gantry can reach past the board to the toolsetter and must keep being allowed to.
+            ConfigStore.Register(new OwnedSection<WorkSurface>("WorkSurface"));
+
+            // Height Map tab choices - notably which area the grid covers, which decides whether the run
+            // sets the work origin from the table or trusts one that is already there.
+            ConfigStore.Register(new OwnedSection<HeightMapConfig>("HeightMap"));
+
             // Workholding fixture library (Machine Setup: Fixture definitions; selected by Start Job) -
             // replaces the retired G28 named-position combo. Needs the ObservableCollection-mirror callback
             // (for the wizard's DataGrid), so it registers via XmlObjectSection directly rather than
@@ -761,7 +820,7 @@ namespace CNC.Controls
                     Base.Tabs.Remove(component);
             }
 
-            Save(CNC.Core.Resources.IniFile);
+            Save();
         }
 
         // Persist a drag-reorder of the top-level tab bar. presentOrder is the new left-to-right order of the
@@ -777,7 +836,7 @@ namespace CNC.Controls
                 ApplyOrder(tabsSlot.Items, n => n.Component, order);
             if (Base?.Tabs != null && Base.Tabs.Count > 0)
                 ApplyOrder(Base.Tabs, s => s, order);
-            Save(CNC.Core.Resources.IniFile);
+            Save();
         }
 
         // Persist a drag-reorder of a nested container slot (e.g. the Tools sub-tabs, container "Tools" slot
@@ -792,7 +851,7 @@ namespace CNC.Controls
             if (slot == null)
                 return;
             ApplyOrder(slot.Items, n => n.Component, presentOrder.ToList());
-            Save(CNC.Core.Resources.IniFile);
+            Save();
         }
 
         // Reorder the present items of a list to match presentOrder, leaving every non-present item pinned to its
@@ -874,27 +933,25 @@ namespace CNC.Controls
         private AppConfig()
         {
             RegisterSections();
-            Properties.Settings.Default.PropertyChanged += Default_PropertyChanged;
         }
 
-        private void Default_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        // Was raised off Properties.Settings.Default.PropertyChanged. Kept a no-op until the singleton
+        // exists so a Config deserialized before/outside AppConfig cannot re-enter the Lazy initializer.
+        internal static void NotifyColorModeChanged()
         {
-            OnPropertyChanged(nameof(ColorMode));   
+            if (settings.IsValueCreated)
+                settings.Value.OnPropertyChanged(nameof(ColorMode));
         }
 
         public static AppConfig Settings { get { return settings.Value; } }
-
-        // Raised when the console toggle shortcut is changed in the Key Mappings editor so the
-        // main window(s) can re-register it without a restart.
-        public static event System.Action ConsoleShortcutChanged;
-        public static void NotifyConsoleShortcutChanged() { ConsoleShortcutChanged?.Invoke(); }
 
         // Raised when tab-switch shortcuts are changed in the Key Mappings editor so the main window(s)
         // can re-read and re-register them without a restart.
         public static event System.Action TabShortcutsChanged;
         public static void NotifyTabShortcutsChanged() { TabShortcutsChanged?.Invoke(); }
 
-        public static string ColorMode { get { return Properties.Settings.Default.ColorMode; } }
+        // Base.Theme IS the colour mode - Settings.Default.ColorMode was only ever a mirror of it.
+        public static string ColorMode { get { return Settings.Base?.Theme ?? "Standard"; } }
 
         public Config Base
         {
@@ -986,6 +1043,188 @@ namespace CNC.Controls
                 Save();
             }
         }
+
+        #region Config overlays (layer a config fragment onto this profile)
+
+        // See ConfigOverlay.cs for the format and why it exists. The three file names below all live in
+        // the per-user config folder alongside App.config.
+        //
+        // Applying is STAGED, never done to the live file: dozens of call sites throughout the app call
+        // AppConfig.Settings.Save() at will, so anything written to App.config while the app is running is
+        // liable to be overwritten by the in-memory state moments later. Instead "Apply" drops the fragment
+        // next to the config and restarts; the merge happens in TryLoad below, at the one point where the
+        // document on disk is authoritative and nothing has read it yet. That also makes the command-line
+        // -overlay flag and the menu command literally the same code path.
+
+        private const string PendingOverlayName = "pending-overlay.ioconfig";
+        private const string PendingRestoreName = "pending-restore.config";
+        private const string PreOverlayBackupName = "pre-overlay-App.config";
+
+        private static string ConfigDirFile(string name)
+        {
+            string dir = CNC.Core.Resources.ConfigPath;
+            if (string.IsNullOrEmpty(dir))
+                dir = AppDomain.CurrentDomain.BaseDirectory;
+            return Path.Combine(dir, name);
+        }
+
+        public static string PendingOverlayPath { get { return ConfigDirFile(PendingOverlayName); } }
+        public static string PendingRestorePath { get { return ConfigDirFile(PendingRestoreName); } }
+
+        // The profile as it was immediately before the last overlay was staged - what "Undo" restores.
+        public static string PreOverlayBackupPath { get { return ConfigDirFile(PreOverlayBackupName); } }
+        public static bool CanUndoOverlay { get { try { return File.Exists(PreOverlayBackupPath); } catch { return false; } } }
+
+        // Overlay file to layer on the next load: the -overlay command-line argument (transient - applied
+        // in memory, never written back) or a staged pending file (persistent - consumed and saved).
+        private static string _overlayPath;
+        private static bool _overlayPersist;
+
+        // Section keys the last load actually applied from an overlay, for the post-restart notice and the
+        // log. Empty when no overlay was layered - "nothing applied" must be distinguishable from "applied".
+        public static List<string> LastOverlayApplied = new List<string>();
+        public static string LastOverlayName;
+
+        /// <summary>
+        /// Stage <paramref name="sourceFile"/> to be layered onto this profile on the next launch, taking a
+        /// pre-overlay backup of the current config first. Returns false (with nothing staged) if the file
+        /// cannot be copied. The caller saves + restarts.
+        /// </summary>
+        public static bool StageOverlay(string sourceFile)
+        {
+            try
+            {
+                if (!File.Exists(sourceFile))
+                    return false;
+
+                // Backup FIRST and from the live file - this is the copy Undo restores, so it has to be the
+                // profile as it stands before the overlay, not after.
+                if (File.Exists(CNC.Core.Resources.IniFile))
+                    File.Copy(CNC.Core.Resources.IniFile, PreOverlayBackupPath, true);
+
+                File.Copy(sourceFile, PendingOverlayPath, true);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                CNC.Core.DebugLog.Write("config", "StageOverlay failed - " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Stage the pre-overlay backup to be restored wholesale on the next launch (the Undo path). Same
+        /// staging reason as above: the running instance must not write App.config.
+        /// </summary>
+        public static bool StageOverlayUndo()
+        {
+            try
+            {
+                if (!File.Exists(PreOverlayBackupPath))
+                    return false;
+                File.Copy(PreOverlayBackupPath, PendingRestorePath, true);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                CNC.Core.DebugLog.Write("config", "StageOverlayUndo failed - " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Stage a chosen App.config snapshot to be swapped in at the next startup, and report whether it
+        /// was staged. The caller restarts; ConsumePendingRestore below does the swap before Load() runs.
+        ///
+        /// Staged rather than applied in place because the live config is READ ONCE at startup and held in
+        /// memory: overwriting the file under a running session would be undone by the next Save, which
+        /// would write the in-memory copy straight back over it. The restore has to happen before anything
+        /// has loaded, and that means a restart.
+        ///
+        /// This is the same mechanism the overlay undo uses - one staging slot, consumed once.
+        /// </summary>
+        public static bool StageConfigRestore(string backupPath)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(backupPath) || !File.Exists(backupPath))
+                    return false;
+
+                File.Copy(backupPath, PendingRestorePath, true);
+                CNC.Core.DebugLog.Write("config", "config restore staged from " + Path.GetFileName(backupPath));
+                return true;
+            }
+            catch (Exception ex)
+            {
+                CNC.Core.DebugLog.Write("config", "StageConfigRestore failed - " + ex.Message);
+                return false;
+            }
+        }
+
+        // Consume a staged restore: swap the backup over App.config before anything reads it. Runs at
+        // startup, before Load(), so the restored file is simply the config this session loads.
+        private static void ConsumePendingRestore()
+        {
+            try
+            {
+                if (!File.Exists(PendingRestorePath))
+                    return;
+
+                File.Copy(PendingRestorePath, CNC.Core.Resources.IniFile, true);
+                File.Delete(PendingRestorePath);
+                try { File.Delete(PreOverlayBackupPath); } catch { }   // consumed - one level of undo, not a stack
+                try { File.Delete(PendingOverlayPath); } catch { }     // an unconsumed overlay must not re-apply
+                CNC.Core.DebugLog.Write("config", "config restored from pre-overlay backup");
+            }
+            catch (Exception ex)
+            {
+                CNC.Core.DebugLog.Write("config", "ConsumePendingRestore failed - " + ex.Message);
+            }
+        }
+
+        // Layer the pending/-overlay fragment onto the just-parsed config document. Returns true if the
+        // document changed (the caller then flags a save so the merge becomes part of the profile).
+        private bool ApplyPendingOverlay(XDocument doc)
+        {
+            if (string.IsNullOrEmpty(_overlayPath))
+                return false;
+
+            List<string> applied;
+            string name = null;
+            try
+            {
+                var overlay = XDocument.Load(_overlayPath);
+                name = CNC.Core.ConfigOverlay.NameOf(overlay);
+                applied = CNC.Core.ConfigOverlay.Apply(doc, overlay);
+            }
+            catch (Exception ex)
+            {
+                CNC.Core.DebugLog.Write("config", "overlay " + _overlayPath + " could not be read - " + ex.Message);
+                applied = new List<string>();
+            }
+
+            LastOverlayApplied = applied;
+            LastOverlayName = name;
+            CNC.Core.DebugLog.Write("config", string.Format("overlay {0}: {1} section(s) applied [{2}]",
+                                    Path.GetFileName(_overlayPath), applied.Count, string.Join(", ", applied)));
+
+            return applied.Count > 0;
+        }
+
+        // Delete a staged overlay only once the load it was layered into actually SUCCEEDED - consuming it
+        // at merge time would throw it away if the parse then failed and Load() fell back to a backup copy.
+        // Consumed even when it applied nothing: a fragment that does not match (wrong file, or a profile
+        // still in the legacy v1 format) would otherwise be retried identically on every launch forever.
+        private static void ConsumeStagedOverlay()
+        {
+            if (string.IsNullOrEmpty(_overlayPath) || !_overlayPersist)
+                return;
+
+            try { File.Delete(_overlayPath); } catch { }
+            _overlayPath = null;
+        }
+
+        #endregion
 
         public bool Load(string filename)
         {
@@ -1082,6 +1321,14 @@ namespace CNC.Controls
                     }
                     else
                     {
+                        // Layer any pending config overlay onto the document BEFORE it is read: the merge is
+                        // pure XML (see ConfigOverlay), so every section - including keys this build does not
+                        // own - is covered without the sections' owners knowing overlays exist. A persisted
+                        // overlay flags a migrate-save so it becomes part of the profile rather than being
+                        // re-applied from the fragment on every launch.
+                        if (ApplyPendingOverlay(doc) && _overlayPersist)
+                            _migratedFormat = true;
+
                         // v2 (<AppConfig>): the Core section rebuilds Base, the nested sections fill it
                         // in, unowned sections are preserved, and absent sections may import a legacy file.
                         ConfigStore.ReadDocument(doc);
@@ -1109,6 +1356,8 @@ namespace CNC.Controls
                             Base.Macros.Remove(macro);
 
                     ApplyOneTimeFixups();
+
+                    ConsumeStagedOverlay();
 
                     ok = true;
                 }
@@ -1205,6 +1454,31 @@ namespace CNC.Controls
             if (fileSlot == null || toolsSlot == null)
                 return;   // not migrated yet - MigrateTopLevelComponentsToMenus owns that case
 
+            // Invariant 3: the Job view is never menu-hosted. It is not just a place to put things - it boots
+            // the controller (Activate -> InitSystem -> $I, settings, parser state), owns the status poller and
+            // hosts the run controls, and the call sites that drive it resolve it with getTab(ViewType.GRBL),
+            // which returns null for a menu-hosted view. Menuing Job therefore cost you the connect handshake
+            // silently. MainPageEditor.CanMenu stops it being chosen; this puts back a profile that chose it
+            // under an earlier build. Runs BEFORE inMenus is computed so the tabs-list cleanup below doesn't
+            // then strip the entry we just restored.
+            var tabsSlot = root.Slot(LayoutKeys.SlotTabs);
+            if (tabsSlot != null)
+            {
+                int demenued = fileSlot.Items.RemoveAll(n => n?.Component == LayoutKeys.Grbl)
+                             + toolsSlot.Items.RemoveAll(n => n?.Component == LayoutKeys.Grbl);
+                if (demenued > 0)
+                {
+                    if (tabsSlot.Items.FindIndex(n => n?.Component == LayoutKeys.Grbl) < 0)
+                        tabsSlot.Items.Insert(0, new LayoutNode(LayoutKeys.Grbl));
+                    // TabOrder.Apply rebuilds the tabs slot from this flat list whenever it is non-empty, so
+                    // restoring only the tree would be undone on the very next load.
+                    if (Base?.Tabs != null && Base.Tabs.Count > 0 && !Base.Tabs.Contains(LayoutKeys.Grbl))
+                        Base.Tabs.Insert(0, LayoutKeys.Grbl);
+                    _migratedFormat = true;   // persist the repair rather than redoing it every launch
+                    CNC.Core.DebugLog.Write("config", "EnforceMenuPlacement: Job view moved back to the tab bar");
+                }
+            }
+
             var inMenus = new HashSet<string>(
                 fileSlot.Items.Concat(toolsSlot.Items).Select(n => n.Component), StringComparer.Ordinal);
 
@@ -1282,6 +1556,11 @@ namespace CNC.Controls
         // change needs one, remove it again once testing on real saved App.config files is done.
         private void ApplyOneTimeFixups()
         {
+            // 2026-07-29: SecretStore moved off the Windows registry to a portable file in the config
+            // directory (CNC.Core is platform-free now). Adopt anything still in HKCU so an existing
+            // user's API key survives. Guarded on "nothing stored yet", so it is a no-op from then on.
+            LegacySecrets.MigrateAll();
+
             MigrateTopLevelComponentsToMenus();
             EnforceMenuPlacement();
 
@@ -1304,15 +1583,32 @@ namespace CNC.Controls
                 CNC.Core.DebugLog.Write("config", string.Format(
                     "ApplyOneTimeFixups: removed {0} shortcut(s) for withdrawn second-level tab targets", deadShortcuts));
 
-            // 2026-07-20: Fixture.CornerOffsetX/Y (see Fixture.cs) is new. A fixture whose PositionValidated
-            // survived from before this field existed has CornerOffsetX/Y stuck at their 0d default, which
-            // StartJobView.BuildProgram would misread as "the true corner sits exactly at Coords" instead of
-            // "never actually probed under this scheme" - force those fixtures back to not-validated so the
-            // operator is prompted to re-run Test position (which now also captures the corner offset).
+            // 2026-08-15: seed Fixture.CornerLocated for fixtures saved before that flag existed.
+            //
+            // This REPLACES a check that ran here every launch (not once, despite the method name) and
+            // said "either offset exactly 0 => never probed => clear PositionValidated". That premise was
+            // wrong - Test position parks the machine AT the true corner, so an operator who sets the
+            // reference from there gets a legitimate 0.000 - and it would have silently un-validated a
+            // freshly probed fence on the NEXT restart, which is a nastier symptom than the refusal that
+            // exposed it (Generate blocked a validated Large Fence with Y offset exactly 0).
+            //
+            // The heuristic below is the same shape, and that is fine HERE and only here: this is a
+            // one-shot migration of existing data, where a rare wrong guess costs one re-run of Test
+            // position. As a standing runtime gate it was simply wrong. A pre-flag fixture has both
+            // offsets at their 0d default; any fixture with a non-zero offset was measured under the
+            // scheme, so its flag can be set with confidence.
             foreach (var fx in Fixtures.Items)
-                if (FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented && fx.PositionValidated
-                    && (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d))
+            {
+                if (fx.CornerLocated || !FixtureKinds.ProbesEdges(fx.Kind) || !fx.Implemented)
+                    continue;
+                if (fx.PositionValidated && (fx.CornerOffsetX != 0d || fx.CornerOffsetY != 0d))
+                    fx.CornerLocated = true;
+                else if (fx.PositionValidated)
+                    // Both offsets 0 AND validated: genuinely indistinguishable from a pre-flag fixture,
+                    // so this one really does need Test position re-run - clear the checkmark that says
+                    // otherwise, exactly as the old fixup did.
                     fx.PositionValidated = false;
+            }
 
             // 2026-07-20 (later still): LayoutKeys.StepperCalProbe (new Tools sub-tab) was added to
             // DefaultLayout.Build(), but that only seeds a FRESH profile - an already-persisted Layout tree
@@ -1772,8 +2068,17 @@ namespace CNC.Controls
                         _forgetNetwork = _selectPort = true;
                         break;
 
+                    // Layer a config fragment onto this profile for THIS RUN only - nothing is written back,
+                    // so a relaunch without the flag returns to the saved profile untouched. The persistent
+                    // equivalent is Help > Support > Apply configuration overlay, which stages the same file
+                    // and goes through the same merge (see the Config overlays region).
+                    case "-overlay":
+                        _overlayPath = GetArg(args, p++);
+                        _overlayPersist = false;
+                        break;
+
                     case "-islegacy":
-                        CNC.Core.Resources.IsLegacyController = true;
+                        CNC.Core.GrblInfo.IsLegacyController = true;
                         break;
 
                     // Preload a program on startup: --LoadFile <path> opens a single g-code file.
@@ -1791,7 +2096,33 @@ namespace CNC.Controls
                         break;
                 }
 
-            if (Load(CNC.Core.Resources.IniFile))
+            // Config overlays, both consumed here at the last moment before the config is read (-configpath
+            // above may have just moved the folder they live in). A staged restore swaps the whole file back;
+            // a staged overlay is layered by TryLoad and persisted. An explicit -overlay wins and stays
+            // transient - a fragment being tried out must not silently become the profile.
+            ConsumePendingRestore();
+            if (string.IsNullOrEmpty(_overlayPath) && File.Exists(PendingOverlayPath))
+            {
+                _overlayPath = PendingOverlayPath;
+                _overlayPersist = true;
+            }
+
+            bool loaded = Load(CNC.Core.Resources.IniFile);
+
+            // A TRANSIENT overlay (-overlay) must not be able to become permanent, and merely not flagging a
+            // save is not enough: dozens of call sites call Save() during a normal session (window placement,
+            // a connect, a macro run), and each one writes the whole in-memory state - overlay included.
+            // Proven the hard way 2026-08-12: one -overlay run persisted its layout AND, because
+            // TabOrder.Apply then pruned the tabs slot back to the flat Config.Tabs, deleted a component out
+            // of the profile entirely. So point this session's writes at a side file instead; the real
+            // profile is then untouchable for the run, which is what "try this out" has to mean.
+            if (loaded && !string.IsNullOrEmpty(_overlayPath) && !_overlayPersist)
+            {
+                configfile = CNC.Core.Resources.IniFile + ".overlay-session";
+                CNC.Core.DebugLog.Write("config", "-overlay is transient: this session's saves go to " + configfile);
+            }
+
+            if (loaded)
             {
                 // Snapshot the pre-session config once at startup, before any in-session edits, so
                 // Load()'s crash recovery and the user's own Backups folder both have a known-good copy.
@@ -1806,6 +2137,8 @@ namespace CNC.Controls
                     // it aside before overwriting so the user's settings are recoverable.
                     BackupStartupSnapshot(CNC.Core.Resources.IniFile);
 
+                    // Explicit path, not Save(): the load FAILED, so configfile was never set and the
+                    // no-argument overload would silently write nothing and report false.
                     if (!Save(CNC.Core.Resources.IniFile))
                     {
                         AppDialogs.Show(LibStrings.FindResource("CreateConfigFail"), appname);
@@ -1852,23 +2185,8 @@ namespace CNC.Controls
                 _migratedFormat = true;   // persist the injected layout/flag via the save below
             }
 
-            // One-shot: the console toggle shipped defaulted to Esc, which MainWindow's PreviewKeyDown then
-            // swallowed app-wide - so Esc stopped dismissing anything inside the main window. Move a profile
-            // still sitting on that default over to F12 (the same key the toggle now defaults to). Only ever
-            // touches the literal old default: a profile with any other binding, including a deliberate Esc
-            // set after this ran, is left alone.
-            if (!Base.ConsoleShortcutEscMigrated)
-            {
-                Base.ConsoleShortcutEscMigrated = true;
-
-                if (string.Equals(Base.ConsoleShortcut, "Esc", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(Base.ConsoleShortcut, "Escape", StringComparison.OrdinalIgnoreCase))
-                {
-                    Base.ConsoleShortcut = "F12";
-                    CNC.Core.DebugLog.Write("config", "ApplyOneTimeFixups: console toggle moved off Esc to F12");
-                }
-                _migratedFormat = true;   // persist the flag (and any change) via the save below
-            }
+            // (The Esc -> F12 console-toggle migration that lived here went with the toggle itself, removed
+            //  2026-08-13. Both config keys are gone; see the note where ConsoleShortcut was declared.)
 
             // One-shot: move Load Stock (now "Start Job") to the front of the tab order for existing saved
             // layouts that pin its old position. Mirrors the HeightMap injection above - guarded by a flag so a
@@ -1920,6 +2238,13 @@ namespace CNC.Controls
                 // never be deleted out of existence by a flat list that predates it.
                 EnforceMenuPlacement();
                 DeduplicateTopLevelPlacements();
+
+                // The final placement, after every fixup has had its say. Cheap, and the one record of what
+                // the tree actually says before MainWindow builds from it - a component that vanishes between
+                // the config file and the tab bar is otherwise invisible to diagnose.
+                CNC.Core.DebugLog.Write("config", "layout tabs: [" + string.Join(", ",
+                    layoutSection.Root.Slot(LayoutKeys.SlotTabs)?.Items.Select(n => n.Component) ?? Enumerable.Empty<string>())
+                    + "]  (flat Tabs: [" + string.Join(", ", Base.Tabs) + "])");
             }
 
             // The load migrated the on-disk format (legacy v1 -> sectioned v2) or imported a legacy
@@ -1927,7 +2252,7 @@ namespace CNC.Controls
             // previous file is preserved as .bak by the atomic Save (recoverable on a downgrade).
             if (_migratedFormat)
             {
-                Save(CNC.Core.Resources.IniFile);
+                Save();
                 _migratedFormat = false;
                 DeleteFoldedInFiles();   // their data is now in App.config; drop the redundant standalone files
             }
@@ -2018,7 +2343,7 @@ namespace CNC.Controls
                     PersistSimulatorChoice(portsel);
                     setPort(port, string.Empty);
                     OpenStreamFor(model, dispatcher);
-                    Save(CNC.Core.Resources.IniFile);
+                    Save();
                 }
             }
 
@@ -2029,21 +2354,42 @@ namespace CNC.Controls
         // target string (ws:// / COMx / host:port). Shared by startup and the Connect menu item.
         private void OpenStreamFor(GrblViewModel model, System.Windows.Threading.Dispatcher dispatcher)
         {
+            // The stream classes take a portable SynchronizationContext, not a Dispatcher (CNC.Core is
+            // being made WPF-free for a .NET 8 server). DispatcherSynchronizationContext is exactly the
+            // dispatcher's own context, so replies still marshal to this UI thread as they always did.
+            //
+            // Input, NOT the default Normal - this is a SAFETY property, not a tuning knob.
+            // A DispatcherSynchronizationContext posts at DispatcherPriority.Normal (9); WPF delivers user
+            // input at Input (5). A job dense enough to keep the reply stream saturated therefore starves
+            // every click and keypress for as long as it runs - INCLUDING Feed Hold. Confirmed on real
+            // hardware 2026-08-04: a 6282-line chamfer job held the planner full (Bf:0) for 25 s straight,
+            // the operator pressed Feed Hold seconds in, and the hold byte did not reach the controller
+            // until 0.85 s AFTER the job had already finished and the reply flood drained. Reproduced
+            // exactly in a dispatcher harness: with replies at Normal an Input-priority callback never ran
+            // across 3000 replies; at Input it ran after the first one.
+            // The latency this costs at the machine is nil - the planner buffer is what absorbs sender
+            // scheduling, and it was 100 blocks ahead for that entire run.
+            // Input (5) is deliberately still ABOVE Background (4): EventUtils.DoEvents pushes a frame that
+            // exits at Background, so replies must outrank that or the blocking handshakes stop being
+            // pumped - the priority trap that broke connect in 2938371.
+            var syncContext = new System.Windows.Threading.DispatcherSynchronizationContext(
+                dispatcher, System.Windows.Threading.DispatcherPriority.Input);
+
             EnsureSimulatorRunning();   // launch the bundled simulator first if the saved target is it
 #if USEWEBSOCKET
             if (Base.PortParams.ToLower().StartsWith("ws://"))
-                new WebsocketStream(Base.PortParams, dispatcher);
+                new WebsocketStream(Base.PortParams, syncContext);
             else
 #endif
             if (Base.PortParams.ToLower().StartsWith("com"))
-                new SerialStream(Base.PortParams, Base.ResetDelay, dispatcher);
+                new SerialStream(Base.PortParams, Base.ResetDelay, syncContext);
             else if (Base.PortParams.Contains(":")) // host:port (IP or hostname)
-                new TelnetStream(Base.PortParams, dispatcher);
+                new TelnetStream(Base.PortParams, syncContext);
             else
 #if USEELTIMA
-                new EltimaStream(Config.PortParams, Config.ResetDelay, dispatcher);
+                new EltimaStream(Config.PortParams, Config.ResetDelay, syncContext);
 #else
-                new SerialStream(Base.PortParams, Base.ResetDelay, dispatcher);
+                new SerialStream(Base.PortParams, Base.ResetDelay, syncContext);
 #endif
             // Report the target only once the link is actually open (drives the green/red target box).
             // "Simulator" instead of the raw 127.0.0.1:port when the target is the bundled sim - Base.StartSimulator
@@ -2067,8 +2413,15 @@ namespace CNC.Controls
             if (!System.IO.File.Exists(exe))
                 return;
 
+            // Mirror the machine's geometry FIRST and unconditionally: the simulator derives G30/G59.3
+            // from this file at boot, so a running instance booted with whatever was there before and
+            // will never re-read it. If the geometry actually changed, restart so it takes effect -
+            // the simulator holds no state worth preserving across a connect.
+            if (MachineOffsets.WriteSimSetup(exe) && SimulatorManager.IsProcessRunningByExe(exe))
+                SimulatorManager.StopSimulator(exe);
+
             if (!SimulatorManager.IsProcessRunningByExe(exe))
-                SimulatorManager.StartSimulator(exe, Base.SimulatorArgs ?? string.Empty, true);
+                SimulatorManager.StartSimulator(exe, MachineOffsets.SimulatorArgs(exe, Base.SimulatorArgs), true);
         }
 
         // Remember an IP address to default the Connect dialog's network tab to next time. Call once a
@@ -2099,7 +2452,7 @@ namespace CNC.Controls
             if (!string.IsNullOrWhiteSpace(ip) && ip != Base.NetworkHost)
             {
                 Base.NetworkHost = ip;
-                Save(CNC.Core.Resources.IniFile);
+                Save();
             }
         }
 
@@ -2128,7 +2481,7 @@ namespace CNC.Controls
             PersistSimulatorChoice(portsel);
             setPort(port, string.Empty);
             OpenStreamFor(model, dispatcher);
-            Save(CNC.Core.Resources.IniFile);
+            Save();
 
             return InitConnectedController(appname, model, 0);
         }
@@ -2140,7 +2493,7 @@ namespace CNC.Controls
             Base.StartSimulator = false;
             setPort(target, string.Empty);
             OpenStreamFor(model, dispatcher);
-            Save(CNC.Core.Resources.IniFile);
+            Save();
 
             return InitConnectedController(appname, model, 0);
         }
@@ -2203,7 +2556,7 @@ namespace CNC.Controls
 
                 // Wait 400ms to see if a MPG is polling Grbl...
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     MPGactive = WaitFor.SingleEvent<string>(
                     cancellationToken,
@@ -2211,16 +2564,13 @@ namespace CNC.Controls
                     a => model.OnRealtimeStatusProcessed += a,
                     a => model.OnRealtimeStatusProcessed -= a,
                     500);
-                }).Start();
-
-                while (MPGactive == null)
-                    EventUtils.DoEvents();
+                });
 
                 if (MPGactive == true)
                 {
                     MPGactive = null;
 
-                    new Thread(() =>
+                    EventUtils.RunPumped(() =>
                     {
                         MPGactive = WaitFor.SingleEvent<string>(
                         cancellationToken,
@@ -2228,10 +2578,7 @@ namespace CNC.Controls
                         a => model.OnRealtimeStatusProcessed += a,
                         a => model.OnRealtimeStatusProcessed -= a,
                         500, () => Comms.com.WriteByte(GrblConstants.CMD_STATUS_REPORT_ALL));
-                    }).Start();
-
-                    while (MPGactive == null)
-                        EventUtils.DoEvents();
+                    });
 
                     if (MPGactive == true)
                     {
@@ -2299,15 +2646,66 @@ namespace CNC.Controls
             this.model = model;
         }
 
+        // How many times the operator has been asked to keep waiting on this connect. Bounded so a machine
+        // that will never answer cannot turn into an endless sequence of identical dialogs.
+        private int waitPrompts = 0;
+
+        /// <summary>
+        /// Offer to keep waiting for a controller that has not answered yet.
+        ///
+        /// Defaults to Yes: someone who has just plugged in a board and pressed connect almost always means
+        /// to wait for it, and the cost of a wrong Yes is ten seconds while the cost of a wrong No is doing
+        /// the whole connect again.
+        /// </summary>
+        private bool AskToKeepWaiting()
+        {
+            if (waitPrompts >= 3)
+                return false;
+
+            waitPrompts++;
+
+            return AppDialogs.Show(
+                "The controller has not answered yet.\r\n\r\n" +
+                "Some boards reset when the port is opened and take several seconds to start up. " +
+                "Keep waiting for about ten more seconds?",
+                "ioSender - waiting for the controller",
+                MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes;
+        }
+
         public bool ResetPending { get; private set; } = false;
         public string Message { get; private set; }
 
         public RestartResult Restart ()
         {
-            Message = model.Message;
+            // Start EMPTY, not from model.Message. JobView reads this as "a message Restart set for
+            // itself" and gives it precedence over the connect outcome - so carrying the pre-connect
+            // status line in here made "nothing to report" indistinguishable from a deliberate message,
+            // and every connect after the first re-announced whatever the last one had left on screen.
+            //
+            // Observed 2026-08-24: a connect to COM6 logged "Connected: 192.168.1.247:23" - the previous
+            // network session's line - and, because that branch won, skipped LogConnectionDetail
+            // entirely, so the settings count and capabilities were never reported. The first connect of
+            // a session looked right only because model.Message happened to be empty at startup.
+            //
+            // MsgHome below is the one thing Restart genuinely has to say for itself, and it still wins.
+            Message = string.Empty;
             model.Message = string.Format(LibStrings.FindResource("MsgWaiting"), AppConfig.Settings.Base.PortParams);
 
             string response = GrblInfo.Startup(model);
+
+            // Nothing yet. Before treating that as a failure, offer to go on waiting: a controller that
+            // resets when its port is opened - which cheap boards do - can take five or ten seconds to come
+            // back, and 2.5s of silence says nothing about whether it ever will.
+            //
+            // Asked rather than simply waiting longer, because the two cases are indistinguishable from
+            // here and cost opposite things. A slow board wants patience; a wrong port, a dead board or an
+            // unplugged cable wants to be told promptly rather than after a minute of hopeful silence. The
+            // operator knows which they are looking at.
+            while (response == string.Empty && AskToKeepWaiting())
+            {
+                model.Message = string.Format(LibStrings.FindResource("MsgWaiting"), AppConfig.Settings.Base.PortParams);
+                response = GrblInfo.Startup(model, 40);      // ~10s
+            }
 
             if (response.StartsWith("<"))
             {
@@ -2413,7 +2811,7 @@ namespace CNC.Controls
                                         bool? res = null;
                                         CancellationToken cancellationToken = new CancellationToken();
 
-                                        new Thread(() =>
+                                        EventUtils.RunPumped(() =>
                                         {
                                             res = WaitFor.SingleEvent<string>(
                                                 cancellationToken,
@@ -2421,10 +2819,7 @@ namespace CNC.Controls
                                                 a => model.OnGrblReset += a,
                                                 a => model.OnGrblReset -= a,
                                                 200, () => Comms.com.WriteByte(GrblConstants.CMD_STATUS_REPORT));
-                                        }).Start();
-
-                                        while (res == null)
-                                            EventUtils.DoEvents();
+                                        });
 
                                         if (!(exit = !model.Signals.Value.HasFlag(Signals.SafetyDoor)))
                                         {
@@ -2495,7 +2890,7 @@ namespace CNC.Controls
             bool? res = null;
             CancellationToken cancellationToken = new CancellationToken();
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.SingleEvent<string>(
                     cancellationToken,
@@ -2503,10 +2898,7 @@ namespace CNC.Controls
                     a => model.OnGrblReset += a,
                     a => model.OnGrblReset -= a,
                     AppConfig.Settings.Base.ResetDelay, () => Comms.com.WriteByte(GrblConstants.CMD_RESET));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             return !ResetPending;
         }

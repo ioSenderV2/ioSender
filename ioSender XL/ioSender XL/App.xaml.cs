@@ -41,8 +41,6 @@ using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Reflection;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -98,6 +96,7 @@ namespace GCode_Sender
             bool debugLog = false;
 #endif
             string debugCategories = null;
+            bool wireLog = false;   // -wirelog; forced on in Debug builds by WireLog.Init itself
             bool demoMarker = false;
             bool crashTest = false;
             bool headless = false;
@@ -144,7 +143,7 @@ namespace GCode_Sender
                     // controller (AtcMacros.ReadEmbedded), so every tool - including T8's 3D-probe stylus -
                     // probes via the main probe input instead of switching to the toolsetter input.
                     case "-notoolsetter":
-                        CNC.Controls.AtcMacros.NoToolsetter = true;
+                        CNC.Core.AtcMacros.NoToolsetter = true;
                         break;
 
                     default:
@@ -155,6 +154,13 @@ namespace GCode_Sender
                             if (eq >= 0)
                                 debugCategories = arg.Substring(eq + 1);
                         }
+                        // -wirelog  unfiltered trace of what actually crossed the link, in its own file.
+                        // console.log mirrors the on-screen Console tab and inherits that view's filter -
+                        // this does not. See WireLog.cs. Already on in Debug builds.
+                        else if (arg == "-wirelog")
+                        {
+                            wireLog = true;
+                        }
                         // -testserver              start the UI test server on the default port
                         // -testserver=8760         ... on an explicit port
                         else if (arg == "-testserver" || arg.StartsWith("-testserver=", StringComparison.OrdinalIgnoreCase))
@@ -162,6 +168,16 @@ namespace GCode_Sender
                             int eq = arg.IndexOf('=');
                             int tp;
                             TestServerPort = (eq >= 0 && int.TryParse(arg.Substring(eq + 1), out tp)) ? tp : 0;
+                        }
+                        // -enableSVGLaserJob  offer "File > Load SVG Laser Job..." for this session.
+                        // Held back by default (CNC.Controls.Features) until the converter has had more
+                        // time on a real machine. Matched case-insensitively: the flag is typed by a human
+                        // and its natural spelling mixes cases, so a case-sensitive switch label would be
+                        // a trap. Set here, at the top of startup, because MainWindow's menu registration
+                        // and the keyboard catalogue both read it - see Features.SvgLaserJob.
+                        else if (string.Equals(arg, "-enableSVGLaserJob", StringComparison.OrdinalIgnoreCase))
+                        {
+                            CNC.Controls.Features.SvgLaserJob = true;
                         }
                         // -message=text  show an informational popup once the main window is up (see StartupMessage)
                         else if (arg.StartsWith("-message=", StringComparison.OrdinalIgnoreCase))
@@ -182,7 +198,18 @@ namespace GCode_Sender
             CNC.Core.DebugLog.Write("app", "OnStartup - args: " + string.Join(" ", args));
 
             CNC.Core.ConsoleLog.Init();
+            CNC.Core.StatusLog.Init();
+            CNC.Core.WireLog.Init(wireLog);
+            if (CNC.Core.WireLog.Enabled)
+                CNC.Core.DebugLog.Write("app", "wire log: " + CNC.Core.WireLog.LogPath);
+            // CNC.Core marshals to the UI thread and pumps messages through this instead of
+            // Application.Current.Dispatcher. Installs both, at Normal dispatcher priority.
+            CNC.Controls.UiPump.Register();
+            CNC.Controls.SerialPortDescriptions.Register();   // WMI friendly names for the port picker
             CNC.Controls.AppMessageBox.Register();
+            // GrblViewModel.Keyboard is the portable JogController by default; point it at the WPF
+            // keypress handler before the first model is built (MainWindow.xaml instantiates one).
+            CNC.Controls.KeypressHandler.Register();
             CNC.Controls.ButtonClickSound.Init();
 
             // Single instance: if another ioSender is already running, hand it our file arg (if any),
@@ -231,6 +258,11 @@ namespace GCode_Sender
             // keyboard focus just by starting up.
             ShutdownMode = ShutdownMode.OnMainWindowClose;
 
+            // Every popup this app opens hands focus back to ioSender when it closes, instead of
+            // letting Windows activate whatever is next in ITS z-order - which is regularly another
+            // application. Installed before the first window is shown so nothing is missed.
+            CNC.Controls.WindowFocusReturn.Install();
+
             var splash = TestServerPort < 0 ? new SplashWindow() : null;
             splash?.Show();
 
@@ -245,8 +277,8 @@ namespace GCode_Sender
             if (demoMarker)
             {
                 var cam = CNC.Controls.AppConfig.Settings.Base.Camera;
-                CNC.Core.ObsBridge.Init(true, cam.ObsHost, cam.ObsPort, cam.ObsPassword);
-                CNC.Core.ObsBridge.ConfigureCameras(cam.ObsCamASource, cam.ObsCamAFilter, cam.ObsCamBSource, cam.ObsCamBFilter, cam.ObsAppSource, cam.ObsAppFilter);
+                CNC.Controls.ObsBridge.Init(true, cam.ObsHost, cam.ObsPort, cam.ObsPassword);
+                CNC.Controls.ObsBridge.ConfigureCameras(cam.ObsCamASource, cam.ObsCamAFilter, cam.ObsCamBSource, cam.ObsCamBFilter, cam.ObsAppSource, cam.ObsAppFilter);
             }
 
             main.AttachSplash(splash);
@@ -334,13 +366,35 @@ namespace GCode_Sender
 
         // Common fatal path: dump the exception to a known log file, surface it to an interactive user (unless
         // running headless), then exit with CrashExitCode. Never throws.
+        // One crash per process. A fatal exception on one thread does not stop another thread from hitting
+        // its own a moment later, and each entry here opened a FRESH log file and re-pointed the
+        // latest_crash.log link at it. Seen 2026-08-06: the real report landed in the 15:07:35 file, a
+        // second fatal at 15:08:05 created an empty one, and latest_crash.log - the file anyone actually
+        // reads - resolved to the empty one. The first exception is the one that matters; later ones are
+        // usually its wreckage.
+        private static int fatalHandled;
+
         private void HandleFatal(string source, Exception ex)
         {
-            string logPath = WriteCrashLog(source, ex);
+            if (Interlocked.CompareExchange(ref fatalHandled, 1, 0) != 0)
+            {
+                // Already going down. Don't touch the log the first crash wrote - just block here so this
+                // thread can't race ahead, and let the Environment.Exit below take the process.
+                Thread.Sleep(Timeout.Infinite);
+                return;
+            }
+
+            // Format the report ONCE and give the same string to both consumers. They used to build their
+            // own, which is wasted work on the ordinary crash and actively harmful on an
+            // OutOfMemoryException, where each allocation is a chance to come away with nothing.
+            string utcStamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+            string summary = null;
+            try { summary = CrashReporter.BuildSummary(source, ex, utcStamp); } catch { }
+
+            string logPath = WriteCrashLog(source, ex, summary);
 
             // Capture a minidump + per-crash summary and flag it for report-on-next-launch. Never throws.
-            string utcStamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture);
-            CrashReporter.Capture(source, ex, utcStamp);
+            CrashReporter.Capture(source, ex, utcStamp, summary);
 
             // Skip the modal dialog for unattended runs (build.ps1 -Headless -> -headless) so a crash
             // can't hang the process on an un-clicked message box; the log + exit code carry the signal.
@@ -397,28 +451,51 @@ namespace GCode_Sender
             base.OnExit(e);
         }
 
+        private const string CrashLogSeparator = "========================================================================\r\n";
+
         // Write a fresh, timestamped crash entry under %AppData%\ioSender\logs\<DayOfWeek>\ (falls back to
         // the app folder if the config dir isn't resolved yet, e.g. a crash during early startup), with
         // "latest_crash.log" (hard-)linked in the top-level logs folder. File creation, day-of-week folder
         // placement, the 8MB/.1 size rollover and per-folder retention are all handled by LogFile - the
         // same primitive ConsoleLog/DebugLog use. Returns the path written, or a best-effort path string if
         // the write itself failed. Never throws.
-        private static string WriteCrashLog(string source, Exception ex)
+        private static string WriteCrashLog(string source, Exception ex, string summary = null)
         {
             var log = CNC.Core.LogFile.Open("ioSender.crash", latestLinkName: "latest_crash.log");
             string path = log?.Path ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ioSender.crash.log");
+            if (log == null)
+                return path;
 
+            // Two attempts, with a forced collection between them. An OutOfMemoryException is at once the
+            // crash that most needs recording and the one least able to record itself - formatting the text
+            // allocates, and File.AppendAllText needs a StreamWriter and an encoder buffer. On 2026-08-06 an
+            // OOM got none of that and the log was left as LogFile.Open had created it: three bytes of UTF-8
+            // BOM, indistinguishable from a run that crashed with nothing to say. The retry is not wishful
+            // thinking - the crash reporter's own .txt, written seconds later with no explicit collect, went
+            // through fine, because the OOM was thrown for one request and smaller ones still succeeded.
+            for (int attempt = 0; attempt < 2; attempt++)
+            {
+                try
+                {
+                    string body = summary ?? CrashReporter.BuildSummary(source, ex,
+                        DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture));
+                    if (log.Write(CrashLogSeparator + body + "\r\n"))
+                        return path;
+                }
+                catch { /* out of memory, most likely - fall through and try again with more of it */ }
+
+                // Reclaim whatever the failed attempt, and whatever overran before it, left behind. This is
+                // a terminal path, so the cost of a blocking collection buys more than it spends.
+                try { GC.Collect(); GC.WaitForPendingFinalizers(); } catch { }
+            }
+
+            // Both attempts failed. Leave a marker rather than the BOM-only stub: the exception's TYPE is
+            // most of the diagnosis and, for an OOM, very nearly all of it - and this needs one short
+            // concatenation to say so.
             try
             {
-                var sb = new StringBuilder();
-                sb.AppendLine("========================================================================");
-                sb.AppendLine("Time (UTC) : " + DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture));
-                sb.AppendLine("Version    : " + (Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "?"));
-                sb.AppendLine("Source     : " + source);
-                sb.AppendLine("Exception  :");
-                sb.AppendLine(ex?.ToString() ?? "(no exception object)");
-                sb.AppendLine();
-                log?.Write(sb.ToString());
+                File.AppendAllText(path, "CRASH LOG WRITE FAILED - " + source + " - " +
+                    (ex == null ? "(no exception object)" : ex.GetType().FullName) + "\r\n");
             }
             catch { /* last resort: nothing more we can do */ }
 

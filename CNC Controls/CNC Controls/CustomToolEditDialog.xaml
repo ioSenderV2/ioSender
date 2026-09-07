@@ -27,6 +27,8 @@
         <local:NumericField x:Uid="ct_diameter" x:Name="fldDiameter" Label="Diameter:" ColonAt="110" Unit="mm" Format="##0.0##" Margin="0,2,0,0"/>
         <local:NumericField x:Uid="ct_flutes" x:Name="fldFlutes" Label="Flutes:" ColonAt="110" Unit="" Format="#0" Margin="0,2,0,0"
                              ToolTip="Not used for Drill or Countersink - their feed formulas don't factor in flute count."/>
+        <local:NumericField x:Uid="ct_angle" x:Name="fldAngle" Label="Included angle:" ColonAt="110" Unit="deg" Format="##0.#" Margin="0,2,0,0"
+                             ToolTip="The full angle between the flanks, as the bit is sold - a &quot;60 degree V-bit&quot; is 60 here, not 30. This is what converts depth to width: plunged 1 mm, a 90 degree bit cuts 2 mm wide but a 60 degree bit only 1.15 mm. Shown for V-bit/chamfer and countersink tools only."/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
             <Button x:Uid="ct_ok" x:Name="btnOk" Content="OK" Click="btnOk_Click" MinWidth="75" MinHeight="24" IsDefault="True"/>
             <Button x:Uid="ct_cancel" x:Name="btnCancel" Content="Cancel" IsCancel="True" MinWidth="75" MinHeight="24" Margin="6,0,0,0"/>

@@ -158,7 +158,7 @@ namespace CNC.Controls
                     if (softLimits)
                         (DataContext as GrblViewModel).PropertyChanged += Model_PropertyChanged;
 
-                    keyboard = (DataContext as GrblViewModel).Keyboard;
+                    keyboard = (DataContext as GrblViewModel).Keyboard as KeypressHandler;
 
                     keyboardMappingsOk = true;
 
@@ -504,6 +504,12 @@ namespace CNC.Controls
 
         private void JogCommand(string cmd, JogKind kind)
         {
+            // Diagnostic only, 2026-08-08: entry-point trace, before ANYTHING else in this method - the
+            // 80s-silent repro left zero [jog]/[jobrunner] lines, meaning the click never reached even
+            // JogGate.TryBegin(). This answers whether JogCommand itself is being entered at all.
+            if (DebugLog.Enabled)
+                DebugLog.Write("jog", string.Format("JogCommand ENTERED cmd=\"{0}\" kind={1}", cmd, kind));
+
             GrblViewModel model = DataContext as GrblViewModel;
 
             if (cmd == "stop") {
@@ -685,23 +691,23 @@ namespace CNC.Controls
                 return;
 
             if (model.HomedState != HomedState.Homed) {
-                model.Message = "Go to centre: home the machine first.";
+                model.SetErrorMessage("Go to centre: home the machine first.");
                 return;
             }
 
             if (model.IsJobRunning ||
                  !(model.GrblState.State == GrblStates.Idle || model.GrblState.State == GrblStates.Jog || model.GrblState.State == GrblStates.Tool)) {
-                model.Message = "Go to centre: the machine must be idle.";
+                model.SetErrorMessage("Go to centre: the machine must be idle.");
                 return;
             }
 
             if (GrblInfo.MaxTravel.X <= 0d || GrblInfo.MaxTravel.Y <= 0d || GrblInfo.MaxTravel.Z <= 0d) {
-                model.Message = "Go to centre: set max travel ($130-$132) first.";
+                model.SetErrorMessage("Go to centre: set max travel ($130-$132) first.");
                 return;
             }
 
             if (GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1) {
-                model.Message = "Go to centre: enable soft limits ($20=1) first.";
+                model.SetErrorMessage("Go to centre: enable soft limits ($20=1) first.");
                 return;
             }
 
@@ -741,23 +747,23 @@ namespace CNC.Controls
                 return;
 
             if (model.HomedState != HomedState.Homed) {
-                model.Message = "Go to corner: home the machine first.";
+                model.SetErrorMessage("Go to corner: home the machine first.");
                 return;
             }
 
             if (model.IsJobRunning ||
                  !(model.GrblState.State == GrblStates.Idle || model.GrblState.State == GrblStates.Jog || model.GrblState.State == GrblStates.Tool)) {
-                model.Message = "Go to corner: the machine must be idle.";
+                model.SetErrorMessage("Go to corner: the machine must be idle.");
                 return;
             }
 
             if (GrblInfo.MaxTravel.X <= 0d || GrblInfo.MaxTravel.Y <= 0d || GrblInfo.MaxTravel.Z <= 0d) {
-                model.Message = "Go to corner: set max travel ($130-$132) first.";
+                model.SetErrorMessage("Go to corner: set max travel ($130-$132) first.");
                 return;
             }
 
             if (GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1) {
-                model.Message = "Go to corner: enable soft limits ($20=1) first.";
+                model.SetErrorMessage("Go to corner: enable soft limits ($20=1) first.");
                 return;
             }
 
@@ -792,11 +798,20 @@ namespace CNC.Controls
             double maxTravel = GrblInfo.MaxTravel.Values[axis];
 
             if (GrblInfo.ForceSetOrigin) {
+                // Clearance at BOTH ends. It used to clamp the home end to exactly 0 - the limit switch
+                // itself, with no set-back at all - and only held the far end off. Confirmed on the machine
+                // 2026-08-12 ($22=9, so this branch): a go-to-corner emitted "$J=G53G21Z0F4570", i.e. drive
+                // Z hard to the top limit. It happened to be a no-op that time because Z was already home,
+                // but from any other height that is a jog into the switch. The far end was right (X869 of
+                // $130=889), which is why only this end had gone unnoticed.
+                //
+                // It also silently skewed the centre: (max+min)/2 with min pinned at 0 put "centre" half a
+                // clearance off the true middle. With the set-back symmetric, the midpoint is correct again.
                 if (!GrblInfo.HomingDirection.HasFlag(GrblInfo.AxisIndexToFlag(axis))) {
-                    if (pos > 0d) pos = 0d;
+                    if (pos > -clearance) pos = -clearance;                                  // 0 .. -maxTravel
                     else if (pos < -maxTravel + clearance) pos = -maxTravel + clearance;
                 } else {
-                    if (pos < 0d) pos = 0d;
+                    if (pos < clearance) pos = clearance;                                    // 0 .. +maxTravel
                     else if (pos > maxTravel - clearance) pos = maxTravel - clearance;
                 }
             } else {
@@ -861,9 +876,10 @@ namespace CNC.Controls
         {
             if (AppConfig.Settings.Base != null && AppConfig.Settings.Base.Jog.KeepUiJogSelection)
             {
-                _lastStep = (JogStep)System.Math.Max(0, System.Math.Min(3, Properties.Settings.Default.UiJogStep));
-                Feed = (JogFeed)System.Math.Max(0, System.Math.Min(3, Properties.Settings.Default.UiJogFeed));
-                StepSize = Properties.Settings.Default.UiJogContinuous ? JogStep.Continuous : _lastStep;
+                var ui = UiState.Current;
+                _lastStep = (JogStep)System.Math.Max(0, System.Math.Min(3, ui.UiJogStep));
+                Feed = (JogFeed)System.Math.Max(0, System.Math.Min(3, ui.UiJogFeed));
+                StepSize = ui.UiJogContinuous ? JogStep.Continuous : _lastStep;
             }
             _persistSelection = true;
 
@@ -877,15 +893,19 @@ namespace CNC.Controls
                 };
         }
 
-        // Persist the current selection immediately (user settings store - isolated from the Base config file).
+        // Persist the current selection immediately. Now stored in App.config's UiState section rather than
+        // user.config - see UiState.cs for why that isolation was given up. Gated on KeepUiJogSelection, so
+        // this only writes when the user asked for the selection to be remembered.
         private void PersistSelection()
         {
             if (!_persistSelection || AppConfig.Settings.Base == null || !AppConfig.Settings.Base.Jog.KeepUiJogSelection)
                 return;
-            Properties.Settings.Default.UiJogStep = DistanceIndex;
-            Properties.Settings.Default.UiJogContinuous = Continuous;
-            Properties.Settings.Default.UiJogFeed = (int)_jogFeed;
-            Properties.Settings.Default.Save();
+
+            var ui = UiState.Current;
+            ui.UiJogStep = DistanceIndex;
+            ui.UiJogContinuous = Continuous;
+            ui.UiJogFeed = (int)_jogFeed;
+            AppConfig.Settings.Save();
         }
 
         public void SetMetric(bool on)
@@ -994,9 +1014,11 @@ namespace CNC.Controls
     // Bare value (the feed rate) is shown; the unit lives in the header and follows the UI jog panel.
     public class KeyboardJogViewModel : ViewModelBase
     {
-        private readonly KeypressHandler keyboard;
+        // Only DefaultSpeedFast is touched here, which is portable jog config - so this takes the base
+        // JogController and does not care whether a keyboard handler is installed.
+        private readonly JogController keyboard;
 
-        public KeyboardJogViewModel(KeypressHandler keyboard)
+        public KeyboardJogViewModel(JogController keyboard)
         {
             this.keyboard = keyboard;
 

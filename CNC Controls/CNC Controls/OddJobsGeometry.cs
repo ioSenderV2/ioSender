@@ -55,7 +55,11 @@ namespace CNC.Controls
         // Rectangle perimeter centered at (cx,cy), half-width hw, half-height hh, starting at the
         // front-left corner, CCW, closed (last point == first). Edges are subdivided so no segment exceeds
         // maxSegmentLength - keeps a tab window's boundary landing close to where it's meant to.
-        public static List<double[]> RectPoints(double cx, double cy, double hw, double hh, double maxSegmentLength)
+        //
+        // dogboneReach > 0 adds a CORNER RELIEF at each corner: on arriving at the corner the path pokes
+        // OUTWARD along that corner's diagonal by dogboneReach on each axis, then comes straight back
+        // before turning down the next edge. See DogboneReachFor for what to pass.
+        public static List<double[]> RectPoints(double cx, double cy, double hw, double hh, double maxSegmentLength, double dogboneReach = 0d)
         {
             var corners = new[] {
                 new[] { cx - hw, cy - hh }, new[] { cx + hw, cy - hh },
@@ -64,9 +68,42 @@ namespace CNC.Controls
             };
             var pts = new List<double[]>();
             for (int i = 0; i < corners.Length - 1; i++)
+            {
                 Subdivide(pts, corners[i], corners[i + 1], maxSegmentLength);
+
+                // The relief belongs to the corner this edge ENDS at, and is emitted before turning onto
+                // the next edge. Subdivide leaves its end point off, so the corner itself is added here -
+                // out to the relief and back - rather than by the next Subdivide's start.
+                if (dogboneReach > 0d)
+                {
+                    var c = corners[i + 1];
+                    // Outward = away from the rectangle's centre on both axes, which for an inset wall
+                    // path is the direction of the material still standing in the corner.
+                    double ox = c[0] > cx ? dogboneReach : -dogboneReach;
+                    double oy = c[1] > cy ? dogboneReach : -dogboneReach;
+                    pts.Add(new[] { c[0], c[1] });
+                    pts.Add(new[] { c[0] + ox, c[1] + oy });
+                }
+            }
             pts.Add(corners[corners.Length - 1]);
             return pts;
+        }
+
+        // How far a dogbone must poke out of a corner, per axis, for a cutter of radius toolRadius running
+        // an outline inset by `inset` from the true wall.
+        //
+        // The relief is done when the cutter's CIRCLE passes through the true corner point C. That puts the
+        // cutter centre at C + (toolRadius/sqrt2) on each axis towards the interior - distance toolRadius
+        // from C, along the diagonal. The path corner sits at C + inset on each axis, so the poke is the
+        // difference. With the usual inset == toolRadius that is toolRadius*(1 - 1/sqrt2) per axis
+        // (~0.293r), a diagonal travel of r*(sqrt2 - 1) (~0.414r), and it overcuts each wall by ~0.293r.
+        //
+        // Note this comes out right for ANY inset, not just inset == toolRadius: the reach is measured from
+        // wherever the path corner actually is, so the cutter still lands the same distance from the true
+        // corner. Returns 0 when the path is already at or inside that point, i.e. nothing to relieve.
+        public static double DogboneReachFor(double toolRadius, double inset)
+        {
+            return Math.Max(0d, inset - toolRadius / Math.Sqrt(2d));
         }
 
         private static void Subdivide(List<double[]> pts, double[] a, double[] b, double maxSegmentLength)

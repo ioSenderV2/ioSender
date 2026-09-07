@@ -43,6 +43,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using CNC.Core;
+using CNC.Controls;   // ObsBridge (client-side, moved out of CNC.Core)
 
 namespace CNC.Controls.Camera
 {
@@ -141,7 +142,9 @@ namespace CNC.Controls.Camera
 
         private void getPosition_Click(object sender, RoutedEventArgs e)
         {
-            var model = (GrblViewModel)Application.Current.MainWindow.DataContext;
+            // Work coordinates from the wire-fed twin (was a GrblViewModel cast of MainWindow's
+            // DataContext) - this project no longer references CNC Core.
+            var model = CNC.Client.MachineClient.Model;
 
             ((Config)DataContext).Camera.XOffset = -model.Position.X;
             ((Config)DataContext).Camera.YOffset = -model.Position.Y;

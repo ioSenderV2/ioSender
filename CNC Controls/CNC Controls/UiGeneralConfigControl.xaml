@@ -16,11 +16,18 @@
             <CheckBox x:Uid="lbl_restoreWindowSize" Content="Restore last window size on startup" Margin="5,4,0,0" IsChecked="{Binding Path=KeepWindowSize, Mode=TwoWay}" ToolTip="Restore window size on next startup."/>
             <CheckBox x:Uid="lbl_friendlyRunLabels" Content="Use &quot;Start&quot;/&quot;Pause&quot; instead of &quot;Cycle Start&quot;/&quot;Feed Hold&quot;" Margin="5,4,0,0" IsChecked="{Binding Path=UseFriendlyRunLabels, Mode=TwoWay}" ToolTip="Renames the run bar's Cycle Start and Feed Hold buttons to the friendlier Start/Pause. Check Run, Dry Run, and Simulate keep their own names either way."/>
             <CheckBox x:Uid="lbl_showJogTargetButtons" Content="Show go-to buttons on the jog pad" Margin="5,4,0,0" IsChecked="{Binding Path=ShowJogTargetButtons, Mode=TwoWay}" ToolTip="Shows the four corner buttons and the centre bullseye on the jog pad - each rapids to that machine position at safe Z. Untick for a plain arrow pad; the arrow and Z buttons are unaffected."/>
+            <CheckBox x:Uid="lbl_showJobSplitView" Content="Show 3D view in split screen on Job tab" Margin="5,4,0,0" IsChecked="{Binding Path=ShowJobSplitView, Mode=TwoWay}" ToolTip="Puts the program view and the 3D view side by side with a draggable splitter, instead of the tab strip that switches between them. The left panel column stays; the jog pad and the Feed/Spindle/Outline columns give up their space to the split. The console moves to the run strip's MDI button, which opens it in its own window."/>
 
             <StackPanel Orientation="Horizontal" Margin="5,8,0,0">
                 <TextBlock x:Uid="lbl_uiScale" Text="UI scale" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip="Scales the whole app - fonts, controls, spacing - live, no restart needed. You may need to resize or maximize the window at higher scales."/>
                 <Slider x:Uid="sld_uiScale" x:Name="sliderUiScale" Width="160" Minimum="0.75" Maximum="2.0" TickFrequency="0.05" IsSnapToTickEnabled="True" Value="{Binding Path=UiScale, Mode=TwoWay}" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding Path=UiScale, StringFormat={}{0:P0}}" VerticalAlignment="Center" Margin="8,0,0,0" Width="40"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Margin="5,8,0,0">
+                <TextBlock x:Uid="lbl_statusAutoClose" Text="Dismiss pop-up status window after" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip="How long the status window stays up when it opens by itself to show an error or alarm. Only errors and alarms open it - other messages are recorded quietly - and every message stays in the log behind the Status button, so a shorter time here loses nothing. A window you opened yourself never closes on its own."/>
+                <Slider x:Uid="sld_statusAutoClose" x:Name="sliderStatusAutoClose" Width="160" Minimum="1" Maximum="60" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Path=StatusWindowAutoCloseSeconds, Mode=TwoWay}" VerticalAlignment="Center"/>
+                <TextBlock x:Uid="lbl_statusAutoCloseValue" Text="{Binding Path=StatusWindowAutoCloseSeconds, StringFormat={}{0} s}" VerticalAlignment="Center" Margin="8,0,0,0" Width="40"/>
             </StackPanel>
 
             <Separator Margin="5,10,5,6"/>

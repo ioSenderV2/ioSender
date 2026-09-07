@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    PORTABILITY PROBE - not part of ioSender XL.sln and never shipped.
+
+    Compiles exactly the same CNC.Core sources against net8.0, so "CNC.Core is portable" is a fact the
+    compiler asserts rather than something inferred from having removed the WPF references. The shipping
+    net462 project (CNC Core.csproj, same folder) is deliberately left alone: converting it to SDK-style
+    and multi-targeting is a change to how the whole app builds, and that should only happen once this
+    proves there is something worth converting for.
+
+    Build it with:  dotnet build "CNC Core/CNC Core/CNC.Core.net8.csproj"
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>CNC.Core.net8</AssemblyName>
+    <RootNamespace>CNC.Core</RootNamespace>
+    <LangVersion>7.3</LangVersion>              <!-- match what the net462 compiler accepts -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <BaseOutputPath>bin\net8probe\</BaseOutputPath>
+    <BaseIntermediateOutputPath>obj\net8probe\</BaseIntermediateOutputPath>
+    <NoWarn>$(NoWarn);CS0168;CS0219;CS0414;CS0067</NoWarn>   <!-- pre-existing unused-variable noise -->
+    <!-- USEWEBSOCKET IS defined here, and that is the point: WebsocketStream was ported off
+         websocket-sharp (an unmaintained net462-only binary) onto System.Net.WebSockets.ClientWebSocket,
+         so the controller's websocket transport now compiles for net8.0 like the rest of Core. It was
+         the last portability debt. If this ever has to come back out, the port regressed. -->
+    <DefineConstants>TRACE;USEWEBSOCKET</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="*.cs" Exclude="Properties\AssemblyInfo.cs" />
+    <EmbeddedResource Include="LibStrings.xaml" />
+    <!-- AtcMacros reads these via GetExecutingAssembly, so they must be embedded here too. Leave them out
+         and the probe still COMPILES - it would only fail at runtime, with every macro reading as absent. -->
+    <EmbeddedResource Include="..\..\macros\pcorner.macro"><LogicalName>pcorner.macro</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\macros\pvisecorner.macro"><LogicalName>pvisecorner.macro</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\macros\pcenter.macro"><LogicalName>pcenter.macro</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\macros\tc.macro"><LogicalName>tc.macro</LogicalName></EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The machine-facing enums + GrblState moved to CNC.Contracts (step 6). Referencing ITS net8
+         probe here means this build asserts the contracts' portability too. -->
+    <ProjectReference Include="..\..\CNC Contracts\CNC.Contracts.net8.csproj" />
+    <!-- Shared non-wire infrastructure (ViewModelBase, UiContext/SyncTarget, helpers) - same
+         transitive-portability assertion for CNC.Common. -->
+    <ProjectReference Include="..\..\CNC Common\CNC.Common.net8.csproj" />
+  </ItemGroup>
+
+</Project>

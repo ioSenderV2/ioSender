@@ -1,4 +1,4 @@
-<UserControl x:Class="GCode_Sender.HeightMapView"
+﻿<UserControl x:Class="GCode_Sender.HeightMapView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -45,30 +45,43 @@
                                 <RadioButton x:Uid="hm_areaProgram" x:Name="rbAreaProgram" Content="From program" GroupName="hmarea" IsChecked="True"
                                              VerticalAlignment="Center" Checked="AreaProgram_Checked"
                                              ToolTip="Probe over the loaded job's XY extent, in the current work coordinates."/>
-                                <RadioButton x:Uid="hm_areaTable" x:Name="rbAreaTable" Content="Full table" GroupName="hmarea" Margin="18,0,0,0"
+                                <RadioButton x:Uid="hm_areaTable" x:Name="rbAreaTable" Content="Full work surface" GroupName="hmarea" Margin="18,0,0,0"
                                              VerticalAlignment="Center" Checked="AreaTable_Checked"
-                                             ToolTip="Probe the whole in-bounds machine travel envelope (referenced to the homed corner, like Surface spoilboard)."/>
+                                             ToolTip="Map the whole table, and set the work origin from it - no Setup and no existing work origin needed. The XY origin is placed at the spoilboard corner before probing, and work Z0 is set to the highest point probed, ready to surface from."/>
                             </StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <StackPanel x:Name="pnlAreaXW" Orientation="Horizontal" Margin="0,6,0,0">
                                 <cnccontrols:NumericField Label="X:" ColonAt="20" Format="-####0.0##"
                                     Value="{Binding HeightMap.MinX, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                                 <cnccontrols:NumericField x:Uid="hm_width" Label="W:" ColonAt="25" Format="-####0.0##" Margin="8,0,0,0"
                                     Value="{Binding HeightMap.Width, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                             </StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                            <StackPanel x:Name="pnlAreaYH" Orientation="Horizontal" Margin="0,5,0,0">
                                 <cnccontrols:NumericField Label="Y:" ColonAt="20" Format="-####0.0##"
                                     Value="{Binding HeightMap.MinY, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                                 <cnccontrols:NumericField x:Uid="hm_height" Label="H:" ColonAt="25" Format="-####0.0##" Margin="8,0,0,0"
                                     Value="{Binding HeightMap.Height, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                             </StackPanel>
-                            <Button x:Uid="hm_fromLimits" Content="Set from program limits" Margin="0,6,0,0" Padding="5,0"
+                            <Button x:Uid="hm_fromLimits" x:Name="btnFromLimits" Content="Set from program limits" Margin="0,6,0,0" Padding="5,0"
                                     HorizontalAlignment="Left" IsEnabled="{Binding IsFileLoaded}" Click="Limits_Click"/>
+                            <TextBlock x:Name="txtAreaNote" Foreground="#586069" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
                         </StackPanel>
                     </GroupBox>
 
                     <GroupBox x:Uid="hm_grpGrid" Header="Grid size" Margin="0,6,0,0">
                         <StackPanel Margin="6">
-                            <StackPanel Orientation="Horizontal">
+                            <StackPanel x:Name="pnlDivisions">
+                                <StackPanel Orientation="Horizontal">
+                                    <cnccontrols:NumericField x:Uid="hm_divX" Label="Divisions X:" ColonAt="80" Format="##0"
+                                        Value="{Binding DivisionsX, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                                    <cnccontrols:NumericField x:Uid="hm_divY" Label="Y:" ColonAt="20" Format="##0" Margin="8,0,0,0"
+                                        Value="{Binding DivisionsY, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                                </StackPanel>
+                                <CheckBox x:Uid="hm_pauseEachPoint" x:Name="chkPauseEachPoint" Content="Hold at each point (move the touch plate)" Margin="0,6,0,0"
+                                          IsChecked="{Binding HeightMap.AddPause, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"
+                                          ToolTip="Pause before every point after the first so the touch plate can be moved to the next spot. Press Cycle Start to continue. Untick only if the probe reaches the board on its own - a spoilboard is not conductive, so a plate normally has to travel with the probe."/>
+                                <TextBlock x:Name="txtDivisionsNote" Foreground="#586069" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            </StackPanel>
+                            <StackPanel x:Name="pnlGridMm" Orientation="Horizontal">
                                 <cnccontrols:NumericField Label="X:" ColonAt="25" Format="###0.0##"
                                     Value="{Binding HeightMap.GridSizeX, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                                 <cnccontrols:NumericField Label="Y:" ColonAt="25" Format="###0.0##" Margin="8,0,0,0"
@@ -76,22 +89,13 @@
                                 <CheckBox x:Uid="hm_lock" Content="Lock" Margin="12,0,0,0" VerticalAlignment="Center"
                                     IsChecked="{Binding HeightMap.GridSizeLockXY, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                             </StackPanel>
+
+                            <cnccontrols:NumericField x:Uid="hm_allowance" Label="Drop allowance:" ColonAt="100" Unit="mm" Format="##0.0##" Margin="0,6,0,0"
+                                Value="{Binding DropAllowance, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                            <TextBlock x:Name="txtAllowanceNote" Foreground="#586069" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
                         </StackPanel>
                     </GroupBox>
 
-                    <GroupBox x:Uid="hm_grpProbing" Header="Probing" Margin="0,6,0,0">
-                        <StackPanel Margin="6">
-                            <cnccontrols:NumericField x:Uid="hm_depth" Label="Probe depth:" ColonAt="90" Unit="mm" Format="###0.0##"
-                                ToolTip="How far DOWN from the parked (start) Z each probe searches before it faults. Park Z at a small safe clearance above the surface, then this must be at least that clearance plus the surface variation."
-                                Value="{Binding HeightMap.ProbeDepth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
-                            <cnccontrols:NumericField x:Uid="hm_feed" Label="Probe feed:" ColonAt="90" Unit="mm/min" Format="#####0" Margin="0,4,0,0"
-                                ToolTip="Feed for every probe. The surface is already roughly known, so all points probe gently at this single approach feed - no fast search pass - which avoids overshoot/false triggers on a fragile probe. Defaults to the probe's latch (slow) feed."
-                                Value="{Binding HeightMap.ProbeFeed, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
-                            <cnccontrols:NumericField x:Uid="hm_dwell" Label="Settle dwell:" ColonAt="90" Unit="s" Format="##0.0##" Margin="0,4,0,0"
-                                ToolTip="Pause before each probe so a fragile/3D probe fully releases and stops ringing after the previous touch and the move. Raise this if you get 'probe already triggered' fails partway through. 0 = none."
-                                Value="{Binding HeightMap.SettleDwell, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
-                        </StackPanel>
-                    </GroupBox>
                 </StackPanel>
             </ScrollViewer>
 
@@ -99,12 +103,15 @@
                 <TextBlock x:Name="txtNoProbe" Foreground="#C0392B" TextWrapping="Wrap" Visibility="Collapsed"
                            Text="No probe defined. Add a 3D probe, touch plate or edge finder in Machine Setup Wizard &gt; Probe definitions."/>
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <Button x:Uid="hm_start" Content="Start" MinWidth="70" MinHeight="26" Click="Start_Click"
+                    <Button x:Uid="hm_start" x:Name="btnStart" Content="Start" MinWidth="70" MinHeight="26" Click="Start_Click"
                             Style="{StaticResource PrimaryButtonStyle}"
-                            IsEnabled="{Binding IsJobRunning, Converter={StaticResource IsNotRunning}}"
                             ToolTip="Start probing the height map grid."/>
-                    <Button x:Uid="hm_stop" Content="Stop" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Stop_Click"
-                            IsEnabled="{Binding IsJobRunning}"
+                    <Button x:Uid="hm_continue" x:Name="btnContinue" Content="Continue" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Continue_Click" IsEnabled="False"
+                            ToolTip="Resume a run that is holding for the touch plate to be moved. Cycle Start does the same thing."/>
+                    <Button x:Uid="hm_retry" x:Name="btnRetry" Content="Retry" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Retry_Click" IsEnabled="False"
+                            ToolTip="Clear the alarm and carry on from the point that failed, keeping the readings already taken. Only offered when the controller reports the alarm as recoverable."/>
+                    <Button x:Uid="hm_stop" x:Name="btnStop" Content="Stop" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Stop_Click"
+                            IsEnabled="False"
                             ToolTip="Cancel the height map probing in progress."/>
                     <Button x:Uid="hm_apply" Content="Apply" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Apply_Click"
                             IsEnabled="{Binding HeightMap.CanApply, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
@@ -120,12 +127,17 @@
         <!-- Right: steps/help on top, 3D view of the planned grid / probed surface (blue low -> red high) below -->
         <Grid Grid.Column="2" Margin="8,0,0,0">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <GroupBox x:Uid="hm_grpSteps" Header="Steps" Grid.Row="0" Margin="0,0,0,8">
-                <TextBlock x:Uid="hm_steps" Margin="8" TextWrapping="Wrap" LineHeight="18">
+            <!-- Steps, Program and Surface share the whole right-hand pane. Start switches to Program (what
+                 is about to be sent) and a completed run switches to Surface Map (what came back), so the
+                 pane always shows the stage the run is actually at. -->
+            <TabControl x:Name="tabView" Grid.Row="0" SelectionChanged="tabView_SelectionChanged">
+            <TabItem x:Uid="hm_tabSteps" x:Name="tabSteps" Header="Steps">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                <TextBlock x:Uid="hm_steps" x:Name="stepsProgram" Margin="8" TextWrapping="Wrap" LineHeight="18">
                     <Run FontWeight="Bold" Text="1. Set the work origin on the stock."/>
                     <Run Text=" Probing happens in the current work coordinates, so jog to the stock corner and zero X/Y (the Setup tab can do this). The area below is in those work coordinates, so this is how it knows where the stock is."/>
                     <LineBreak/>
@@ -141,16 +153,53 @@
                     <Run FontWeight="Bold" Text="5. Apply / Save."/>
                     <Run Text=" Apply rewrites the loaded program to follow the surface. Save stores the map (.map) to reuse later (Load)."/>
                 </TextBlock>
-            </GroupBox>
 
-            <GroupBox x:Uid="hm_grpView" Header="Surface" Grid.Row="1">
+                <!-- Full work surface has a different shape end to end: nothing to set up first, and the
+                     operator is part of the loop at every point. Shown INSTEAD of the steps above rather
+                     than bolted onto them, because almost every line of those would have to be contradicted. -->
+                <TextBlock x:Uid="hm_stepsFull" x:Name="stepsFullSurface" Margin="8" TextWrapping="Wrap" LineHeight="18" Visibility="Collapsed">
+                    <Run FontWeight="Bold" Text="Surfacing the whole spoilboard - no origin to set."/>
+                    <Run Text=" This mode sets the work origin itself, so there is no Setup pass and no corner to probe: X0 Y0 is placed on the table corner before probing starts, and Z0 on the highest point found once it finishes."/>
+                    <LineBreak/>
+                    <Run FontWeight="Bold" Text="1. Fit the cutter you will surface with."/>
+                    <Run Text=" The map is measured through whatever is in the spindle, so measuring with one tool and cutting with another throws the whole reference out by the difference between them."/>
+                    <LineBreak/>
+                    <Run FontWeight="Bold" Text="2. Choose the divisions."/>
+                    <Run Text=" Points per axis across the whole table - 4 x 4 is 16 probes, which is plenty to find the high and low spots of a gently-dished board. Every extra division costs you probes, and you are placing the plate for each one by hand."/>
+                    <LineBreak/>
+                    <Run FontWeight="Bold" Text="3. Have the touch plate ready."/>
+                    <Run Text=" MDF will not close a circuit, so the plate has to travel with the probe. The machine positions over each point and holds; put the plate under the bit, press Continue (or Cycle Start), and it probes Z and moves on. It holds before every point except the first, where you are already standing. The plate's thickness is taken off automatically - a 3D probe has none taken off, since it touches the surface itself."/>
+                    <LineBreak/>
+                    <Run FontWeight="Bold" Text="4. Start - Z parks itself."/>
+                    <Run Text=" The first point is a search: it goes to the top of travel and probes the whole way down, because nothing yet knows where the board is. After that the bit stays just above the plate between points rather than climbing back up, so each remaining probe is short - which also means a point where you forget the plate stops almost immediately instead of diving. Probe depth is what has to cover how much the board varies. Stop cancels."/>
+                    <LineBreak/>
+                    <Run FontWeight="Bold" Text="5. Then surface."/>
+                    <Run Text=" It reports the highest and lowest points and sets Z0 to the highest. In Work Order's Surface operation tick 'Entire spoilboard' and 'Use the work origin already set', give it a depth, and run - the range it reported is how deep you must go to clean up the whole board rather than only the high spots."/>
+                </TextBlock>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+
+            <TabItem x:Uid="hm_tabProgram" x:Name="tabProgram" Header="Program"
+                     ToolTip="The probing program this run will send, listed before it moves anything. Rebuilt each time Start is pressed.">
+                <ContentControl x:Name="programHost"/>
+            </TabItem>
+
+            <TabItem x:Uid="hm_tabSurface" x:Name="tabSurface" Header="Surface Map">
+              <Grid>
+            <!-- DataContext pinned to this view so the Visual3D children below can bind at all.
+                 RelativeSource FindAncestor walks the FrameworkElement tree, and a Visual3D is not in it -
+                 those bindings failed silently, the mesh never reached the visual, and the scene therefore
+                 had no bounds for ZoomExtents to find. The Probing tab's copy of this viewport always bound
+                 through DataContext, which is why it renders and this one never did. -->
             <helix:HelixViewport3D x:Name="viewport" ZoomExtentsWhenLoaded="True"
+                                   DataContext="{Binding RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
                                    RotateAroundMouseDownPoint="True" ZoomAroundMouseDownPoint="True">
                 <helix:HelixViewport3D.Camera>
                     <PerspectiveCamera Position="0,0,100" LookDirection="0,0,-100" UpDirection="0,1,0.5" FieldOfView="61" NearPlaneDistance="0.001"/>
                 </helix:HelixViewport3D.Camera>
                 <helix:DefaultLights/>
-                <helix:MeshGeometryVisual3D MeshGeometry="{Binding HeightMap.MeshGeometry, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}">
+                <helix:MeshGeometryVisual3D MeshGeometry="{Binding Path=HeightMap.MeshGeometry}">
                     <helix:MeshGeometryVisual3D.Material>
                         <MaterialGroup>
                             <DiffuseMaterial>
@@ -170,10 +219,42 @@
                         </MaterialGroup>
                     </helix:MeshGeometryVisual3D.Material>
                 </helix:MeshGeometryVisual3D>
-                <helix:LinesVisual3D Thickness="1" Color="Lime" Points="{Binding HeightMap.BoundaryPoints, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
-                <helix:PointsVisual3D Size="4" Color="Red" Points="{Binding HeightMap.MapPoints, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
+                <helix:LinesVisual3D Thickness="1" Color="Lime" Points="{Binding Path=HeightMap.BoundaryPoints}"/>
+                <helix:PointsVisual3D Size="4" Color="Red" Points="{Binding Path=HeightMap.MapPoints}"/>
             </helix:HelixViewport3D>
-            </GroupBox>
+
+                <!-- Legend. The bar's gradient is the SAME ramp the mesh material uses, in the same order,
+                     so the two cannot drift apart into saying different things about the same colour.
+                     Bottom-up (StartPoint 0,1) because low belongs at the bottom. -->
+                <Border x:Name="pnlLegend" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0"
+                        Background="#CCFFFFFF" BorderBrush="#40000000" BorderThickness="1" CornerRadius="3"
+                        Padding="6,5" Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock x:Uid="hm_legendTitle" Text="Height" FontWeight="SemiBold" FontSize="11" Margin="0,0,0,4"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Border Width="14" Height="110" BorderBrush="#60000000" BorderThickness="1">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
+                                        <GradientStop Color="Blue" Offset="0"/>
+                                        <GradientStop Color="Cyan" Offset="0.2"/>
+                                        <GradientStop Color="Green" Offset="0.4"/>
+                                        <GradientStop Color="Yellow" Offset="0.6"/>
+                                        <GradientStop Color="Red" Offset="0.8"/>
+                                        <GradientStop Color="Purple" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                            <Grid Margin="5,0,0,0" Height="110">
+                                <TextBlock x:Name="txtLegendHigh" FontSize="11" VerticalAlignment="Top"/>
+                                <TextBlock x:Name="txtLegendRange" FontSize="10" Foreground="#586069" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="txtLegendLow" FontSize="11" VerticalAlignment="Bottom"/>
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+              </Grid>
+            </TabItem>
+            </TabControl>
         </Grid>
     </Grid>
 </UserControl>

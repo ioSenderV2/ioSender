@@ -40,22 +40,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using System;
 using System.Linq;
 using System.Text;
-using System.Windows.Forms;
 using System.IO;
 using System.IO.Ports;
-using System.Management;
-using System.Windows.Threading;
+using System.Threading;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
 namespace CNC.Core
 {
-    public class SerialStream : StreamComms
+    public class SerialStream : StreamCommsBase, StreamComms
     {
         private SerialPort serialPort = null;
         private byte[] buffer = new byte[Comms.RXBUFFERSIZE];
         private StringBuilder input = new StringBuilder(Comms.RXBUFFERSIZE);
         private volatile Comms.State state = Comms.State.ACK;
-        private Dispatcher Dispatcher { get; set; }
+        private SynchronizationContext SyncContext { get; set; }
 
         private readonly string portParams;
         private readonly string portName;
@@ -64,16 +63,16 @@ namespace CNC.Core
 
         public event DataReceivedHandler DataReceived;
 
-        public Action<string> AckSink { get; set; }
+        public event Action<Comms.ReplyClass, string> ReplyClassified;
         public bool BlockingWrites { get; set; }
 
         // Raw serial log, enabled at runtime by the -debugfile <path> launch arg (Resources.DebugFile).
         // Written from the comms thread, so it survives a frozen UI - the only log available after a hang.
         StreamWriter log = null;
-        public SerialStream(string PortParams, int ResetDelay, Dispatcher dispatcher)
+        public SerialStream(string PortParams, int ResetDelay, SynchronizationContext syncContext)
         {
             Comms.com = this;
-            Dispatcher = dispatcher;
+            SyncContext = syncContext;
             Reply = string.Empty;
 
             if (PortParams.IndexOf(":") < 0)
@@ -83,7 +82,7 @@ namespace CNC.Core
 
             if (parameter.Count() < 4)
             {
-                AppDialogs.Show(string.Format(LibStrings.FindResource("SerialPortError"), PortParams), "ioSender");
+                UserPrompt.Show(string.Format(LibStrings.FindResource("SerialPortError"), PortParams), "ioSender");
                 System.Environment.Exit(2);
             }
 
@@ -200,7 +199,7 @@ namespace CNC.Core
                 }
                 catch
                 {
-                    AppDialogs.Show("Unable to open log file: " + Resources.DebugFile, "ioSender");
+                    UserPrompt.Show("Unable to open log file: " + Resources.DebugFile, "ioSender");
                 }
                 return true;
             }
@@ -235,6 +234,8 @@ namespace CNC.Core
         public Action<int> ByteReceived { get; set; }
 
         public bool IsReconnecting { get { return reconnector != null && reconnector.IsReconnecting; } }
+
+        public void NotifyLinkLost() { reconnector?.NotifyLost(); }
 
         public event System.Action ConnectionLost
         {
@@ -347,7 +348,7 @@ namespace CNC.Core
             return c;
         }
 
-        public void WriteByte(byte data)
+        protected override void WriteByteRaw(byte data)
         {
             try
             {
@@ -360,7 +361,7 @@ namespace CNC.Core
             }
         }
 
-        public void WriteBytes(byte[] bytes, int len)
+        protected override void WriteBytesRaw(byte[] bytes, int len)
         {
             try
             {
@@ -407,6 +408,12 @@ namespace CNC.Core
                 }
                 command += "\r";
                 byte[] bytes = System.Text.Encoding.UTF8.GetBytes(command);
+                // The one write in this solution that does NOT route through StreamCommsBase's leaves, so
+                // it traces itself. This write is deliberately synchronous; handing it to WriteBytes would
+                // make it async (WriteAsync unless BlockingWrites) and change ordering against the machine.
+                // Note it also encodes UTF8 while WriteString above uses Encoding.Default - preserved as
+                // found, not reconciled, because that choice reaches the controller.
+                TraceRawWrite(bytes, bytes.Length);
                 try
                 {
                     if (serialPort != null && serialPort.IsOpen)
@@ -419,36 +426,26 @@ namespace CNC.Core
             }
         }
 
-        public void AwaitAck()
+        // Pending predicates read this instance's own volatile state, not Comms.com's - the loops these
+        // replace all went through the global, which is only the same object by convention.
+        private bool AwaitingAck { get { return state == Comms.State.DataReceived || state == Comms.State.AwaitAck; } }
+
+        public bool AwaitAck()
         {
-            while (Comms.com.CommandState == Comms.State.DataReceived || Comms.com.CommandState == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
+            if (EventUtils.WaitWhile(() => AwaitingAck, Comms.AckTimeoutMs))
+                return true;
+
+            ConsoleLog.Write("[SerialStream] AwaitAck: no ok/error within " + Comms.AckTimeoutMs + "ms");
+            return false;
         }
 
-        public void AwaitAck(string command)
+        public bool AwaitAck(string command)
         {
             PurgeQueue();
             Reply = string.Empty;
             WriteCommand(command);
 
-            while (Comms.com.CommandState == Comms.State.DataReceived || Comms.com.CommandState == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
-        }
-
-        public void AwaitResponse()
-        {
-            while (Comms.com.CommandState == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
-        }
-
-        public void AwaitResponse(string command)
-        {
-            PurgeQueue();
-            Reply = string.Empty;
-            WriteCommand(command);
-
-            while (Comms.com.CommandState == Comms.State.AwaitAck)
-                System.Threading.Thread.Sleep(15);
+            return AwaitAck();
         }
 
         public string GetReply(string command)
@@ -456,7 +453,12 @@ namespace CNC.Core
             Reply = string.Empty;
             WriteCommand(command);
 
-            AwaitResponse();
+            // Any reply ends this wait, not just ok/error - GetReply's caller wants the response line.
+            if (!EventUtils.WaitWhile(() => state == Comms.State.AwaitAck, Comms.AckTimeoutMs))
+            {
+                ConsoleLog.Write("[SerialStream] GetReply('" + command + "'): no reply within " + Comms.AckTimeoutMs + "ms");
+                return string.Empty;
+            }
 
             return Reply;
         }
@@ -511,15 +513,20 @@ namespace CNC.Core
                             log.Flush();
                         }
                         if (Reply.Length != 0 && DataReceived != null)
-                            Dispatcher.BeginInvoke(DataReceived, Reply);
+                            Comms.PostTo(SyncContext, DataReceived, Reply);
                         //                            Dispatcher.Invoke(addEdge, Reply);
 
                         state = Reply == "ok" ? Comms.State.ACK : (Reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
 
-                        // Tap ok/error acks straight to the streamer (when installed), bypassing the UI
-                        // dispatcher so flow control never waits on a busy UI. Non-blocking enqueue.
-                        if (AckSink != null && (state == Comms.State.ACK || state == Comms.State.NAK))
-                            AckSink(Reply);
+                        // Classified-reply tap straight to any subscriber (StreamPump), bypassing the UI
+                        // dispatcher so flow control never waits on a busy UI. Non-blocking enqueue only -
+                        // see the interface doc-comment. Raised for every reply, not just ack/nak.
+                        ReplyClassified?.Invoke(
+                            state == Comms.State.ACK ? Comms.ReplyClass.Ack :
+                            state == Comms.State.NAK ? Comms.ReplyClass.Nak :
+                            Reply.Length > 0 && Reply[0] == '<' ? Comms.ReplyClass.Status :
+                            Comms.ReplyClass.Other,
+                            Reply);
                     }
                 }
                 else
@@ -613,6 +620,16 @@ namespace CNC.Core
             SelectedMode = ConnectModes[0];
         }
 
+        /// <summary>
+        /// Host-supplied friendly names for serial ports, keyed by port name ("COM3" -> "USB Serial Device").
+        /// Enumerating the ports themselves stays here - it has to run where the hardware is, which in a
+        /// client/server split is the server. Only the DESCRIPTION is host-specific: it used to come from a
+        /// WMI query (Win32_PnPEntity), which compiles anywhere but is Windows-only at runtime. The WPF app
+        /// installs that via CNC.Controls.SerialPortDescriptions; a host that installs nothing simply gets
+        /// bare port names.
+        /// </summary>
+        public static Func<IEnumerable<string>, IDictionary<string, string>> DescriptionProvider;
+
         public void Refresh ()
         {
             var _portnames = SerialPort.GetPortNames();
@@ -629,31 +646,28 @@ namespace CNC.Core
                     _portnames = pn.ToArray();
                 }
 
-                using (var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_PnPEntity WHERE Caption like '%(COM%'")) try
+                IDictionary<string, string> descriptions = null;
+                try
                 {
-                    var ports = searcher.Get().Cast<ManagementBaseObject>().ToList().Select(p => p["Caption"].ToString());
-                    var portList = _portnames.Select(n => ports.FirstOrDefault(s => s.Contains('(' + n + ')'))).ToList();
-                    foreach (var fullname in portList)
-                    {
-                        var name = fullname.Substring(fullname.IndexOf("(COM") + 1).Trim().TrimEnd(')');
-                        var port = new ComPort(name);
-
-                        port.FullName = name + " - " + fullname.Replace('(' + name + ')', string.Empty).Trim();
-
-                        Ports.Add(port);
-                    }
+                    if (DescriptionProvider != null)
+                        descriptions = DescriptionProvider(_portnames);
                 }
-                catch
-                {
-                }
+                catch { }
 
-                if (Ports.Count != _portnames.Length)
+                // Straight pass over the sorted names, description where one is known. The previous version
+                // built the described list first and appended undescribed ports afterwards - and threw a NRE
+                // mid-loop for any port WMI had no caption for, aborting the whole block into the same
+                // fallback. Every port still appears, described where possible; the order is now simply the
+                // sorted one in all cases.
+                foreach (var name in _portnames)
                 {
-                    foreach (var port in _portnames)
-                    {
-                        if (port.StartsWith("COM") && Ports.Where(n => n.Name == port).FirstOrDefault() == null)
-                            Ports.Add(new ComPort(port));
-                    }
+                    var port = new ComPort(name);
+
+                    string description;
+                    if (descriptions != null && descriptions.TryGetValue(name, out description) && !string.IsNullOrWhiteSpace(description))
+                        port.FullName = name + " - " + description.Trim();
+
+                    Ports.Add(port);
                 }
 
                 if (Ports.Count > 0)

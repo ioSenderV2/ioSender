@@ -676,12 +676,14 @@ namespace CNC.Controls
             if (string.IsNullOrWhiteSpace(program))
                 return;
 
-            bool ok = MacroProcessor.Run(model, (DryRun ? "Auto square dry run " : "Auto square holes ") + "XYZ"[_gangedAxis], program, true);
-
             // Touch-off completed (or was already reused) -> a follow-up run can reuse this Z0. So after a dry
             // run you can untick Dry run and Run again to cut at the same Z0 without touching off again.
-            if (ok)
-                ReuseZ0 = true;
+            // onDone, not the return value (Step 7): Run() now reports "started", asynchronously - the old
+            // blocking Run's true return meant the touch-off had actually happened, so arming ReuseZ0 from
+            // "started" would wrongly arm it when the operator cancels at a hold mid-run. jobFinished=true
+            // is the genuine program end, which is when the touch-off is a fact.
+            MacroProcessor.Run(model, (DryRun ? "Auto square dry run " : "Auto square holes ") + "XYZ"[_gangedAxis], program, true,
+                onDone: jobFinished => { if (jobFinished) ReuseZ0 = true; });
         }
 
         private void ApplyOffset()

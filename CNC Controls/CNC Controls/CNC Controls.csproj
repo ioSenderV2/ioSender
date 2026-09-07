@@ -14,11 +14,6 @@
     <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <WarningLevel>4</WarningLevel>
     <TargetFrameworkProfile />
-    <!-- The ATC .macro files are EmbeddedResources from ..\..\macros\ (outside this project). VS's fast
-         up-to-date check ignores external files, so a normal Build skips re-embedding edited macros (leaving
-         stale embedded/seeded/uploaded copies). Disabling it forces the real up-to-date check, which tracks
-         the EmbeddedResource inputs - so editing a macro + Build re-embeds it without needing a Clean. -->
-    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -50,6 +45,7 @@
     <Reference Include="System" />
     <Reference Include="UIAutomationProvider" />
     <Reference Include="System.Data" />
+    <Reference Include="System.Management" />   <!-- WMI: serial port friendly names -->
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
@@ -65,6 +61,10 @@
     <Reference Include="ToggleSwitch">
       <HintPath>..\..\toggle-switch-control-master\WPF\ToggleSwitch\bin\Release\ToggleSwitch.dll</HintPath>
     </Reference>
+    <Reference Include="websocket-sharp, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\websocket-sharp\websocket-sharp\bin\Release\websocket-sharp.dll</HintPath>
+    </Reference>
     <Reference Include="WindowsBase" />
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
@@ -72,25 +72,31 @@
   <ItemGroup>
     <!-- FeedsAndSpeedsView.xaml.cs deserializes the Feeds & Speeds export/apply JSON directly. -->
     <PackageReference Include="System.Text.Json" Version="6.0.10" />
+    <!-- App-agnostic UI test server: AppDialogs routes the app's message boxes through it so the harness can
+         answer/read them. Published standalone at github.com/stevenrwood/WpfUiTestServer. Was referenced by
+         CNC Core (and reached here transitively) until AppDialogs moved here - Core had to drop it because the
+         package's nuspec declares WPF <frameworkAssemblies>, which NuGet injects into every consumer. -->
+    <PackageReference Include="WpfUiTestServer" Version="1.3.0" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="About.xaml.cs">
       <DependentUpon>About.xaml</DependentUpon>
     </Compile>
+    <Compile Include="AppDialogs.cs" />
     <Compile Include="AppConfig.cs" />
     <Compile Include="RunLabels.cs" />
     <Compile Include="DialogScaling.cs" />
     <Compile Include="ComponentAvailability.cs" />
     <Compile Include="ComponentRegistry.cs" />
     <Compile Include="StretchTabControl.cs" />
-    <Compile Include="ConfigStore.cs" />
-    <Compile Include="IProgramSource.cs" />
-    <Compile Include="StreamPump.cs" />
     <Compile Include="LayoutModel.cs" />
     <Compile Include="LayoutSection.cs" />
     <Compile Include="Fixture.cs" />
-    <Compile Include="GCodeProgramComments.cs" />
     <Compile Include="TabOrderConfig.cs" />
+    <Compile Include="SvgLaserSettings.cs" />
+    <Compile Include="WorkSurface.cs" />
+    <Compile Include="HeightMapConfig.cs" />
+    <Compile Include="RestorePoint.cs" />
     <Compile Include="SettingsPanelRegistry.cs" />
     <Compile Include="SettingsNavNode.cs" />
     <Compile Include="SettingsSearchIndex.cs" />
@@ -98,7 +104,6 @@
     <Compile Include="NullToVisibilityConverter.cs" />
     <Compile Include="ConfigPanel.cs" />
     <Compile Include="StartJobConfig.cs" />
-    <Compile Include="AtcMacros.cs" />
     <Compile Include="ArcsToLines.cs" />
     <Compile Include="BasicConfigControl.xaml.cs">
       <DependentUpon>BasicConfigControl.xaml</DependentUpon>
@@ -124,12 +129,16 @@
     <Compile Include="ToolsView.xaml.cs">
       <DependentUpon>ToolsView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="GlobalKeys.cs" />
     <Compile Include="OddJobsGeometry.cs" />
     <Compile Include="OddJobsStockCanvas.cs" />
     <Compile Include="WorkOrderModel.cs" />
     <Compile Include="WorkOrderCompiler.cs" />
+    <Compile Include="WorkOrderDrawing.cs" />
+    <Compile Include="WorkOrderPalette.cs" />
     <Compile Include="OddJobsToolMemory.cs" />
     <Compile Include="CustomTool.cs" />
+    <Compile Include="TrueTypeOutlines.cs" />
     <Compile Include="WorkOrderView.xaml.cs">
       <DependentUpon>WorkOrderView.xaml</DependentUpon>
     </Compile>
@@ -206,6 +215,23 @@
     <Compile Include="GrblAlarmList.xaml.cs">
       <DependentUpon>GrblAlarmList.xaml</DependentUpon>
     </Compile>
+    <Compile Include="GeometryInterop.cs" />
+    <Compile Include="UiPump.cs" />
+    <Compile Include="UiState.cs" />
+    <Compile Include="ObsBridge.cs" />
+    <Compile Include="ControllerService.cs" />
+    <Compile Include="ControllerMapper.cs" />
+    <Compile Include="XInput.cs" />
+    <Compile Include="UiTimer.cs" />
+    <Compile Include="GamepadInput.cs" />
+    <Compile Include="SerialPortDescriptions.cs" />
+    <Compile Include="FeedsSpeedsAiReview.cs" />
+    <Compile Include="LegacySecrets.cs" />
+    <Compile Include="PathConstructor.cs" />
+    <Compile Include="KeypressHandler.cs" />
+    <Compile Include="ShortcutKey.cs" />
+    <Compile Include="SearchHighlightAdorner.cs" />
+    <Compile Include="ElementHighlightAdorner.cs" />
     <Compile Include="KeyMapEditor.xaml.cs">
       <DependentUpon>KeyMapEditor.xaml</DependentUpon>
     </Compile>
@@ -215,6 +241,7 @@
     <Compile Include="Converters.cs" />
     <Compile Include="TabKeyBinder.cs" />
     <Compile Include="ActionKeyBinder.cs" />
+    <Compile Include="Features.cs" />
     <Compile Include="CoolantControl.xaml.cs">
       <DependentUpon>CoolantControl.xaml</DependentUpon>
     </Compile>
@@ -321,6 +348,13 @@
     <Compile Include="OutlineFlyout.xaml.cs">
       <DependentUpon>OutlineFlyout.xaml</DependentUpon>
     </Compile>
+    <Page Include="RunStripPanel.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Compile Include="RunStripPanel.xaml.cs">
+      <DependentUpon>RunStripPanel.xaml</DependentUpon>
+    </Compile>
     <Compile Include="OverrideControl.xaml.cs">
       <DependentUpon>OverrideControl.xaml</DependentUpon>
     </Compile>
@@ -330,7 +364,6 @@
     <Compile Include="SimulatorConfigView.xaml.cs">
       <DependentUpon>SimulatorConfigView.xaml</DependentUpon>
     </Compile>
-    <Compile Include="GrblFilesystems.cs" />
     <Compile Include="TearableTab.cs" />
     <Compile Include="PipeServer.cs" />
     <Compile Include="ButtonClickSound.cs" />
@@ -417,7 +450,9 @@
     </Compile>
     <Compile Include="UIUtils.cs" />
     <Compile Include="UIViewModel.cs" />
+    <Compile Include="MachineOffsets.cs" />
     <Compile Include="Widget.cs" />
+    <Compile Include="WindowFocusReturn.cs" />
     <Compile Include="MachinePositionFlyout.xaml.cs">
       <DependentUpon>MachinePositionFlyout.xaml</DependentUpon>
     </Compile>
@@ -856,11 +891,8 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
-    <!-- ATC support macros, embedded for auto-provisioning (AtcMacros.cs). LogicalName = bare file name. -->
-    <EmbeddedResource Include="..\..\macros\pcorner.macro"><LogicalName>pcorner.macro</LogicalName></EmbeddedResource>
-    <EmbeddedResource Include="..\..\macros\pvisecorner.macro"><LogicalName>pvisecorner.macro</LogicalName></EmbeddedResource>
-    <EmbeddedResource Include="..\..\macros\pcenter.macro"><LogicalName>pcenter.macro</LogicalName></EmbeddedResource>
-    <EmbeddedResource Include="..\..\macros\tc.macro"><LogicalName>tc.macro</LogicalName></EmbeddedResource>
+    <!-- The ATC .macro EmbeddedResources moved to CNC Core.csproj with AtcMacros.cs. They must live in
+         the SAME assembly as the class that reads them (GetExecutingAssembly), so don't add them back. -->
     <None Include="app.config" />
     <None Include="Properties\Settings.settings">
       <Generator>PublicSettingsSingleFileGenerator</Generator>
@@ -869,6 +901,18 @@
     <AppDesigner Include="Properties\" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\CNC Contracts\CNC.Contracts.csproj">
+      <Project>{9448A265-0B77-4235-A5F5-BDE212EC75E7}</Project>
+      <Name>CNC.Contracts</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\CNC Svg\CNC.Svg.csproj">
+      <Project>{E051200B-F61A-4E3F-8E80-0D9B14EE826B}</Project>
+      <Name>CNC.Svg</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\CNC Common\CNC.Common.csproj">
+      <Project>{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}</Project>
+      <Name>CNC.Common</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\CNC Core\CNC Core\CNC Core.csproj">
       <Project>{f245ff89-a838-4d6e-aa40-92cfd3d072d3}</Project>
       <Name>CNC Core</Name>

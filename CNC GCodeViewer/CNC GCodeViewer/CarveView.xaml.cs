@@ -23,10 +23,14 @@ using System.Windows.Threading;
 using HelixToolkit.Wpf;
 using CNC.Core;
 using CNC.GCode;
+using CNC.Controls;   // GeometryInterop.ToMedia3D
+// As in Renderer.xaml.cs: bare "Point3D" here is the WPF one (Vector3D arithmetic, Point3DCollection);
+// machine geometry arrives as CNC.Core.Point3D and converts via ToMedia3D().
+using Point3D = System.Windows.Media.Media3D.Point3D;
 
 namespace CNC.Controls.Viewer
 {
-    public partial class CarveView : UserControl
+    public partial class CarveView : UserControl, IToolpathView
     {
         private struct Seg { public Point3D A, B; public bool Rapid; public double Len; public double Radius; public int Shape; public double Angle; }
 
@@ -34,13 +38,15 @@ namespace CNC.Controls.Viewer
         private const int ShapeFlat = 0, ShapeBall = 1, ShapeVbit = 2;
 
         // Cutter geometry per tool number and declared stock size now come from the shared
-        // CNC.Controls.GCodeProgramComments parser (rebuilt once per completed Load File/Load Folder) instead
+        // CNC.Core.GCodeProgramComments parser (rebuilt once per completed Load File/Load Folder) instead
         // of a private copy of the same (TOOL T=n D=d TYPE=FLAT|BALL|VBIT [A=angle]) / (STOCK X=.. Y=.. Z=..)
         // regexes - drives the carve radius + cone and the stock block size.
         private double defaultToolRadius = 3d;
         private int defaultToolShape = ShapeFlat;
         private double defaultToolAngle;
         private double stockX, stockY, stockZ;   // stock size from GCodeProgramComments.Stock; 0 = unknown
+        private double stockOX, stockOY;         // stock's minimum corner in work coords, when declared
+        private bool haveStockOrigin;            // false = size only (e.g. Fusion) -> centre it on the cut
 
         // current cutter geometry the carve uses (set per segment in playback, or the default for live motion)
         private double curR = 3d;
@@ -60,6 +66,17 @@ namespace CNC.Controls.Viewer
         private LinesVisual3D cutLines, rapidLines;
         private Point3D bMin, bMax;     // program bounding box (work coords)
         private bool haveBox;
+
+        // The deepest Z reached by an actual CUTTING move - G1/G2/G3 and nothing else. The bounding box
+        // above cannot answer this: Grow() takes every segment the emulator produces, so a rapid, a probe
+        // approach, a "G53 G0 ... Z0" preamble or an expanded G28/G30 park all drag bMin.Z down with them.
+        // That is the same contamination the XY footprint already had to stop trusting (see InitHeightmap's
+        // "EXACTLY the declared board" comment) - it was never a cut-extent signal in Z either. A Setup or
+        // probing program has no cutting moves at all, so nothing is allowed to argue with the declared
+        // stock thickness: a 6.35 mm board was being drawn ~80 mm thick because the toolsetter probe and
+        // the move to stock origin were counted as if they had cut that deep. Reported 2026-08-12.
+        private double cutMinZ;
+        private bool haveCutZ;
 
         // ---- playback ----
         private int segIdx;
@@ -85,20 +102,33 @@ namespace CNC.Controls.Viewer
         public CarveView()
         {
             InitializeComponent();
+            // Loaded is NOT a reliable moment to find the DataContext. Hosted in a TabItem it was, because
+            // the tab realises its content only when selected, by which time the context has propagated.
+            // Split screen builds this into a ContentControl in code, where Loaded can fire BEFORE the
+            // context arrives - so model stayed null, nothing ever subscribed to FileName, and the scene
+            // only rebuilt on visibility changes. It sat on the no-program 150x150 default through a
+            // Generate (traced 2026-08-10: "loaded=False ... file=''" with the program plainly on screen).
+            DataContextChanged += (s, e) => { AttachModel(); ScheduleBuild(); };
         }
 
         private void CarveView_Loaded(object sender, RoutedEventArgs e)
         {
-            if (model == null && DataContext is GrblViewModel m)
-            {
-                model = m;
-                wpos = model.WorkPosition;
-                if (wpos != null)
-                    wpos.PropertyChanged += Wpos_PropertyChanged;
-                model.PropertyChanged += Model_PropertyChanged;
-            }
+            AttachModel();
             viewport.SizeChanged += (s, ev) => FrameIfNeeded();   // frame once the viewport has a render size
             ScheduleBuild();
+        }
+
+        // Idempotent: whichever of Loaded/DataContextChanged wins the race does the wiring, the other is a
+        // no-op. Both have to try, because neither is guaranteed to be the one that has a model.
+        private void AttachModel()
+        {
+            if (model != null || !(DataContext is GrblViewModel m))
+                return;
+            model = m;
+            wpos = model.WorkPosition;
+            if (wpos != null)
+                wpos.PropertyChanged += Wpos_PropertyChanged;
+            model.PropertyChanged += Model_PropertyChanged;
         }
 
         // Build the scene on a fresh dispatcher cycle. BuildToolpath runs GCodeEmulator.Execute, which pumps the
@@ -133,6 +163,17 @@ namespace CNC.Controls.Viewer
         {
             if (e.PropertyName == nameof(GrblViewModel.FileName) && IsVisible)
                 ScheduleBuild();
+            // The work offset is what places the machine envelope in work space, and a Setup/probe run
+            // changes it WHILE this view is open. Rebuilding only when the view became visible was enough
+            // while this lived in a TAB - returning to the tab re-showed it, which re-asked - but split
+            // screen keeps it permanently visible, so after a probe moved the origin nothing ever re-asked
+            // and the envelope kept its old placement while the stock and toolpath sat in the new frame.
+            // Reported 2026-08-10: "3D view ... is not even in the work envelope", right after a Setup run.
+            //
+            // Cheap to call on every notification: BuildScene's signature check already includes the
+            // offset, so an unchanged one returns early instead of re-adding the carve mesh.
+            else if (e.PropertyName == nameof(GrblViewModel.WorkPositionOffset) && IsVisible)
+                ScheduleBuild();
         }
 
         // The controller settings/offsets that size + place the envelope and the loaded program may arrive after
@@ -146,6 +187,38 @@ namespace CNC.Controls.Viewer
         private void Wpos_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             UpdateTool();
+        }
+
+        // ---- IToolpathView ----
+
+        /// <summary>Show a program's toolpath. The scene is rebuilt from GCode.File, so the tokens are
+        /// only the host's way of saying "there is a program now".</summary>
+        public void Open(List<GCodeToken> tokens)
+        {
+            ScheduleBuild();
+        }
+
+        /// <summary>
+        /// The program is gone, so the carve goes with it. The mesh depicts material removed BY THAT
+        /// PROGRAM: leaving it up claims the stock is cut when nothing on screen says so, and the next
+        /// job would preview onto an already-carved surface - simulated removal indistinguishable from
+        /// real. The board itself stays, uncarved, because the material is still on the table.
+        /// </summary>
+        public void Close()
+        {
+            carveVisual = null;
+            carveMesh = null;
+            meshPos = null;
+            hmap = null;
+            haveLast = false;
+            dirtyCells.Clear();
+            haveBox = haveCutZ = false;
+            segs.Clear();
+            // The signature is built from the program, which has just emptied, so this would rebuild
+            // anyway - but only once something asks. Ask now, so the stale carve cannot be seen in the
+            // gap before the next program loads (which is exactly when the operator looks at it).
+            lastSceneSig = null;
+            ScheduleBuild();
         }
 
         private static double Travel(int axis)
@@ -184,12 +257,24 @@ namespace CNC.Controls.Viewer
         {
             int cnt = GCode.File.Tokens?.Count ?? 0;
             string name = model?.FileName ?? string.Empty;
+            // The stock belongs in the signature too, or editing it in Setup leaves the old block on
+            // screen: the program is unchanged, so nothing else here would differ.
+            var st = CNC.Core.GCodeProgramComments.Stock;
+            var sec = StartJobConfig.Section;
+            string stockSig = st != null
+                ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "d{0:F2},{1:F2},{2:F2},{3},{4:F2},{5:F2}",
+                                st.Value.X, st.Value.Y, st.Value.Z, st.Value.HasOrigin, st.Value.OX, st.Value.OY)
+                : sec != null
+                    ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "s{0:F2},{1:F2},{2:F2}",
+                                    sec.Width, sec.Height, sec.Thickness)
+                    : "-";
             return string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "{0}|{1}|{2:F3},{3:F3},{4:F3},{5:F3},{6:F3},{7:F3}",
+                "{0}|{1}|{2:F3},{3:F3},{4:F3},{5:F3},{6:F3},{7:F3}|{8}",
                 cnt, name,
                 EnvMin(0) - Wco(0), EnvMax(0) - Wco(0),
                 EnvMin(1) - Wco(1), EnvMax(1) - Wco(1),
-                EnvMin(2) - Wco(2), EnvMax(2) - Wco(2));
+                EnvMin(2) - Wco(2), EnvMax(2) - Wco(2),
+                stockSig);
         }
 
         private void BuildScene()
@@ -202,6 +287,25 @@ namespace CNC.Controls.Viewer
             // large program) on every IsVisibleChanged is what made returning to the Job tab stall for ~1-2 s;
             // when unchanged the retained visuals re-render for free - just refresh the tool cone + framing.
             string sig = SceneSignature();
+
+            // Instrumentation only (-debuglog=carve). Two fixes aimed at the stock block have now failed to
+            // change what the operator sees, so the next step is reading what this method actually does
+            // rather than reasoning about it again: whether a program is even loaded, whether the STOCK
+            // comment parsed, whether the signature short-circuit skipped the rebuild, and whether the
+            // viewport had a size to lay out into (the missing-gridlines-until-tab-switch report).
+            if (DebugLog.Enabled)
+            {
+                var st = CNC.Core.GCodeProgramComments.Stock;
+                DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "BuildScene vp={0:0}x{1:0} children={2} sigChanged={3} loaded={4} haveBox={5} tokens={6} | stock={7} | file=\"{8}\"",
+                    viewport.ActualWidth, viewport.ActualHeight, viewport.Children.Count,
+                    sig != lastSceneSig, GCode.File.IsLoaded, haveBox, GCode.File.Tokens?.Count ?? 0,
+                    st == null ? "(none declared)" : string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "X={0:0.###} Y={1:0.###} Z={2:0.###} hasOrigin={3} OX={4:0.###} OY={5:0.###}",
+                        st.Value.X, st.Value.Y, st.Value.Z, st.Value.HasOrigin, st.Value.OX, st.Value.OY),
+                    model?.FileName ?? string.Empty));
+            }
+
             if (sig == lastSceneSig && viewport.Children.Count > 0)
             {
                 UpdateTool();
@@ -212,6 +316,11 @@ namespace CNC.Controls.Viewer
 
             viewport.Children.Clear();
             viewport.Children.Add(new DefaultLights());
+            // Cleared on every rebuild; whichever stock path runs below puts it back up if it has nothing
+            // to draw. (Not cleared on the short-circuit return above - that scene is unchanged, message
+            // included.)
+            if (txtNoStock != null)
+                txtNoStock.Visibility = Visibility.Collapsed;
 
             // machine envelope shifted into work coordinates
             double xmin = EnvMin(0) - Wco(0), xmax = EnvMax(0) - Wco(0);
@@ -275,26 +384,73 @@ namespace CNC.Controls.Viewer
             viewport.ZoomExtents(0);
         }
 
+        // Say so, rather than draw a board nobody described. Called from the two places that used to invent
+        // one (a 150x150x19 block at the origin, or a 19 mm thickness under a real footprint).
+        private void NoStockInfo(string why)
+        {
+            if (txtNoStock != null)
+                txtNoStock.Visibility = Visibility.Visible;
+            if (DebugLog.Enabled)
+                DebugLog.Write("carve", "no stock block drawn - " + why);
+        }
+
         // The stock block: the program's XY bounding box plus a margin, from the deepest cut up to work Z0.
         private void AddStock()
         {
             double margin = 6d, top, bottom, cx, cy, sx, sy;
 
-            if (haveBox)
+            // Two independent facts, and the block needs BOTH: where the board is (declared, or inferred
+            // from the program) and how thick it is (declared, or the depth of a real cut). Missing either,
+            // there is nothing honest to draw - the stand-in block this replaces was a size the operator
+            // never gave and could not tell apart from one they did.
+            bool haveFootprint = (haveStockOrigin && stockX > 0d && stockY > 0d) || haveBox;
+            bool haveThickness = stockZ > 0d || haveCutZ;
+            if (!haveFootprint || !haveThickness)
             {
+                NoStockInfo(string.Format("footprint={0} thickness={1}", haveFootprint, haveThickness));
+                return;
+            }
+
+            if (haveStockOrigin && stockX > 0d && stockY > 0d)
+            {
+                // Declared stock (from the program, or Setup when it declares none): draw the real board
+                // in its real place. Deliberately NOT gated on haveBox - with no program loaded this used
+                // to fall through to a 150x150 stand-in at the origin, which is what an emptied Job tab
+                // showed after a run finished: a placeholder easily mistaken for the real stock being
+                // wrong. The board is on the table whether or not a program is open.
+                top = 0d;
+                bottom = stockZ > 0d ? -stockZ : cutMinZ;   // one of the two is known - see the guard above
+                if (haveBox)
+                    top = Math.Max(bMax.Z, 0d);
+                if (haveCutZ)
+                    bottom = Math.Min(bottom, cutMinZ);   // a through-CUT goes deeper than the stock - see InitHeightmap
+                sx = stockX;
+                sy = stockY;
+                cx = stockOX + stockX / 2d;
+                cy = stockOY + stockY / 2d;
+            }
+            else
+            {
+                // No declared board, but a program is loaded (the guard above required one or the other):
+                // its own extents are the only statement about the material that exists.
                 top = Math.Max(bMax.Z, 0d);
-                bottom = Math.Min(bMin.Z, top - 1d);
+                bottom = Math.Min(stockZ > 0d ? -stockZ : cutMinZ, top - 1d);
                 sx = (bMax.X - bMin.X) + 2d * margin;
                 sy = (bMax.Y - bMin.Y) + 2d * margin;
                 cx = (bMin.X + bMax.X) / 2d;
                 cy = (bMin.Y + bMax.Y) / 2d;
             }
-            else
-            {
-                top = 0d; bottom = -19d; sx = sy = 150d; cx = cy = 0d;
-            }
 
             double h = Math.Max(top - bottom, 1d);
+
+            // Instrumentation only - which branch drew it, and off what numbers.
+            if (DebugLog.Enabled)
+                DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "AddStock branch={0} | centre {1:0.##},{2:0.##} size {3:0.##} x {4:0.##} mm | z {5:0.##}..{6:0.##} | declared Z={7:0.##} cutMinZ={8}",
+                    (haveStockOrigin && stockX > 0d && stockY > 0d) ? "DECLARED" : "cut-bbox+margin",
+                    cx, cy, sx, sy, bottom, top, stockZ,
+                    haveCutZ ? cutMinZ.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : "none"));
+
             viewport.Children.Add(new BoxVisual3D
             {
                 Center = new Point3D(cx, cy, bottom + h / 2d),
@@ -318,7 +474,7 @@ namespace CNC.Controls.Viewer
                 builtCount = cnt;
                 builtName = name;
                 segs.Clear();
-                haveBox = false;
+                haveBox = haveCutZ = false;
                 StopPlayback();
 
                 var cut = new Point3DCollection();
@@ -332,7 +488,7 @@ namespace CNC.Controls.Viewer
                 if (tokens != null)
                 {
                     var emu = new GCodeEmulator(true);   // translate canned cycles / G28 / G30 into moves
-                    emu.SetStartPosition(new Point3D(0d, 0d, 0d));
+                    emu.SetStartPosition(new CNC.Core.Point3D(0d, 0d, 0d));
 
                     foreach (var a in emu.Execute(tokens))
                     {
@@ -342,7 +498,7 @@ namespace CNC.Controls.Viewer
                             case Commands.M61:
                                 if (a.Token is GCToolSelect ts)
                                 {
-                                    var ti = CNC.Controls.GCodeProgramComments.For(ts.Tool);
+                                    var ti = CNC.Core.GCodeProgramComments.For(ts.Tool);
                                     if (ti.HasValue)
                                     {
                                         curRad = Math.Max(ti.Value.Diameter / 2d, 0.1d);
@@ -352,10 +508,18 @@ namespace CNC.Controls.Viewer
                                 }
                                 break;
                             case Commands.G0:
-                                AddSeg(a.Start, a.End, true, curRad, curShp, curAng, cut, rapid);
+                                AddSeg(a.Start.ToMedia3D(), a.End.ToMedia3D(), true, curRad, curShp, curAng, cut, rapid);
                                 break;
                             case Commands.G1:
-                                AddSeg(a.Start, a.End, false, curRad, curShp, curAng, cut, rapid);
+                                AddSeg(a.Start.ToMedia3D(), a.End.ToMedia3D(), false, curRad, curShp, curAng, cut, rapid);
+                                // NOT every G1 that arrives here is a cut. The emulator reports a G38.x probe
+                                // as a G1 (it draws like one), and a G53 move is in the MACHINE frame, not the
+                                // work frame the stock lives in. Neither removes material: a Setup program,
+                                // whose deepest motion is a toolsetter probe at Z-83 in G91, was drawing a
+                                // 6.35 mm board as an 83 mm slab. Observed in the carve log, cutMinZ=-83
+                                // against declared 6.35, 2026-08-12.
+                                if (!a.IsProbe && !a.IsInMachineCoord)
+                                    GrowCut(a.Start.ToMedia3D(), a.End.ToMedia3D());
                                 break;
                             case Commands.G2:
                             case Commands.G3:
@@ -363,13 +527,14 @@ namespace CNC.Controls.Viewer
                                 var p = a.Start;
                                 foreach (var q in pts)
                                 {
-                                    AddSeg(p, q, false, curRad, curShp, curAng, cut, rapid);
+                                    AddSeg(p.ToMedia3D(), q.ToMedia3D(), false, curRad, curShp, curAng, cut, rapid);
+                                    GrowCut(p.ToMedia3D(), q.ToMedia3D());
                                     p = q;
                                 }
                                 break;
                             default:
                                 if (!a.End.Equals(a.Start))
-                                    AddSeg(a.Start, a.End, a.IsRetract, curRad, curShp, curAng, cut, rapid);
+                                    AddSeg(a.Start.ToMedia3D(), a.End.ToMedia3D(), a.IsRetract, curRad, curShp, curAng, cut, rapid);
                                 break;
                         }
                     }
@@ -408,7 +573,7 @@ namespace CNC.Controls.Viewer
             Grow(b);
         }
 
-        // Both tool geometry and declared stock size now come from the shared CNC.Controls.GCodeProgramComments
+        // Both tool geometry and declared stock size now come from the shared CNC.Core.GCodeProgramComments
         // parser (already rebuilt by the time this runs - it's refreshed synchronously on the same Load
         // File/Load Folder completion this view's poll-on-render eventually notices), no local re-scan needed.
         // defaultToolRadius is the lowest-numbered tool's radius (used before the first tool change and for
@@ -419,13 +584,38 @@ namespace CNC.Controls.Viewer
             defaultToolShape = ShapeFlat;
             defaultToolAngle = 0d;
 
-            var stock = CNC.Controls.GCodeProgramComments.Stock;
+            var stock = CNC.Core.GCodeProgramComments.Stock;
             stockX = stock?.X ?? 0d;
             stockY = stock?.Y ?? 0d;
             stockZ = stock?.Z ?? 0d;
+            haveStockOrigin = stock?.HasOrigin ?? false;
+            stockOX = stock?.OX ?? 0d;
+            stockOY = stock?.OY ?? 0d;
+
+            // Nothing declared? Fall back to the Setup tab's stock. It describes the board physically on
+            // the table, which for anything generated here is the same board the program was laid out
+            // against - and it beats the alternative, which is inventing a block from the toolpath's own
+            // bounding box. Same origin convention as a Work Order: Setup's corner probe puts work (0,0)
+            // at the stock's minimum corner.
+            //
+            // The program's own declaration still WINS when it has one, and that ordering matters: a
+            // posted file (Fusion) may have been made for entirely different material from whatever is
+            // clamped down now, so its own statement about itself is the better authority.
+            if (stock == null)
+            {
+                var sec = StartJobConfig.Section;
+                if (sec != null && sec.Width > 0d && sec.Height > 0d)
+                {
+                    stockX = sec.Width;
+                    stockY = sec.Height;
+                    stockZ = sec.Thickness;
+                    stockOX = stockOY = 0d;
+                    haveStockOrigin = true;
+                }
+            }
 
             int lowest = int.MaxValue;
-            foreach (var kv in CNC.Controls.GCodeProgramComments.All)
+            foreach (var kv in CNC.Core.GCodeProgramComments.All)
                 if (kv.Key < lowest)
                 {
                     lowest = kv.Key;
@@ -433,6 +623,15 @@ namespace CNC.Controls.Viewer
                     defaultToolShape = ShapeId(kv.Value.Shape);
                     defaultToolAngle = kv.Value.Angle;
                 }
+        }
+
+        // Record a cutting move's depth - called ONLY from the G1/G2/G3 arms of BuildToolpath's switch, never
+        // from the default arm (probes, retracts, emulator-expanded parks) and never for a rapid.
+        private void GrowCut(Point3D a, Point3D b)
+        {
+            double z = Math.Min(a.Z, b.Z);
+            cutMinZ = haveCutZ ? Math.Min(cutMinZ, z) : z;
+            haveCutZ = true;
         }
 
         // Cut moves define the part footprint; rapids (often above the stock at safe Z) don't grow the stock.
@@ -462,18 +661,74 @@ namespace CNC.Controls.Viewer
             if (!haveBox)
                 return;
 
+            // How thick is the board? Nothing declared it, and no cutting move went below Z0 to imply it -
+            // this program is all rapids and probes. Leave carveVisual null so BuildScene falls through to
+            // AddStock, which says "No stock size information" instead of inventing a 19 mm slab.
+            if (stockZ <= 0d && !haveCutZ)
+            {
+                NoStockInfo("no declared thickness, and no cutting move to infer one from");
+                return;
+            }
+
             // Footprint: the real (STOCK X Y) when the program gives it (centred on the cut), else the toolpath
             // bbox + margin. Never smaller than the cut extents so the toolpath always stays on the stock.
             const double margin = 6d;
-            double cx = (bMin.X + bMax.X) / 2d, cy = (bMin.Y + bMax.Y) / 2d;
-            double sx = (bMax.X - bMin.X) + 2d * margin, sy = (bMax.Y - bMin.Y) + 2d * margin;
-            if (stockX > 0d) sx = Math.Max(sx, stockX);
-            if (stockY > 0d) sy = Math.Max(sy, stockY);
-            double x0 = cx - sx / 2d, x1 = cx + sx / 2d, y0 = cy - sy / 2d, y1 = cy + sy / 2d;
+            double x0, x1, y0, y1;
+
+            if (haveStockOrigin && stockX > 0d && stockY > 0d)
+            {
+                // The program said where the material actually is, so draw THAT rather than a block
+                // inferred from the cut. Centring on the toolpath put a correctly-sized board around
+                // whatever was being engraved instead of where the operator's stock sits - a 368x232
+                // board rendered as a block the size of the lettering on it.
+                // EXACTLY the declared board - no union with the toolpath's bounding box. That union was
+                // meant to keep an over-running cut on the mesh, but the box is grown by Grow() from
+                // rapids as well as cuts (AddSeg), so a program opening with "G53 G0 X.. Y.. Z0" - which
+                // every Work Order does - dragged a corner of the stock out to a MACHINE coordinate and
+                // rendered the board with a huge slab attached. It was never a cut-extent signal.
+                //
+                // Nothing is lost by dropping it: material outside the declared stock does not exist, and
+                // a cut that leaves the board simply carves nothing (the heightmap indices clamp).
+                x0 = stockOX; x1 = stockOX + stockX;
+                y0 = stockOY; y1 = stockOY + stockY;
+            }
+            else
+            {
+                // Size-only (Fusion) or nothing declared: the origin could be any point on the block, so
+                // centring on the cut is the least-wrong guess available.
+                double cx = (bMin.X + bMax.X) / 2d, cy = (bMin.Y + bMax.Y) / 2d;
+                double sx = (bMax.X - bMin.X) + 2d * margin, sy = (bMax.Y - bMin.Y) + 2d * margin;
+                if (stockX > 0d) sx = Math.Max(sx, stockX);
+                if (stockY > 0d) sy = Math.Max(sy, stockY);
+                x0 = cx - sx / 2d; x1 = cx + sx / 2d; y0 = cy - sy / 2d; y1 = cy + sy / 2d;
+            }
             htop = 0d;                                       // stock top = work Z0 (the material top); rapids above don't cut
-            hbot = stockZ > 0d ? -stockZ : Math.Min(bMin.Z, -1d);
-            hbot = Math.Min(hbot, bMin.Z);                  // include any cut deeper than the stock thickness
+            // The declared thickness is the board, full stop. Only a real CUT is allowed to argue with it -
+            // a through-cut genuinely does go deeper than the stock, and the mesh has to reach that far or
+            // the trail runs off the bottom of the block. cutMinZ, not bMin.Z: the bounding box counts
+            // rapids, probe approaches and expanded G28/G30 parks, none of which remove material. That is
+            // what drew a 6.35 mm board as an ~80 mm slab on a Setup job, whose deepest motion is a
+            // toolsetter probe. A program with no cutting moves at all leaves the declared thickness alone.
+            hbot = stockZ > 0d ? -stockZ : Math.Min(cutMinZ, -1d);   // one of the two is known - see the guard at the top
+            if (haveCutZ)
+                hbot = Math.Min(hbot, cutMinZ);
             if (hbot >= htop) hbot = htop - 1d;
+
+            // Instrumentation only: the numbers the block is ACTUALLY built from, and which branch chose
+            // them - the one thing that separates "the stock was never declared" from "it was declared and
+            // something downstream ignored it".
+            if (DebugLog.Enabled)
+                DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "InitHeightmap branch={0} | x {1:0.##}..{2:0.##} y {3:0.##}..{4:0.##} ({5:0.##} x {6:0.##} mm) | z {7:0.##}..{8:0.##} | declared {9:0.##}x{10:0.##}x{11:0.##} origin={12} | cut x {13:0.##}..{14:0.##} y {15:0.##}..{16:0.##} | cutMinZ={17} boxMinZ={18:0.##}",
+                    (haveStockOrigin && stockX > 0d && stockY > 0d) ? "DECLARED" : "centred-on-cut",
+                    x0, x1, y0, y1, x1 - x0, y1 - y0, hbot, htop,
+                    stockX, stockY, stockZ, haveStockOrigin,
+                    bMin.X, bMax.X, bMin.Y, bMax.Y,
+                    // The pair that decides the thickness: what the CUTS reached, against what the whole
+                    // bounding box reached. "none" means no G1/G2/G3 in the program at all - a Setup or
+                    // probing job - and the declared thickness stands untouched.
+                    haveCutZ ? cutMinZ.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : "none",
+                    bMin.Z));
 
             double w = Math.Max(x1 - x0, 1d), h = Math.Max(y1 - y0, 1d);
             const int maxCells = 320;                       // finer grid -> sharper carve (was 150)

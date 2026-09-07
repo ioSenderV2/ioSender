@@ -30,11 +30,16 @@ TARGETS = [
     # ioSender (ioSender XL views: MainWindow + the top-level view tabs)
     ('ioSender XL/ioSender XL/HeightMapView.xaml', 'ioSender'),
     ('ioSender XL/ioSender XL/StartJobView.xaml', 'ioSender'),
+    ('ioSender XL/ioSender XL/JobView.xaml', 'ioSender'),
+    ('ioSender XL/ioSender XL/JobWorkspace.xaml', 'ioSender'),
     ('ioSender XL/ioSender XL/ProgramPanel.xaml', 'ioSender'),
     ('ioSender XL/ioSender XL/MainWindow.xaml', 'ioSender'),
+    ('ioSender XL/ioSender XL/MirrorWindow.xaml', 'ioSender'),
 
     # CNC.Controls.WPF (the main controls library)
     ('CNC Controls/CNC Controls/JobControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/RunStripPanel.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/StatusControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/PortDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/AutoSquareWizard.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/StepperCalibrationProbeWizard.xaml', 'CNC.Controls.WPF'),
@@ -57,6 +62,9 @@ TARGETS = [
     ('CNC Controls/CNC Controls/CustomToolEditDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/KbdDefaultSpeedControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/JogConfigControl.xaml', 'CNC.Controls.WPF'),
+    # Was localized (30 rows already in the CSVs) but never listed here, so new x:Uids on it were
+    # silently skipped - the run reports "Added 0 row(s)" and looks like a no-op rather than a gap.
+    ('CNC Controls/CNC Controls/JogUiConfigControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/JogBaseControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/ConsoleControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/FileActionControl.xaml', 'CNC.Controls.WPF'),
@@ -107,6 +115,9 @@ TARGETS = [
 
     # CNC.Controls.Camera (the camera view + its App-settings panel)
     ('CNC Controls Camera/CNC Controls Camera/ConfigControl.xaml', 'CNC.Controls.Camera'),
+
+    # CNC.Converters (the file-import converters' own parameter dialogs)
+    ('CNC Converters/SvgLaserDialog.xaml', 'CNC.Converters'),
 ]
 
 # LibStrings.xaml ResourceDictionaries (code-string localization). Each <system:String x:Uid=..>value..
@@ -222,7 +233,12 @@ def existing_keys(path):
 def main():
     dry = '--dry-run' in sys.argv
     grand = 0
-    jobs = [(x, a, rows_for) for (x, a) in TARGETS] + [(x, a, rows_for_libstrings) for (x, a) in LIBSTRINGS]
+    # A view's own XAML can carry BOTH localizable controls and <system:String> resource entries - JobView
+    # does - so every target gets both extractors. Running only rows_for over TARGETS silently skipped the
+    # string resources, which is how new <system:String> entries were being added with zero locale rows.
+    jobs = ([(x, a, rows_for) for (x, a) in TARGETS] +
+            [(x, a, rows_for_libstrings) for (x, a) in TARGETS] +
+            [(x, a, rows_for_libstrings) for (x, a) in LIBSTRINGS])
     for xaml, assembly, builder in jobs:
         if not os.path.exists(os.path.join(REPO, xaml)):
             print('  skip (missing): %s' % xaml)

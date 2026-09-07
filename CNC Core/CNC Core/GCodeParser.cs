@@ -42,7 +42,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.IO;
 using System.Windows;
-using System.Windows.Media.Media3D;
 using System.Xml.Serialization;
 using CNC.Core;
 using System.Text;
@@ -380,7 +379,7 @@ namespace CNC.GCode
             bool strip = state == CommandIgnoreState.Strip;
 
             if (!strip && state != CommandIgnoreState.No)
-                strip = AppDialogs.Show(string.Format(LibStrings.FindResource("ParserStrip"), code), LibStrings.FindResource("ParserStripHdr"), MessageBoxButton.YesNo) == MessageBoxResult.Yes;
+                strip = UserPrompt.Show(string.Format(LibStrings.FindResource("ParserStrip"), code), LibStrings.FindResource("ParserStripHdr"), PromptButtons.YesNo) == PromptResult.Yes;
 
             return strip;
         }
@@ -1225,7 +1224,7 @@ namespace CNC.GCode
                 Tokens.Add(new GCToolSelect(Commands.ToolSelect, gcValues.N, gcValues.T, blockDelete));
 
                 if (!quiet && ToolChanged != null && !ToolChanged(gcValues.T))
-                    AppDialogs.Show(string.Format(LibStrings.FindResource("ParserToolProfile"), gcValues.T.ToString()), "GCode parser", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    UserPrompt.Show(string.Format(LibStrings.FindResource("ParserToolProfile"), gcValues.T.ToString()), "GCode parser", PromptButtons.OK, PromptIcon.Warning);
             }
 
             if (modalGroups != ModalGroups.G1)
@@ -1571,13 +1570,28 @@ namespace CNC.GCode
                         case Commands.G53:
                             if (motionMode == MotionMode.G0 || motionMode == MotionMode.G1)
                             {
-                                if (modalGroups.HasFlag(ModalGroups.G1))
-                                    Tokens.Add(new GCAbsLinearMotion(cmdNonModal, motionMode == MotionMode.G0 ? Commands.G0 : Commands.G1, gcValues.N, gcValues.XYZ, AxisFlags.None, blockDelete));
-                                else
-                                {
-                                    Tokens.Add(new GCAbsLinearMotion(cmdNonModal, motionMode == MotionMode.G0 ? Commands.G0 : Commands.G1, gcValues.N, gcValues.XYZ, axisWords, blockDelete));
-                                    axisWords = AxisFlags.None;
-                                }
+                                // The axis words belong to the G53 token whether or not the block also
+                                // restates G0/G1 - they are the whole point of it, and GCodeEmulator's G53
+                                // case is the only thing that converts them out of the machine frame.
+                                //
+                                // Since 824b8f18 (2021-05-17) a block that restated the motion word took a
+                                // branch passing AxisFlags.None and leaving axisWords set, so "G53 G0 X.. Y.."
+                                // - every generated park line - produced an axis-less G53 marker plus an
+                                // ORDINARY G0 emitted by the fall-through below, carrying machine coordinates
+                                // with nothing left to say they were machine coordinates. The emulator then
+                                // treated them as work coordinates: the 3D view drew park moves in the wrong
+                                // place, and ProgramLimits mixed frames. Observed 2026-08-24 as a 32 mm job
+                                // refusing to start with "Y: the program spans 858 mm" - 858 being 38 (work)
+                                // minus -820.001 (G30's MACHINE Y, via #5182).
+                                Tokens.Add(new GCAbsLinearMotion(cmdNonModal, motionMode == MotionMode.G0 ? Commands.G0 : Commands.G1, gcValues.N, gcValues.XYZ, axisWords, blockDelete));
+                                axisWords = AxisFlags.None;
+
+                                // G53 has consumed this block's motion. Clearing the modal-group flag stops
+                                // the fall-through at "20. Motion modes" emitting a second, axis-less motion
+                                // token for the same block - its condition fires on this flag alone.
+                                // motionMode itself is deliberately left alone: G0/G1 stays modally active
+                                // for the blocks that follow, exactly as on the controller.
+                                modalGroups &= ~ModalGroups.G1;
                             }
                             else
                                 throw new GCodeException(LibStrings.FindResource("ParserNoG0orG1"));
@@ -2857,12 +2871,12 @@ namespace CNC.GCode
 
     static public class GCSpline
     {
-        public static List<Point3D> GeneratePoints(double[] start, Point first, Point second, double[] end, double arcResolution, bool isRelative = false)
+        public static List<Point3D> GeneratePoints(double[] start, Point2D first, Point2D second, double[] end, double arcResolution, bool isRelative = false)
         {
             const double min_step = 0.002d, max_step = 0.1d, sigma = 0.1d;
 
             double t = 0d, step = max_step;
-            Point bez_target = new Point(start[0], start[1]);
+            Point2D bez_target = new Point2D(start[0], start[1]);
             List<Point3D> segments = new List<Point3D>();
 
             while (t < 1d)
@@ -2999,7 +3013,7 @@ namespace CNC.GCode
 
         public List<Point3D> GeneratePoints(double[] start, double arcResolution, bool isRelative = false)
         {
-            return GCSpline.GeneratePoints(start, new Point(start[0] + I, start[1] + J), new Point(X + P, Y + Q), Values, arcResolution);
+            return GCSpline.GeneratePoints(start, new Point2D(start[0] + I, start[1] + J), new Point2D(X + P, Y + Q), Values, arcResolution);
         }
     }
 
@@ -3045,8 +3059,8 @@ namespace CNC.GCode
 
         public List<Point3D> GeneratePoints(double[] start, double arcResolution, bool isRelative = false)
         {
-            Point first = new Point(start[0] + (I * 2d) / 3d, start[1] + (J * 2d) / 3d);
-            Point second = new Point(X + ((start[0] + I - X) *2d / 3d), Y + ((start[1] + J - Y) * 2d / 3d));
+            Point2D first = new Point2D(start[0] + (I * 2d) / 3d, start[1] + (J * 2d) / 3d);
+            Point2D second = new Point2D(X + ((start[0] + I - X) *2d / 3d), Y + ((start[1] + J - Y) * 2d / 3d));
 
             return GCSpline.GeneratePoints(start, first, second, Values, arcResolution);
         }

@@ -1,13 +1,22 @@
 ﻿/*
- * KeypressHandler.xaml.cs - part of CNC Controls library for Grbl
+ * KeypressHandler.cs - part of CNC Controls library
  *
- * v0.35 / 2021-10-20 / Io Engineering (Terje Io)
+ * v0.47 / 2026-03-23 / Io Engineering (Terje Io)
  *
+ * Lives in CNC.Controls, not CNC.Core: everything here is WPF keyboard input (Key, ModifierKeys,
+ * KeyEventArgs, UserControl contexts, Keyboard.FocusedElement). It derives from the portable
+ * CNC.Core.JogController, which owns the jog state and execution this class used to duplicate
+ * alongside it - so there is now one JogDistances/JogFeedrates/jog-mode, not two.
+ *
+ * The class NAME is load-bearing: saved key mappings persist their action identity as
+ * "<ReflectedType.Name>.<MethodName>" (e.g. "KeypressHandler.FeedOverrideFinePlus") in the App.config
+ * "KeyMap" section, so renaming this class - or moving the override functions below off it - silently
+ * orphans every existing user's overrides. The namespace is not part of that string and is free to move.
  */
 
 /*
 
-Copyright (c) 2020-2021, Io Engineering (Terje Io)
+Copyright (c) 2020-2026, Io Engineering (Terje Io)
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification,
@@ -39,104 +48,470 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Windows.Controls;
 using System.Windows.Input;
+using System.Xml.Serialization;
 using CNC.Core;
+using CNC.GCode;
 
 namespace CNC.Controls
 {
-    public class KeypressHandler
+    public class KeypressHandler : JogController
     {
-        private enum JogMode
+        private int N_AXIS = 3;
+        private bool preCancel = false;
+        private List<KeypressHandlerFn> handlers = new List<KeypressHandlerFn>();
+        private List<HandlerFn> functions = new List<HandlerFn>();
+        private AxisJog[] axisjog = new AxisJog[9];
+        private JogKey[] jogKeys = new JogKey[] {
+            new JogKey(0, Key.Right),
+            new JogKey(0, Key.Left),
+            new JogKey(1, Key.Up),
+            new JogKey(1, Key.Down),
+            new JogKey(2, Key.PageUp),
+            new JogKey(2, Key.PageDown),
+            new JogKey(3, Key.Home),
+            new JogKey(3, Key.End),
+            new JogKey(4),
+            new JogKey(4),
+            new JogKey(5),
+            new JogKey(5),
+            new JogKey(6),
+            new JogKey(6),
+            new JogKey(7),
+            new JogKey(7),
+            new JogKey(8),
+            new JogKey(8)
+        };
+
+        /// <summary>
+        /// Install this class as the keyboard-capable jog controller for every GrblViewModel.
+        /// Called from App.OnStartup, alongside AppMessageBox.Register(), before the first model is built.
+        /// </summary>
+        public static void Register()
         {
-            Step = 0,
-            Slow,
-            Fast,
-            None // must be last!
+            GrblViewModel.KeyboardFactory = model => new KeypressHandler(model);
         }
 
+        public KeypressHandler(GrblViewModel model) : base(model)
+        {
+            for (int i = 0; i < axisjog.Length; i++)
+                axisjog[i] = new AxisJog();
+
+            AddFunction(FeedOverrideFinePlus, null);
+            AddFunction(FeedOverrideFineMinus, null);
+            AddFunction(FeedOverrideCoarseMinus, null);
+            AddFunction(FeedOverrideCoarsePlus, null);
+            AddFunction(FeedOverrideReset, null);
+            AddFunction(FeedOverrideRapidsMedium, null);
+            AddFunction(FeedOverrideRapidsLow, null);
+            AddFunction(FeedOverrideRapidsReset, null);
+            AddFunction(FloodOverrideToggle, null);
+            AddFunction(MistOverrideToggle, null);
+            AddFunction(Fan0Toggle, null);
+            AddFunction(SpindleOverrideFinePlus, null);
+            AddFunction(SpindleOverrideFineMinus, null);
+            AddFunction(SpindleOverrideCoarseMinus, null);
+            AddFunction(SpindleOverrideCoarsePlus, null);
+            AddFunction(SpindleOverrideStop, null);
+            AddFunction(ProbeConnectedToggle, null);
+            AddFunction(OptionalStopToggle, null);
+            AddFunction(SingleBlockToggle, null);
+        }
+
+        public override void Configure(int numAxes, string axisLetters, bool lathe)
+        {
+            base.Configure(numAxes, axisLetters, lathe);   // axis letters / lathe orientation are machine config
+
+            N_AXIS = numAxes;
+            axisLetters = axisLetters.Replace("-", "");
+            for (int i = 0; i < jogKeys.Length; i++)
+            {
+                jogKeys[i].Command = string.Empty;
+            }
+            for (int i = 0; i < numAxes; i++)
+            {
+                var k = lathe ? (i == 0 ? 2 : 0) : i;
+                jogKeys[i * 2].Command = axisLetters.Substring(k, 1) + (lathe && i != 0 ? "-{0}" : "{0}");
+                jogKeys[i * 2 + 1].Command = axisLetters.Substring(k, 1) + (lathe && i != 0 ? "{0}" : "-{0}");
+            }
+        }
+
+        // JogMode moved to CNC.Core.JogMode (JogController.cs) - it is jog state, not a keyboard concern,
+        // and JogCommand is typed in it. Callers now use the namespace-level JogMode.
+
+        [XmlType(TypeName = "KeyMapping")]
         public class KeypressHandlerFn
         {
-            public Key key;
-            public ModifierKeys modifiers;
+            [XmlIgnore]
+            internal string method, dummy;
+
+            public Key Key;
+            public ModifierKeys Modifiers;
+            public bool OnUp;
+            [XmlIgnore]
+            public UserControl context;
+            [XmlIgnore]
             public Func<Key, bool> Call;
+            public string Context { get { return context == null ? "null" : context.Name; } set { dummy = value; } }
+            public string Method { get { return Call == null ? method : Call.Method.ReflectedType.Name + "." +  Call.Method.Name; } set { method = value; } }
         }
 
-        private bool fullJog = false, preCancel = false, softLimits = false;
-        private volatile Key[] axisjog = new Key[3] { Key.None, Key.None, Key.None };
-        private double[] jogDistance = new double[3] { 0.05, 500.0, 500.0 };
-        private double[] jogSpeed = new double[3] { 100.0, 200.0, 500.0 };
-        private JogMode jogMode = JogMode.None;
-        private GrblViewModel grbl;
-        private List<KeypressHandlerFn> handlers = new List<KeypressHandlerFn>();
-
-        public void AddHandler(Key key, ModifierKeys modifiers, Func<Key, bool> handler)
+        private class HandlerFn
         {
-            handlers.Add(new KeypressHandlerFn(){key = key, modifiers = modifiers, Call = handler});
+            public UserControl context;
+            public Func<Key, bool> Call;
+            public Key DefaultKey = Key.None;                 // factory default (first AddHandler key)
+            public ModifierKeys DefaultModifiers = ModifierKeys.None;
+            public string Context { get { return context == null ? "null" : context.Name; } }
+            public string Method { get { return Call.Method.ReflectedType.Name + "." + Call.Method.Name; } }
         }
 
-        public KeypressHandler(GrblViewModel model)
+        private class JogKey
         {
-            grbl = model;
-
-            if (GrblSettings.IsLoaded)
+            public JogKey (int axisIndex, Key key)
             {
-                double val;
-                // grblHAL exposes firmware $ jog settings; these seed the initial values, but the App Jog config
-                // below is authoritative for ioSender's keyboard jog and is pushed live (updateConfig), so an
-                // edit on Settings:App applies at once.
-                if (!(val = GrblSettings.GetDouble(GrblSetting.JogStepDistance)).Equals(double.NaN))
-                    jogDistance[(int)JogMode.Step] = val;
-                if (!(val = GrblSettings.GetDouble(GrblSetting.JogSlowDistance)).Equals(double.NaN))
-                    jogDistance[(int)JogMode.Slow] = val;
-                if (!(val = GrblSettings.GetDouble(GrblSetting.JogFastDistance)).Equals(double.NaN))
-                    jogDistance[(int)JogMode.Fast] = val;
-                if (!(val = GrblSettings.GetDouble(GrblSetting.JogStepSpeed)).Equals(double.NaN))
-                    jogSpeed[(int)JogMode.Step] = val;
-                if (!(val = GrblSettings.GetDouble(GrblSetting.JogSlowSpeed)).Equals(double.NaN))
-                    jogSpeed[(int)JogMode.Slow] = val;
-                if (!(val = GrblSettings.GetDouble(GrblSetting.JogFastSpeed)).Equals(double.NaN))
-                    jogSpeed[(int)JogMode.Fast] = val;
-
-                fullJog = GrblInfo.IsGrblHAL;
-                model.IsMetric = GrblSettings.GetString(GrblSetting.ReportInches) != "1";
+                Key = key;
+                DefaultKey = key;
+                Command = string.Empty;
+                AxisIndex = axisIndex;
+            }
+            public JogKey(int axisIndex)
+            {
+                Key = Key.None;
+                DefaultKey = Key.None;
+                Command = string.Empty;
+                AxisIndex = axisIndex;
             }
 
-            // The App-level Jog config is authoritative for ioSender's keyboard jogging on ALL controllers:
-            // subscribe and push it live so editing the jog distances/speeds on Settings:App applies immediately
-            // (and the status-bar "Jog step" refreshes). Previously this was skipped whenever the controller
-            // exposed firmware $ jog settings (grblHAL), which left the App fields inert and the readout stale.
-            AppConfig.Settings.Jog.PropertyChanged += Jog_PropertyChanged;
-            updateConfig();
+            public Key Key { get; set; }
+            public Key DefaultKey { get; private set; }
+            public string Command { get; set; }
+            public int AxisIndex { get; private set; }
+            public bool Remapped { get; set; } = false;
         }
 
-        private void Jog_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        private class AxisJog
         {
-            updateConfig();
+            public AxisJog ()
+            {
+                Key = Key.None;
+                Command = String.Empty;
+                Distance = 0d;
+            }
+
+            public Key Key { get; set; }
+            public string Command { get; set; }
+            public double Distance { get; set; }
         }
 
-        public bool CanJog { get { return grbl.GrblState.State == GrblStates.Idle || grbl.GrblState.State == GrblStates.Tool || grbl.GrblState.State == GrblStates.Jog; } }
-        public bool IsJogging {  get { return jogMode != JogMode.None || grbl.GrblState.State == GrblStates.Jog; } }
-
-        private void updateConfig()
+        public void AddFunction(Func<Key, bool> call, UserControl context)
         {
-            grbl.JogStep = jogDistance[(int)JogMode.Step] = AppConfig.Settings.Jog.StepDistance;
-            jogDistance[(int)JogMode.Slow] = AppConfig.Settings.Jog.SlowDistance;
-            jogDistance[(int)JogMode.Fast] = AppConfig.Settings.Jog.SlowDistance;
-            jogSpeed[(int)JogMode.Step] = AppConfig.Settings.Jog.StepFeedrate;
-            jogSpeed[(int)JogMode.Slow] = AppConfig.Settings.Jog.SlowFeedrate;
-            jogSpeed[(int)JogMode.Fast] = AppConfig.Settings.Jog.FastFeedrate;
-
-            softLimits = GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) == 1;
-
-            if (!GrblInfo.IsGrblHAL)
-                fullJog = AppConfig.Settings.Jog.KeyboardEnable;
+            var function = functions.Where(k => k.Call == call && k.context == context).FirstOrDefault();
+            if (function == null)
+                functions.Add(new HandlerFn() { Call = call, context = context });
         }
 
-        public bool ProcessKeypress(KeyEventArgs e, bool allowJog)
+        public void AddHandler(Key key, ModifierKeys modifiers, Func<Key, bool> handler, UserControl context = null, bool onUp = true)
         {
-            bool isJogging = IsJogging;
-            double[] dist = new double[3] { 0d, 0d, 0d };
+            AddFunction(handler, context);
+            SetDefault(handler, context, key, modifiers);
+            handlers.Add(new KeypressHandlerFn(){ Key = key, Modifiers = modifiers, Call = handler, context = context, OnUp = onUp });
+        }
+        public void AddHandler(Key key, ModifierKeys modifiers, Func<Key, bool> handler, bool onUp)
+        {
+            AddFunction(handler, null);
+            SetDefault(handler, null, key, modifiers);
+            handlers.Add(new KeypressHandlerFn() { Key = key, Modifiers = modifiers, Call = handler, context = null, OnUp = onUp });
+        }
+
+        private void SetDefault(Func<Key, bool> handler, UserControl context, Key key, ModifierKeys modifiers)
+        {
+            var fn = functions.Where(k => k.Call == handler && k.context == context).FirstOrDefault();
+            if (fn != null && fn.DefaultKey == Key.None)   // first registration wins
+            {
+                fn.DefaultKey = key;
+                fn.DefaultModifiers = modifiers;
+            }
+        }
+
+        // Jog configuration and state (JogDistances, JogFeedrates, JogStepDistance, SoftLimits,
+        // LimitSwitchesClearance, IsJoggingEnabled, IsContinuousJoggingEnabled, DefaultSpeedFast,
+        // CanJog/CanJog2/IsJogging, CurrentJogMode, JogModeChanged) all come from the portable
+        // JogController base - this class used to keep a second, parallel copy of them.
+
+        /// <summary>True while the current dispatch is a key autorepeat.</summary>
+        public bool IsRepeating { get; private set; } = false;
+
+        // ---- persistence -----------------------------------------------------------------------
+        //
+        // Key mappings are stored as the "KeyMap" section of App.config (folded in from the old standalone
+        // KeyMap0.xml). CNC.Core can't reference the config store, so AppConfig keeps SectionConfig in sync with
+        // the section payload and provides PersistHook to save App.config; with no hook (e.g. helper tools) the
+        // code falls back to the legacy KeyMap0.xml file.
+        public static List<KeypressHandlerFn> SectionConfig;
+        public static System.Action PersistHook;
+        private static bool UseSection { get { return PersistHook != null; } }
+        private static string KeyMapPath { get { return Resources.ConfigPath + "KeyMap0.xml"; } }
+
+        // Serializable snapshot of the current mappings: the live handlers (minus the F-key macro handler) plus a
+        // synthetic entry for each remapped jog key.
+        public List<KeypressHandlerFn> ExportMappings()
+        {
+            var list = handlers.Where(x => x.Method != "JobControl.FnKeyHandler").ToList();
+            for (var i = 0; i < jogKeys.Length; i++)
+                if (jogKeys[i].Remapped)
+                    list.Add(new KeypressHandlerFn() { Key = jogKeys[i].Key, Modifiers = ModifierKeys.None, OnUp = false, Method = "Jogkey." + GrblInfo.AxisIndexToLetter(i >> 1) + ((i & 1) == 1 ? "minus" : "plus") });
+            return list;
+        }
+
+        public bool SaveMappings(string filename = null)
+        {
+            if (handlers.Count == 0)
+                return false;
+
+            if (UseSection)
+            {
+                SectionConfig = ExportMappings();
+                PersistHook();
+                return true;
+            }
+
+            try
+            {
+                var xs = new XmlSerializer(typeof(List<KeypressHandlerFn>), new XmlRootAttribute("KeyMappings"));
+                using (var fsout = new FileStream(filename ?? KeyMapPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    xs.Serialize(fsout, ExportMappings());
+                return true;
+            }
+            catch (Exception e)
+            {
+                UserPrompt.Show(e.Message, "ioSender", PromptButtons.OK, PromptIcon.Warning);
+                return false;
+            }
+        }
+
+        // One-time importer for the "KeyMap" section: read the legacy KeyMap0.xml if present.
+        public static List<KeypressHandlerFn> ReadLegacyFile()
+        {
+            try
+            {
+                if (!File.Exists(KeyMapPath))
+                    return null;
+                var xs = new XmlSerializer(typeof(List<KeypressHandlerFn>), new XmlRootAttribute("KeyMappings"));
+                using (var reader = new StreamReader(KeyMapPath))
+                    return (List<KeypressHandlerFn>)xs.Deserialize(reader);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        // Load the saved mappings from the App.config "KeyMap" section (populated at config-load). Call once the
+        // handlers have been registered (JobView.OnBooted); a null section leaves the default bindings in place.
+        public bool LoadMappings()
+        {
+            if (!UseSection || SectionConfig == null || handlers.Count == 0)
+                return false;
+            ImportMappings(SectionConfig);
+            return true;
+        }
+
+        public bool LoadMappings(string filename)
+        {
+            if (handlers.Count == 0)
+                return false;
+
+            try
+            {
+                var xs = new XmlSerializer(typeof(List<KeypressHandlerFn>), new XmlRootAttribute("KeyMappings"));
+                List<KeypressHandlerFn> keymappings;
+                using (var reader = new StreamReader(filename))
+                    keymappings = (List<KeypressHandlerFn>)xs.Deserialize(reader);
+                ImportMappings(keymappings);
+                return true;
+            }
+            catch
+            {
+                UserPrompt.Show("keymap file is corrupt!", "ioSender", PromptButtons.OK, PromptIcon.Error);
+                return false;
+            }
+        }
+
+        // Apply a deserialized mapping list onto the live handlers / jog keys.
+        private void ImportMappings(List<KeypressHandlerFn> keymappings)
+        {
+            if (keymappings == null)
+                return;
+
+            foreach (var newmap in keymappings)
+            {
+                if (newmap?.method == null)
+                    continue;
+
+                if (newmap.method.StartsWith("Jogkey.")) {
+                    int k = GrblInfo.AxisLetterToIndex(newmap.method.Substring(7, 1));
+                    if(k >= 0 && newmap.method.Substring(8) == "plus" || newmap.method.Substring(8) == "minus")
+                    {
+                        k = k * 2 + (newmap.method.Substring(8) == "minus" ? 1 : 0);
+                        jogKeys[k].Key = newmap.Key;
+                        jogKeys[k].Remapped = true;
+                    }
+                } else {
+
+                    var handler = functions.Where(x => x.Method == newmap.method && x.Context == newmap.Context).FirstOrDefault();
+                    var keymap = handlers.Where(k => k.Modifiers == newmap.Modifiers && k.Key == newmap.Key && k.OnUp == newmap.OnUp && k.Context == newmap.Context).FirstOrDefault();
+
+                    if (handler != null)
+                    {
+                        if (keymap != null)
+                        {
+                            if (keymap.Method != newmap.method)
+                            {
+                                keymap.OnUp = newmap.OnUp;
+                                keymap.Call = handler.Call;
+                            }
+                        }
+                        else
+                            handlers.Add(new KeypressHandlerFn() { Key = newmap.Key, Modifiers = newmap.Modifiers, Call = handler.Call, context = handler.context, OnUp = newmap.OnUp });
+                    }
+                    else if (keymap != null && newmap.method == "None")
+                        handlers.Remove(keymap);
+                }
+            }
+        }
+
+        // ---- Editor API (used by the Key Mappings editor) -------------------------------------
+
+        /// <summary>A single editable binding row surfaced to the Key Mappings editor.</summary>
+        public class KeyBinding
+        {
+            public string Method;           // catalog identity for action bindings, "Jogkey.X.plus" for jog
+            public string Context;          // owning control name or "null"
+            public Key Key;
+            public ModifierKeys Modifiers;
+            public Key DefaultKey;          // factory default binding (for change detection / reset)
+            public ModifierKeys DefaultModifiers;
+            public bool OnUp = true;
+            public bool IsJog;
+            public int JogIndex = -1;       // index into jogKeys for jog bindings
+            public string AxisLabel;        // e.g. "X +" for jog bindings
+        }
+
+        /// <summary>All bindable actions (bound and unbound), excluding the macro Fn-key dispatcher.</summary>
+        public List<KeyBinding> GetActionBindings()
+        {
+            var list = new List<KeyBinding>();
+
+            foreach (var fn in functions)
+            {
+                if (fn.Method == "JobControl.FnKeyHandler")
+                    continue;
+
+                var h = handlers.FirstOrDefault(k => k.Call == fn.Call && k.context == fn.context);
+
+                list.Add(new KeyBinding {
+                    Method = fn.Method,
+                    Context = fn.Context,
+                    Key = h == null ? Key.None : h.Key,
+                    Modifiers = h == null ? ModifierKeys.None : h.Modifiers,
+                    DefaultKey = fn.DefaultKey,
+                    DefaultModifiers = fn.DefaultModifiers,
+                    OnUp = h == null || h.OnUp
+                });
+            }
+
+            return list;
+        }
+
+        /// <summary>Per-axis jog keys for the active machine (active axes only).</summary>
+        public List<KeyBinding> GetJogBindings()
+        {
+            var list = new List<KeyBinding>();
+
+            for (int i = 0; i < jogKeys.Length; i++)
+            {
+                if (string.IsNullOrEmpty(jogKeys[i].Command))
+                    continue;
+
+                bool plus = (i & 1) == 0;
+                string letter = GrblInfo.AxisIndexToLetter(jogKeys[i].AxisIndex);
+
+                list.Add(new KeyBinding {
+                    IsJog = true,
+                    JogIndex = i,
+                    Key = jogKeys[i].Key,
+                    Modifiers = ModifierKeys.None,
+                    DefaultKey = jogKeys[i].DefaultKey,
+                    DefaultModifiers = ModifierKeys.None,
+                    AxisLabel = letter + (plus ? " +" : " −"),
+                    Method = "Jogkey." + letter + (plus ? ".plus" : ".minus")
+                });
+            }
+
+            return list;
+        }
+
+        /// <summary>Apply edited action bindings back onto the live handler list.</summary>
+        public void ApplyActionBindings(IEnumerable<KeyBinding> bindings)
+        {
+            foreach (var b in bindings)
+            {
+                if (b.IsJog)
+                    continue;
+
+                var fn = functions.FirstOrDefault(f => f.Method == b.Method && f.Context == b.Context);
+                if (fn == null)
+                    continue;
+
+                var existing = handlers.FirstOrDefault(k => k.Call == fn.Call && k.context == fn.context);
+
+                if (b.Key == Key.None)
+                {
+                    if (existing != null)
+                        handlers.Remove(existing);
+                }
+                else if (existing != null)
+                {
+                    existing.Key = b.Key;
+                    existing.Modifiers = b.Modifiers;
+                    existing.OnUp = b.OnUp;
+                }
+                else
+                    handlers.Add(new KeypressHandlerFn { Key = b.Key, Modifiers = b.Modifiers, Call = fn.Call, context = fn.context, OnUp = b.OnUp });
+            }
+        }
+
+        /// <summary>Apply edited jog keys back onto the live jog key table.</summary>
+        public void ApplyJogBindings(IEnumerable<KeyBinding> bindings)
+        {
+            foreach (var b in bindings)
+            {
+                if (!b.IsJog || b.JogIndex < 0 || b.JogIndex >= jogKeys.Length)
+                    continue;
+
+                if (jogKeys[b.JogIndex].Key != b.Key)
+                {
+                    jogKeys[b.JogIndex].Key = b.Key;
+                    jogKeys[b.JogIndex].Remapped = true;
+                }
+            }
+        }
+
+        public bool ProcessKeypress(KeyEventArgs e, bool allowJog, UserControl context = null)
+        {
+            bool isJogging = IsJogging, jogkeyPressed = false;
+            JogKey jogKey = null;
+
+            // Focus in an MDI-tagged text box (the MDI strip's edit box, the Console command
+            // prompt) must never jog - let its arrow keys drive command history/caret instead.
+            // Keys mapped to jog (e.g. Up/Down) otherwise jog before the per-key TextBox check
+            // below ever runs, so gate the whole pass on it here.
+            if (allowJog && Keyboard.FocusedElement is System.Windows.Controls.TextBox mdiBox && (mdiBox.Tag as string) == "MDI")
+                allowJog = false;
 
             if (e.IsUp && isJogging)
             {
@@ -144,242 +519,306 @@ namespace CNC.Controls
 
                 isJogging = false;
 
-                for (int i = 0; i < 3; i++)
+                for (int i = 0; i < N_AXIS; i++)
                 {
-                    if (axisjog[i] == e.Key)
+                    if (axisjog[i].Key == e.Key)
                     {
-                        axisjog[i] = Key.None;
+                        axisjog[i].Key = Key.None;
+                        axisjog[i].Distance = 0d;
                         cancel = true;
                     }
                     else
-                        isJogging = isJogging || (axisjog[i] != Key.None);
+                        isJogging = isJogging || (axisjog[i].Key != Key.None);
                 }
 
                 isJogging &= allowJog;
 
-                if (cancel && !isJogging && jogMode != JogMode.Step)
+                if (cancel && !isJogging && CurrentJogMode != JogMode.Step)
                     JogCancel();
             }
 
-            if (!isJogging && allowJog && Comms.com.OutCount != 0)
+            // Hold off starting a NEW jog while the out-queue is still draining - but only for an actual jog
+            // key. This used to swallow EVERY key whenever OutCount was non-zero, so any keyboard shortcut
+            // pressed while the controller had anything queued was silently eaten. It went unnoticed while
+            // this method was reachable from only three views; once GlobalKeys routed every window
+            // through it, it ate shortcuts application-wide.
+            if (!isJogging && allowJog && Comms.com.OutCount != 0 && jogKeys.Any(p => p.Key == e.Key && p.Command != string.Empty))
                 return true;
 
-            if (e.IsDown && CanJog && allowJog)
+            AllowJog = allowJog;
+
+            // Ctrl+Shift is allowed through here now (Ctrl+Shift+<jog key> = Slow tier below). It is no longer
+            // excluded: the Ctrl+Shift letter jogs (J/H/K/L...) are not jog keys, so they still fall through to
+            // the handler dispatch and are unaffected.
+            if(IsJoggingEnabled && e.IsDown && CanJog && !(Keyboard.Modifiers == ModifierKeys.Alt || Keyboard.Modifiers == ModifierKeys.Windows))
+                jogKey = jogKeys.Where(p => p.Key == e.Key && p.Command != string.Empty).FirstOrDefault();
+
+            if (jogKey != null)
             {
                 // Do not respond to autorepeats!
                 if (e.IsRepeat)
                     return true;
 
-                switch (e.Key)
-                {
-                    case Key.PageUp:
-                        isJogging = axisjog[GrblConstants.Z_AXIS] != Key.PageUp;
-                        axisjog[GrblConstants.Z_AXIS] = Key.PageUp;
-                        break;
+                if (grbl.GrblState.State == GrblStates.Alarm)   // 'grbl' is this handler's model (== context.DataContext when a context is supplied); using it directly keeps a null-context caller (e.g. a modeless hold prompt forwarding jog keys) from NRE'ing here
+                    return true;
 
-                    case Key.PageDown:
-                        isJogging = axisjog[GrblConstants.Z_AXIS] != Key.PageDown;
-                        axisjog[GrblConstants.Z_AXIS] = Key.PageDown;
-                        break;
+                N_AXIS = GrblInfo.AxisFlags.HasFlag(AxisFlags.A) ? 4 : 3;
 
-                    case Key.Left:
-                        isJogging = axisjog[GrblConstants.X_AXIS] != Key.Left;
-                        axisjog[GrblConstants.X_AXIS] = Key.Left;
-                        break;
-
-                    case Key.Up:
-                        isJogging = axisjog[GrblConstants.Y_AXIS] != Key.Up;
-                        axisjog[GrblConstants.Y_AXIS] = Key.Up;
-                        break;
-
-                    case Key.Right:
-                        isJogging = axisjog[GrblConstants.X_AXIS] != Key.Right;
-                        axisjog[GrblConstants.X_AXIS] = Key.Right;
-                        break;
-
-                    case Key.Down:
-                        isJogging = axisjog[GrblConstants.Y_AXIS] != Key.Down;
-                        axisjog[GrblConstants.Y_AXIS] = Key.Down;
-                        break;
-                }
+                isJogging = axisjog[jogKey.AxisIndex].Key != e.Key;
+                axisjog[jogKey.AxisIndex].Key = e.Key;
+                axisjog[jogKey.AxisIndex].Command = jogKey.Command;
             }
+            else
+                jogkeyPressed = !(Keyboard.FocusedElement is System.Windows.Controls.TextBox) && (e.Key == Key.Left || e.Key == Key.Right || e.Key == Key.Up || e.Key == Key.Down || e.Key == Key.PageUp || e.Key == Key.PageDown);
 
             if (isJogging)
             {
                 string command = string.Empty;
 
-                if (GrblInfo.LatheModeEnabled)
+                if (grbl.GrblState.State == GrblStates.Alarm)   // 'grbl' is this handler's model (== context.DataContext when a context is supplied); using it directly keeps a null-context caller (e.g. a modeless hold prompt forwarding jog keys) from NRE'ing here
+                    return true;
+
+                isJogging = false;
+
+                for (int i = 0; i < N_AXIS; i++)
                 {
-                    for (int i = 0; i < 2; i++) switch (axisjog[i])
+                    if (axisjog[i].Key != Key.None)
                     {
-                        case Key.Left:
-                            dist[GrblConstants.Z_AXIS] = -1d;
-                            command += "Z-{3}";
-                            break;
-
-                        case Key.Up:
-                            dist[GrblConstants.X_AXIS] = -1d;
-                            command += "X-{1}";
-                            break;
-
-                        case Key.Right:
-                            dist[GrblConstants.Z_AXIS] = 1d;
-                            command += "Z{3}";
-                            break;
-
-                        case Key.Down:
-                            dist[GrblConstants.X_AXIS] = 1d;
-                            command += "X{1}";
-                            break;
+                       isJogging = true;
+                        axisjog[i].Distance = axisjog[i].Command.Contains('-') ? -1d : 1d;
                     }
-                }
-                else for (int i = 0; i < 3; i++) switch (axisjog[i])
-                {
-                    case Key.PageUp:
-                        dist[GrblConstants.Z_AXIS] = 1d;
-                        command += "Z{3}";
-                        break;
-
-                    case Key.PageDown:
-                        dist[GrblConstants.Z_AXIS] = -1d;
-                        command += "Z-{3}";
-                        break;
-
-                    case Key.Left:
-                        dist[GrblConstants.X_AXIS] = -1d;
-                        command += "X-{1}";
-                        break;
-
-                    case Key.Up:
-                        dist[GrblConstants.Y_AXIS] = 1d;
-                        command += "Y{2}";
-                        break;
-
-                    case Key.Right:
-                        dist[GrblConstants.X_AXIS] = 1d;
-                        command += "X{1}";
-                        break;
-
-                    case Key.Down:
-                        dist[GrblConstants.Y_AXIS] = -1d;
-                        command += "Y-{2}";
-                        break;
+                    else
+                        axisjog[i].Distance = 0d;
                 }
 
-                if ((isJogging = command != string.Empty))
+                if (isJogging)
                 {
-                    if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+                    // Tier selection is the keyboard's business; the mode itself lives on the base, so
+                    // decide it locally and publish once via SetJogMode (which raises JogModeChanged).
+                    JogMode mode;
+                    ModifierKeys jogmods = Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift);
+                    if (jogmods == ModifierKeys.Control)   // Ctrl (alone) -> single step
                     {
-                        for (int i = 0; i < 3; i++)
-                            axisjog[i] = Key.None;
-                        preCancel = !(jogMode == JogMode.Step || jogMode == JogMode.None);
-                        jogMode = JogMode.Step;
-                        jogDistance[(int)jogMode] = grbl.JogStep;
+                        for (int i = 0; i < N_AXIS; i++)
+                            axisjog[i].Key = Key.None;
+                        preCancel = !(CurrentJogMode == JogMode.Step || CurrentJogMode == JogMode.None);
+                        mode = JogMode.Step;
+                        JogDistances[(int)mode] = grbl.JogStep;
                     }
-                    else if (fullJog)
+                    else if (IsContinuousJoggingEnabled)
                     {
                         preCancel = true;
-                        if ((Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
-                            jogMode = JogMode.Fast;
+                        // Absolute tiers, consistent with the UI jog panel / buttons: Shift = Fast, Ctrl+Shift =
+                        // Slow, no modifier = the DefaultSpeedFast default speed.
+                        if (jogmods == (ModifierKeys.Control | ModifierKeys.Shift))
+                            mode = JogMode.Slow;
+                        else if (jogmods == ModifierKeys.Shift)
+                            mode = JogMode.Fast;
                         else
-                            jogMode = JogMode.Slow;
+                            mode = DefaultSpeedFast ? JogMode.Fast : JogMode.Slow;
                     }
                     else
                     {
-                        for (int i = 0; i < 3; i++)
-                            axisjog[i] = Key.None;
-                        jogMode = JogMode.None;
+                        for (int i = 0; i < N_AXIS; i++)
+                            axisjog[i].Key = Key.None;
+                        mode = JogMode.None;
                     }
 
-                    if (jogMode != JogMode.None)
+                    SetJogMode(mode);
+
+                    if (mode != JogMode.None)
                     {
-                        if (GrblInfo.IsGrblHAL || !softLimits)
+                        // Intent only: which axes, which way, how far, how fast. The JogController does
+                        // the soft-limit clamping, G91/G53 selection and "$J=" rendering - machine safety
+                        // stays server-side rather than in a key handler.
+                        var jog = new JogCommand(N_AXIS)
                         {
-                            var distance = jogDistance[(int)jogMode].ToInvariantString();
-                            SendJogCommand("$J=G91G21" + string.Format(command + "F{0}",
-                                                             jogSpeed[(int)jogMode].ToInvariantString(),
-                                                              distance, distance, distance));
-                        }
-                        else
-                        {
-                            for (int i = 0; i < 3; i++)
-                            {
-                                if (dist[i] != 0d)
-                                {
-                                    if(GrblInfo.HomingDirection.HasFlag(GrblInfo.AxisIndexToFlag(i)))
-                                        dist[i] = dist[i] < 0d ? grbl.MachinePosition.Values[i] : Math.Max(0d, GrblInfo.MaxTravel.Values[i] - grbl.MachinePosition.Values[i] - .5d);
-                                    else
-                                        dist[i] = dist[i] > 0d ? (- grbl.MachinePosition.Values[i] - .5d) : Math.Max(0d, GrblInfo.MaxTravel.Values[i] + grbl.MachinePosition.Values[i] - .5d);
-                                }
-                            }
-                            SendJogCommand("$J=G91G21" + string.Format(command + "F{0}",
-                                                             jogSpeed[(int)jogMode].ToInvariantString(),
-                                                              dist[GrblConstants.X_AXIS].ToInvariantString(),
-                                                               dist[GrblConstants.Y_AXIS].ToInvariantString(),
-                                                                dist[GrblConstants.Z_AXIS].ToInvariantString()));
-                        }
+                            Mode = mode,
+                            Distance = JogDistances[(int)mode],
+                            Feedrate = JogFeedrates[(int)mode],
+                            CancelFirst = preCancel
+                        };
+
+                        for (int i = 0; i < N_AXIS; i++)
+                            jog.Directions[i] = axisjog[i].Distance;
+
+                        Execute(jog);
                     }
 
-                    return jogMode != JogMode.None;
-                }
+                    return mode != JogMode.None;
+                } 
             }
 
-            if (e.IsUp)
+            IsRepeating = e.IsRepeat;
+
+            if (Keyboard.Modifiers == ModifierKeys.Alt)
             {
-                if (Keyboard.Modifiers == ModifierKeys.Alt)
+                var handler = handlers.Where(k => k.Modifiers == Keyboard.Modifiers && k.Key == e.SystemKey && k.OnUp == e.IsUp && k.context == context).FirstOrDefault();
+                if (handler != null)
+                    return handler.Call(e.SystemKey);
+                else
                 {
-                    var handler = handlers.Where(k => k.modifiers == Keyboard.Modifiers && k.key == e.SystemKey).FirstOrDefault();
+                    handler = handlers.Where(k => k.Modifiers == Keyboard.Modifiers && k.Key == e.SystemKey && k.OnUp == e.IsUp && k.context == null).FirstOrDefault();
                     if (handler != null)
                         return handler.Call(e.SystemKey);
                 }
-                else if (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Control || Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+            }
+            else
+            {
+                // Shift/Ctrl/Ctrl+Shift on a jog key are only speed/step modifiers (Shift=fast, Ctrl=step,
+                // Ctrl+Shift=slow - applied in JogCommand), never distinct key bindings. In UI jog mode the
+                // continuous-jog path above is disabled and the cursor keys dispatch here (registered with
+                // ModifierKeys.None), so without this a modified arrow matches nothing and is silently dropped
+                // (which is why Shift+arrow only jogged when the arrow was pressed first). Strip those modifiers
+                // for jog keys so every combo routes to the unmodified handler and JogCommand applies the tier.
+                // The Ctrl+Shift letter jogs (J/H/K/L etc.) are unaffected - those keys are not jog keys.
+                ModifierKeys mods = Keyboard.Modifiers;
+                if (jogKeys.Any(j => j.Key == e.Key))
+                    mods &= ~(ModifierKeys.Shift | ModifierKeys.Control);
+
+                if (mods == ModifierKeys.None || mods == ModifierKeys.Control || mods == (ModifierKeys.Control | ModifierKeys.Shift))
                 {
-                    var handler = handlers.Where(k => k.modifiers == Keyboard.Modifiers && k.key == e.Key).FirstOrDefault();
+                    var handler = handlers.Where(k => k.Modifiers == mods && k.Key == e.Key && k.OnUp == e.IsUp && k.context == context).FirstOrDefault();
                     if (handler != null)
                         return handler.Call(e.Key);
-
-                    else switch (e.Key)
+                    else
                     {
-                        case Key.NumPad4:
-                            JogControl.JogData.StepDec();
-                            return true;
-                        //  break;
-
-                        case Key.NumPad6:
-                            JogControl.JogData.StepInc();
-                            return true;
-
-                        case Key.NumPad8:
-                            JogControl.JogData.FeedInc();
-                            return true;
-
-                        case Key.NumPad2:
-                            JogControl.JogData.FeedDec();
-                            return true;
-                                //  break;
+                        handler = handlers.Where(k => k.Modifiers == mods && k.Key == e.Key && k.OnUp == e.IsUp && k.context == null).FirstOrDefault();
+                        if (handler != null)
+                            return handler.Call(e.Key);
                     }
                 }
             }
 
-            return false;
+            return jogkeyPressed;
         }
 
+        // Kept as named entry points for existing callers; the base does the work (Cancel already
+        // resets the jog mode and raises JogModeChanged).
         public void JogCancel()
         {
-            while (Comms.com.OutCount != 0) ;
-            Comms.com.WriteByte(GrblConstants.CMD_JOG_CANCEL); // Cancel jog
-            jogMode = JogMode.None;
+            Cancel();
         }
 
+        // Retained for callers that render their own jog block (ControllerMapper's gamepad jogging).
         public void SendJogCommand(string command)
         {
-            if (IsJogging)
-            {
-                while (Comms.com.OutCount != 0) ;
-                if(preCancel)
-                    Comms.com.WriteByte(GrblConstants.CMD_JOG_CANCEL); // Cancel current jog
-            }
-            Comms.com.WriteCommand(command);
+            Send(command, preCancel);
+        }
+
+        private bool FeedOverrideFinePlus(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_FEED_OVR_FINE_PLUS);
+
+            return true;
+        }
+        private bool FeedOverrideFineMinus(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_FEED_OVR_FINE_MINUS);
+
+            return true;
+        }
+        private bool FeedOverrideCoarseMinus(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_FEED_OVR_COARSE_MINUS);
+
+            return true;
+        }
+        private bool FeedOverrideCoarsePlus(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_FEED_OVR_COARSE_PLUS);
+
+            return true;
+        }
+        private bool FeedOverrideReset(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_FEED_OVR_RESET);
+
+            return true;
+        }
+        private bool FeedOverrideRapidsMedium(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_RAPID_OVR_MEDIUM);
+
+            return true;
+        }
+        private bool FeedOverrideRapidsLow(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_RAPID_OVR_LOW);
+
+            return true;
+        }
+        private bool FeedOverrideRapidsReset(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_RAPID_OVR_RESET);
+
+            return true;
+        }
+        private bool FloodOverrideToggle(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_COOLANT_FLOOD_OVR_TOGGLE);
+
+            return true;
+        }
+        private bool MistOverrideToggle(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_COOLANT_MIST_OVR_TOGGLE);
+
+            return true;
+        }
+        private bool Fan0Toggle(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_OVERRIDE_FAN0_TOGGLE);
+
+            return true;
+        }
+        private bool SpindleOverrideFinePlus(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_SPINDLE_OVR_FINE_PLUS);
+
+            return true;
+        }
+        private bool SpindleOverrideFineMinus(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_SPINDLE_OVR_FINE_MINUS);
+
+            return true;
+        }
+        private bool SpindleOverrideCoarseMinus(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_SPINDLE_OVR_COARSE_MINUS);
+
+            return true;
+        }
+        private bool SpindleOverrideCoarsePlus(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_SPINDLE_OVR_COARSE_PLUS);
+
+            return true;
+        }
+        private bool SpindleOverrideStop(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_SPINDLE_OVR_STOP);
+
+            return true;
+        }
+        private bool ProbeConnectedToggle(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_PROBE_CONNECTED_TOGGLE);
+
+            return true;
+        }
+        private bool OptionalStopToggle(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_OPTIONAL_STOP_TOGGLE);
+
+            return true;
+        }
+        private bool SingleBlockToggle(Key key)
+        {
+            Comms.com.WriteByte(GrblConstants.CMD_SINGLE_BLOCK_TOGGLE);
+
+            return true;
         }
     }
 }

@@ -8,7 +8,6 @@
              d:DesignHeight="331" d:DesignWidth="400"
              IsVisibleChanged="ConsoleControl_IsVisibleChanged">
     <UserControl.Resources>
-        <local:StringCollectionToTextConverter x:Key="OcToString" />
         <local:LogicalNotConverter x:Key="BooleanConverter" />
     </UserControl.Resources>
     <!--> <GroupBox Header="Console" HorizontalAlignment="Center" VerticalAlignment="Top" Width="394" Height="328"> <\!-->
@@ -30,12 +29,20 @@
         </DockPanel>
         <DockPanel DockPanel.Dock="Top" HorizontalAlignment="Stretch" Margin="0,0,0,5">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="0,5,5,0">
-                <!-- Console text size: adjusts (and persists) Config.ConsoleFontSize, which the scrollback binds to. -->
-                <TextBlock x:Uid="lbl_consoleFont" Text="Font" VerticalAlignment="Center" Foreground="#FF606060" Margin="0,0,4,0"/>
-                <RepeatButton x:Uid="btn_fontSmaller" Content="A−" MinWidth="26" MinHeight="23" Padding="4,1" Click="FontSmaller_Click" ToolTip="Smaller console text"/>
+                <!-- Two INDEPENDENT text sizes. "Log" adjusts Config.ConsoleFontSize (the scrollback below);
+                     "MDI" adjusts Config.ConsoleInputFontSize (the input line at the bottom). They were one
+                     value with the input hardcoded, which meant sizing the log for skimming also sized the
+                     line you type g-code into. Both persist. -->
+                <TextBlock x:Uid="lbl_consoleFont" Text="Log" VerticalAlignment="Center" Foreground="#FF606060" Margin="0,0,4,0"/>
+                <RepeatButton x:Uid="btn_fontSmaller" Content="A−" MinWidth="26" MinHeight="23" Padding="4,1" Click="FontSmaller_Click" ToolTip="Smaller console log text"/>
                 <TextBlock VerticalAlignment="Center" MinWidth="20" TextAlignment="Center" Margin="3,0"
                            Text="{Binding Source={x:Static local:AppConfig.Settings}, Path=Base.ConsoleFontSize, StringFormat={}{0:0}}"/>
-                <RepeatButton x:Uid="btn_fontLarger" Content="A+" MinWidth="26" MinHeight="23" Padding="4,1" Margin="0,0,8,0" Click="FontLarger_Click" ToolTip="Larger console text"/>
+                <RepeatButton x:Uid="btn_fontLarger" Content="A+" MinWidth="26" MinHeight="23" Padding="4,1" Margin="0,0,10,0" Click="FontLarger_Click" ToolTip="Larger console log text"/>
+                <TextBlock x:Uid="lbl_mdiFont" Text="MDI" VerticalAlignment="Center" Foreground="#FF606060" Margin="0,0,4,0"/>
+                <RepeatButton x:Uid="btn_mdiFontSmaller" Content="A−" MinWidth="26" MinHeight="23" Padding="4,1" Click="InputFontSmaller_Click" ToolTip="Smaller MDI input text"/>
+                <TextBlock VerticalAlignment="Center" MinWidth="20" TextAlignment="Center" Margin="3,0"
+                           Text="{Binding Source={x:Static local:AppConfig.Settings}, Path=Base.ConsoleInputFontSize, StringFormat={}{0:0}}"/>
+                <RepeatButton x:Uid="btn_mdiFontLarger" Content="A+" MinWidth="26" MinHeight="23" Padding="4,1" Margin="0,0,8,0" Click="InputFontLarger_Click" ToolTip="Larger MDI input text"/>
                 <Button x:Uid="btn_clear" Content="Clear" VerticalAlignment="Top" MinHeight="23" MinWidth="60" Padding="6,1" Click="btn_Clear" ToolTip="Clear the console output above."/>
             </StackPanel>
             <StackPanel Orientation="Horizontal">
@@ -50,17 +57,31 @@
              as the global MDI strip. The strip is kept for the other tabs. -->
         <DockPanel x:Name="inputRow" DockPanel.Dock="Bottom" Margin="5,3,5,2"
                    IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}">
-            <TextBlock Text="&#8250;" FontFamily="Consolas" FontSize="13" FontWeight="Bold"
+            <TextBlock Text="&#8250;" FontFamily="Consolas" FontSize="26" FontWeight="Bold"
                        VerticalAlignment="Center" Margin="3,0,5,0" Foreground="#FF888888"/>
             <!-- AcceptsReturn so a MULTI-LINE PASTE is preserved and shown (grows up to MaxLines, then scrolls);
                  Enter still SENDS every line (txtInput_KeyDown handles Return and marks it handled, so no newline
-                 is inserted). Single-line typing stays one line. -->
-            <TextBox x:Name="txtInput" x:Uid="txt_mdiInput" Tag="MDI" FontFamily="Consolas" FontSize="11" MinHeight="22"
+                 is inserted). Single-line typing stays one line.
+
+                 FontSize binds to Base.ConsoleInputFontSize, its OWN setting - not Base.ConsoleFontSize, which
+                 sizes the scrollback. The scrollback is a log you skim; this is the line you type g-code into
+                 and must read back before pressing Enter, so it defaults to roughly double (was hardcoded 11,
+                 now 22) and has its own A-/A+ pair in the toolbar above. MinHeight and the prompt glyph are
+                 sized for that default so the caret is never in a box shorter than its own text; the box grows
+                 from there on its own if the size is turned up further. -->
+            <TextBox x:Name="txtInput" x:Uid="txt_mdiInput" Tag="MDI" FontFamily="Consolas" MinHeight="38"
+                     FontSize="{Binding Source={x:Static local:AppConfig.Settings}, Path=Base.ConsoleInputFontSize}"
                      AcceptsReturn="True" MaxLines="8" VerticalContentAlignment="Center"
                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                      ToolTip="Enter a command (MDI). Paste multiple lines to send them all on Enter. Up/Down recalls history, Esc clears."/>
         </DockPanel>
-        <TextBox x:Name="txtOutput" x:Uid="txt_consoleOutput" IsReadOnly="True" TextWrapping="NoWrap" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
+        <!-- Text is set from code-behind on a coalescing timer, NOT bound. The old MultiBinding
+             (ResponseLog + ResponseLog.Count through StringCollectionToTextConverter) re-joined the whole
+             2000-line scrollback and re-set the entire TextBox text on EVERY collection change - twice per
+             line once the trim kicked in - which at a dense job's response rate saturated the UI thread:
+             status stopped painting, input starved, and a multi-minute backlog of received-but-unprocessed
+             lines drained long after the machine went quiet. See FlushLog in code-behind. -->
+        <TextBox x:Name="txtOutput" x:Uid="txt_consoleOutput" IsReadOnly="True" IsUndoEnabled="False" TextWrapping="NoWrap" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
                  local:TextBoxUtilities.AlwaysScrollToEnd="True" IsInactiveSelectionHighlightEnabled="True"
                  FontSize="{Binding Source={x:Static local:AppConfig.Settings}, Path=Base.ConsoleFontSize}" FontFamily="Verdana"
                  ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -75,12 +96,6 @@
                     <MenuItem x:Uid="mnu_save" Header="Save..." Click="OutSave_Click"/>
                 </ContextMenu>
             </TextBox.ContextMenu>
-            <TextBox.Text>
-                <MultiBinding Converter="{StaticResource OcToString}">
-                    <Binding Path="ResponseLog" Mode="OneWay"/>
-                    <Binding Path="ResponseLog.Count" Mode="OneWay" />
-                </MultiBinding>
-            </TextBox.Text>
         </TextBox>
     </DockPanel>
     <!--> </GroupBox> </!-->

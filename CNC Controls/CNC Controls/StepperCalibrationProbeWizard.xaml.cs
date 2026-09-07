@@ -1,4 +1,4 @@
-/*
+﻿/*
  * StepperCalibrationProbeWizard.xaml.cs - part of CNC Controls library
  *
  * Steps/mm calibration by probing a reference block of ALREADY-KNOWN true size (a precision square,
@@ -534,8 +534,10 @@ namespace CNC.Controls
                 txtWarnings.Text = "Select a validated Corner Fence fixture first.";
                 return;
             }
-            // Same "never actually captured under this scheme" guard StartJobView.Generate_Click uses.
-            if (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d)
+            // Same "never actually captured under this scheme" guard StartJobView.Generate_Click uses -
+            // the explicit flag, not "either offset is 0" (0 is a legitimate measurement; see
+            // Fixture.CornerOffsetX).
+            if (!fx.CornerLocated)
             {
                 txtWarnings.Text = "This fixture's corner position hasn't been located yet - run Test position again in Machine Setup > Fixture definitions.";
                 return;
@@ -717,23 +719,19 @@ namespace CNC.Controls
             b.AppendLine("#<_ls_plateoffset> = 0");
             b.AppendLine("#<_ls_lipoffset> = 0");   // always the 3D probe here
             b.AppendLine("#<_ls_edgemargin> = 10");   // see pcorner.macro's own comment - slop against an unconfirmed edge
-            b.AppendLine("#<_ls_spoilx> = 0");
-            b.AppendLine("#<_ls_spoily> = 0");
             b.AppendLine(string.Format("#<_ls_searchf> = {0}", searchF));
             b.AppendLine(string.Format("#<_ls_latchf> = {0}", latchF));
             b.AppendLine(string.Format("#<_ls_zfloor> = {0}", (GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 1.0d : -9999d).ToInvariantString("0.0##")));
 
             // Park at G30 and confirm the probe before touching anything - same pattern StartJobView.BuildProgram
-            // uses (EmitGotoG30 + MBOX). #<_abs_x>/#<_abs_y> are grblHAL's own live current-machine-position
-            // named parameters; every G53 move NAMES both axes explicitly (never a bare "G53 G0 Z0") - a firmware
-            // bug sign-flips a homing-direction-inverted ($23) axis's parser base after a G53 move that leaves
-            // it "unmoved", producing a false Alarm:2.
+            // uses (EmitGotoG30 + MBOX). Use the SHARED emitter rather than hand-rolling the three lines: this
+            // copy had drifted (it still named X/Y on the lift via #<_abs_x>/#<_abs_y> long after that was shown
+            // to be both a parse-time read and a soft-limit trap) while the other three call sites in this same
+            // file already went through MacroProcessor.EmitGotoG30. See EmitGotoG30's comment.
             b.AppendLine("(park at G30 - install / confirm the probe)");
-            b.AppendLine("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z0");
-            b.AppendLine("G53 G0 X[#5181] Y[#5182]");
-            b.AppendLine("G53 G0 X[#5181] Y[#5182] Z[#5183]");
+            MacroProcessor.EmitGotoG30(l => b.AppendLine(l));
             b.AppendLine("(WAITIDLE)");
-            b.AppendLine("(MBOX, OKCANCEL, Install and seat the probe, then click OK. Cancel aborts.)");
+            b.AppendLine(string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. It must MATCH what is in the spindle - the wrong tip silently shifts the work origin by half the diameter difference. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
 
             // Corner 1 (origin, FrontLeft) - REUSE mode, corner offset only (no locate pass). #<_bottom> falls
             // back to the machine's own Z floor rather than a cached spoilboard reading (see the TLO-baseline
@@ -831,7 +829,7 @@ namespace CNC.Controls
             b.AppendLine("(park at G30 - install / confirm the probe)");
             MacroProcessor.EmitGotoG30(l => b.AppendLine(l));
             b.AppendLine("(WAITIDLE)");
-            b.AppendLine("(MBOX, OKCANCEL, Install and seat the probe, then click OK. Cancel aborts.)");
+            b.AppendLine(string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. It must MATCH what is in the spindle - the wrong tip silently shifts the work origin by half the diameter difference. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
 
             b.AppendLine("(--- spoilboard baseline ---)");
             if (reuseStartPos)

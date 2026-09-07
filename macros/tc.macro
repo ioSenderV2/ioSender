@@ -65,6 +65,27 @@
 ; (computed in G59 coordinates, executed under G54) landed outside travel and hit a soft limit.
 #<_wcs> = #5220
 
+; Suspend any active G92 offset for the duration of this macro, and restore it before returning
+; (G92.3, next to the WCS restore below). WCO = G5x offset + G92 offset + TLO, so a leftover G92
+; shifts every non-G53 move this macro makes - including "G0 Z0" over the puck after G59.3 is
+; selected, which is NOT a machine-coordinate move however much it reads like one.
+;
+; Confirmed on real hardware 2026-08-16: a persistent G92 of Z+37 (set by the Probing tab's G92
+; coordinate-system option, and restored from NVS across resets because $384=0) made that G0 Z0
+; target machine Z +37 against a Z envelope topping out at 0 -> ALARM:2 at TC02, before the probe.
+; G49 below is NOT enough: it cancels the old tool's TLO and never touches G92.
+; pcorner.macro and pvisecorner.macro already guard this - see their own notes about a stray G92
+; landing a search ~70 mm from the real surface. This macro had the same exposure and no guard.
+;
+; G92.2/G92.3, NOT G92.1: this runs MID-JOB, and a job may legitimately be working under a G92.
+; Destroying it here would move every remaining cut. G92.2 zeroes the applied offset while leaving
+; the stored one intact; G92.3 puts it back. Both verified present in this controller's firmware
+; (gcode.c: NonModal_ClearCoordinateOffset / NonModal_RestoreCoordinateOffset).
+; ⚠️ G92.3 restores from NVS, so it depends on G92 persistence being ENABLED ($384=0, the default
+; and this machine's setting). With $384=1 a G92 is never written, and G92.3 would restore a stale
+; value instead of the caller's - if that setting is ever changed, revisit this pair.
+G92.2
+
 M5
 M9
 G53 G0 Z-5
@@ -155,6 +176,9 @@ o120 ELSEIF [#<_wcs> EQ 8]
 o120 ELSE
   G59.3
 o120 ENDIF
+; Put the caller's G92 offset back, alongside the WCS just restored - the two together are the
+; coordinate frame this macro borrowed, and they are handed back as a pair. See G92.2 at the top.
+G92.3
 (PRINT, TC03 probe_z=#<_probe_z>)
 
 o199 IF [EXISTS[#<_tlo_ref>]]

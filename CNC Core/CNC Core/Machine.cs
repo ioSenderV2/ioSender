@@ -40,7 +40,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using System.Collections.Generic;
 using System.Linq;
 using CNC.GCode;
-using System.Windows.Media.Media3D;
 using System.Globalization;
 
 namespace CNC.Core
@@ -58,7 +57,36 @@ namespace CNC.Core
         protected double[] scaleFactors = new double[9];
         protected double[] toolOffsets = new double[9];
         protected List<CoordinateSystem> coordinateSystems = new List<CoordinateSystem>();
-        protected CoordinateSystem coordinateSystem, g28, g30, g92;
+        // Never null. Every one of these starts life as a zeroed stand-in and is only ever REPLACED by a
+        // real one, never set back to null - see Neutral() for why that matters.
+        protected CoordinateSystem coordinateSystem = Neutral(string.Empty),
+                                   g28 = Neutral("G28"),
+                                   g30 = Neutral("G30"),
+                                   g92 = Neutral("G92");
+
+        /// <summary>
+        /// A zeroed stand-in for a coordinate system the controller has not told us about.
+        ///
+        /// coordinateSystems is filled from the controller's answer to $#, and Reset() only asks for it on
+        /// grblHAL. On plain Grbl - an MKS DLC32 running Grbl 1.1h, say - the list is therefore EMPTY, every
+        /// lookup returns FirstOrDefault()'s null, and the first consumer to dereference one crashes. That
+        /// is how loading an SVG laser job took the app down on 2026-08-21: GCodeEmulator read
+        /// coordinateSystem.Rotation on the program's first G0.
+        ///
+        /// Null guards had been accreting one crash site at a time - Machine.cs guards all six of its own
+        /// uses, GCodeEmulator.cs guards two of thirteen - which fixes each report and leaves the next one
+        /// waiting. A non-null default makes every unguarded site correct at once and leaves the existing
+        /// guards harmlessly true.
+        ///
+        /// Zero is the honest value here rather than an invented one: it is what offsets[] and origin[]
+        /// already hold before any G-code runs, and Rotation is a grblHAL WCS feature that plain Grbl does
+        /// not have at all. What this does NOT do is claim the controller has no offsets - it means they
+        /// were never asked for. See GrblWorkParameters.IsLoaded to tell the two apart.
+        /// </summary>
+        protected static CoordinateSystem Neutral(string code)
+        {
+            return new CoordinateSystem { Code = code ?? string.Empty };
+        }
         protected List<Tool> toolTable = new List<Tool>();
         protected Point6D machinePos = new Point6D();
 
@@ -88,10 +116,13 @@ namespace CNC.Core
                 foreach (Tool t in GrblWorkParameters.Tools)
                     toolTable.Add(t);
 
-            coordinateSystem = coordinateSystems.Where(x => x.Code == GrblParserState.WorkOffset).FirstOrDefault();
-            g28 = coordinateSystems.Where(x => x.Code == "G28").FirstOrDefault();
-            g30 = coordinateSystems.Where(x => x.Code == "G30").FirstOrDefault();
-            g92 = coordinateSystems.Where(x => x.Code == "G92").FirstOrDefault();
+            // ?? Neutral(..) on every one: FirstOrDefault hands back null whenever the controller has not
+            // reported that system, and these are dereferenced unguarded all over GCodeEmulator.
+            coordinateSystem = coordinateSystems.Where(x => x.Code == GrblParserState.WorkOffset).FirstOrDefault()
+                               ?? Neutral(GrblParserState.WorkOffset);
+            g28 = coordinateSystems.Where(x => x.Code == "G28").FirstOrDefault() ?? Neutral("G28");
+            g30 = coordinateSystems.Where(x => x.Code == "G30").FirstOrDefault() ?? Neutral("G30");
+            g92 = coordinateSystems.Where(x => x.Code == "G92").FirstOrDefault() ?? Neutral("G92");
 
             isRelative = GrblParserState.DistanceMode == DistanceMode.Incremental;
             IsImperial = !GrblParserState.IsMetric;
@@ -109,7 +140,12 @@ namespace CNC.Core
             Feedrate = val == null ? 0d : double.Parse(val, CultureInfo.InvariantCulture);
             val = GrblParserState.IsActive("S");
             _rpm = val == null ? 0d : double.Parse(val, CultureInfo.InvariantCulture);
-            _tool = GrblParserState.Tool == GrblConstants.NO_TOOL ? 0 : int.Parse(GrblParserState.Tool);
+            // TryParse, not Parse: the sentinel is "None", but before any parser state has been received
+            // Tool is simply EMPTY - and int.Parse("") throws. The WPF app never hits this because a parser
+            // is only built after a connection has reported state; a headless host builds one immediately
+            // (found by actually running CNC.Core on .NET, which no amount of compiling would have shown).
+            int toolnum;
+            _tool = int.TryParse(GrblParserState.Tool, out toolnum) ? toolnum : 0;
             SelectedTool = null;
             RetractOldZ = GrblParserState.IsActive("G99") == null;
             SpindleRpmMode = GrblParserState.IsActive("G96") == null;
@@ -159,7 +195,10 @@ namespace CNC.Core
             }
             set
             {
-                coordinateSystem = coordinateSystems.Where(x => x.Id == value).FirstOrDefault();
+                // Selecting a system the controller never reported must not reintroduce the null that
+                // Neutral() exists to keep out of this field.
+                coordinateSystem = coordinateSystems.Where(x => x.Id == value).FirstOrDefault()
+                                   ?? Neutral(string.Empty);
             }
         }
         public MotionMode MotionMode { get; protected set; }

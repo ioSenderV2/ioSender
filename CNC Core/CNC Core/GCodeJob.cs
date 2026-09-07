@@ -42,19 +42,14 @@ using System.Collections.Generic;
 using System.IO;
 using System.ComponentModel;
 using System.Windows;
-using System.Windows.Media.Media3D;
 using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
 using CNC.GCode;
 
 namespace CNC.Core
 {
-    public enum Action
-    {
-        New,
-        Add,
-        End
-    }
+    // The Action enum moved to CNC Common (GCodeAction.cs), same namespace - first piece of the
+    // g-code document model to go shared (converters/transformers are client-side document tooling).
 
     public class GCodeBlock : ViewModelBase
     {
@@ -78,6 +73,22 @@ namespace CNC.Core
         public uint LineNum { get { return _lineNum; } set { _lineNum = value; RefreshDisplay(); } }
         public int Length { get; set; }
         public string Data { get { return _data; } set { _data = value; RefreshDisplay(); OnPropertyChanged(); } }
+
+        /// <summary>
+        /// The block as it was BEFORE constant #&lt;name&gt; parameters were substituted into it, or null
+        /// when nothing was substituted (the overwhelmingly common case - one null reference per line,
+        /// no second copy of a 220k-line program).
+        ///
+        /// Data is what runs: literals, so it parses, renders in the 3D view and reaches a controller
+        /// that cannot evaluate parameters. Raw is what the file SAID, and is what gets written back out
+        /// by Save - otherwise saving a program with variables in it would quietly flatten them to
+        /// literals and the whole point of putting them there (retuning by editing four numbers) would
+        /// be lost on the first save.
+        /// </summary>
+        public string Raw { get; set; }
+
+        /// <summary>What Save should write: the source form when there was one, else what runs.</summary>
+        public string Source { get { return Raw ?? _data; } }
 
         // Program list display: the Block column shows the program line number and the Data column hides the N
         // word - while Data itself stays intact for streaming (the controller needs the N word for line-number
@@ -140,6 +151,17 @@ namespace CNC.Core
         // G92 is active, which corrupted a real tool-change macro's positioning (Alarm:2 + a hang-watchdog
         // reset) before this fix.
         public bool HasToolChange { get; set; }
+
+        // DRAFT/UNVERIFIED 2026-08-08 - not yet built or hardware-tested, see
+        // docs/Architecture-Unified-Streaming-Engine.md Step 2. Set at load time (GCodeJob.ParseFileLines/
+        // AddBlock, same call sites as HasSpindleOrCoolantOn/HasToolChange above) from a plain text check
+        // (MacroRunner.RecognizeDirective) - NOT the token parser, since a directive is sender-only
+        // metadata inside an ordinary "(...)" comment, never real G-code. Canonical uppercase keyword
+        // ("PREREQ"/"PROMPT"/"MBOX"/"WAITIDLE") or null. Purely additive for now: nothing reads this yet,
+        // so setting it changes no behavior - the unified streamer's dispatch loop (StreamPump.SendNext)
+        // is what will branch on it in a later step.
+        public string Directive { get; set; }
+        public bool IsDirective { get { return Directive != null; } }
 
         // Outline grouping: set when the Fusion add-in's own section-marker comments are recognized in a
         // loaded file (see rxSectionMarker below). Null for a file with no section markers (the Program list
@@ -350,20 +372,42 @@ namespace CNC.Core
                         tSanitize += System.Diagnostics.Stopwatch.GetTimestamp() - t0;
                     }
 
+                    // O-word / #-expression / $-command passthrough, ported from AddBlock (which had it
+                    // all along for GENERATED programs - Load File never did, so a FILE with a #-line
+                    // was unloadable: ParseBlock THROWS on expression syntax, and the per-line error
+                    // dialog below then blew up cross-thread from the background loader. Found loading
+                    // the unified engine's own prompt-test file, 2026-08-08. Same rules as AddBlock:
+                    // verbatim only when the controller evaluates expressions; $-commands always.
+                    // Constants first: a resolved line has no '#' left, so the passthrough test below
+                    // sees the line as it will actually be parsed and streamed.
+                    block = ResolveConstants(block, (int)LineNumber + 1);
+
+                    string ts_ = block.TrimStart();
+                    bool isOword = ts_.Length > 1 && (ts_[0] == 'o' || ts_[0] == 'O') && ts_[1] == '<';
+                    bool isSystemCommand = ts_.Length > 0 && ts_[0] == '$';
+                    bool passThrough = isSystemCommand || (GrblInfo.ExpressionsSupported && (isOword || block.IndexOf('#') >= 0));
+
                     int tokenStart = Parser.Tokens.Count;
                     t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-                    bool parsed = Parser.ParseBlock(ref block, false, out ln, out isComment);
+                    bool parsed;
+                    try { parsed = Parser.ParseBlock(ref block, false, out ln, out isComment); }
+                    catch { if (!passThrough) throw; parsed = false; ln = 0; isComment = false; }
                     tParse += System.Diagnostics.Stopwatch.GetTimestamp() - t0;
 
                     t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-                    if (parsed)
+                    if (parsed || passThrough)
                     {
+                        // Captured BEFORE the addLineNumber branch below can prepend "N123" onto block -
+                        // that would break the leading-"(" check a directive is recognized by. DRAFT, see
+                        // GCodeBlock.Directive's own comment.
+                        string directiveKeyword = isComment ? MacroRunner.RecognizeDirective(block) : null;
+
                         if (ln > 0)
                         {
                             LineNumber = ln;
                             addLineNumber = false;
                         }
-                        else if (addLineNumber)
+                        else if (addLineNumber && parsed)   // never number a passthrough line (breaks O-word routing / #-assignments - see AddBlock)
                         {
                             LineNumber += 10;
                             block = "N" + LineNumber.ToString() + block;
@@ -380,7 +424,9 @@ namespace CNC.Core
                                 BeginSection(sm.Groups[1].Value);
                         }
 
-                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd) { HasSpindleOrCoolantOn = CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = CurrentLineHasToolChange(tokenStart), Tokens = Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) });
+                        // parsed guards the token-derived flags, same as AddBlock: a failed parse leaves
+                        // Parser.Tokens stale from the last successful line - never trust it here.
+                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = parsed && CurrentLineHasToolChange(tokenStart), Directive = directiveKeyword, Tokens = parsed ? Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) : new List<GCodeToken>() });
                         while (commands.Count > 0)
                         {
                             block = commands.Dequeue();
@@ -398,7 +444,7 @@ namespace CNC.Core
                 }
                 catch (Exception e)
                 {
-                    if ((ok = AppDialogs.Show(string.Format(LibStrings.FindResource("LoadError").Replace("\\n", "\r"), e.Message, LineNumber, block), "ioSender", MessageBoxButton.YesNo) == MessageBoxResult.Yes))
+                    if ((ok = UserPrompt.Show(string.Format(LibStrings.FindResource("LoadError").Replace("\\n", "\r"), e.Message, LineNumber, block), "ioSender", PromptButtons.YesNo) == PromptResult.Yes))
                         block = sr.ReadLine();
                     else
                         block = null;
@@ -438,6 +484,10 @@ namespace CNC.Core
                 bool isComment = false;
                 uint ln;
 
+                // Kept for the diagnostics below: `block` is reassigned as it is trimmed, renumbered and
+                // rewritten, so by the time anything goes wrong it no longer says what the program said.
+                string sourceBlock = block;
+
                 block = block.Trim();
 
                 // O-word flow (O<name> CALL/IF/WHILE/...) and #-expression lines are evaluated by the CONTROLLER,
@@ -448,6 +498,10 @@ namespace CNC.Core
                 // no separating space isn't recognised as a parameter assignment) - so generated O-word programs
                 // (e.g. Load Stock's corner probe) and their #<_name>=value setup lines can be streamed with flow
                 // control instead of being forced onto the MDI path.
+                // Constants first, for the same reason as ParseFileLines: isParamLine and the
+                // passthrough test below must see the line as it will be parsed and streamed.
+                block = ResolveConstants(block, (int)LineNumber + 1);
+
                 string ts = block.TrimStart();
                 bool isOword = ts.Length > 1 && (ts[0] == 'o' || ts[0] == 'O') && ts[1] == '<';
                 bool isParamLine = ts.Length > 0 && ts[0] == '#';
@@ -459,15 +513,61 @@ namespace CNC.Core
                 // confirmed on real hardware 2026-07-27: a generated program's own "$TLR" line vanished
                 // entirely between the previous and next line in the actual wire transmission.
                 bool isSystemCommand = ts.Length > 0 && ts[0] == '$';
-                bool passThrough = isSystemCommand || (GrblInfo.ExpressionsSupported && (isOword || block.IndexOf('#') >= 0));
+
+                // EVERY block this parser cannot make sense of is passed through verbatim. It used to be a
+                // short list of known exceptions ($-commands, O-words, #-expressions) and everything else
+                // was silently discarded - which meant this parser's own gaps quietly EDITED the operator's
+                // program, with no error, no log, and nothing on the wire.
+                //
+                // That is not a theoretical risk. 2026-07-27: a generated "$TLR" vanished. 2026-08-11, on
+                // real hardware: "G59.3" was dropped from a Setup run, so the very next line - "G0 Z0",
+                // meant as "the toolsetter's top of travel" - executed in the still-active G54 and became
+                // "go to WORK zero", a 128 mm rapid straight down into the touch plate. It pulled the
+                // bearings out of the v-wheels. The identical program had run safely an hour earlier only
+                // because G54's Z was shallower then; that run set the origin deeper, which is what made
+                // the next one destructive. Three "G65 P5 Q<n>" probe-input selects were lost the same way.
+                //
+                // The controller is the authority on what is valid g-code, not this parser. A line it
+                // cannot execute comes back as an error the sender already surfaces and the run stops -
+                // loud, attributable, and harmless. A line omitted is a DIFFERENT PROGRAM than the one the
+                // operator read and approved, and it fails as motion. Between "send something the parser
+                // did not recognise" and "quietly change the program", only one of those is survivable.
+                //
+                // With ONE exception, and it is not a stylistic one: '!', '~' and '?' are grblHAL REALTIME
+                // characters. The controller acts on them the moment they appear in the stream - anywhere
+                // in a line, not just at the start - so they are not text destined for the parser at all.
+                // Passing those through would turn a stray character in a file into a feed hold mid-cut or
+                // an unexpected cycle start. They stay out of the program, but they are now LOGGED rather
+                // than discarded in silence, which is the property that was actually missing.
+                // '$' is deliberately NOT in this set: system commands are legitimate and already passed.
+                bool isRealtimeChar = ts.Length > 0 && (ts[0] == '!' || ts[0] == '~' || ts[0] == '?');
+                bool passThrough = !isRealtimeChar;
 
                 int tokenStart = Parser.Tokens.Count;
                 bool parsed;
                 try { parsed = Parser.ParseBlock(ref block, false, out ln, out isComment); }
-                catch { if (!passThrough) throw; parsed = false; }
+                catch (Exception pe)
+                {
+                    // Also no longer fatal-and-silent: the block is still emitted below, verbatim.
+                    parsed = false;
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("gcode", string.Format("AddBlock: ParseBlock threw ({0}: {1}), passing verbatim >>{2}<<",
+                            pe.GetType().Name, pe.Message, sourceBlock));
+                }
+
+                // Kept as a diagnostic now rather than a filter: with passThrough always true this cannot
+                // silently drop anything, but a line this parser fails on is still worth knowing about -
+                // it is a gap in the parser, and it is how the program view and the bounding box end up
+                // missing information the controller acts on.
+                if (!parsed && !isComment && DebugLog.Enabled)
+                    DebugLog.Write("gcode", string.Format("AddBlock: not parsed, passing verbatim >>{0}<<", sourceBlock));
 
                 if (parsed || passThrough)
                 {
+                    // Captured BEFORE the AddLineNumbers branch below can prepend "N123" onto block - see
+                    // the ParseFileLines call site's identical comment. DRAFT, see GCodeBlock.Directive.
+                    string directiveKeyword = isComment ? MacroRunner.RecognizeDirective(block) : null;
+
                     // Don't add a line number to a block that already carries one (e.g. a generated program that
                     // numbered its own lines) - two N-words make a malformed block (the controller rejects it
                     // with error:25). Also never number an O-word, #-parameter, or $-command line (see above -
@@ -484,7 +584,7 @@ namespace CNC.Core
                     // parsed guards Tokens here too: a failed parse (O-word/#-expression passthrough, see
                     // `passThrough` above) leaves Parser.Tokens stale from whatever line last parsed
                     // successfully - only trust it right after ParseBlock itself returned true.
-                    AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = parsed && CurrentLineHasToolChange(tokenStart), Tokens = parsed ? Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) : new List<GCodeToken>() });
+                    AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = parsed && CurrentLineHasToolChange(tokenStart), Directive = directiveKeyword, Tokens = parsed ? Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) : new List<GCodeToken>() });
                     while (commands.Count > 0)
                     {
                         block = commands.Dequeue();
@@ -494,10 +594,23 @@ namespace CNC.Core
                         AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, false, false));
                     }
                 }
+                else if (DebugLog.Enabled)
+                    // The only remaining way out without emitting, and it is deliberate: a realtime
+                    // control character, which the controller would act on rather than execute. Logged,
+                    // because "the program contains a line the machine never sees" must never again be
+                    // something that happens without a word being said about it.
+                    DebugLog.Write("gcode", string.Format(
+                        "AddBlock: NOT SENT - realtime control character, not g-code >>{0}<<", sourceBlock));
             }
-            catch //(Exception e)
+            catch (Exception e)
             {
-                // 
+                // Was an empty catch: a block lost here vanished as silently as one lost to the old
+                // discard branch - same symptom, different cause, no way to tell which. Nothing inside
+                // the try should throw now that ParseBlock's own faults are handled where they happen,
+                // so reaching this is a bug worth seeing rather than a case worth swallowing.
+                if (DebugLog.Enabled)
+                    DebugLog.Write("gcode", string.Format("AddBlock: THREW ({0}: {1}) - BLOCK LOST >>{2}<<",
+                        e.GetType().Name, e.Message, block));
             }
 
             if (action == Action.End)
@@ -553,8 +666,107 @@ namespace CNC.Core
             AddBlock(block, Action.Add);
         }
 
+        // Constant #<name> parameters declared by the program being loaded, in declaration order. Reset
+        // with the rest of the job state when a new program starts.
+        private readonly NgcConstants.Resolver constants = new NgcConstants.Resolver();
+
+        // The source form of the block currently being added, when substitution actually changed it.
+        // Set by ResolveConstants and consumed by AddStamped - every block reaches AddStamped through
+        // one of the two per-line loops, and both call ResolveConstants first.
+        private string pendingRaw;
+
+        /// <summary>
+        /// Substitute constant <c>#&lt;name&gt;</c> parameters when the controller cannot evaluate them.
+        ///
+        /// A controller reporting EXPR gets the line untouched - it does this itself, and better. Without
+        /// EXPR the choice used to be binary: pass a '#' line through unparsed, or throw. Neither is much
+        /// good for a file whose exposure values are declared at the top, so resolve the ones that are
+        /// provably constant and keep refusing everything else.
+        ///
+        /// Throws rather than returning a flag: the per-line handlers in both loops already surface a
+        /// GCodeException with the line number and the offending block, and let the operator abort. A
+        /// program that is half-substituted must never reach the machine.
+        /// </summary>
+        private string ResolveConstants(string block, int lineNumber)
+        {
+            pendingRaw = null;
+
+            if (block == null || block.IndexOf('#') < 0)
+                return block;
+
+            string source = block;
+
+            // A (PROMPT) field answered at load wins over the declaration the file carries, on EVERY
+            // controller: the rewritten "#<_name> = <answer>" is what an EXPR controller is sent and
+            // what a non-EXPR one resolves below. Without this the file's own default would either be
+            // re-declared after the preamble (EXPR) or baked into Data here (non-EXPR), and the answer
+            // would silently never reach the wire - which is exactly what happened on the laser before
+            // 2026-09-06.
+            if (PromptFields != null)
+                block = NgcConstants.RewriteAssignment(block, PromptValueFor);
+
+            if (GrblInfo.ExpressionsSupported)
+            {
+                if (!ReferenceEquals(block, source))
+                    pendingRaw = source;
+                return block;
+            }
+
+            string resolved, reason;
+            if (!constants.TryLine(lineNumber, block, out resolved, out reason))
+                throw new GCodeException(reason);
+
+            // Only remember a source form when there IS one. An unchanged line - a comment mentioning
+            // '#', say - must not get a redundant second copy of itself; on a large program that would
+            // be a string per line for nothing.
+            if (!string.Equals(resolved, source, StringComparison.Ordinal))
+                pendingRaw = source;
+
+            return resolved;
+        }
+
+        // ------------------------------------------------------------------ (PROMPT) fields at load
+
+        /// <summary>
+        /// The (PROMPT param, default[, label]) fields this program declared, with the operator's answers
+        /// (or the declared defaults on an unattended load), as collected by GCodeProgram when the
+        /// program was loaded. Null when the program has none or was not prompted at load. JobRunner
+        /// reads this to skip its own Cycle-Start dialog and, on an EXPR controller, to send the preamble.
+        /// </summary>
+        public List<MacroRunner.PromptField> PromptFields { get; private set; }
+
+        public bool PromptedAtLoad { get { return PromptFields != null; } }
+
+        /// <summary>
+        /// Install the answered fields before the program's lines are parsed: each one seeds the constant
+        /// resolver, so references resolve from line 1 on a non-EXPR controller, and its declaration in
+        /// the file - if it has one - is rewritten to the answer (see ResolveConstants).
+        /// </summary>
+        public void ApplyPromptFields(List<MacroRunner.PromptField> fields)
+        {
+            PromptFields = fields != null && fields.Count > 0 ? fields : null;
+            if (PromptFields != null)
+                foreach (var f in PromptFields)
+                    constants.Seed(f.Inner, f.Value);
+        }
+
+        private string PromptValueFor(string name)
+        {
+            if (PromptFields == null)
+                return null;
+            foreach (var f in PromptFields)
+                if (f.Inner.Equals(name, StringComparison.OrdinalIgnoreCase))
+                    return f.Value;
+            return null;
+        }
+
         private void AddStamped(GCodeBlock b)
         {
+            // What the line said before substitution, so Save can write it back out. Cleared either way,
+            // so a block added without going through ResolveConstants cannot inherit the previous line's.
+            b.Raw = pendingRaw;
+            pendingRaw = null;
+
             b.Section = CurrentSection;
             if (sectionStartPending)
             {
@@ -661,6 +873,8 @@ namespace CNC.Core
             HasSections = false;
             AddLineNumbers = true;
             Parser.Reset();
+            constants.Reset();
+            PromptFields = null;    // a new program starts with no answered fields; ApplyPromptFields re-seeds
         }
     }
 

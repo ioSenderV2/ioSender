@@ -67,7 +67,7 @@ namespace CNC.Controls
             InitializeComponent();
 
             this.model = model;
-            keyboard = model.Keyboard;
+            keyboard = model.Keyboard as KeypressHandler;
             DataContext = this;
             groupStateConverter = Resources["GroupState"] as KeyMapGroupStateConverter;
 
@@ -86,13 +86,7 @@ namespace CNC.Controls
         public void Commit()
         {
             keyboard.ApplyJogBindings(rows.Where(r => r.IsJog).Select(r => r.Model));
-            keyboard.ApplyActionBindings(rows.Where(r => !r.IsJog && !r.IsConsole).Select(r => r.Model));
-
-            var console = rows.FirstOrDefault(r => r.IsConsole);
-            if (console != null)
-                AppConfig.Settings.Base.ConsoleShortcut = console.Model.Key == Key.None
-                    ? string.Empty
-                    : ShortcutKey.ToStorageString(console.Model.Key, console.Model.Modifiers);
+            keyboard.ApplyActionBindings(rows.Where(r => !r.IsJog).Select(r => r.Model));
 
             // Rebuild the saved tab-switch list from the bound rows only (unbound tabs are simply absent).
             AppConfig.Settings.Base.TabShortcuts = rows
@@ -108,9 +102,9 @@ namespace CNC.Controls
                 .Select(r => new TabShortcut { Id = r.Model.Method, Key = r.Model.Key == Key.None ? string.Empty : ShortcutKey.ToStorageString(r.Model.Key, r.Model.Modifiers) })
                 .ToList();
 
-            if (model.ControllerMapper != null)
+            if (GamepadInput.Mapper != null)
             {
-                var m = model.ControllerMapper;
+                var m = GamepadInput.Mapper;
                 foreach (var r in controllerRows)
                     m.SetAction(r.Button, r.Action);
 
@@ -130,7 +124,6 @@ namespace CNC.Controls
 
             keyboard.SaveMappings();   // persists into the App.config "KeyMap" section
             AppConfig.Settings.Save();
-            AppConfig.NotifyConsoleShortcutChanged();
             AppConfig.NotifyTabShortcutsChanged();
         }
 
@@ -149,13 +142,12 @@ namespace CNC.Controls
                 Add(new BindingRow(b, Label(b.Method)) { Description = Description(b.Method) });
             }
 
-            // The console toggle is just another program-level toggle - surface it alongside the rest.
-            var console = new KeypressHandler.KeyBinding { Method = "Console.Toggle", Context = "null", DefaultKey = Key.Escape };
-            ShortcutKey.TryParse(AppConfig.Settings.Base.ConsoleShortcut, out console.Key, out console.Modifiers);
-            Add(new BindingRow(console, "Toggle console window") { IsConsole = true, Description = "Show or hide the console window." });
+            // ("Toggle console window" was removed 2026-08-13. The run strip's MDI button is bindable now -
+            //  ActionKeyBinder "Program.Mdi", in this same Program group - which reaches the console without
+            //  needing a second store and a second dispatch path of its own. Esc still closes the console.)
 
             // Tab-switch shortcuts. Unbound by default (DefaultKey = None); persisted in Base.TabShortcuts and
-            // dispatched at the main-window level like the console toggle, so they fire regardless of focus.
+            // dispatched at the main-window level, so they fire regardless of focus.
             var saved = AppConfig.Settings.Base.TabShortcuts;
             foreach (var t in TabTargets)
             {
@@ -292,7 +284,7 @@ namespace CNC.Controls
             foreach (var row in rows)
                 row.ResetToDefault();
 
-            if (model.ControllerMapper != null)
+            if (GamepadInput.Mapper != null)
                 foreach (var r in controllerRows)
                     r.Action = ControllerMapper.DefaultAction(r.Button);
 
@@ -416,19 +408,19 @@ namespace CNC.Controls
         {
             ActionItems = BuildActionItems();
 
-            if (model.Controller == null || model.ControllerMapper == null)
+            if (GamepadInput.Service == null || GamepadInput.Mapper == null)
             {
                 lblController.Text = "Controller support is not available.";
                 return;
             }
 
-            model.ControllerMapper.EnsureLoaded();   // show the saved map, not just defaults
+            GamepadInput.Mapper.EnsureLoaded();   // show the saved map, not just defaults
 
             foreach (var b in ControllerMapper.MappableButtons)
             {
                 var def = ControllerMapper.DefaultAction(b);
                 var choices = ActionItems.Select(a => a.Action == def ? new ActionItem(a.Action, "* " + a.Label, a.Description) : a).ToList();
-                controllerRows.Add(new ControllerRow(b, ButtonName(b), model.ControllerMapper.GetAction(b), choices));
+                controllerRows.Add(new ControllerRow(b, ButtonName(b), GamepadInput.Mapper.GetAction(b), choices));
             }
 
             gridController.ItemsSource = controllerRows;
@@ -438,7 +430,7 @@ namespace CNC.Controls
             UpdateRestoreDefaultsButton();
 
             // Analog jog settings
-            var m = model.ControllerMapper;
+            var m = GamepadInput.Mapper;
             chkAnalogEnabled.IsChecked = m.AnalogJogEnabled;
             txtDeadzone.Text = m.DeadzonePercent.ToString(System.Globalization.CultureInfo.InvariantCulture);
             txtFeedScale.Text = m.FeedScale.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
@@ -457,15 +449,15 @@ namespace CNC.Controls
             // write straight to Config.TabShortcuts) are reflected here, even though this editor is built once.
             SyncTabRows();
 
-            if (_controllerHooked || model.Controller == null || model.ControllerMapper == null)
+            if (_controllerHooked || GamepadInput.Service == null || GamepadInput.Mapper == null)
                 return;
 
             _controllerHooked = true;
-            model.ControllerMapper.Enabled = false;
+            GamepadInput.Mapper.Enabled = false;
             UpdateControllerStatus();
-            model.Controller.Connected += Controller_StatusChanged;
-            model.Controller.Disconnected += Controller_StatusChanged;
-            model.Controller.Polled += Controller_Polled;
+            GamepadInput.Service.Connected += Controller_StatusChanged;
+            GamepadInput.Service.Disconnected += Controller_StatusChanged;
+            GamepadInput.Service.Polled += Controller_Polled;
         }
 
         // Tab hidden / view left: unhook and resume machine dispatch.
@@ -475,20 +467,20 @@ namespace CNC.Controls
                 return;
 
             _controllerHooked = false;
-            if (model.Controller != null)
+            if (GamepadInput.Service != null)
             {
-                model.Controller.Connected -= Controller_StatusChanged;
-                model.Controller.Disconnected -= Controller_StatusChanged;
-                model.Controller.Polled -= Controller_Polled;
+                GamepadInput.Service.Connected -= Controller_StatusChanged;
+                GamepadInput.Service.Disconnected -= Controller_StatusChanged;
+                GamepadInput.Service.Polled -= Controller_Polled;
             }
-            if (model.ControllerMapper != null)
-                model.ControllerMapper.Enabled = true;   // resume machine dispatch
+            if (GamepadInput.Mapper != null)
+                GamepadInput.Mapper.Enabled = true;   // resume machine dispatch
         }
 
         private void UpdateControllerStatus()
         {
-            lblController.Text = model.Controller != null && model.Controller.IsConnected
-                ? "Controller connected (slot " + model.Controller.ControllerIndex + ")."
+            lblController.Text = GamepadInput.Service != null && GamepadInput.Service.IsConnected
+                ? "Controller connected (slot " + GamepadInput.Service.ControllerIndex + ")."
                 : "No controller detected.";
         }
 
@@ -501,7 +493,7 @@ namespace CNC.Controls
         // check of what the controller actually reports (D-pad lights here = input is getting through).
         private void Controller_Polled(object sender, EventArgs e)
         {
-            ushort buttons = model.Controller.State.wButtons;
+            ushort buttons = GamepadInput.Service.State.wButtons;
             foreach (var r in controllerRows)
                 r.Pressed = (buttons & (ushort)r.Button) != 0;
         }
@@ -710,23 +702,42 @@ namespace CNC.Controls
 
         // ---- categories (outline groups) ------------------------------------------------------
 
-        /// <summary>The single group holding every top-level destination - tab strip entries and menu
-        /// entries alike. ActionKeyBinder's main-menu catalog entries name it too, so the two halves of the
-        /// list can't drift into separate groups.</summary>
+        /// <summary>The top-level VIEWS - what can sit on the tab strip (or be reached from the menu that
+        /// hosts it when it is not on the bar). Tab.* ids.</summary>
         public const string TopLevelGroup = "Top Level Tabs";
-        private const int TopLevelOrder = 13;
+
+        /// <summary>The built-in main-menu COMMANDS - Connect, File &gt; ..., Help &gt; ... - which are not
+        /// views at all and cannot be placed on the tab strip.
+        ///
+        /// These used to share TopLevelGroup, on the reasoning that to the operator both are just
+        /// "destinations". In practice it read as clutter: a list of tabs you can rearrange, with fifteen
+        /// menu commands you cannot, interleaved alphabetically among them. Ordered immediately BEFORE the
+        /// tabs so the two stay adjacent - they are related, just not the same thing.</summary>
+        public const string MenuGroup = "Top Level Menu Items";
+
+        private const int MenuOrder = 13;
+        private const int TopLevelOrder = 14;
+
+        /// <summary>Sort order for a group an ActionKeyBinder row named for itself. Anything unrecognised
+        /// keeps the historical "UI zoom" slot, which is where these rows sat before the field existed.</summary>
+        private static int GroupOrder(string group)
+        {
+            if (group == MenuGroup) return MenuOrder;
+            if (group == TopLevelGroup) return TopLevelOrder;
+            return 9;
+        }
 
         private static void Categorize(BindingRow r)
         {
             if (r.IsJog) { r.Set("Jog", 0); return; }
-            if (r.IsConsole) { r.Set("Program", 9); return; }
             // ActionKeyBinder rows carry their own group where they want one (the main-menu commands name
             // TopLevelGroup); the original zoom/OBS entries predate that field and default to "UI zoom".
-            if (r.IsZoomAction) { r.Set(r.ActionGroup ?? "UI zoom", r.ActionGroup == TopLevelGroup ? TopLevelOrder : 9); return; }
-            // One group for everything reachable from the top-level tab strip or the menus - the views
-            // (TabTargets) and the main-menu commands (ActionKeyBinder, handled above) sit together, because
-            // to the operator they are one list of destinations and whether a given one is currently a tab or
-            // a menu entry is their own layout choice, not a category.
+            // An ActionKeyBinder row carries its own group where it wants one (the main-menu commands name
+            // MenuGroup); the original zoom/OBS entries predate that field and default to "UI zoom".
+            if (r.IsZoomAction) { r.Set(r.ActionGroup ?? "UI zoom", GroupOrder(r.ActionGroup)); return; }
+            // The top-level VIEWS. The main-menu commands are handled above and land in MenuGroup, which
+            // sorts immediately before this one - adjacent, because they are related, but distinct, because
+            // a tab can be moved on and off the strip and a File/Help command cannot.
             if (r.IsTabSwitch) { r.Set(TopLevelGroup, TopLevelOrder); return; }
 
             string m = r.Model.Method ?? string.Empty;
@@ -761,10 +772,11 @@ namespace CNC.Controls
             { "Spindle override", "Real-time override of spindle speed." },
             { "Coolant & aux", "Toggle coolant outputs and the auxiliary fan." },
             { "Zeroing", "Set the work-coordinate zero for an axis (or all axes)." },
-            { "Program", "Program-level toggles (optional stop, single block, probe state) and the console window." },
+            { "Program", "Program-level toggles (optional stop, single block, probe state), the console window, and the run strip's MDI and Status buttons." },
             { "Probing", "Start or stop probing and toggle the probe-connected state." },
             { "3D view", "Control the 3D tool-path viewer." },
-            { TopLevelGroup, "Everything on the top-level tab strip and in the menus, in one list. A key reaches its target wherever that target currently lives - as a tab or as a menu entry - so moving something in Settings > Top-level tabs never costs it its shortcut. All unbound by default; a menu command that is greyed out does nothing." },
+            { MenuGroup, "The built-in main-menu commands - Connect, File and Help. These are not views and cannot be placed on the tab strip. All unbound by default; a menu command that is greyed out does nothing when its key is pressed." },
+            { TopLevelGroup, "The views that can sit on the top-level tab strip. A key reaches its target wherever that target currently lives - as a tab, or on the menu that hosts it when it is off the bar - so moving something in Settings > Top-level tabs never costs it its shortcut. All unbound by default." },
             { "Other", "Additional actions." }
         };
 
@@ -1013,7 +1025,6 @@ namespace CNC.Controls
             public KeypressHandler.KeyBinding Model { get; }
             public string Label { get; }
             public string Description { get; set; }
-            public bool IsConsole { get; set; }
             public bool IsTabSwitch { get; set; }
             public bool IsZoomAction { get; set; }
             public string ActionGroup { get; set; }   // ActionKeyBinder.ActionInfo.Group, when the entry names one

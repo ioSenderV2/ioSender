@@ -46,11 +46,9 @@ using System.Globalization;
 using System.IO;
 using System.Data;
 using System.Diagnostics;
-using System.Windows.Media;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Threading;
-using System.Windows.Threading;
 using System.Windows;
 using CNC.GCode;
 using System.Collections.Concurrent;
@@ -60,239 +58,23 @@ namespace CNC.Core
 {
     public delegate void GCodePushHandler(string gcode, Action action);
 
-    public class GrblConstants
-    {
-        public const byte
-            CMD_EXIT = 0x03, // ctrl-C
-            CMD_RESET = 0x18, // ctrl-X
-            CMD_STOP = 0x19, // ctrl-Y
-            CMD_STATUS_REPORT = 0x80,
-            CMD_CYCLE_START = 0x81,
-            CMD_FEED_HOLD = 0x82,
-            CMD_GCODE_REPORT = 0x83,
-            CMD_SAFETY_DOOR = 0x84,
-            CMD_JOG_CANCEL = 0x85,
-            CMD_STATUS_REPORT_ALL = 0x87,
-            CMD_OPTIONAL_STOP_TOGGLE = 0x88,
-            CMD_SINGLE_BLOCK_TOGGLE = 0x89,
-            CMD_OVERRIDE_FAN0_TOGGLE = 0x8A,
-            CMD_MPG_MODE_TOGGLE = 0x8B,
-            CMD_AUTO_REPORTING_TOGGLE = 0x8C,
-            CMD_FEED_OVR_RESET = 0x90,
-            CMD_FEED_OVR_COARSE_PLUS = 0x91,
-            CMD_FEED_OVR_COARSE_MINUS = 0x92,
-            CMD_FEED_OVR_FINE_PLUS = 0x93,
-            CMD_FEED_OVR_FINE_MINUS = 0x94,
-            CMD_RAPID_OVR_RESET = 0x95,
-            CMD_RAPID_OVR_MEDIUM = 0x96,
-            CMD_RAPID_OVR_LOW = 0x97,
-            CMD_SPINDLE_OVR_RESET = 0x99,
-            CMD_SPINDLE_OVR_COARSE_PLUS = 0x9A,
-            CMD_SPINDLE_OVR_COARSE_MINUS = 0x9B,
-            CMD_SPINDLE_OVR_FINE_PLUS = 0x9C,
-            CMD_SPINDLE_OVR_FINE_MINUS = 0x9D,
-            CMD_SPINDLE_OVR_STOP = 0x9E,
-            CMD_COOLANT_FLOOD_OVR_TOGGLE = 0xA0,
-            CMD_COOLANT_MIST_OVR_TOGGLE = 0xA1,
-            CMD_PID_REPORT = 0xA2,
-            CMD_TOOL_ACK = 0xA3,
-            CMD_PROBE_CONNECTED_TOGGLE = 0xA4;
+    // GrblConstants moved to CNC Contracts (GrblConstants.cs), same namespace - the command
+    // bytes/strings ARE the wire protocol, and clients need them without a CNC.Core reference.
 
-        public const string
-            CMD_STATUS_REPORT_LEGACY = "?",
-            CMD_CYCLE_START_LEGACY = "~",
-            CMD_FEED_HOLD_LEGACY = "!",
-            CMD_UNLOCK = "$X",
-            CMD_HOMING = "$H",
-            CMD_CHECK = "$C",
-            CMD_GETSETTINGS = "$$",
-            CMD_GETSETTINGS_ALL = "$+",
-            CMD_GETPARSERSTATE = "$G",
-            CMD_GETINFO = "$I",
-            CMD_GETINFO_EXTENDED = "$I+",
-            CMD_GETNGCPARAMETERS = "$#",
-            CMD_GETSTARTUPLINES = "$N",
-            CMD_GETSETTINGSDETAILS = "$ES",
-            CMD_GETSETTINGSGROUPS = "$EG",
-            CMD_GETALARMCODES = "$EA",
-            CMD_GETERRORCODES = "$EE",
-            CMD_GETSPINDLES = "$SPINDLESH",
-            CMD_PROGRAM_DEMARCATION = "%",
-            CMD_SDCARD_MOUNT = "$FM",
-            CMD_SDCARD_DIR = "$F",
-            CMD_SDCARD_DIR_ALL = "$F+",
-            CMD_SDCARD_REWIND = "$FR",
-            CMD_SDCARD_RUN = "$F=",
-            CMD_SDCARD_UNLINK = "$FD=",
-            CMD_SDCARD_DUMP = "$F<=",
-            CMD_FS_PWD = "$PWD",
-            AXISLETTERS = "XYZABCUVW",
-            FORMAT_METRIC = "###0.000",
-            FORMAT_IMPERIAL = "##0.0000",
-            NO_TOOL = "None",
-            THCSIGNALS = "AERTOVHDUBF"; // Keep in sync with THCSignals enum below!!
-
-        public const int
-            X_AXIS = 0,
-            Y_AXIS = 1,
-            Z_AXIS = 2,
-            A_AXIS = 3,
-            B_AXIS = 4,
-            C_AXIS = 5,
-            U_AXIS = 6,
-            V_AXIS = 7,
-            W_AXIS = 8;
-    }
-
-    public enum CameraMoveMode
-    {
-        XAxisFirst = 1,
-        YAxisFirst = 2,
-        BothAxes = 3
-    }
-
-    public enum GrblStates
-    {
-        Unknown = 0,
-        Idle,
-        Run,
-        Tool,
-        Hold,
-        Home,
-        Check,
-        Jog,
-        Alarm,
-        Door,
-        Sleep
-    }
-
-    public enum GrblMode
-    {
-        Normal = 0,
-        Laser,
-        Lathe
-    }
-
-    public enum GrblEncoderMode
-    {
-        Unknown = 0,
-        FeedRate = 1,
-        RapidRate = 2,
-        SpindleRPM = 3
-    }
-
-    public enum GrblSetting
-    {
-        PulseMicroseconds = 0,
-        StepperIdleLockTime = 1,
-        StepInvertMask = 2,
-        DirInvertMask = 3,
-        InvertStepperEnable = 4,
-        LimitPinsInvertMask = 5,
-        InvertProbePin = 6,
-        StatusReportMask = 10,
-        JunctionDeviation = 11,
-        ArcTolerance = 12,
-        ReportInches = 13,
-        SoftLimitsEnable = 20,
-        HardLimitsEnable = 21,
-        HomingEnable = 22,
-        HomingDirMask = 23,
-        HomingFeedRate = 24,
-        HomingSeekRate = 25,
-        HomingDebounceDelay = 26,
-        HomingPulloff = 27,
-        G73Retract = 28,
-        PulseDelayMicroseconds = 29,
-        RpmMax = 30,
-        RpmMin = 31,
-        Mode = 32, // enum GrblMode
-        PWMFreq = 33,
-        PWMOffValue = 34,
-        PWMMinValue = 35,
-        PWMMaxValue = 36,
-        TravelResolutionBase = 100,
-        MaxFeedRateBase = 110,
-        AccelerationBase = 120,
-        MaxTravelBase = 130,
-        MotorCurrentBase = 140,
-    }
-
-    public enum grblHALSetting
-    {
-        PulseMicroseconds = 0,
-        StepperIdleLockTime = 1,
-        StepInvertMask = 2,
-        DirInvertMask = 3,
-        InvertStepperEnable = 4,
-        LimitPinsInvertMask = 5,
-        InvertProbePin = 6,
-        StatusReportMask = 10,
-        JunctionDeviation = 11,
-        ArcTolerance = 12,
-        ReportInches = 13,
-        ControlInvertMask = 14, // Note: Used for detecting GrblHAL firmware
-        CoolantInvertMask = 15,
-        SpindleInvertMask = 16,
-        ControlPullUpDisableMask = 17,
-        LimitPullUpDisableMask = 18,
-        ProbePullUpDisable = 19,
-        SoftLimitsEnable = 20,
-        HardLimitsEnable = 21,
-        HomingEnable = 22,
-        HomingDirMask = 23,
-        HomingFeedRate = 24,
-        HomingSeekRate = 25,
-        HomingDebounceDelay = 26,
-        HomingPulloff = 27,
-        G73Retract = 28,
-        PulseDelayMicroseconds = 29,
-        RpmMax = 30,
-        RpmMin = 31,
-        Mode = 32, // enum GrblMode
-        PWMFreq = 33,
-        PWMOffValue = 34,
-        PWMMinValue = 35,
-        PWMMaxValue = 36,
-        StepperDeenergizeMask = 37,
-        SpindlePPR = 38,
-        EnableLegacyRTCommands = 39,
-        SoftLimitJogging = 40,
-        HomingLocateCycles = 43,
-        HomingCycle_1 = 44,
-        HomingCycle_2 = 45,
-        HomingCycle_3 = 46,
-        HomingCycle_4 = 47,
-        HomingCycle_5 = 48,
-        HomingCycle_6 = 49,
-        JogStepSpeed = 50,
-        JogSlowSpeed = 51,
-        JogFastSpeed = 52,
-        JogStepDistance = 53,
-        JogSlowDistance = 54,
-        JogFastDistance = 55,
-        // Per axis settings
-        TravelResolutionBase = 100,
-        MaxFeedRateBase = 110,
-        AccelerationBase = 120,
-        MaxTravelBase = 130,
-        MotorCurrentBase = 140,
-        MicroStepsBase = 150,
-        StallGuardBase = 200,
-        // End per axis settings
-        FtpPort0 = 308,
-        FtpPort1 = 318,
-        FtpPort2 = 328,
-        ToolChangeMode = 341,
-        UnlockAfterEStop = 484
-    }
+    // CameraMoveMode moved to CNC.Controls (ICamera.cs), same namespace - camera move sequencing is
+    // client policy, not machine state; nothing in Core reads it.
+    // GrblStates moved to CNC Contracts (MachineEnums.cs), same namespace - the wire messages carry it.
+    // GrblMode, GrblEncoderMode, GrblSetting and grblHALSetting moved to CNC Contracts
+    // (SettingEnums.cs), same namespace - the $-setting number map is wire addressing.
 
     public enum StreamingState
     {
         NoFile = 0,
         Idle,
         Send,
-        SendMDI,
+        // SendMDI removed 2026-08-11: it was the busy flag of JobRunner's private MDI pacing, which
+        // MdiDispatcher replaced (docs/Architecture-MDI-Dispatch-Unification.md). It was never assigned
+        // to model.StreamingState - only to the engine's own field - so no UI ever observed it.
         Home,
         Halted,
         FeedHold,
@@ -307,12 +89,7 @@ namespace CNC.Core
         Error
     }
 
-    public enum HomedState
-    {
-        Unknown = 0,
-        NotHomed,
-        Homed
-    }
+    // HomedState moved to CNC Contracts (MachineEnums.cs), same namespace.
 
     public enum SDState
     {
@@ -322,48 +99,8 @@ namespace CNC.Core
         Detected = 3
     }
 
-    [Flags]
-    public enum Signals : int // Keep in sync with GrblInfo.SignalLetters constant below
-    {
-        Off = 0,
-        LimitX = 1 << 0,
-        LimitY = 1 << 1,
-        LimitZ = 1 << 2,
-        LimitA = 1 << 3,
-        LimitB = 1 << 4,
-        LimitC = 1 << 5,
-        LimitU = 1 << 6,
-        LimitV = 1 << 7,
-        LimitW = 1 << 8,
-        EStop = 1 << 9,
-        Probe  = 1 << 10,
-        Reset = 1 << 11,
-        SafetyDoor = 1 << 12,
-        Hold = 1 << 13,
-        CycleStart = 1 << 14,
-        BlockDelete = 1 << 15,
-        OptionalStop = 1 << 16,
-        ProbeDisconnected = 1 << 17,
-        MotorWarning = 1 << 18,
-        MotorFault = 1 << 19
-    }
-
-    [Flags]
-    public enum THCSignals : int
-    {
-        Off = 0,
-        ArcOk = 1 << 0,
-        THCEnabled = 1 << 1,
-        THCActive = 1 << 2,
-        TorchOn = 1 << 3,
-        OhmicProbe = 1 << 4,
-        VelocityLock = 1 << 5,
-        VoidLock = 1 << 6,
-        Down = 1 << 7,
-        Up = 1 << 8,
-        Breakaway = 1 << 9,
-        FloatSwitch = 1 << 10
-    }
+    // Signals and THCSignals moved to CNC Contracts (MachineEnums.cs), same namespace. Signals must
+    // stay in sync with the GrblInfo.SignalLetters constant below.
 
     [Flags]
     public enum Probes : int
@@ -374,72 +111,12 @@ namespace CNC.Core
         Probe2 = 1 << 2
     }
 
-    public struct GrblState
-    {
-        public GrblStates State;
-        public int Substate;
-        public int LastAlarm;
-        public int Error;
-        public Color Color;
-        public bool MPG;
-    }
+    // The GrblState struct moved to CNC Contracts (MachineEnums.cs), same namespace - it is the wire
+    // shape of the controller's run state and MachineState.GrblState's type.
 
-    public class Resources
-    {
-        public static string Path { get; set; }
-        public static string Locale { get; set; }
-        public static string IniName { get; set; }
-        public static string IniFile { get { return (System.IO.Path.IsPathRooted(IniName) ? "" : ConfigPath) + IniName; } }
-        public static string DebugFile { get; set; } = string.Empty;
-        public static string ConfigPath { get; set; }
-        public static bool IsLegacyController { get; set; } = false; // Set true if controller is legacy v1.1
-
-        public static string BackupsFolder { get { return System.IO.Path.Combine(ConfigPath, "Backups"); } }
-
-        // Shared by the crash log, debug log and console log: resolve (and create) the "logs"
-        // subfolder under the config dir, falling back to %AppData%\ioSender\logs (ConfigPath may
-        // still be unresolved this early in startup, e.g. during a crash before settings load), and
-        // as a last resort the app's own base directory. Never throws.
-        public static string ResolveLogsDirectory()
-        {
-            string dir;
-            try
-            {
-                dir = ConfigPath;
-                if (string.IsNullOrEmpty(dir) || dir == "./" || !System.IO.Path.IsPathRooted(dir))
-                    dir = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), "ioSender");
-                dir = System.IO.Path.Combine(dir, "logs");
-                System.IO.Directory.CreateDirectory(dir);
-            }
-            catch
-            {
-                try
-                {
-                    dir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
-                    System.IO.Directory.CreateDirectory(dir);
-                }
-                catch { dir = AppDomain.CurrentDomain.BaseDirectory; }
-            }
-            return dir;
-        }
-
-        // Every MacroProcessor.Run() call writes its g-code here first (see MacroProcessor.cs) - a
-        // persistent, inspectable copy of the LAST thing each Generate button actually built, named after
-        // the run (e.g. "Start Job" -> "start_job.macro"). Overwritten each run - this is a debugging aid,
-        // not a history; the streamed program itself is never saved to disk otherwise.
-        public static string GeneratedFolder { get { return System.IO.Path.Combine(ConfigPath, "Generated"); } }
-
-        // Odd Jobs work orders saved by name (Save.../Load... on the Work Order tab). Distinct from the single
-        // live work order kept in App.config, which is just "what the tab was left showing".
-        public static string WorkOrdersFolder { get { return System.IO.Path.Combine(ConfigPath, "WorkOrders"); } }
-
-        static Resources()
-        {
-            ConfigPath = Path = @"./";
-            Locale = "en-US";
-            IniName = "App.config";
-        }
-    }
+    // Resources (the config/locale/logs path statics) moved to CNC Common (Resources.cs), same
+    // namespace - pure host-environment paths both sides need. Its IsLegacyController flag was
+    // machine truth parked on a paths class; it lives on GrblInfo now.
 
     public static class Grbl
     {
@@ -469,7 +146,7 @@ namespace CNC.Core
             if (GrblViewModel.ResponseLogVerbose && !GrblViewModel.Silent)
                 GrblViewModel.ResponseLog.Add(command);
 
-            var t = new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                 cancellationToken,
@@ -477,10 +154,7 @@ namespace CNC.Core
                 a => GrblViewModel.OnResponseReceived += a,
                 a => GrblViewModel.OnResponseReceived -= a,
                 5000, () => GrblViewModel.ExecuteCommand(command));
-            }); t.Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             return res == true;
         }
@@ -499,7 +173,7 @@ namespace CNC.Core
             if (GrblViewModel.ResponseLogVerbose && !GrblViewModel.Silent)
                 GrblViewModel.ResponseLog.Add(command);
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                 cancellationToken,
@@ -507,17 +181,14 @@ namespace CNC.Core
                 a => GrblViewModel.OnResponseReceived += a,
                 a => GrblViewModel.OnResponseReceived -= a,
                 1000, () => GrblViewModel.ExecuteCommand(command));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             if (res == true)
                 res = null;
 
             while (res == null)
             {
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.SingleEvent<string>(
                     cancellationToken,
@@ -525,10 +196,7 @@ namespace CNC.Core
                     a => GrblViewModel.OnResponseReceived += a,
                     a => GrblViewModel.OnResponseReceived -= a,
                     5000);
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 if (GrblViewModel.GrblState.State != GrblStates.Idle)
                     res = null;
@@ -545,23 +213,25 @@ namespace CNC.Core
             if (GrblViewModel == null)
                 return false;
 
-            // Wait for WCO update to get current work offsets
+            // Wait for WCO update to get current work offsets.
+            //
+            // The wait is INSIDE the poller check now. It used to sit outside it, so with the poller
+            // disabled no thread was ever started, nothing could ever assign res, and this pumped the UI
+            // for ever - an unconditional hang that, unlike the rest of this family, needed no exception
+            // to trigger it. A WCO update only arrives because something is polling for one, so with the
+            // poller off there is nothing to wait for: report "no update" rather than never returning.
+            if (!GrblViewModel.Poller.IsEnabled)
+                return false;
 
-            if (GrblViewModel.Poller.IsEnabled)
+            EventUtils.RunPumped(() =>
             {
-                new Thread(() =>
-                {
-                    res = WaitFor.SingleEvent<string>(
-                    cancellationToken,
-                    null,
-                    a => GrblViewModel.OnWCOUpdated += a,
-                    a => GrblViewModel.OnWCOUpdated -= a,
-                    5000);
-                }).Start();
-            }
-
-            while (res == null)
-                EventUtils.DoEvents();
+                res = WaitFor.SingleEvent<string>(
+                cancellationToken,
+                null,
+                a => GrblViewModel.OnWCOUpdated += a,
+                a => GrblViewModel.OnWCOUpdated -= a,
+                5000);
+            });
 
             return res == true;
         }
@@ -1128,7 +798,7 @@ namespace CNC.Core
     {
         #region Attributes
 
-        private static Dispatcher dispatcher;
+        private static SyncTarget target;   // thread that began the request; responses may arrive on a comms/worker thread
         private static bool _probeProtect = false, _latheUVWMode = false;
         private static int _numAxes;
         private static string _axisLetters = GrblConstants.AXISLETTERS;
@@ -1150,6 +820,10 @@ namespace CNC.Core
             }
         }
         public static string SignalLetters { get; private set; } = "XYZABCUVWEPRDHSLTOMF"; // Keep in sync with Signals enum above!!
+        // Moved here from Resources: "controller is legacy Grbl v1.1" is machine truth, and every
+        // reader sits next to GrblInfo.IsGrblHAL/Build checks anyway. Set by AppConfig from the
+        // connection profile; gates the extended-protocol requests below.
+        public static bool IsLegacyController { get; set; } = false;
         public static string PositionFormatString { get; private set; } = string.Empty;
         public static string Version { get; private set; } = string.Empty;
         public static int Build { get; private set; } = 0;
@@ -1332,7 +1006,7 @@ namespace CNC.Core
         public static bool Get(GrblViewModel model)
         {
             bool? res = null;
-            bool getExtended = !Resources.IsLegacyController && ExtendedProtocol; // && Build >= 20201109;
+            bool getExtended = !GrblInfo.IsLegacyController && ExtendedProtocol; // && Build >= 20201109;
             CancellationToken cancellationToken = new CancellationToken();
 
             PollGrbl.Suspend();
@@ -1342,10 +1016,10 @@ namespace CNC.Core
             // show it in the console rather than hiding it as boilerplate (was model.Silent = true; see
             // the [MSG:...] special-case comment below this method's call site for the prior rationale).
             Firmware = model.Firmware;
-            dispatcher = Dispatcher.CurrentDispatcher;
+            target = SyncTarget.Capture();
             dataReceived += Process;
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -1353,10 +1027,7 @@ namespace CNC.Core
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
                     1000, () => Comms.com.WriteCommand(getExtended ? GrblConstants.CMD_GETINFO_EXTENDED : GrblConstants.CMD_GETINFO));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             dataReceived -= Process;
 
@@ -1382,7 +1053,7 @@ namespace CNC.Core
                 Axes.Add(new Axis(i, AxisIndexToLetter(_numAxes == 2 && i == 1 ? 2 : i)));
             }
 
-            if (!Resources.IsLegacyController)
+            if (!GrblInfo.IsLegacyController)
                 IsGrblHAL = IsGrblHAL || Firmware == "grblHAL";
 
             if (IsLoaded)
@@ -1438,15 +1109,15 @@ namespace CNC.Core
                 if (!(val = GrblSettings.GetDouble(grblHALSetting.JogStepDistance)).Equals(double.NaN))
                     model.Keyboard.JogStepDistance = val;
                 if (!(val = GrblSettings.GetDouble(grblHALSetting.JogSlowDistance)).Equals(double.NaN))
-                    model.Keyboard.JogDistances[(int)KeypressHandler.JogMode.Slow] = val;
+                    model.Keyboard.JogDistances[(int)JogMode.Slow] = val;
                 if (!(val = GrblSettings.GetDouble(grblHALSetting.JogFastDistance)).Equals(double.NaN))
-                    model.Keyboard.JogDistances[(int)KeypressHandler.JogMode.Fast] = val;
+                    model.Keyboard.JogDistances[(int)JogMode.Fast] = val;
                 if (!(val = GrblSettings.GetDouble(grblHALSetting.JogStepSpeed)).Equals(double.NaN))
-                    model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Step] = val;
+                    model.Keyboard.JogFeedrates[(int)JogMode.Step] = val;
                 if (!(val = GrblSettings.GetDouble(grblHALSetting.JogSlowSpeed)).Equals(double.NaN))
-                    model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Slow] = val;
+                    model.Keyboard.JogFeedrates[(int)JogMode.Slow] = val;
                 if (!(val = GrblSettings.GetDouble(grblHALSetting.JogFastSpeed)).Equals(double.NaN))
-                    model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Fast] = val;
+                    model.Keyboard.JogFeedrates[(int)JogMode.Fast] = val;
             }
         }
 
@@ -1455,11 +1126,41 @@ namespace CNC.Core
             return Grbl.GrblViewModel != null && Get(Grbl.GrblViewModel);
         }
 
-        public static string Startup(GrblViewModel model)
+        // The status report THIS handshake matched, captured as it arrives (see OnStartup below).
+        //
+        // It cannot be read back off Comms.com.Reply afterwards: that field is assigned on the comms READ
+        // THREAD for every line the controller sends (TelnetStream.ReadComplete and its siblings), so it
+        // holds whatever arrived LAST, not what any WaitFor matched. Startup used to return it, and the few
+        // statements between "the loop saw a <...>" and "return" were enough for the app's own follow-up
+        // $G/$# acks to overwrite it with "ok".
+        //
+        // Restart() then tested response.StartsWith("<"), found "ok", and told the operator "Unexpected
+        // response received from controller: ok" about a controller that had just answered a perfect status
+        // report - and returned NoResponse, which skips InitSystem, which is why $I was never sent and every
+        // capability read as absent. One race, both bugs. Captured on the wire 2026-08-12 06:16:
+        //
+        //   06:16:21.767  < <Idle|MPos:742.589,-820.001,0.000|...|FW:grblHAL>   the match
+        //   06:16:22.211  < ok                                                   $G's ack, overwrites Reply
+        //   06:16:22.239  < ok                                                   $#'s ack
+        //   06:16:44.119  Restart() -> NoResponse
+        private static string startupReport;
+
+        /// <summary>
+        /// Handshake with the controller, retrying <paramref name="retries"/> times at 250ms apart.
+        ///
+        /// The default is sized for a board that is already up: ten tries, two and a half seconds, and a
+        /// grblHAL controller answers on the first. It is deliberately NOT sized for the slowest board that
+        /// exists, because every connect would then pay for it.
+        ///
+        /// Cheap clone controllers reset when the serial port is opened and can take five or ten seconds to
+        /// come back, which is longer than any default worth having. The caller offers to wait longer rather
+        /// than this guessing - see Controller.Restart.
+        /// </summary>
+        public static string Startup(GrblViewModel model, int retries = 10)
         {
             bool? res = null;
-            int retries = 10;
 
+            startupReport = string.Empty;
             PollGrbl.Suspend();
             CancellationToken cancellationToken = new CancellationToken();
 
@@ -1467,7 +1168,7 @@ namespace CNC.Core
             {
                 res = null;
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.SingleEvent<string>(
                     cancellationToken,
@@ -1475,12 +1176,11 @@ namespace CNC.Core
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
                     250, () => Comms.com.WriteByte(GrblConstants.CMD_STATUS_REPORT_ALL));
-                }).Start();
+                });
 
-                while (res == null)
-                    EventUtils.DoEvents();
-
-                if (Comms.com.Reply.StartsWith("<"))
+                // What WE matched, not what happened to arrive last - a status report from the poller or an
+                // "ok" from someone else's command must neither end this loop nor prolong it.
+                if (!string.IsNullOrEmpty(startupReport))
                     retries = 0;
             }
 
@@ -1489,7 +1189,7 @@ namespace CNC.Core
                 res = null;
                 Comms.com.PurgeQueue();
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.SingleEvent<string>(
                     cancellationToken,
@@ -1497,17 +1197,28 @@ namespace CNC.Core
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
                     1500, () => Comms.com.WriteByte((byte)GrblConstants.CMD_STATUS_REPORT_LEGACY[0]));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
             }
-            else if (!Resources.IsLegacyController)
+            else if (!GrblInfo.IsLegacyController)
                 IsGrblHAL = model.Firmware == "grblHAL";
 
             PollGrbl.Resume();
 
-            return Comms.com.Reply;
+            // Loud when it would have mattered: this is the exact condition that produced the false
+            // "Unexpected response received from controller: ok" dialog, and reading it off a log beats
+            // reproducing a thread race. Fall back to Comms.com.Reply only when nothing matched at all -
+            // there the last line received IS the best evidence of what the controller is saying.
+            if (DebugLog.Enabled)
+            {
+                if (string.IsNullOrEmpty(startupReport))
+                    DebugLog.Write("connect", string.Format("Startup: no status report matched in {0} attempts - reporting the last line received: '{1}'",
+                        10, Comms.com.Reply));
+                else if (Comms.com.Reply != startupReport)
+                    DebugLog.Write("connect", string.Format("Startup: matched '{0}', but the last line received is now '{1}' - returning the match (this is the race that used to fail the connect)",
+                        startupReport, Comms.com.Reply));
+            }
+
+            return string.IsNullOrEmpty(startupReport) ? Comms.com.Reply : startupReport;
         }
 
         private static void DetectNumAxes(string rt_report)
@@ -1534,13 +1245,19 @@ namespace CNC.Core
         private static void OnStartup(string data)
         {
             if ((ExtendedProtocol = data.StartsWith("<")))
+            {
+                startupReport = data;   // hold onto it HERE - Comms.com.Reply will not keep it
                 DetectNumAxes(data);
+            }
         }
 
         private static void OnLegacyStartup(string data)
         {
             if (data.StartsWith("<"))
+            {
+                startupReport = data;
                 DetectNumAxes(data);
+            }
         }
 
         // Extract "drv:<branch>@<sha>" from the raw build stamp (see touch_build_stamp.py's ref() format).
@@ -1581,9 +1298,25 @@ namespace CNC.Core
 
         private static void Process(string data)
         {
-            if (Dispatcher.CurrentDispatcher != dispatcher)
+            Process(data, false);
+        }
+
+        // 'marshalled' makes the hop to the captured thread happen AT MOST ONCE, and it is load-bearing.
+        // This guard used to re-raise the dataReceived multicast - which this method is itself the only
+        // subscriber to - so the marshalled call re-entered here. That was safe under the
+        // Dispatcher.Invoke it replaced, because a dispatcher can never run the callback inline on the
+        // calling thread. SyncTarget.Send CAN: it deliberately runs inline when it has no context to
+        // marshal through (a plain worker thread, or a headless host with no UI thread registered), and
+        // the base SynchronizationContext.Send likewise invokes its delegate on the calling thread.
+        // Inline means IsCurrent is still false on re-entry, so this recursed until the stack died -
+        // a StackOverflowException, which no AppDomain handler can catch, so the process disappeared
+        // with no crash log and no dialog. Running the body on the "wrong" thread when there is nothing
+        // to marshal to is the correct headless behaviour; recursing is never correct.
+        private static void Process(string data, bool marshalled)
+        {
+            if (!marshalled && !target.IsCurrent)
             {
-                dispatcher.Invoke(dataReceived, data);
+                target.Send(() => Process(data, true));
                 return;
             }
 
@@ -1829,7 +1562,7 @@ namespace CNC.Core
 
             PollGrbl.Suspend();
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -1837,10 +1570,7 @@ namespace CNC.Core
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
                     400, () => Comms.com.WriteCommand(GrblConstants.CMD_GETPARSERSTATE));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             PollGrbl.Resume();
 
@@ -2151,7 +1881,7 @@ namespace CNC.Core
 
     public class GrblWorkParameters
     {
-        private static Dispatcher dispatcher;
+        private static SyncTarget target;   // thread that began the request; responses may arrive on a comms/worker thread
         public static bool IsLoaded { get { return CoordinateSystems.Count > 0; } }
         public static LatheMode LatheMode { get; private set; }
         public static double ToolLengthOffsetReference { get; private set; } = double.NaN;
@@ -2161,6 +1891,17 @@ namespace CNC.Core
         public static CoordinateSystem ProbePosition { get; private set; } = new CoordinateSystem("PRB", "");
         public static bool ProbeSuccesful { get; private set; } = false;
         public static int HomedMask { get; private set; } = -1;   // grblHAL sys.homed.mask from the $# [HOME:...] line; -1 = unknown / not fetched
+
+        // Staging for the above. HomedMask used to be cleared to -1 on ENTRY to Get() and set directly by the
+        // [HOME:] parse, which opened a window - from that clear until the report's [HOME:] line was consumed -
+        // in which ANY other reader saw "unknown". Every reader of this field treats -1 as "can't know" and
+        // fails open, so the window silently disabled them. MacroRunner.StoredPositionUnreachable read it
+        // inside that window on every run it ever made (4 for 4 across the whole log history: the soft-limit
+        // guard never once actually evaluated, and a G59.3 taught ON the envelope boundary went through to a
+        // mid-run Alarm:2 on 2026-09-02). Staging here and publishing once the report has been consumed means
+        // a concurrent reader gets the PREVIOUS mask - slightly stale, but a real answer - instead of "unknown",
+        // and -1 goes back to meaning only what it says: the read genuinely failed.
+        private static int homedMaskStaged = -1;
 
         private static Action<string> dataReceived;
 
@@ -2196,16 +1937,16 @@ namespace CNC.Core
             if (!GrblParserState.IsLoaded)
                 GrblParserState.Get(model);
 
-            dispatcher = Dispatcher.CurrentDispatcher;
+            target = SyncTarget.Capture();
             dataReceived += process;
             LatheMode = GrblParserState.LatheMode;
-            HomedMask = -1;     // fail-closed: only a fresh [HOME:...] line sets it
+            homedMaskStaged = -1;   // only a fresh [HOME:...] line fills this; published below once consumed
 
             model.Silent = true;
 
             PollGrbl.Suspend();
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -2216,15 +1957,23 @@ namespace CNC.Core
                     // [HOME:..] is one of the LAST lines - too short a timeout truncates it and HomedMask never gets
                     // set. 1500 ms is ample on USB/serial and harmless when the report returns quickly.
                     1500, () => Comms.com.WriteCommand(GrblConstants.CMD_GETNGCPARAMETERS));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             PollGrbl.Resume();
 
             model.Silent = false;
             dataReceived -= process;
+
+            // Publish the freshly-read mask (see homedMaskStaged). Logged because the whole point of this
+            // field is to be read by guards that fail OPEN when it is -1: if it ever reads -1 here with
+            // res=True, the [HOME:] line is being missed or arriving after the ack, and every one of those
+            // guards is silently off. That is exactly what was happening before this change.
+            int homedWas = HomedMask;
+            HomedMask = homedMaskStaged;
+            if (DebugLog.Enabled)
+                DebugLog.Write("run", string.Format("GrblWorkParameters.Get: res={0} HomedMask {1} -> {2}{3}",
+                    res, homedWas, HomedMask,
+                    res == true && HomedMask < 0 ? "  (NO [HOME:] IN A COMPLETED $# REPORT - guards that need it will fail open)" : ""));
 
             if (Tools.Count == 1)
             {
@@ -2300,9 +2049,17 @@ namespace CNC.Core
 
         private static void process(string data)
         {
-            if (Dispatcher.CurrentDispatcher != dispatcher)
+            process(data, false);
+        }
+
+        // See GrblParserState.Process for why the marshal must not re-raise dataReceived: SyncTarget.Send
+        // can run inline, and re-entering this guard then recurses to a StackOverflowException. This is the
+        // site that actually crashed - loading a large program while $# was in flight.
+        private static void process(string data, bool marshalled)
+        {
+            if (!marshalled && !target.IsCurrent)
             {
-                dispatcher.Invoke(dataReceived, data);
+                target.Send(() => process(data, true));
                 return;
             }
 
@@ -2371,7 +2128,7 @@ namespace CNC.Core
                             int c = parameters.LastIndexOf(':');
                             int mask;
                             if (c >= 0 && int.TryParse(parameters.Substring(c + 1), out mask))
-                                HomedMask = mask;
+                                homedMaskStaged = mask;   // published by Get() once the report is consumed
                         }
                         break;
                 }
@@ -2452,7 +2209,7 @@ namespace CNC.Core
                 }
                 catch (Exception e)
                 {
-                    AppDialogs.Show(e.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    UserPrompt.Show(e.Message, "ioSender", PromptButtons.OK, PromptIcon.Warning);
                 }
 
             return ok;
@@ -2519,7 +2276,7 @@ namespace CNC.Core
 
     public static class GrblSpindles
     {
-        private static Dispatcher dispatcher;
+        private static SyncTarget target;   // thread that began the request; responses may arrive on a comms/worker thread
         public static ObservableCollection<Spindle> Spindles { get; private set; } = new ObservableCollection<Spindle>();
 
         private static Action<string> dataReceived;
@@ -2535,13 +2292,15 @@ namespace CNC.Core
 
             if (GrblInfo.IsGrblHAL && GrblInfo.Build >= 20240307 && Spindles.Count == 0)
             {
-                dispatcher = Dispatcher.CurrentDispatcher;
+                target = SyncTarget.Capture();
                 dataReceived += process;
 
                 PollGrbl.Suspend();
+                // Do not issue into the tail of the previous query's reply - see GrblHandshake.
+                GrblHandshake.DrainToQuiet(model);
                 CancellationToken cancellationToken = new CancellationToken();
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                         cancellationToken,
@@ -2549,10 +2308,7 @@ namespace CNC.Core
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         400, () => Comms.com.WriteCommand(GrblConstants.CMD_GETSPINDLES));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 PollGrbl.Resume();
                 dataReceived -= process;
@@ -2575,9 +2331,15 @@ namespace CNC.Core
 
         private static void process(string data)
         {
-            if (Dispatcher.CurrentDispatcher != dispatcher)
+            process(data, false);
+        }
+
+        // Same one-hop guard as the other two handshakes - see GrblParserState.Process.
+        private static void process(string data, bool marshalled)
+        {
+            if (!marshalled && !target.IsCurrent)
             {
-                dispatcher.Invoke(dataReceived, data);
+                target.Send(() => process(data, true));
                 return;
             }
 
@@ -2587,6 +2349,61 @@ namespace CNC.Core
                 if (valuepair.Length == 2 && valuepair[0] == "[SPINDLE" && valuepair[1].Split('|')[1] != "-")
                     Spindles.Add(new Spindle(valuepair[1]));
             }
+        }
+    }
+
+    /// <summary>
+    /// Barrier for the connect-time query chain.
+    ///
+    /// WaitFor.AckResponse returns on the FIRST literal "ok" it sees, and it subscribes before writing its
+    /// command - so if the PREVIOUS query's reply is still streaming, it harvests that command's "ok" and
+    /// returns having collected nothing of its own. The whole handshake then runs one command behind
+    /// itself, and every query reports success. Confirmed on real hardware 2026-08-24:
+    ///
+    ///     09:52:34.053  > $EE          sent while $EA's ALARMCODE stream was still running
+    ///     09:52:34.056  < ok           $EA's ok - GrblErrors.Get() takes it and returns
+    ///     09:52:34.061  < [ERRORCODE:0||]      $EE's real answer, now unwatched
+    ///     09:52:34.064  > $ES          GrblSettings.Load() fires into it
+    ///     09:52:34.099  < ok           $EE's ok - ends ProcessDetail's wait
+    ///     09:52:34.099  < [SETTING:0|...]      $ES's real answer, ONE LINE too late
+    ///
+    /// so Settings came out EMPTY while Load() returned ack=True. Downstream, GrblInfo.MaxTravel derives
+    /// from that collection and became 0, StartJobView emitted its "#<_bottom> = -9999" sentinel, and
+    /// pcorner.macro turned it into "G38.2 Z-9998" - caught only by soft limits, as ALARM:2.
+    ///
+    /// Pure timing, which is why it is intermittent: 90 ms between $EE and $ES collected 104 settings, 11 ms
+    /// collected none - same build, same machine, minutes apart. Possible since the chained $EA/$EE/$ES
+    /// connect sequence landed upstream in e097540b (2021-12-26).
+    ///
+    /// This does not make AckResponse correct - it still cannot tell whose "ok" it is reading. It removes
+    /// the condition that lets it read the wrong one, at the one place the chain is issued back-to-back.
+    /// </summary>
+    public static class GrblHandshake
+    {
+        /// <summary>
+        /// Pump until the link has produced nothing for <paramref name="quietMs"/>, giving up after
+        /// <paramref name="maxMs"/>. Call before issuing a connect-time query whose reply is terminated by
+        /// a bare "ok". Costs quietMs per call by design - a handshake is not a hot path, and the
+        /// alternative is a machine that silently does not know its own travel limits.
+        /// </summary>
+        public static void DrainToQuiet(GrblViewModel model, int quietMs = 40, int maxMs = 1000)
+        {
+            if (model == null || Comms.com == null || !Comms.com.IsOpen)
+                return;
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            long lastSeen = 0;
+            Action<string> seen = _ => lastSeen = sw.ElapsedMilliseconds;
+
+            model.OnResponseReceived += seen;
+            try
+            {
+                bool quiet = EventUtils.WaitWhile(() => sw.ElapsedMilliseconds - lastSeen < quietMs, maxMs);
+                if (DebugLog.Enabled && !quiet)
+                    DebugLog.Write("connect", string.Format(
+                        "DrainToQuiet: link still talking after {0} ms - issuing the next query anyway", maxMs));
+            }
+            finally { model.OnResponseReceived -= seen; }
         }
     }
 
@@ -2609,9 +2426,11 @@ namespace CNC.Core
             if (GrblInfo.HasEnums && messages.Count == 0)
             {
                 PollGrbl.Suspend();
+                // Do not issue into the tail of the previous query's reply - see GrblHandshake.
+                GrblHandshake.DrainToQuiet(model);
                 CancellationToken cancellationToken = new CancellationToken();
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                         cancellationToken,
@@ -2619,10 +2438,7 @@ namespace CNC.Core
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         1000, () => Comms.com.WriteCommand(GrblConstants.CMD_GETERRORCODES));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 PollGrbl.Resume();
             }
@@ -2730,9 +2546,11 @@ namespace CNC.Core
             if (GrblInfo.HasEnums && messages.Count == 0)
             {
                 PollGrbl.Suspend();
+                // Do not issue into the tail of the previous query's reply - see GrblHandshake.
+                GrblHandshake.DrainToQuiet(model);
                 CancellationToken cancellationToken = new CancellationToken();
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                         cancellationToken,
@@ -2740,10 +2558,7 @@ namespace CNC.Core
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         1000, () => Comms.com.WriteCommand(GrblConstants.CMD_GETALARMCODES));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 PollGrbl.Resume();
             }
@@ -2883,9 +2698,11 @@ namespace CNC.Core
             if (GrblInfo.HasEnums && Groups.Count == 0)
             {
                 PollGrbl.Suspend();
+                // Do not issue into the tail of the previous query's reply - see GrblHandshake.
+                GrblHandshake.DrainToQuiet(model);
                 CancellationToken cancellationToken = new CancellationToken();
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                         cancellationToken,
@@ -2893,10 +2710,7 @@ namespace CNC.Core
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         400, () => Comms.com.WriteCommand(GrblConstants.CMD_GETSETTINGSGROUPS));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 PollGrbl.Resume();
             }
@@ -2985,7 +2799,7 @@ namespace CNC.Core
             PollGrbl.Suspend();
             CancellationToken cancellationToken = new CancellationToken();
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -2993,10 +2807,7 @@ namespace CNC.Core
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
                     400, () => Comms.com.WriteCommand(GrblConstants.CMD_GETSTARTUPLINES));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             PollGrbl.Resume();
 
@@ -3213,7 +3024,7 @@ namespace CNC.Core
                         PollGrbl.Suspend();
                         Grbl.GrblViewModel.Silent = true;
 
-                        new Thread(() =>
+                        EventUtils.RunPumped(() =>
                         {
                             res = WaitFor.AckResponse<string>(
                                 cancellationToken,
@@ -3221,10 +3032,7 @@ namespace CNC.Core
                                 a => Grbl.GrblViewModel.OnResponseReceived += a,
                                 a => Grbl.GrblViewModel.OnResponseReceived -= a,
                                 400, () => Comms.com.WriteCommand("$SED=" + Id.ToString()));
-                        }).Start();
-
-                        while (res == null)
-                            EventUtils.DoEvents();
+                        });
 
                         if (_description == null)
                             _description = String.Empty;
@@ -3305,20 +3113,24 @@ namespace CNC.Core
         }
     }
 
-    // One settings restore point (an auto-snapshot written on Save). See GrblSettings.GetSnapshots().
-    public class SettingsSnapshot
-    {
-        public string FilePath { get; set; }
-        public DateTime Saved { get; set; }
-
-        public string SavedText { get { return Saved.ToString("yyyy-MM-dd HH:mm:ss"); } }
-    }
-
     public static class GrblSettings
     {
         private static List<string> responses = new List<string>();
 
         public static ObservableCollection<GrblSettingDetails> Settings { get; private set; } = new ObservableCollection<GrblSettingDetails>();
+
+        /// <summary>
+        /// Serialises access to <see cref="Settings"/>. It has TWO writers on DIFFERENT threads: the
+        /// $$ parser adds directly from the comms worker, and the missing-setting path posts an Add
+        /// to the UI thread so bindings see a fully populated entry. Meanwhile the parser enumerates
+        /// the collection for every line it processes.
+        ///
+        /// That combination crashed a real connect (2026-08-10, "Collection was modified; enumeration
+        /// operation may not execute" out of GrblSettings.Process): connecting to a controller whose
+        /// settings are not already loaded queues an Add for nearly every line, so the window where a
+        /// posted Add lands mid-enumeration is wide open.
+        /// </summary>
+        private static readonly object settingsLock = new object();
 
         // Edits made in the settings editor but not yet written to the controller, keyed by setting Id.
         // The left-hand list reads these (via GrblSettingDetails.EditValue) so changes show immediately
@@ -3393,6 +3205,79 @@ namespace CNC.Core
         public static bool IsLoaded { get { return Settings.Count > 0; } }
         public static bool ReportProbeCoordinates { get; private set; }
 
+        // Raised after the settings collection has been (re)read from the controller, or written back to it -
+        // i.e. whenever "what the controller holds" has changed underneath anything that took a copy.
+        //
+        // Added 2026-08-12 for the Machine Setup wizard, which read $130-$132 once on activation and then
+        // showed those numbers indefinitely. That is not merely cosmetic there: its Apply diffs the on-screen
+        // values against the LIVE settings, so a stale table turns into a pending change that writes the old
+        // value back - a travel envelope corrected from the MDI was one Apply away from being un-corrected.
+        //
+        // Fires on whatever thread completed the load; subscribers that touch UI must marshal.
+        public static event EventHandler SettingsReloaded;
+
+        private static void RaiseSettingsReloaded()
+        {
+            var handler = SettingsReloaded;
+            if (handler != null)
+                handler(null, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Record a "$n=value" the controller has just accepted from OUTSIDE the settings UI - the MDI, the
+        /// console, a macro. Those never go through Save() or a $$ reload, so before this nothing here knew
+        /// the machine had changed: the cached value stayed at whatever the last $$ said, for the rest of the
+        /// session, and every consumer of it was quietly wrong.
+        ///
+        /// Observed 2026-08-12: "$132=120" typed at the MDI, acked ok, and Machine Setup went on showing 152
+        /// - correctly, because that IS what this collection still held. GrblInfo.MaxTravel is derived from
+        /// here too, so the jog envelope clamp was working from the old number as well.
+        ///
+        /// Called from the MDI dispatcher's ack path, which is the one place that sees both the command and
+        /// its reply. Only an "ok" counts - a rejected write changed nothing.
+        /// </summary>
+        public static void NoteExternalWrite(string command, string reply)
+        {
+            if (string.IsNullOrWhiteSpace(command) || reply == null ||
+                 !reply.Trim().Equals("ok", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var m = System.Text.RegularExpressions.Regex.Match(command.Trim(), @"^\$(\d+)\s*=\s*(\S.*?)\s*$");
+            if (!m.Success)
+                return;   // a query ("$132"), a jog, a command - not a setting write
+
+            int id;
+            if (!int.TryParse(m.Groups[1].Value, out id))
+                return;
+            string value = m.Groups[2].Value;
+
+            // The ack arrives on the pacer thread; these are view models with UI-affine notifications, and
+            // GrblInfo re-derivation touches the view model. Post, never Send - a context Send can run
+            // inline (see UiContext), and this is called from inside reply handling.
+            UiContext.Post(() =>
+            {
+                var detail = Settings.FirstOrDefault(s => s.Id == id);
+                if (detail == null || detail.Value == value)
+                    return;
+
+                // Logged for the same reason Save() logs: this is a real change to the machine's
+                // configuration. It matters MORE here - a $131 typed at the MDI leaves no dialog, no
+                // Apply, and no trace anywhere else, so nothing but this line will ever say it happened.
+                Grbl.GrblViewModel?.LogDetail(string.Format("Controller setting changed from the console - ${0} {1}: {2} -> {3}",
+                                                            id, detail.Name, detail.Value, value));
+
+                detail.Value = value;
+                detail.SetLoadedBaseline();   // the controller holds this now - not a pending local edit
+
+                // Re-derive the cached projections (MaxTravel, homing direction, step resolution). The jog
+                // clamp and the 3D machine frame read those, not the collection.
+                if (Grbl.GrblViewModel != null)
+                    GrblInfo.OnSettingsLoaded(Grbl.GrblViewModel);
+
+                RaiseSettingsReloaded();
+            });
+        }
+
         public static GrblSettingDetails Get(GrblSetting key)
         {
             return Settings.Where(x => x.Id == ((int)key)).FirstOrDefault();
@@ -3459,10 +3344,13 @@ namespace CNC.Core
         public static bool Load(GrblViewModel model)
         {
             bool? res = null;
-            bool load, getExtended = !Resources.IsLegacyController && GrblInfo.IsGrblHAL && GrblInfo.Build >= 20200716;
+            bool load, getExtended = !GrblInfo.IsLegacyController && GrblInfo.IsGrblHAL && GrblInfo.Build >= 20200716;
             CancellationToken cancellationToken = new CancellationToken();
 
             PollGrbl.Suspend();
+            // Do not issue into the tail of the previous query's reply - see GrblHandshake. This is the
+            // one that hurt: $ES landing behind $EE's ok collected ZERO settings and still reported success.
+            GrblHandshake.DrainToQuiet(model);
             model.Silent = true;
 
             // The grblHAL setting-enum metadata (per-setting name/type/group + the group tree) is fetched only on
@@ -3473,11 +3361,12 @@ namespace CNC.Core
             // those stale group-less settings first so the details query rebuilds them with metadata (no duplicates).
             bool needMeta = GrblInfo.HasEnums && GrblSettingGroups.Groups.Count == 0;
             if (needMeta && Settings.Count > 0)
-                Settings.Clear();
+                lock (settingsLock)
+                    Settings.Clear();
 
             if ((load = Settings.Count == 0 || needMeta) && GrblInfo.HasEnums)
             {
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                         cancellationToken,
@@ -3485,21 +3374,34 @@ namespace CNC.Core
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         1000, () => Comms.com.WriteCommand(GrblConstants.CMD_GETSETTINGSDETAILS));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 GrblSettingGroups.Get(model);
             }
 
+            // Load() can complete "successfully" and leave Settings EMPTY, and nothing downstream can tell:
+            // GetInteger then answers -1 for every id (a MISS, not a value) and GetDouble parses null, so
+            // GrblInfo.MaxTravel derives as 0. Observed on hardware 2026-08-24 - $ES/$EG/$+ all went out at
+            // connect, the controller answered, and Settings.Count was still 0 a minute later. Downstream:
+            // the stored-position guard skipped silently, the jog clamp and the program-fit check switched
+            // off, and StartJobView emitted its "#<_bottom> = -9999" sentinel into pcorner.macro, which
+            // turned it into "G38.2 Z-9998" and alarmed. Log each stage so the one that drops it is named.
+            if (DebugLog.Enabled)
+                DebugLog.Write("settings", string.Format(
+                    "Load: detailsPath={0} HasEnums={1} needMeta={2} getExtended={3} -> detail responses={4}, Settings={5}",
+                    load, GrblInfo.HasEnums, needMeta, getExtended, responses.Count, Settings.Count));
+
             foreach (var response in responses)
-                Settings.Add(new GrblSettingDetails(response));
+                lock (settingsLock)
+                    Settings.Add(new GrblSettingDetails(response));
+
+            if (DebugLog.Enabled)
+                DebugLog.Write("settings", "Load: after adding details, Settings=" + Settings.Count);
 
             res = null;
             responses.Clear();
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -3507,10 +3409,14 @@ namespace CNC.Core
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
                     1000, () => Comms.com.WriteCommand(getExtended ? GrblConstants.CMD_GETSETTINGS_ALL : GrblConstants.CMD_GETSETTINGS));
-            }).Start();
+            });
 
-            while (res == null)
-                EventUtils.DoEvents();
+            // Process() creates a missing entry and queues the Add through UiContext.Post, so the count here
+            // can legitimately lag - which is itself worth seeing. res is WaitFor's verdict: false/null means
+            // the dump was never acked inside the 1000 ms window.
+            if (DebugLog.Enabled)
+                DebugLog.Write("settings", string.Format("Load: after $+/$$ dump, ack={0}, Settings={1}",
+                    res == null ? "(null)" : res.ToString(), Settings.Count));
 
             model.Silent = false;
             PollGrbl.Resume();
@@ -3597,6 +3503,7 @@ namespace CNC.Core
                 ReportProbeCoordinates = true;
 
             GrblInfo.OnSettingsLoaded(model);
+            RaiseSettingsReloaded();
 
             return IsLoaded;
         }
@@ -3623,19 +3530,37 @@ namespace CNC.Core
 
             var changed = Settings.Where(x => x.IsDirty).ToList();
 
+            // Captured BEFORE the writes: SetLoadedBaseline() in the loop moves LoadedValue on to the new
+            // value as each ack arrives, so reading it afterwards would report "845.000 -> 845.000".
+            var wasValue = new Dictionary<int, string>();
+            foreach (var s in changed)
+                wasValue[s.Id] = s.LoadedValue;
+
             if (changed.Count > 0)
             {
                 foreach (var setting in changed)
                 {
+                    bool acked;
 #if USE_ASYNC
                     var task = Task.Run(() => Comms.com.AwaitAck(string.Format("${0}={1}", Setting.Id, Setting.Value)));
-                    await await Task.WhenAny(task, Task.Delay(2500));
+                    acked = await await Task.WhenAny(task, Task.Delay(2500).ContinueWith(_ => false));
 #else
                     Comms.com.WriteCommand(string.Format("${0}={1}", setting.Id, setting.Value));
-                    Comms.com.AwaitAck();
+                    acked = Comms.com.AwaitAck();
 #endif
                     setting.ClearErrors();
-                    if (Comms.com.Reply.StartsWith("error:"))
+                    if (!acked)
+                    {
+                        // Neither ok nor error came back. Do NOT fall through to the Reply check below:
+                        // Comms.com.Reply is a last-writer-wins global that still holds some earlier
+                        // exchange's line, so it would report THAT one's outcome as this setting's - the
+                        // same defect as the connect handshake's. The setting stays dirty and unbaselined,
+                        // because we do not know whether the controller took it.
+                        // Unreachable before 2026-08-13: the wait was unbounded, so it hung here instead.
+                        ok = false;
+                        setting.SetError("No response from controller");
+                    }
+                    else if (Comms.com.Reply.StartsWith("error:"))
                     {
                         ok = false;
                         setting.SetError(GrblErrors.GetMessage(Comms.com.Reply.Substring(6)));
@@ -3652,9 +3577,54 @@ namespace CNC.Core
                 // Wizard) instead of the values read at connect.
                 if (Grbl.GrblViewModel != null)
                     GrblInfo.OnSettingsLoaded(Grbl.GrblViewModel);
+
+                // Also on the WRITE path, not just the read: this is where the wizard's own Apply lands, and
+                // where any other view that saves a setting lands. Anything holding a copy is out of date the
+                // moment this returns, whoever did the writing.
+                RaiseSettingsReloaded();
+
+                LogSaved(changed, wasValue);
             }
 
             return ok;
+        }
+
+        /// <summary>
+        /// Record a settings write in status.log - the count, then one line per setting with its OLD and
+        /// NEW value.
+        ///
+        /// A controller setting is the most consequential thing an operator can change from in here: $131
+        /// decides the travel envelope, $20 whether soft limits exist at all, $27 the pull-off that
+        /// determines whether a taught G30/G59.3 is still reachable. Until now none of it was recorded, so
+        /// "it used to work" had nothing to check against - and $131 840 -> 845, made mid-session on
+        /// 2026-08-24, is exactly the kind of change that explains the next day's symptom.
+        ///
+        /// Failures are named individually rather than folded into a count: a partial save leaves the
+        /// controller holding SOME of what was asked for, which is the state most likely to be
+        /// misremembered as "I changed that".
+        /// </summary>
+        private static void LogSaved(List<GrblSettingDetails> changed, Dictionary<int, string> wasValue)
+        {
+            var model = Grbl.GrblViewModel;
+            if (model == null || changed == null || changed.Count == 0)
+                return;
+
+            int failed = changed.Count(s => s.HasErrors);
+            model.LogDetail(failed == 0
+                ? string.Format("Controller settings saved - {0} changed", changed.Count)
+                : string.Format("Controller settings saved - {0} of {1} changed, {2} FAILED",
+                                changed.Count - failed, changed.Count, failed), failed > 0);
+
+            foreach (var s in changed)
+            {
+                string was;
+                if (!wasValue.TryGetValue(s.Id, out was) || was == null)
+                    was = "(unset)";
+
+                model.LogDetail(string.Format("  ${0} {1}: {2} -> {3}{4}",
+                    s.Id, s.Name, was, s.Value,
+                    s.HasErrors ? "  FAILED - not written" : string.Empty), s.HasErrors);
+            }
         }
 
         private static List<string> Export ()
@@ -3704,15 +3674,14 @@ namespace CNC.Core
             return exp;
         }
 
-        public static void CopyToClipboard()
+        /// <summary>
+        /// The exported settings as a single block of text, or null when there is nothing to export.
+        /// Was CopyToClipboard(), which wrote to the WPF clipboard - an OS/UI facility with no server
+        /// equivalent, so the caller now owns that step (see About.xaml.cs).
+        /// </summary>
+        public static string ExportText()
         {
-            if (Settings.Count > 0) try
-            {
-                Clipboard.SetText(string.Join("\r\n", Export().ToArray()));
-            }
-            catch
-            {
-            }
+            return Settings.Count > 0 ? string.Join("\r\n", Export().ToArray()) : null;
         }
 
         public static bool Backup(string filename)
@@ -3734,7 +3703,7 @@ namespace CNC.Core
             }
             catch (Exception e)
             {
-                AppDialogs.Show(e.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                UserPrompt.Show(e.Message, "ioSender", PromptButtons.OK, PromptIcon.Warning);
             }
 
             return ok;
@@ -3768,35 +3737,10 @@ namespace CNC.Core
             catch { }   // snapshots are a convenience; failure must not affect connect
         }
 
-        // Restore points (newest first) for the Restore picker - scanned across all day-of-week
-        // subfolders so the picker shows the whole rolling week's history, not just today's.
-        public static List<SettingsSnapshot> GetSnapshots()
-        {
-            var list = new List<SettingsSnapshot>();
-
-            try
-            {
-                foreach (var dir in RotatingFileStore.ExistingDayDirectories(SnapshotFolder))
-                {
-                    foreach (var path in Directory.GetFiles(dir, "Grbl_*.txt"))
-                    {
-                        string stamp = System.IO.Path.GetFileNameWithoutExtension(path).Substring("Grbl_".Length);
-
-                        if (!DateTime.TryParseExact(stamp, RotatingFileStore.TimestampFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime saved))
-                            saved = File.GetLastWriteTime(path);
-
-                        list.Add(new SettingsSnapshot
-                        {
-                            FilePath = path,
-                            Saved = saved
-                        });
-                    }
-                }
-            }
-            catch { }
-
-            return list.OrderByDescending(s => s.Saved).ToList();
-        }
+        // Restore points are built by CNC.Controls.RestorePoint.All(), which pairs these Grbl_*.txt
+        // snapshots with the App.config_* ones written beside them. There was a second, Grbl-only listing
+        // here (GetSnapshots); it is gone rather than left alongside, because two independent scans of the
+        // same folder is how the two kinds came to be treated as unrelated in the first place.
 
         public static string FormatFloat(string value, string format)
         {
@@ -3856,13 +3800,19 @@ namespace CNC.Core
                             break;
                     }
 
-                    var setting = Settings.Where(x => x.Id == id).FirstOrDefault();
+                    GrblSettingDetails setting;
+                    lock (settingsLock)
+                        setting = Settings.Where(x => x.Id == id).FirstOrDefault();
 
                     if (setting == null)
                     {
-                        Action<GrblSettingDetails> addMethod = Settings.Add;
                         setting = new GrblSettingDetails(id.ToString() + "|0||||||");
-                        Application.Current.Dispatcher.BeginInvoke(addMethod, setting);
+                        var added = setting;
+                        // Queued, not inline, even when already on the UI thread: the caller configures
+                        // `setting` immediately below, and the original BeginInvoke meant the collection
+                        // (and anything bound to it) saw a fully populated entry. The lock is what stops
+                        // that queued Add landing while this thread is enumerating - see settingsLock.
+                        UiContext.Post(() => { lock (settingsLock) Settings.Add(added); });
                     }
 
                     setting.Value = valuepair[1];
@@ -3892,6 +3842,9 @@ namespace CNC.Core
         internal static void Resume()
         {
             suspend = false;
+            // No polls went out while suspended, so that silence is not evidence of anything - start the
+            // starvation clock fresh rather than immediately tripping on a long blocking handshake.
+            LinkMonitor.Reset();
         }
 
         public void Run()
@@ -3913,6 +3866,7 @@ namespace CNC.Core
                 pollTimer.Interval = PollInterval;
                 pollTimer.Start();
                 RTCommand = GrblConstants.CMD_STATUS_REPORT_ALL;
+                LinkMonitor.Reset();   // polling starts now - don't judge the link on time before it
             }
             else
                 pollTimer.Stop();
@@ -3926,7 +3880,50 @@ namespace CNC.Core
             try
             {
                 if(!suspend)
-                    Comms.com.WriteByte(RTCommand);
+                {
+                    // Timed so a late status report can be attributed: a normal interval here with slow
+                    // reports downstream clears the poller entirely. See PollDiag's header.
+                    if (PollDiag.Enabled)
+                    {
+                        var sw = System.Diagnostics.Stopwatch.StartNew();
+                        Comms.com.WriteByte(RTCommand);
+                        PollDiag.PollSent(sw.Elapsed.TotalMilliseconds);
+                    }
+                    else
+                        Comms.com.WriteByte(RTCommand);
+
+                    // The write above "succeeded" - which on a half-open socket proves nothing at all.
+                    // The only real evidence the link is two-way is that replies keep arriving, so check
+                    // that here, on the one timer that is running whenever we expect traffic. Reported
+                    // once per outage; the transport's existing Reconnector takes it from here.
+                    // EventMode false = somebody is doing a raw synchronous exchange on this link and
+                    // consuming replies with Comms.com.ReadByte() instead of letting them through
+                    // Comms.PostTo - a YModem file transfer is the one that matters. LinkMonitor.Rx() only
+                    // stamps in PostTo, so during such a transfer it sees zero RX BY CONSTRUCTION and
+                    // starves on a link that is working perfectly.
+                    // Not hypothetical: this tore down a tc.macro upload 10.06s after it started
+                    // (2026-08-06) - NotifyLinkLost mid-YModem, socket reopened under the transfer, the
+                    // controller left mid-protocol and mute until the app was restarted and the machine
+                    // re-homed. A watchdog that kills the thing it is watching is worse than none.
+                    // IsReconnecting first: Starved() consumes its report-once token, and burning that
+                    // while a reconnect is already in flight would swallow the NEXT real outage.
+                    // Widen the window for states where grblHAL legitimately stops answering. Homing is not
+                    // a theory: '$H' at 15:36:44.114 on 2026-08-06 drew a single '<Home|...>' and then total
+                    // silence, and the 10s window then in force declared the link lost and tore it down
+                    // mid-home on a moving machine. The state is read fresh each tick rather than latched on
+                    // entry, so nothing has to remember to clear it; if the link genuinely dies while homing
+                    // the state stays Home and the longer backstop still reports it.
+                    var state = Grbl.GrblViewModel == null ? GrblStates.Unknown : Grbl.GrblViewModel.GrblState.State;
+                    bool quiet = state == GrblStates.Home || state == GrblStates.Sleep;
+
+                    if (Comms.com.EventMode && !Comms.com.IsReconnecting &&
+                         LinkMonitor.Starved(quiet ? LinkMonitor.QuietStateTimeoutMs : LinkMonitor.TimeoutMs))
+                    {
+                        DebugLog.Write("link", string.Format("no reply for {0}ms while polling (state {1}) - reporting the link lost",
+                                                              LinkMonitor.SilentMs, state));
+                        Comms.com.NotifyLinkLost();
+                    }
+                }
 
                 if (RTCommand == GrblConstants.CMD_STATUS_REPORT_ALL)
                     RTCommand = GrblLegacy.ConvertRTCommand(GrblConstants.CMD_STATUS_REPORT);

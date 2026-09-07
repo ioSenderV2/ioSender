@@ -1,4 +1,4 @@
-<local:ConfigPanel x:TypeArguments="local:WorkOrder" x:Class="CNC.Controls.WorkOrderView"
+﻿<local:ConfigPanel x:TypeArguments="local:WorkOrder" x:Class="CNC.Controls.WorkOrderView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -33,8 +33,21 @@
                  bottom run bar, same as every other Generate-first tab. -->
             <!-- Work order's own name (its file's name, no path or extension) - not the word "Toolpaths",
                  which said nothing this panel doesn't already show by being full of toolpaths. -->
-            <TextBlock x:Name="txtWorkOrderName" Grid.Row="1" Margin="0,0,0,8" FontWeight="SemiBold"
-                       Text="(untitled)" ToolTip="Not yet saved" TextTrimming="CharacterEllipsis"/>
+            <!-- Right-click: the file-level operations this tab never had (user request 2026-08-08).
+                 Rename/Delete need an actual .workorder file - the Opened handler greys them out for an
+                 untitled work order rather than hiding them, so the capability stays discoverable. -->
+            <TextBlock x:Name="txtWorkOrderName" Grid.Row="1" Margin="0,0,0,8" FontWeight="SemiBold" Background="Transparent"
+                       Text="(untitled)" ToolTip="Not yet saved" TextTrimming="CharacterEllipsis">
+                <TextBlock.ContextMenu>
+                    <ContextMenu Opened="WorkOrderNameMenu_Opened">
+                        <MenuItem x:Uid="mi_worename" x:Name="miWoRename" Header="Rename..." Click="MenuRenameWorkOrder_Click"/>
+                        <MenuItem x:Uid="mi_woopencopy" x:Name="miWoOpenCopy" Header="Open Copy..." Click="MenuOpenCopyWorkOrder_Click"/>
+                        <MenuItem x:Uid="mi_woclose" x:Name="miWoClose" Header="Close" Click="MenuCloseWorkOrder_Click"/>
+                        <Separator/>
+                        <MenuItem x:Uid="mi_wodelete" x:Name="miWoDelete" Header="Delete..." Click="MenuDeleteWorkOrder_Click"/>
+                    </ContextMenu>
+                </TextBlock.ContextMenu>
+            </TextBlock>
             <Border Grid.Row="2" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="4" SnapsToDevicePixels="True">
                 <TreeView x:Name="treeToolpaths" BorderThickness="0" Background="Transparent"
                           SelectedItemChanged="treeToolpaths_SelectedItemChanged" PreviewKeyDown="TreeToolpaths_PreviewKeyDown"/>
@@ -84,6 +97,12 @@
                             <TextBox x:Name="txtName" MinWidth="180" MinHeight="22" VerticalAlignment="Center" VerticalContentAlignment="Center"
                                      TextChanged="txtName_TextChanged"/>
                         </StackPanel>
+                        <StackPanel x:Name="pnlGroupRow" Orientation="Horizontal" Margin="0,0,0,6">
+                            <Label x:Uid="lbl_wogroup" Content="Group:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Uid="cbx_wogroup" x:Name="cbxGroup" MinWidth="180" MinHeight="22" VerticalAlignment="Center" IsEditable="True"
+                                      LostFocus="cbxGroup_Changed" SelectionChanged="cbxGroup_Changed"
+                                      ToolTip="Collects toolpaths under one heading in the tree so a set can be enabled or disabled together, and gives an Indirect toolpath a whole group to copy instead of a single toolpath. Pick an existing group or type a new name; leave blank for none. Joining a group moves this toolpath next to the others in it, because the tree order is the cutting order."/>
+                        </StackPanel>
                         <StackPanel x:Name="pnlGeometryRow" Orientation="Horizontal" Margin="0,0,0,6">
                             <Label x:Uid="lbl_wogeom" Content="Geometry:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
                             <ComboBox x:Name="cbxGeometry" MinWidth="180" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxGeometry_SelectionChanged"/>
@@ -94,6 +113,16 @@
                                       ToolTip="Runs this toolpath's CURRENT geometry and operations here, at this toolpath's own X/Y - a live reference, not a copy. Editing the source later changes this one too."/>
                         </StackPanel>
 
+                        <StackPanel x:Name="pnlAnchorRow" Orientation="Horizontal" Margin="0,2,0,2">
+                            <Label x:Uid="lbl_woanchor" Content="X/Y refers to:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Uid="cbx_woanchor" x:Name="cbxAnchor" MinWidth="180" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxAnchor_SelectionChanged"
+                                      ToolTip="Which point of this shape the X and Y offsets below name. Center is the default. Picking a corner lets you type a coordinate read straight off a previous operation, so a follow-on pass lines up against a known edge without doing the half-width arithmetic yourself. Changing this moves the shape - the numbers you typed stay as they are."/>
+                        </StackPanel>
+                        <StackPanel x:Name="pnlOffsetModeRow" Orientation="Horizontal" Margin="0,2,0,2">
+                            <Label x:Uid="lbl_wooffsetmode" Content="X/Y offsets are:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Uid="cbx_wooffsetmode" x:Name="cbxOffsetMode" MinWidth="180" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxOffsetMode_SelectionChanged"
+                                      ToolTip="What the X and Y offsets below are measured from. Absolute places the borrowed geometry at those work coordinates. Relative measures from the source toolpath's own position, so moving the source moves this copy with it and a row of them stays a row."/>
+                        </StackPanel>
                         <local:NumericField x:Uid="fld_wox" x:Name="fldX" Label="X offset:" ColonAt="150" Format="-####0.0##" Unit="mm"/>
                         <local:NumericField x:Uid="fld_woy" x:Name="fldY" Label="Y offset:" ColonAt="150" Format="-####0.0##" Unit="mm"/>
                         <local:NumericField x:Uid="fld_wolen" x:Name="fldLength" Label="Length:" ColonAt="150" Format="###0.0##" Unit="mm"/>
@@ -104,10 +133,81 @@
                         <local:NumericField x:Uid="fld_wow" x:Name="fldWidth" Label="Width (X):" ColonAt="150" Format="###0.0##" Unit="mm"/>
                         <local:NumericField x:Uid="fld_wod" x:Name="fldDepthY" Label="Depth (Y):" ColonAt="150" Format="###0.0##" Unit="mm"/>
 
+                        <!-- Text fields serve two masters: the Text GEOMETRY (always shown there), and shape
+                             text - the checkbox below on Line/Circle/Oval/Square/Rect, which engraves text
+                             fitted INSIDE the shape (WorkOrderTextFit). They sit after the dimensions because
+                             for a shape the text is an addition to it; the Text kind hides the dimensions, so
+                             its layout reads the same as ever. -->
+                        <!-- Square/Rect only: a round cutter cannot leave a square inside corner, so a
+                             square part will not seat in the pocket cut for it. See WorkOrderToolpath.CornerReliefs. -->
+                        <StackPanel x:Name="pnlCornerReliefsRow" Orientation="Horizontal" Margin="154,2,0,2">
+                            <CheckBox x:Uid="chk_wocornerreliefs" x:Name="chkCornerReliefs" Content="Corner reliefs" VerticalAlignment="Center" Click="chkCornerReliefs_Click"
+                                      ToolTip="Cut a dogbone relief into each inside corner so a square-cornered part actually seats in the pocket. The cutter pokes out along each corner's diagonal until its circle reaches the true corner, leaving a small round nick in both walls. Applies to the pocket and side finish walls; a contour's corners are already cut exactly and are left alone."/>
+                        </StackPanel>
+                        <StackPanel x:Name="pnlHasTextRow" Orientation="Horizontal" Margin="154,2,0,2">
+                            <CheckBox x:Uid="chk_wohastext" x:Name="chkHasText" Content="Text" VerticalAlignment="Center" Click="chkHasText_Click"
+                                      ToolTip="Engrave text fitted inside this shape. The shape itself still cuts exactly as before - ticking this adds a V-bit Engrave operation that cuts the text. Leave Cap height 0 to size the text to the largest that fits."/>
+                        </StackPanel>
+                        <StackPanel x:Name="pnlTextRow" Orientation="Horizontal" Margin="0,2,0,2">
+                            <Label x:Uid="lbl_wotext" Content="Text:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Top"/>
+                            <TextBox x:Uid="txt_wotext" x:Name="txtEngraveText" MinWidth="180" MinHeight="46" MaxWidth="240"
+                                     AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                                     ToolTip="What to engrave. Press Enter for a second line. Uppercase, digits and common punctuation are supported; lowercase is engraved as uppercase, and anything the font cannot draw is skipped rather than cut as a gap."/>
+                        </StackPanel>
+                        <local:NumericField x:Uid="fld_wocap" x:Name="fldCapHeight" Label="Cap height:" ColonAt="150" Format="###0.0##" Unit="mm"
+                                            ToolTip="Height of a capital letter - the size you actually mean by &quot;10 mm lettering&quot;. Round letters overshoot it very slightly, as they should. For text fitted in a shape, 0 sizes it to the largest that fits - a size that can't fit is refused at Generate."/>
+                        <StackPanel x:Name="pnlFontRow" Orientation="Horizontal" Margin="0,2,0,2">
+                            <Label x:Uid="lbl_wofont" Content="Font:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Uid="cbx_wofont" x:Name="cbxFont" MinWidth="180" MaxWidth="240" MinHeight="22" VerticalAlignment="Center"
+                                      ToolTip="Single stroke engraves each letter as one pen line - the best cut for small lettering. Any other font V-CARVES the letter shapes: the bit follows the outline at a depth set by the local stroke width, giving the tapered strokes and sharp corners of carved lettering. Best at larger sizes."/>
+                        </StackPanel>
+                        <StackPanel x:Name="pnlFontStyleRow" Orientation="Horizontal" Margin="154,0,0,4">
+                            <CheckBox x:Uid="chk_wofontbold" x:Name="chkFontBold" Content="Bold" VerticalAlignment="Center"/>
+                            <CheckBox x:Uid="chk_wofontitalic" x:Name="chkFontItalic" Content="Italic" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <!-- SVG artwork (Geometry = Svg). The file is REFERENCED, not copied into the work
+                             order, so re-exporting the artwork updates the cut - see WorkOrderToolpath.SvgFile.
+                             The size readout under the row is the artwork's real ink extent at the chosen
+                             width, which is what tells the operator whether it fits the stave. -->
+                        <StackPanel x:Name="pnlSvgFileRow" Orientation="Horizontal" Margin="0,2,0,2">
+                            <Label x:Uid="lbl_wosvgfile" Content="SVG file:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <TextBox x:Uid="txt_wosvgfile" x:Name="txtSvgFile" MinWidth="140" MaxWidth="180" MinHeight="22" VerticalContentAlignment="Center"
+                                     ToolTip="The .svg file to carve. It is referenced, not copied - re-export the artwork and the next Generate picks it up. Moving or renaming the file is reported at Generate rather than cutting something stale."/>
+                            <Button x:Uid="btn_wosvgbrowse" x:Name="btnSvgBrowse" Content="..." MinWidth="30" MinHeight="22" Margin="4,0,0,0"
+                                    Click="btnSvgBrowse_Click" ToolTip="Choose an .svg file."/>
+                        </StackPanel>
+                        <local:NumericField x:Uid="fld_wosvgwidth" x:Name="fldSvgWidth" Label="Artwork width:" ColonAt="150" Format="###0.0##" Unit="mm"
+                                            ToolTip="How wide the artwork itself is - measured across the drawing's own ink, not its page, so padding around the logo does not count. The height follows from the artwork's proportions."/>
+                        <StackPanel x:Name="pnlSvgInfoRow" Orientation="Horizontal" Margin="154,0,0,4">
+                            <TextBlock x:Name="txtSvgInfo" Foreground="#FF606060" FontSize="11" TextWrapping="Wrap" MaxWidth="240"/>
+                        </StackPanel>
+                        <StackPanel x:Name="pnlTextHAlignRow" Orientation="Horizontal" Margin="0,2,0,2">
+                            <Label x:Uid="lbl_wotexthalign" Content="Horizontal align:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="cbxTextHAlign" MinWidth="180" MinHeight="22" VerticalAlignment="Center"
+                                      ToolTip="Where the text sits when it is smaller than the room available. On a Line it distributes along the length. Text in a circle or oval is center-only."/>
+                        </StackPanel>
+                        <StackPanel x:Name="pnlTextVAlignRow" Orientation="Horizontal" Margin="0,2,0,2">
+                            <Label x:Uid="lbl_wotextvalign" Content="Vertical align:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="cbxTextVAlign" MinWidth="180" MinHeight="22" VerticalAlignment="Center"
+                                      ToolTip="Vertical placement in the leftover room. On a Line: Top sets the text on the line, Bottom hangs it below, Center straddles it."/>
+                        </StackPanel>
+                        <!-- Stock material. NOT a property of this toolpath - it is the one on the Setup tab,
+                             edited here as well so a wrong material can be corrected without leaving Work
+                             Order. Always visible: it drives every operation's feeds and speeds, not just an
+                             engrave, so hiding it behind the Text checkbox would be arbitrary. -->
+                        <StackPanel x:Name="pnlMaterialRow" Orientation="Horizontal" Margin="0,2,0,2">
+                            <Label x:Uid="lbl_womaterial" Content="Material:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Uid="cbx_womaterial" x:Name="cbxMaterial" MinWidth="180" MinHeight="22" VerticalAlignment="Center"
+                                      SelectionChanged="cbxMaterial_SelectionChanged"
+                                      ToolTip="Stock material, shared with the Setup tab - changing it here changes it there. Drives the feeds and speeds suggested for every operation in this work order."/>
+                        </StackPanel>
+
                         <!-- Surface only - see WorkOrderToolpath.EntireSpoilboard's own comment. -->
-                        <StackPanel x:Name="pnlEntireSpoilboard" Orientation="Horizontal" Margin="0,0,0,6">
+                        <StackPanel x:Name="pnlEntireSpoilboard" Margin="0,0,0,6">
                             <CheckBox x:Uid="chk_woentirespoilboard" x:Name="chkEntireSpoilboard" Content="Entire spoilboard" VerticalAlignment="Center" Click="chkEntireSpoilboard_Click"
                                       ToolTip="Face the whole in-bounds machine travel, ignoring this toolpath's Width/Depth/X/Y above. Machine-referenced (no WCS to set it from) - touches off its own Z0 by jogging to the surface, and must be the only enabled operation in this work order."/>
+                            <CheckBox x:Uid="chk_wospoilexistingorigin" x:Name="chkSpoilExistingOrigin" Content="Use the work origin already set" Margin="18,4,0,0" VerticalAlignment="Center" IsEnabled="{Binding IsChecked, ElementName=chkEntireSpoilboard}" Click="chkSpoilExistingOrigin_Click"
+                                      ToolTip="Skip the park and jog-to-touch, and cut on the origin that is already set. Tick this after the Height Map tab's Full work surface has run: it puts X0 Y0 on the table corner and Z0 on the highest point it probed, which beats a single eyeballed touch - one touch cannot tell you whether you hit a high spot or a low one."/>
                         </StackPanel>
 
                         <!-- Pattern: repeats this toolpath - geometry AND all its operations - at each instance
@@ -158,7 +258,7 @@
                         <TextBlock x:Name="txtDrillMatch" Foreground="#586069" FontSize="11" Margin="0,2,0,4" TextWrapping="Wrap" Visibility="Collapsed"/>
                         <local:NumericField x:Uid="fld_wototal" x:Name="fldTotalDepth" Label="Total depth:" ColonAt="150" Format="###0.0##" Unit="mm"/>
                         <local:NumericField x:Uid="fld_wodoc" x:Name="fldDepthOfCut" Label="Depth of cut:" ColonAt="150" Format="###0.0##" Unit="mm"
-                                            ToolTip="Axial step per pass - how much deeper each pass goes."/>
+                                            ToolTip="Axial step per pass - how much deeper each pass goes. On a V-carve it is the step between depth levels: the walls tile exactly either way, so a larger step just means fewer, heavier passes. Set it to the carve's full depth to cut each groove in one, if the bit will take it."/>
                         <local:NumericField x:Uid="fld_wopeck" x:Name="fldPeckDepth" Label="Peck depth:" ColonAt="150" Format="###0.0##" Unit="mm"
                                             ToolTip="How far the drill advances between full retracts. Retracting clears the chips instead of packing them into the flutes."/>
                         <local:NumericField x:Uid="fld_wostepdown" x:Name="fldBoreStepDown" Label="Step down (per rev):" ColonAt="150" Format="###0.0##" Unit="mm"
@@ -170,6 +270,11 @@
                         <local:NumericField x:Uid="fld_wofloorleave" x:Name="fldFloorStockToLeave" Label="Floor stock to leave:" ColonAt="150" Format="##0.0##" Unit="mm"
                                             ToolTip="How much material the roughing operation leaves on the floor for this pass to remove. Roughing's depth stops this far short of true depth."/>
                         <local:NumericField x:Uid="fld_wochamferdepth" x:Name="fldChamferDepth" Label="Chamfer depth:" ColonAt="150" Format="##0.0##" Unit="mm"/>
+                        <local:NumericField x:Uid="fld_woengravewidth" x:Name="fldEngraveWidth" Label="Stroke width:" ColonAt="150" Format="##0.0##" Unit="mm"
+                                            ToolTip="How wide the engraved line should be. The plunge depth is worked out from this and the V-bit's included angle, because width is what you can measure on the part - the same 0.8 mm line is 0.40 mm deep on a 90 degree bit but 0.69 mm on a 60 degree one."/>
+                        <local:NumericField x:Uid="fld_wocarvemaxdepth" x:Name="fldCarveMaxDepth" Label="Max carve depth:" ColonAt="150" Format="##0.0##" Unit="mm"
+                                            ToolTip="Ceiling on how deep the carve may go. 0 = automatic, the deepest the bit itself can cut. A carve's depth follows each shape's own width, so this leaves fine detail untouched and only flattens off the areas wide enough to want more - which is what makes a very narrow bit usable on artwork that also has thick strokes."/>
+                        <TextBlock x:Name="txtEngraveDepth" Foreground="#586069" FontSize="11" Margin="154,0,0,4" TextWrapping="Wrap" Visibility="Collapsed"/>
                         <local:NumericField x:Uid="fld_wocountersink" x:Name="fldCountersinkDiameter" Label="Countersink diameter:" ColonAt="150" Format="##0.0##" Unit="mm"
                                             ToolTip="Target finished diameter - the bit plunges straight down the hole's centerline until its cone reaches this width. Depth is computed automatically."/>
 
@@ -200,10 +305,38 @@
                 <RowDefinition Height="*" MinHeight="120"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <TextBlock x:Uid="hlp_woBody" Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,6" Foreground="#24292F"
-                       Text="Add a toolpath, pick its geometry and place it on the stock, then add the operations that cut it - pocket, contour, finishing passes, chamfer. Run builds every toolpath into one program, in the order listed."/>
+            <StackPanel Grid.Row="0">
+                <TextBlock x:Uid="hlp_woBody" TextWrapping="Wrap" Margin="0,0,0,6" Foreground="#24292F"
+                           Text="Add a toolpath, pick its geometry and place it on the stock, then add the operations that cut it - pocket, contour, finishing passes, chamfer. Run builds every toolpath into one program, in the order listed."/>
+                <!-- The stock this work order was authored for, and what to do when it isn't what Setup says.
+                     Hidden entirely when the two agree, which is the normal case - see UpdateStockBanner. -->
+                <Border x:Name="pnlStockBanner" Visibility="Collapsed" Margin="0,0,0,6" Padding="8,6"
+                        Background="#FFF8E1" BorderBrush="#E6C200" BorderThickness="1" CornerRadius="4">
+                    <StackPanel>
+                        <TextBlock x:Name="txtStockBanner" TextWrapping="Wrap" Foreground="#5D4200" FontSize="11"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <Button x:Uid="btn_woapplystock" x:Name="btnApplyStockToSetup" Content="Apply to Setup" Padding="8,3" Margin="0,0,6,0"
+                                    Click="btnApplyStockToSetup_Click"
+                                    ToolTip="Set the Setup tab's stock size to the size this work order was authored for. Setup's numbers describe the blank actually on the machine, so this is never done for you."/>
+                            <Button x:Uid="btn_woadoptstock" x:Name="btnAdoptSetupStock" Content="Use Setup's size" Padding="8,3"
+                                    Click="btnAdoptSetupStock_Click"
+                                    ToolTip="Record the Setup tab's current stock size in this work order, as the blank it expects. This is also how you change a work order's stock size: set it on Setup, then take it from here."/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
             <Border Grid.Row="1" BorderBrush="#D0D7DE" BorderThickness="1" CornerRadius="4" Margin="0,0,0,6" SnapsToDevicePixels="True">
-                <Canvas x:Name="canvasDiagram" ClipToBounds="True" Background="White" SizeChanged="canvasDiagram_SizeChanged"/>
+                <!-- Right-click: the drawing as a dimensioned PDF sheet, for taking to the machine or
+                     sending to whoever asked for the part. Greyed out with no toolpaths - there is no
+                     drawing to save yet, and hiding it would make the capability undiscoverable. -->
+                <Canvas x:Name="canvasDiagram" ClipToBounds="True" Background="White" SizeChanged="canvasDiagram_SizeChanged">
+                    <Canvas.ContextMenu>
+                        <ContextMenu Opened="DiagramMenu_Opened">
+                            <MenuItem x:Uid="mi_wosavedrawing" x:Name="miSaveDrawing" Header="Save Drawing..." Click="MenuSaveDrawing_Click"
+                                      ToolTip="Write this stock drawing to a PDF, with the stock dimensioned and a table listing every feature - its position, geometry, operations and tooling."/>
+                        </ContextMenu>
+                    </Canvas.ContextMenu>
+                </Canvas>
             </Border>
             <TextBlock x:Name="txtSummary" Grid.Row="2" FontWeight="SemiBold" VerticalAlignment="Top" TextWrapping="Wrap"/>
         </Grid>

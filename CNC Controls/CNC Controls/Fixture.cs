@@ -98,6 +98,7 @@ namespace CNC.Controls
         private double _maxOpening = 0d;
         private double _cornerOffsetX = 0d;
         private double _cornerOffsetY = 0d;
+        private bool _cornerLocated = false;
         private ProbeType _probeType = ProbeType.ThreeDProbe;
 
         public string Name { get { return _name; } set { _name = value; OnChanged(); } }
@@ -117,9 +118,15 @@ namespace CNC.Controls
         // the fence is bolted down, so this offset is reproducible run to run. Start Job then points corner
         // 1's SINGLE probe directly at the tight ~5mm-inset anchor (StartJobView.BuildProgram) instead of a
         // loose locate pass followed by a tight re-probe - see the "double probe of corner 1" backlog item.
-        // 0/0 means "never captured under this scheme" (fresh fixture, or one saved before this feature) -
-        // BuildProgram refuses to generate until Test position has been re-run (real 0,0 offsets never occur
-        // in practice - Coords is always jogged well clear of the corner).
+        // Whether these offsets have been captured is CornerLocated, NOT "are they both non-zero".
+        // ⚠️ The old check was "CornerOffsetX == 0 || CornerOffsetY == 0 means never captured", on the
+        // premise that Coords is always jogged well clear of the corner. THAT PREMISE IS FALSE and it
+        // refused a legitimately-probed fixture on real hardware 2026-08-15: Test position PARKS the
+        // machine at the true corner, so setting the reference from there (or simply jogging accurately
+        // to it) makes an offset legitimately 0.000. The operator's Large Fence had X=-0.369, Y=0.000
+        // and could not be used; a second fence sat at 0.012/-0.011 and passed only by floating-point
+        // luck - the check was drawing a meaningful distinction between -0.011 and 0.000, which is no
+        // distinction at all. 0 is a real value here, so "captured" needs its own flag.
         public double CornerOffsetX { get { return _cornerOffsetX; } set { _cornerOffsetX = value; OnChanged(); } }
         public double CornerOffsetY { get { return _cornerOffsetY; } set { _cornerOffsetY = value; OnChanged(); } }
 
@@ -205,6 +212,15 @@ namespace CNC.Controls
         // Alarm:5 probe fail this was added to prevent.
         public bool PositionValidated { get { return _positionValidated; } set { _positionValidated = value; OnChanged(); } }
 
+        // Has CornerOffsetX/Y actually been measured? Explicit, because the offsets themselves have no
+        // spare value to mean "unknown" - 0 is a legitimate measurement (see CornerOffsetX's comment).
+        // Set only where the offsets are set (FixtureEditDialog.OnTestPositionDone) and cleared only
+        // where they are cleared, so the three move as one.
+        // Declared AFTER Coords deliberately: the Coords setter runs during XML deserialization, and
+        // anything it touches that deserializes EARLIER gets clobbered on every load - the trap that
+        // CornerOffsetX/Y's own comment records. This property is not touched there either way.
+        public bool CornerLocated { get { return _cornerLocated; } set { _cornerLocated = value; OnChanged(); } }
+
         public Fixture Clone()
         {
             var c = new Fixture();
@@ -218,6 +234,7 @@ namespace CNC.Controls
             Coords = o.Coords; PositionValidated = o.PositionValidated;
             JawWidth = o.JawWidth; MaxOpening = o.MaxOpening;
             CornerOffsetX = o.CornerOffsetX; CornerOffsetY = o.CornerOffsetY;
+            CornerLocated = o.CornerLocated;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

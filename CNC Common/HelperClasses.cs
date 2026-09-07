@@ -1,0 +1,421 @@
+﻿/*
+ * HelperClasses.cs - part of CNC Controls library for Grbl
+ *
+ * v0.36 / 2021-11-06 / Io Engineering (Terje Io)
+ *
+ */
+
+using System;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Globalization;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics.Contracts;
+using System.Threading;
+using System.Collections.Concurrent;
+using System.Threading.Tasks;
+using System.Diagnostics;
+using System.IO;
+
+namespace CNC.Core
+{
+    // LibStrings moved to LibStrings.cs - it is now a portable (non-WPF) embedded-resource lookup.
+
+    public class ViewModelBase : INotifyPropertyChanged, INotifyDataErrorInfo
+    {
+        private readonly Dictionary<string, ICollection<string>> _validationErrors = new Dictionary<string, ICollection<string>>();
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        /// <summary>
+        /// The subscriber list, for diagnostics only (PollDiag counts them to test whether handlers are
+        /// accumulating across a session). A field-like event's backing field is visible only inside the
+        /// class that declares it, so a derived class cannot read it without this.
+        /// </summary>
+        protected PropertyChangedEventHandler PropertyChangedHandler { get { return PropertyChanged; } }
+
+        //protected void OnPropertyChanged(string propertyName)
+        //{
+        //    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        //}
+
+        // A handful of call sites raise property changes from a background thread (e.g. Grbl.WaitForResponse /
+        // ProbingViewModel.WaitForResponse spin a worker Thread and call GrblViewModel.ExecuteCommand directly
+        // from it, off the normal SerialStream Dispatcher.BeginInvoke-marshaled path - StreamPump's job-streaming
+        // thread does the same setting BlockExecuting/ScrollPosition). Any manually-wired (non-XAML-binding)
+        // PropertyChanged subscriber that touches a DependencyObject directly then throws "the calling thread
+        // cannot access this object" - see issue #7 (MainWindow.FlashMessage). Hopping here, once, covers every
+        // subscriber instead of guarding each one individually. Cheap when already on the UI thread (the
+        // overwhelming common case): CheckAccess is a simple thread-id compare.
+        protected void OnPropertyChanged([CallerMemberName] string propertyName = "")
+        {
+            // Nobody listening => nothing to raise, and above all nothing to MARSHAL. UiContext.Send
+            // below is SYNCHRONOUS - it blocks until the UI thread runs the callback (~30 us) - and an
+            // object still being CONSTRUCTED on a worker thread has no subscribers yet: PropertyChanged is
+            // only wired when the object reaches a binding. Loading a 220k-line program builds 220k
+            // GCodeBlocks off the UI thread (GCode.BackgroundLoad -> Task.Run -> ParseFileLines), each
+            // raising ~4 of these from its constructor and setters (LineNum and Data both call
+            // RefreshDisplay, which raises DataDisplay + BlockDisplay; Data raises its own) - roughly a
+            // MILLION blocking round trips, measured 2026-08-04 at 33.4 s of a 34.5 s parse. Skipping the
+            // hop when there is no handler took that load from 32.0 s to 2.6 s.
+            //
+            // BackgroundLoad exists precisely to keep that work off the UI thread; without this guard it
+            // was serialising all of it straight back through the UI thread - which is also why the load
+            // took the same ~32 s in Debug and Release: the cost was cross-thread latency, not CPU.
+            //
+            // Raising an event with no subscribers is a no-op, so returning early cannot change behaviour.
+            // Captured into a local first for the usual raise-vs-unsubscribe race - the same guarantee the
+            // ?.Invoke calls below already relied on.
+            var handler = PropertyChanged;
+            if (handler == null)
+                return;
+
+            if (!UiContext.IsCurrent)
+                UiContext.Send(() => handler(this, new PropertyChangedEventArgs(propertyName)));
+            else
+                handler(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        #region INotifyDataErrorInfo members
+
+        public void ClearErrors()
+        {
+            List<string> properties = new List<string>();
+
+            foreach (var error in _validationErrors)
+                if (!properties.Contains(error.Key))
+                    properties.Add(error.Key);
+
+            _validationErrors.Clear();
+
+            foreach (var property in properties)
+                if (!string.IsNullOrEmpty(property))
+                    RaiseErrorsChanged(property);
+        }
+        public void SetError(string message)
+        {
+            _validationErrors.Add(string.Empty, new List<string> { message });
+        }
+
+        public void SetError(string property, string message)
+        {
+            ICollection<string> value;
+            if (_validationErrors.TryGetValue(property, out value))
+                value.Add(message);
+            else
+                _validationErrors.Add(property, new List<string> { message });
+
+            RaiseErrorsChanged(property);
+        }
+
+        public event EventHandler<DataErrorsChangedEventArgs> ErrorsChanged;
+        private void RaiseErrorsChanged(string propertyName)
+        {
+            ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(propertyName));
+        }
+
+        public IEnumerable GetErrors(string propertyName)
+        {
+            if (string.IsNullOrEmpty(propertyName) || !_validationErrors.ContainsKey(propertyName))
+                return null;
+
+            return _validationErrors[propertyName];
+        }
+
+        public bool HasErrors
+        {
+            get { return _validationErrors.Count > 0; }
+        }
+
+        #endregion
+    }
+
+    public static class dbl
+    {
+        public static string ToInvariantString(this double value)
+        {
+            return value.ToString(CultureInfo.InvariantCulture);
+        }
+        public static string ToInvariantString(this double value, string format)
+        {
+            return value.ToString(format, CultureInfo.InvariantCulture);
+        }
+
+        public static bool Assign(double value, ref double holder)
+        {
+            bool changed;
+
+            if ((changed = double.IsNaN(value) ? !double.IsNaN(holder) : holder != value))
+                holder = value;
+
+            return changed;
+        }
+
+        public static double[] ParseList(string s)
+        {
+            string[] v = s.Split(',');
+            double[] values = new double[v.Length];
+
+            for (int i = 0; i < v.Length; i++)
+            {
+                if (!double.TryParse(v[i], NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out values[i]))
+                    values[i] = 0.0d;
+            }
+
+            return values;
+        }
+
+        public static double Parse(string value)
+        {
+            double result = double.NaN;
+
+            if (value != null)
+            {
+                value = value.Trim();
+
+                if (value.Length == 0 || !double.TryParse(value, NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out result))
+                    result = double.NaN;
+            }
+
+            return result;
+        }
+    }
+
+    // by Nick : https://stackoverflow.com/questions/326802/how-can-you-two-way-bind-a-checkbox-to-an-individual-bit-of-a-flags-enumeration
+    public class EnumFlags<T> : ViewModelBase where T : struct, IComparable, IFormattable, IConvertible
+    {
+        private T value;
+
+        private int Foo<TEnum>(TEnum value) where TEnum : struct  // C# does not allow enum constraint
+        {
+            return (int)(ValueType)value;
+        }
+
+        public EnumFlags(T t)
+        {
+            if (!typeof(T).IsEnum) throw new ArgumentException($"{nameof(T)} must be an enum type"); // I really wish they would just let me add Enum to the generic type constraints
+            value = t;
+        }
+
+        public T Value
+        {
+            get { return value; }
+            set
+            {
+                if (!this.value.Equals(value))
+                {
+                    this.value = value;
+                    OnPropertyChanged("Item[]");
+                }
+            }
+        }
+
+        [IndexerName("Item")]
+        public bool this[T key]
+        {
+            get
+            {
+                // .net does not allow us to specify that T is an enum, so it thinks we can't cast T to int.
+                // to get around this, cast it to object then cast that to int.
+                return (((int)(object)value & (int)(object)key) == (int)(object)key);
+            }
+            set
+            {
+                if ((((int)(object)this.value & (int)(object)key) == (int)(object)key) == value) return;
+
+                this.value = (T)(object)((int)(object)this.value ^ (int)(object)key);
+
+                OnPropertyChanged("Item[]");
+            }
+        }
+    }
+
+    public static class FileUtils
+    {
+        public static bool IsAllowedFile (string filename, string extensions)
+        {
+            int pos = filename.LastIndexOf('.');
+
+            return pos > 0 && ("," + extensions + ",").Contains("," + filename.Substring(pos + 1).ToLower() + ",");
+        }
+        public static string ExtensionsToFilter(string extensions)
+        {
+            string[] filetypes = extensions.Split(',');
+
+            for (int i = 0; i < filetypes.Length; i++)
+                filetypes[i] = "*." + filetypes[i];
+
+            return string.Join(";", filetypes);
+        }
+
+        public static StreamReader OpenFile(string filename)
+        {
+            StreamReader file = null;
+            try
+            {
+                file = new StreamReader(filename);
+            }
+            catch
+            {
+            }
+
+            return file;
+        }
+    }
+
+    // https://stackoverflow.com/questions/17794530/accessing-an-array-in-xaml-with-enums
+    public static class StringEnumConversion
+    {
+        public static int ConvertToEnum<T>(object value)
+        {
+            Contract.Requires(typeof(T).IsEnum);
+            Contract.Requires(value != null);
+            Contract.Requires(Enum.IsDefined(typeof(T), value.ToString()));
+            return (int)Enum.Parse(typeof(T), value.ToString());
+        }
+    }
+
+
+    public class Copy
+    {
+        public static void Properties<T>(T source, T target)
+        {
+            var type = typeof(T);
+            foreach (var sourceProperty in type.GetProperties())
+            {
+                if (sourceProperty.CanRead)
+                {
+                    var targetProperty = type.GetProperty(sourceProperty.Name);
+                    if (targetProperty.CanWrite)
+                        targetProperty.SetValue(target, sourceProperty.GetValue(source, null), null);
+                }
+            }
+            //foreach (var sourceField in type.GetFields())
+            //{
+            //    var targetField = type.GetField(sourceField.Name);
+            //    targetField.SetValue(target, sourceField.GetValue(source));
+            //}
+        }
+    }
+    public static class WaitFor
+    {
+        // https://stackoverflow.com/questions/17635440/how-to-wait-for-a-single-event-in-c-with-timeout-and-cancellation
+        public static bool SingleEvent<TEvent>(this CancellationToken token, Action<TEvent> handler, Action<Action<TEvent>> subscribe, Action<Action<TEvent>> unsubscribe, int msTimeout, System.Action initializer = null)
+        {
+            var q = new BlockingCollection<TEvent>();
+            // A DataReceived callback already in-flight on the comms thread can fire this after the finally
+            // block has unsubscribed and disposed q - swallow the resulting ObjectDisposedException (the wait
+            // is already over, so the late item is irrelevant).
+            Action<TEvent> add = item => { try { q.TryAdd(item); } catch (ObjectDisposedException) { } };
+            subscribe(add);
+            try
+            {
+                initializer?.Invoke();
+                TEvent eventResult;
+                if (q.TryTake(out eventResult, msTimeout, token))
+                {
+                    handler?.Invoke(eventResult);
+                    return true;
+                }
+                return false;
+            }
+            finally
+            {
+                unsubscribe(add);
+                q.Dispose();
+            }
+        }
+
+        /// <summary>How an <see cref="AckOrErrorResponse"/> wait ended.</summary>
+        public enum AckOutcome
+        {
+            Timeout,   //!< Nothing arrived for the whole timeout - the controller said nothing.
+            Ok,        //!< The controller acknowledged.
+            Error      //!< The controller answered "error:N" - an ANSWER, but not a success.
+        }
+
+        /// <summary>
+        /// As <see cref="AckResponse"/>, but an "error:N" also ENDS the wait instead of being handled and
+        /// then ignored. AckResponse returns only on the literal "ok", so a command the controller answers
+        /// with an error waits out its entire timeout - and because that timeout is applied per MESSAGE
+        /// rather than to the wait as a whole, any traffic at all (status polls arrive several times a
+        /// second) keeps resetting it. The wait then ends only after a full quiet gap, which can be far
+        /// longer than the nominal timeout: a $F answered with error:62 was observed taking 36 seconds
+        /// against a stated 2000 ms, and was reported to the caller as "the controller did not answer" -
+        /// a materially different and more alarming fact than "it answered with an error".
+        ///
+        /// Deliberately reports Error separately from Ok rather than folding it into "answered". An error
+        /// can arrive before the reply is complete, so treating it as success would turn a partial read
+        /// into a confident empty one - which is exactly how the ATC macros came to be reported missing
+        /// when they were present. Callers should treat Error as "unknown", same as Timeout; the point of
+        /// this overload is to reach that conclusion immediately instead of after tens of seconds.
+        /// </summary>
+        public static AckOutcome AckOrErrorResponse<TEvent>(this CancellationToken token, Action<TEvent> handler, Action<Action<TEvent>> subscribe, Action<Action<TEvent>> unsubscribe, int msTimeout, System.Action initializer = null)
+        {
+            var q = new BlockingCollection<TEvent>();
+            Action<TEvent> add = item => { try { q.TryAdd(item); } catch (ObjectDisposedException) { } };
+            subscribe(add);
+            try
+            {
+                initializer?.Invoke();
+                TEvent eventResult;
+                while (q.TryTake(out eventResult, msTimeout, token))
+                {
+                    handler?.Invoke(eventResult);
+                    string line = (object)eventResult as string;
+                    if (line == "ok")
+                        return AckOutcome.Ok;
+                    if (line != null && line.StartsWith("error:", StringComparison.OrdinalIgnoreCase))
+                        return AckOutcome.Error;
+                }
+                return AckOutcome.Timeout;
+            }
+            finally
+            {
+                unsubscribe(add);
+                q.Dispose();
+            }
+        }
+
+        public static bool AckResponse<TEvent>(this CancellationToken token, Action<TEvent> handler, Action<Action<TEvent>> subscribe, Action<Action<TEvent>> unsubscribe, int msTimeout, System.Action initializer = null)
+        {
+            var q = new BlockingCollection<TEvent>();
+            // A DataReceived callback already in-flight on the comms thread can fire this after the finally
+            // block has unsubscribed and disposed q - swallow the resulting ObjectDisposedException (the wait
+            // is already over, so the late item is irrelevant).
+            Action<TEvent> add = item => { try { q.TryAdd(item); } catch (ObjectDisposedException) { } };
+            subscribe(add);
+            try
+            {
+                initializer?.Invoke();
+                TEvent eventResult;
+                while (q.TryTake(out eventResult, msTimeout, token))
+                {
+                    handler?.Invoke(eventResult);
+                    if((string)(object)eventResult == "ok")
+                        return true;
+                }
+                return false;
+            }
+            finally
+            {
+                unsubscribe(add);
+                q.Dispose();
+            }
+        }
+
+        // https://stackoverflow.com/questions/470256/process-waitforexit-asynchronously
+
+        public static Task WaitForExitAsync(this Process process, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            var tcs = new TaskCompletionSource<object>();
+            process.EnableRaisingEvents = true;
+            process.Exited += (sender, args) => tcs.TrySetResult(null);
+            if (cancellationToken != default(CancellationToken))
+                cancellationToken.Register(() => { tcs.TrySetCanceled(); });
+
+            return tcs.Task;
+        }
+    }
+}

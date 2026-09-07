@@ -1,4 +1,4 @@
-/*
+﻿/*
  * WorkOrderCompiler.cs - part of CNC Controls library
  *
  * Compiles an Odd Jobs WorkOrder (toolpaths -> operations, see WorkOrderModel.cs) into ONE merged g-code
@@ -23,6 +23,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using CNC.Core;
+using CNC.Svg;
 
 namespace CNC.Controls
 {
@@ -120,21 +121,37 @@ namespace CNC.Controls
         // The nominal outline of a toolpath's geometry centered on (cx,cy) - a pattern instance position, which
         // for an unpatterned toolpath is just its own X/Y - offset inward by `inset` (a tool-center offset).
         // Closed shapes come back closed (last point == first); a Line comes back open.
-        private static List<double[]> Outline(WorkOrderToolpath tp, double cx, double cy, double inset)
+        // reliefToolRadius > 0 asks for corner reliefs on a Square/Rect that has them ticked - pass the
+        // cutter radius from an INTERNAL wall pass (Pocket, Side finish) and 0 everywhere else. It is a
+        // parameter rather than something read off `tp` because the relief is sized by the CUTTER, which
+        // belongs to the operation: the same rectangle roughed with a 1/4" and finished with a 1/8" wants
+        // two different reliefs. Contour passes 0 - its corners are convex (see IsInternalFeature) and a
+        // round cutter already reproduces them exactly, so there is nothing there to relieve.
+        private static List<double[]> Outline(WorkOrderToolpath tp, double cx, double cy, double inset, double reliefToolRadius = 0d)
         {
+            double reach = tp.CornerReliefs && reliefToolRadius > 0d
+                            ? OddJobsGeometry.DogboneReachFor(reliefToolRadius, inset)
+                            : 0d;
+
             switch (tp.Geometry)
             {
                 case WorkOrderGeometryKind.Line:
                     // A line has no interior, so an inset would only shorten it - the tool straddles it.
                     return OddJobsGeometry.LinePoints(cx, cy, tp.Length, tp.Angle, SegmentMm);
+                case WorkOrderGeometryKind.Text:
+                    // Text is many disjoint strokes, not one outline, so it has no meaningful single path -
+                    // BuildEngrave goes to StrokeFont directly. Returning empty rather than falling through
+                    // to the Rect default below, which would have quietly traced a rectangle around the
+                    // words for any caller that asked.
+                    return new List<double[]>();
                 case WorkOrderGeometryKind.Circle:
                     return OddJobsGeometry.CirclePoints(cx, cy, Math.Max(0.1d, tp.Diameter / 2d - inset), CircleSegments);
                 case WorkOrderGeometryKind.Oval:
                     return OddJobsGeometry.EllipsePoints(cx, cy, Math.Max(0.1d, tp.Width / 2d - inset), Math.Max(0.1d, tp.Depth / 2d - inset), CircleSegments);
                 case WorkOrderGeometryKind.Square:
-                    return OddJobsGeometry.RectPoints(cx, cy, Math.Max(0.1d, tp.Size / 2d - inset), Math.Max(0.1d, tp.Size / 2d - inset), SegmentMm);
+                    return OddJobsGeometry.RectPoints(cx, cy, Math.Max(0.1d, tp.Size / 2d - inset), Math.Max(0.1d, tp.Size / 2d - inset), SegmentMm, reach);
                 default:
-                    return OddJobsGeometry.RectPoints(cx, cy, Math.Max(0.1d, tp.Width / 2d - inset), Math.Max(0.1d, tp.Depth / 2d - inset), SegmentMm);
+                    return OddJobsGeometry.RectPoints(cx, cy, Math.Max(0.1d, tp.Width / 2d - inset), Math.Max(0.1d, tp.Depth / 2d - inset), SegmentMm, reach);
             }
         }
 
@@ -270,9 +287,38 @@ namespace CNC.Controls
             return targetZ;
         }
 
+        /// <summary>
+        /// Make arbitrary text safe to place INSIDE a (...) g-code comment.
+        ///
+        /// grblHAL-style parsers end a comment at the FIRST ')', so one nested bracket truncates the
+        /// block and everything after it parses as g-code. That is not theoretical: on 2026-08-15 a
+        /// real work order failed on
+        ///     (TOOLPATH T16 Rect 1 - v-carve "..." , 27.3 mm caps (sized to fit)-31387lines)
+        /// where the comment ended at "fit)" and the controller rejected "-31387lines)" with "G-code
+        /// words consist of a letter and a value" - error:2, at the very start of a 32-minute job.
+        ///
+        /// Every string that reaches a comment goes through here, rather than each call site
+        /// remembering: this file already carried FOUR copies of the same Replace pair, and the one
+        /// place that mattered had none. Newlines go too - a comment cannot span lines.
+        ///
+        /// Sanitise where g-code is GENERATED, never on the way out to the controller. Rewriting
+        /// blocks in the send path is what once dropped a G59.3 and drove the machine 128 mm into a
+        /// touch plate; what the operator's program says is what the controller must receive.
+        /// </summary>
+        internal static string CommentText(string text)
+        {
+            return (text ?? string.Empty)
+                .Replace('(', '[').Replace(')', ']')
+                .Replace((char)13, ' ').Replace((char)10, '|');
+        }
+
         private static void AppendSection(List<string> lines, string description, List<string> sectionLines)
         {
-            lines.Add(string.Format("(TOOLPATH {0} - {1} lines)", description, sectionLines.Count));
+            // description is assembled from operator-authored names AND from this file's own literals -
+            // and one of those literals, " (sized to fit)", is exactly what broke a real job. Sanitising
+            // HERE, at the boundary where text becomes a comment, covers both without every contributor
+            // to a description having to know it ends up inside brackets.
+            lines.Add(string.Format("(TOOLPATH {0} - {1} lines)", CommentText(description), sectionLines.Count));
             lines.AddRange(sectionLines);
         }
 
@@ -361,24 +407,81 @@ namespace CNC.Controls
                     continue;
                 }
 
-                var source = WorkOrderRules.ResolveIndirectSource(wo, tp);
-                if (source == null)
-                    continue;
+                // One shadow per placement: one for an Indirect pointing at a single toolpath, N for one
+                // pointing at a GROUP. WorkOrderRules.Expand decides both what supplies each shape and
+                // where it lands, and the editor's preview draws from the same call - so a group cannot
+                // cut in an arrangement the preview never drew.
+                var placements = WorkOrderRules.Expand(wo, tp);
+                if (placements.Count == 0)
+                    continue;       // broken reference - dropped, exactly as before
 
-                resolved.Toolpaths.Add(new WorkOrderToolpath
+                foreach (var placement in placements)
                 {
-                    Name = tp.Name,
-                    Geometry = source.Geometry,
-                    Enabled = tp.Enabled,
-                    X = tp.X, Y = tp.Y,
-                    Length = source.Length, Angle = source.Angle, Diameter = source.Diameter,
-                    Width = source.Width, Depth = source.Depth, Size = source.Size,
-                    Pattern = tp.Pattern,
-                    Columns = tp.Columns, RowSpacing = tp.RowSpacing, ColumnSpacing = tp.ColumnSpacing, Rows = tp.Rows,
-                    PatternCount = tp.PatternCount, PatternRadius = tp.PatternRadius,
-                    PatternStartAngle = tp.PatternStartAngle, PatternArcSpan = tp.PatternArcSpan,
-                    Operations = source.Operations
-                });
+                    var geom = placement.Geometry;
+
+                    // Everything comes from the borrowed toolpath by default - the shadow exists to BE it,
+                    // somewhere else. Listing its fields by hand instead is how this silently lost SvgFile,
+                    // SvgWidth, the whole text block and CornerReliefs: an Indirect pointing at an SVG
+                    // resolved to a toolpath with no artwork, and one pointing at Text resolved back to the
+                    // "TEXT" default. Inverting the default means a field added to WorkOrderToolpath is
+                    // inherited here without anyone remembering to come back for it.
+                    //
+                    // The pattern block comes across with everything else, which was a real change when it
+                    // landed: it used to be copied from `tp`, where Pattern is forced to None for every
+                    // Indirect toolpath, so those eight fields only ever copied defaults and an Indirect
+                    // pointing at a 3x2 grid cut ONE instance instead of six.
+                    var shadow = WorkOrderRules.CopyFields(geom, new WorkOrderToolpath());
+
+                    // ... except the handful the INDIRECT toolpath supplies, which is what makes this a
+                    // different toolpath rather than a second copy. [NoClone] held back Name and Operations,
+                    // and both are set explicitly just below.
+                    //
+                    // A group expands to several shadows, so each is named for the member it came from -
+                    // otherwise every (TOOLPATH ...) comment in the program would carry the same name.
+                    shadow.Name = placements.Count > 1 ? tp.Name + "/" + geom.Name : tp.Name;
+
+                    // The Indirect toolpath's own tick is the ONLY gate on its output: it cuts what the
+                    // source DEFINES, not what the source currently has ticked.
+                    //
+                    // So the borrowed operations are copied here with Enabled forced on, rather than shared
+                    // as the same objects. Sharing them meant the source's ticks gated the copy too, and
+                    // unticking a group - which cascades to its members' operations - silently produced a
+                    // ticked Indirect toolpath that cut nothing at all. Reported the first time anyone
+                    // disabled a group whose copy they still wanted.
+                    //
+                    // This costs nothing in liveness. ResolveIndirect runs at Generate, so every parameter
+                    // is still read fresh from the source each time - feeds, depths, tools, the lot. The one
+                    // thing not inherited is the tick, which is a staging control ("what do I want cut on
+                    // this run") rather than part of the definition being borrowed.
+                    shadow.Enabled = tp.Enabled;
+                    shadow.Operations = geom.Operations
+                                            .Select(o =>
+                                            {
+                                                var copy = WorkOrderRules.CopyFields(o, new WorkOrderOperation());
+                                                copy.Enabled = true;
+                                                return copy;
+                                            })
+                                            .ToList();
+
+                    // Position comes from the placement, already resolved - absolute, or relative to the
+                    // source's own, and for a group offset from its anchor member. It is a CENTER, so the
+                    // shadow is pinned to Center/Absolute: inheriting the borrowed toolpath's anchor would
+                    // apply its half-width a second time, and inheriting a Relative mode would re-resolve a
+                    // position that is already resolved.
+                    shadow.X = placement.X;
+                    shadow.Y = placement.Y;
+                    shadow.Anchor = WorkOrderAnchor.Center;
+                    shadow.OffsetMode = WorkOrderOffsetMode.Absolute;
+
+                    // The shadow presents the borrowed geometry, so it is not Indirect and must not look it -
+                    // IsIndirect keys off Geometry, but a stale name left here would be a live reference for
+                    // anything reading the field rather than the property. Its group goes too: the copy is
+                    // not a member of the group it was copied FROM.
+                    shadow.IndirectSource = null;
+                    shadow.Group = string.Empty;
+
+                    resolved.Toolpaths.Add(shadow);
+                }
             }
             return resolved;
         }
@@ -434,7 +537,11 @@ namespace CNC.Controls
         {
             var lines = new List<string>();
             double wallLeave = WallLeave(tp);
-            var wall = OrderForDirection(Outline(tp, cx, cy, op.BitDiameter / 2d + wallLeave), tp, op);
+            // Corner reliefs go on the pass that leaves the FINAL wall. When wallLeave > 0 a Side finish
+            // follows and owns the wall, so relieving here would cut away the very stock that pass was
+            // left to take - the reliefs are emitted there instead.
+            var wall = OrderForDirection(Outline(tp, cx, cy, op.BitDiameter / 2d + wallLeave,
+                                                wallLeave > 0d ? 0d : op.BitDiameter / 2d), tp, op);
             var rings = ClearingRings(tp, cx, cy, op.BitDiameter, wallLeave, op.Stepover)
                 .Select(r => OrderForDirection(r, tp, op)).ToList();
             var depths = PassDepths(RoughDepth(tp, op), op.DepthOfCut);
@@ -484,6 +591,444 @@ namespace CNC.Controls
                 if (!tp.IsClosed)
                     previousZ = 0d;
             }
+            return lines;
+        }
+
+        // Engrave text with a V-bit: follow each glyph stroke once, at a single depth. The stroke font gives
+        // centreline paths (see CNC.Core.StrokeFont), so the cut IS the letter - there is no outline to
+        // offset and no interior to clear, which is why this shares nothing with BuildContour.
+        //
+        // DEPTH IS DERIVED, NOT SPECIFIED. The operator asks for a stroke WIDTH, because that is what they
+        // can see and measure on the finished part; a V-bit produces that width by plunging until its cone
+        // is that wide, which depends entirely on the tool's included angle:
+        //
+        //     width = 2 * depth * tan(halfAngle)   =>   depth = (width / 2) / tan(halfAngle)
+        //
+        // The same 0.8 mm line is 0.40 mm deep on a 90-degree bit and 0.69 mm on a 60. Specifying depth
+        // instead would mean the same job cutting a different width after a bit change, silently.
+        //
+        // Single pass on purpose: a V-bit at engraving depths removes very little, and stepping down would
+        // just retrace the same groove. DepthOfCut is not consulted, and no tabs - there is nothing being
+        // cut free.
+        private static List<string> BuildEngrave(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
+        {
+            // Shape text (HasText on a Line/Circle/Oval/Square/Rect): size, placement and baseline angle
+            // come from the fit resolver - the SAME one WorkOrderRules.Validate ran to gate Generate, so
+            // by the time we are here it fits; the refusal below is defense against a caller that skipped
+            // validation, not a second opinion.
+            double capHeight = tp.CapHeight, angleDeg = tp.Angle, fitDx = 0d, fitDy = 0d;
+            bool shapeText = tp.HasText && tp.Geometry != WorkOrderGeometryKind.Text
+                          && WorkOrderRules.SupportsShapeText(tp.Geometry);
+            if (shapeText)
+            {
+                var fit = WorkOrderTextFit.Resolve(tp);
+                if (!fit.Fits)
+                    return new List<string> { "(ENGRAVE skipped - text does not fit: "
+                        + CommentText(fit.Error) + ")" };
+                capHeight = fit.CapHeight; angleDeg = fit.Angle; fitDx = fit.OffsetX; fitDy = fit.OffsetY;
+            }
+
+            // One op kind, two ways of cutting it. Artwork has no stroke-font equivalent - an SVG IS
+            // outlines - so it always carves whatever the engrave width says; text carves when it carries
+            // a real font family, chosen on the GEOMETRY where the font itself is (WorkOrderToolpath.
+            // FontFamily). Both used to be separate branches here while the editor tested only IsCarved,
+            // so the two disagreed about every SVG toolpath - see WorkOrderToolpath.CarvesOutlines.
+            if (tp.CarvesOutlines)
+                return BuildVCarve(tp, op, cx, cy, capHeight, angleDeg, fitDx, fitDy);
+
+            var lines = new List<string>();
+
+            var strokes = CNC.Core.StrokeFont.Render(tp.Text, capHeight);
+            if (strokes.Count == 0)
+                return lines;   // empty or wholly unrenderable text - emit nothing rather than a bare plunge
+
+            // One shared answer for depth-from-width, INCLUDING the clamp at the bit's own maximum cutting
+            // diameter - see CustomTool.EngraveCutFor. Computing it here as well as in the UI is how the two
+            // would drift apart.
+            var tool = CustomTools.Find(op.Tool);
+            var cut = tool != null ? tool.EngraveCutFor(op.EngraveWidth)
+                                   : new EngraveCut { Width = Math.Max(0.01d, op.EngraveWidth), MaxWidth = double.MaxValue,
+                                                      Depth = Math.Max(0.01d, op.EngraveWidth) / 2d };
+            double halfAngle = tool != null ? tool.HalfAngleRad : Math.PI / 4d;
+            double depth = Math.Max(0.01d, cut.Depth);
+
+            // StrokeFont lays the text out with its baseline starting at the origin and running along +X.
+            // Move it so the toolpath's anchor lands on (cx,cy), then rotate about that same anchor - so
+            // the point the operator pinned stays pinned as the angle changes. Anything else makes lining
+            // text up against an edge an exercise in trial and error.
+            //
+            // Two centering conventions on purpose: the Text KIND centers the cap-height band on the
+            // anchor (what "put 10 mm lettering at X,Y" means); shape text centers the MEASURED BLOCK,
+            // because the block is what the fit resolver proved fits, then shifts by the alignment
+            // offsets - which are in the text frame, so they rotate with a Line's baseline.
+            var size = CNC.Core.StrokeFont.Measure(tp.Text, capHeight);
+            double originX = -size.X / 2d + fitDx;
+            double originY = shapeText ? -size.Y / 2d + fitDy : -size.Y / 2d + capHeight / 2d;
+            double rad = angleDeg * Math.PI / 180d;
+            double cos = Math.Cos(rad), sin = Math.Sin(rad);
+
+            lines.Add(string.Format(CultureInfo.InvariantCulture,
+                "(ENGRAVE \"{0}\" cap {1:0.###} mm, stroke {2:0.###} mm wide -> {3:0.###} mm deep at {4:0.#} deg included)",
+                // grblHAL ends a comment at the FIRST ')' (see the note on this file's comment helper), so
+                // brackets in the operator's own text would truncate the block and let the rest parse as
+                // g-code. Newlines are folded to '|' for the same reason - one comment, one line.
+                CommentText(tp.Text),
+                capHeight, cut.Width, depth, halfAngle * 360d / Math.PI));
+
+            if (cut.Clamped)
+                lines.Add(string.Format(CultureInfo.InvariantCulture,
+                    "(ENGRAVE stroke width limited to {0:0.###} mm - the widest this bit can cut; asked for {1:0.###})",
+                    cut.Width, op.EngraveWidth));
+
+            foreach (var stroke in strokes)
+            {
+                for (int i = 0; i < stroke.Count; i++)
+                {
+                    double lx = stroke[i].X + originX, ly = stroke[i].Y + originY;
+                    double x = cx + lx * cos - ly * sin;
+                    double y = cy + lx * sin + ly * cos;
+
+                    if (i == 0)
+                    {
+                        lines.Add("G0 Z" + F(SafeZ()));
+                        lines.Add("G0 X" + F(x) + " Y" + F(y));
+                        lines.Add("G1 Z" + F(-depth) + " F" + F(op.PlungeFeed));
+                    }
+                    else
+                        lines.Add("G1 X" + F(x) + " Y" + F(y) + " F" + F(op.Feed));
+                }
+            }
+            lines.Add("G0 Z" + F(SafeZ()));
+
+            return lines;
+        }
+
+        // Even-odd ray cast along +X against a single closed ring - for assigning carve passes to the
+        // glyph that contains them.
+        private static bool PointInRing(List<Point2D> ring, Point2D pt)
+        {
+            bool inside = false;
+            for (int i = 0, j = ring.Count - 1; i < ring.Count; j = i++)
+            {
+                double yi = ring[i].Y, yj = ring[j].Y;
+                if ((yi > pt.Y) == (yj > pt.Y))
+                    continue;
+                double xInt = ring[i].X + (pt.Y - yi) / (yj - yi) * (ring[j].X - ring[i].X);
+                if (pt.X < xInt)
+                    inside = !inside;
+            }
+            return inside;
+        }
+
+        // Grid cell for the carve's distance field. 0.1 mm keeps the field's error an order below anything
+        // a V-bit leaves in wood, and text-sized fields build in well under a second at it.
+        private const double CarveResolution = 0.1d;
+
+        // Default depth between successive carve levels, used when an operation has no depth of cut set.
+        // This does NOT scallop the walls - consecutive passes tile the cone exactly, a deeper pass's flank
+        // running through the tip of the one above - it only sets how much material a single ring removes,
+        // and the in-plan faceting of curved boundaries.
+        //
+        // Which also means the shallower levels are geometrically REDUNDANT wherever the region reaches
+        // full depth: the deepest pass alone recreates the whole V, and the ones above it cut material that
+        // pass is about to take. They are depth-of-cut stepping, nothing more - so the operation's own
+        // DepthOfCut now drives it (CarveStep), and this is only the fallback for one left at zero.
+        private const double CarveDepthStepDefault = 0.5d;
+
+        // The depth step a carve should use: the operation's own, or the default when it has none. Clamped
+        // to something a tip can survive being asked for - a step of zero would be an infinite level count,
+        // and the engine's own Math.Max would silently turn it into 0.01 mm and build for a very long time.
+        private static double CarveStep(WorkOrderOperation op)
+        {
+            return op != null && op.DepthOfCut > 0.01d ? op.DepthOfCut : CarveDepthStepDefault;
+        }
+
+        // The distance-field build inside VCarve.Build is by far the most expensive thing Generate does -
+        // minutes for board-sized lettering at CarveResolution - and it depends on NOTHING but the glyph
+        // outlines (text/font/style/size) and the cone (half angle, max depth). Position, alignment, WCS,
+        // the skip-first-tool-change option, feeds - none of them touch it; they act on the emitted
+        // coordinates afterwards. So the passes are memoized on exactly those inputs: clicking Generate
+        // again for another identical board - or after toggling "first tool already loaded", or after
+        // nudging X/Y - reuses the carve and takes seconds, while any edit to the artwork or the V-bit
+        // changes the key and recomputes. The key must BE the full input set, or the cache serves the
+        // wrong geometry with no symptom (the resolution/step consts are compile-time fixed, so they are
+        // not part of it - expose either as a setting and it MUST join the key). Pass objects are
+        // read-only downstream (grouping reorders references, emission reads points), so sharing is safe.
+        //
+        // THAT CLAIM WAS ONCE FALSE AND IT SHIPPED. The key covered only the TEXT inputs, because text
+        // was the only carvable thing when it was written; 7143bc4d added SVG as a second geometry
+        // source and did not extend it. Neither SvgFile nor SvgWidth was in the key, and capHeight -
+        // which IS in it, is the TEXT cap height, unrelated to artwork. So changing the artwork width and
+        // regenerating HIT the cache and reused the old passes (indistinguishable from the width field
+        // being inert, which is the bug fbc93787 had just fixed), and pointing a toolpath at a different
+        // .svg carved the PREVIOUS logo. Static and process-lifetime, so a restart hid it.
+        // Adding a geometry source means adding its inputs to CarveSourceKey. There is no other answer.
+
+        // U+0001 as the field separator - an unambiguous boundary even though Text and file paths are
+        // free-form; a bare concat, or any separator that can occur inside a value, lets different field
+        // combinations produce one key. Built from (char)1 rather than written as an escape on purpose:
+        // an escape in source is something a bulk edit can silently mangle, and this very method spent
+        // part of its own fix carrying a raw control byte for exactly that reason.
+        private static readonly string KeySep = ((char)1).ToString();
+
+        private static readonly Dictionary<string, List<CNC.Core.VCarvePass>> carvePassCache = new Dictionary<string, List<CNC.Core.VCarvePass>>();
+        private const int CarveCacheMax = 8;   // a work order rarely has more distinct carves than this
+
+        /// <summary>
+        /// Everything about WHERE THE CONTOURS COME FROM, as a key fragment - the half of the carve's
+        /// input set that differs per geometry kind. Leads with the kind, so a text carve and an SVG
+        /// carve can never collide however their other fields line up. Returns null when the inputs
+        /// cannot be fingerprinted, which means "do not cache this" - never "cache it under a guess".
+        /// </summary>
+        private static string CarveSourceKey(WorkOrderToolpath tp, double capHeight)
+        {
+            if (tp.Geometry != WorkOrderGeometryKind.Svg)
+                return string.Join(KeySep, "text", tp.Text, tp.FontFamily,
+                    tp.FontBold ? "b" : "", tp.FontItalic ? "i" : "",
+                    capHeight.ToString("R", CultureInfo.InvariantCulture));
+
+            // A PATH IS NOT ITS CONTENTS, so the key carries a hash of the BYTES. Iterating on a logo
+            // means re-exporting over the same filename, which leaves path and width identical while
+            // the artwork changes underneath - the cache would go stale in precisely the workflow the
+            // SVG feature exists to serve. Write-stamp+length was the cheaper option and was rejected:
+            // a restore from backup, or any exporter that preserves timestamps, changes content while
+            // both of those hold still. Hashing a few hundred KB is free against a carve measured in
+            // MINUTES, so there is no reason to accept a weaker identity here.
+            string hash;
+            try
+            {
+                using (var sha = System.Security.Cryptography.SHA256.Create())
+                    hash = BitConverter.ToString(sha.ComputeHash(System.IO.File.ReadAllBytes(tp.SvgFile)));
+            }
+            catch
+            {
+                hash = null;    // missing/unreadable/locked - see the null contract above
+            }
+            if (hash == null)
+                return null;
+
+            return string.Join(KeySep, "svg", tp.SvgFile ?? string.Empty,
+                tp.SvgWidth.ToString("R", CultureInfo.InvariantCulture), hash);
+        }
+
+        // What this carve is OF, for the debug trace - a HIT/MISS line that does not name its source
+        // cannot be read against the artwork that produced it.
+        private static string CarveSourceLabel(WorkOrderToolpath tp)
+        {
+            return tp.Geometry == WorkOrderGeometryKind.Svg
+                ? "svg=\"" + (string.IsNullOrEmpty(tp.SvgFile) ? "(none)" : System.IO.Path.GetFileName(tp.SvgFile))
+                  + "\" w=" + tp.SvgWidth.ToString("0.###", CultureInfo.InvariantCulture) + "mm"
+                : "text=\"" + tp.Text + "\"";
+        }
+
+        private static List<CNC.Core.VCarvePass> CachedCarvePasses(WorkOrderToolpath tp, double capHeight,
+                                                                   double halfAngle, double maxDepth, double step,
+                                                                   List<IList<Point2D>> polys)
+        {
+            // The source fragment (see CarveSourceKey) plus the cone AND the depth step. The step is in the
+            // key because it is now a setting rather than a compile-time constant - which the comment above
+            // named as the exact condition requiring it. Without it, changing an operation's depth of cut
+            // and regenerating would HIT the cache and reuse passes built at the old step: the field would
+            // look inert, which is precisely how the SVG width bug presented.
+            string source = CarveSourceKey(tp, capHeight);
+            string key = source == null ? null : string.Join(KeySep, source,
+                halfAngle.ToString("R", CultureInfo.InvariantCulture),
+                maxDepth.ToString("R", CultureInfo.InvariantCulture),
+                step.ToString("R", CultureInfo.InvariantCulture));
+
+            List<CNC.Core.VCarvePass> passes;
+            if (key != null && carvePassCache.TryGetValue(key, out passes))
+            {
+                // Logged because the whole cost question turns on this: a HIT returns in microseconds and
+                // a MISS is the multi-minute build. A timing trace that does not say which it was is
+                // unreadable - the second Generate of the same artwork looks like a different engine.
+                if (DebugLog.Enabled)
+                    DebugLog.Write("workorder", string.Format(CultureInfo.InvariantCulture,
+                        "carve cache HIT ({0} passes) {1}", passes.Count, CarveSourceLabel(tp)));
+                return passes;
+            }
+
+            var swCarve = System.Diagnostics.Stopwatch.StartNew();
+            passes = CNC.Core.VCarve.Build(polys, halfAngle, maxDepth, CarveResolution, step);
+            swCarve.Stop();
+            if (DebugLog.Enabled)
+                DebugLog.Write("workorder", string.Format(CultureInfo.InvariantCulture,
+                    "carve cache MISS {0:0}ms ({1} passes, {2} contours, res={3}mm, step={4}mm{5}) {6}",
+                    swCarve.Elapsed.TotalMilliseconds, passes.Count, polys.Count,
+                    CarveResolution, step,
+                    key == null ? ", NOT CACHEABLE" : string.Empty, CarveSourceLabel(tp)));
+
+            if (key != null)
+            {
+                if (carvePassCache.Count >= CarveCacheMax)
+                    carvePassCache.Clear();
+                carvePassCache[key] = passes;
+            }
+            return passes;
+        }
+
+        // V-carve text set in a real outline font: the bit follows iso-depth contours of the glyph's
+        // FILLED shape, so strokes taper into their corners the way carved lettering does. Depth is again
+        // a consequence, but of the glyph's own local width rather than a requested stroke width: at every
+        // point the cone sinks until it spans the stroke (see CNC.Core.VCarve for the geometry and its
+        // error budget). The one ceiling is the bit itself - past DiameterMm the cone runs out and the
+        // shank would rub - and where a stroke is wider than that ceiling the bottom flattens off and is
+        // cleared, below.
+        // capHeight/angleDeg/fitDx/fitDy arrive resolved from BuildEngrave: the toolpath's own values for
+        // the Text kind, the fit resolver's for shape text (see there).
+        private static List<string> BuildVCarve(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy,
+                                                double capHeight, double angleDeg, double fitDx, double fitDy)
+        {
+            var lines = new List<string>();
+
+            // Where the contours come from is the ONLY difference between carving a word and carving a
+            // logo - everything below this point is the same code (see docs/Architecture-SVG-Import.md).
+            List<OutlineContour> outline;
+            if (tp.Geometry == WorkOrderGeometryKind.Svg)
+            {
+                var svg = SvgOutlines.Load(tp.SvgFile, tp.SvgWidth);
+                if (svg.Error != null)
+                    return new List<string> { "(VCARVE skipped - " + CommentText(svg.Error) + ")" };
+                // An import that dropped elements must NOT cut the remainder. A partial logo looks
+                // plausible in the preview and is wrong in the wood, and the operator has no way to see
+                // which half went missing - so refuse, and name what was skipped.
+                if (!svg.IsComplete)
+                    return new List<string> { "(VCARVE skipped - "
+                        + CommentText(System.IO.Path.GetFileName(tp.SvgFile) + " uses features this build cannot import: "
+                                      + svg.Describe()) + ")" };
+                outline = svg.Contours;
+            }
+            else
+                outline = TrueTypeOutlines.Render(tp.Text, tp.FontFamily, capHeight, tp.FontBold, tp.FontItalic);
+
+            if (outline.Count == 0)
+                return lines;   // blank text or an unresolvable family - emit nothing rather than a bare plunge
+
+            var tool = CustomTools.Find(op.Tool);
+            double halfAngle = tool != null ? tool.HalfAngleRad : Math.PI / 4d;
+            // One shared answer for the carve's depth ceiling, INCLUDING the operation's optional cap and
+            // the clamp at the bit's own cutting diameter - see CustomTool.CarveDepthFor. Computing it
+            // here as well as in the editor's note is how the two would drift apart (same reasoning, and
+            // the same precedent, as EngraveCutFor in BuildEngrave above).
+            double maxDepth = tool != null
+                ? tool.CarveDepthFor(op.CarveMaxDepth).Depth
+                : (op.CarveMaxDepth > 0d ? op.CarveMaxDepth : 3d);
+
+            // The engine carves in the text's own coordinates (baseline flat, Y up) and the transform to
+            // the stock happens per emitted point - same shape either way, but the field's grid stays
+            // aligned with the glyphs instead of sampling them diagonally.
+            var polys = new List<IList<Point2D>>();
+            double minX = double.MaxValue, maxX = double.MinValue, minY = double.MaxValue, maxY = double.MinValue;
+            foreach (var c in outline)
+            {
+                polys.Add(c.Points);
+                foreach (var p in c.Points)
+                {
+                    if (p.X < minX) minX = p.X;
+                    if (p.X > maxX) maxX = p.X;
+                    if (p.Y < minY) minY = p.Y;
+                    if (p.Y > maxY) maxY = p.Y;
+                }
+            }
+
+            // clearFlats on (the default): where a stroke is wider than the cone can span, the engine
+            // appends the maxDepth clearing generations itself - see VCarve.Build.
+            var passes = CachedCarvePasses(tp, capHeight, halfAngle, maxDepth, CarveStep(op), polys);
+            if (passes.Count == 0)
+                return lines;
+
+            // Anchor at the centre of the text's bounding box - the same extents the model reports for
+            // placement - then rotate about that anchor, so the pinned point stays pinned as the angle
+            // changes, exactly as the stroke branch does. Shape text additionally shifts by the fit's
+            // alignment offsets, pre-rotation (the text frame), matching the stroke branch.
+            double ox = -(minX + maxX) / 2d + fitDx, oy = -(minY + maxY) / 2d + fitDy;
+            double rad = angleDeg * Math.PI / 180d;
+            double cos = Math.Cos(rad), sin = Math.Sin(rad);
+
+            // Cut each letter COMPLETELY before moving to the next. The engine's global shallow-to-deep
+            // order keeps the "step down into material already opened" invariant, but that invariant only
+            // matters WITHIN a connected region - across separate glyphs it just interleaves, so the
+            // machine hopped letter to letter at every depth level, filling in bits and pieces until the
+            // very end. Passes are regrouped by the outer glyph contour that contains them, letters
+            // ordered left to right along the (unrotated) baseline, keeping the original relative order -
+            // regular passes shallow to deep, then that glyph's clearing generations - inside each.
+            var outers = new List<List<Point2D>>();
+            foreach (var c in outline)
+                if (c.IsOuter)
+                    outers.Add(c.Points);
+            outers.Sort((a, b) =>
+            {
+                double ax = double.MaxValue, bx = double.MaxValue;
+                foreach (var p in a) if (p.X < ax) ax = p.X;
+                foreach (var p in b) if (p.X < bx) bx = p.X;
+                return ax.CompareTo(bx);
+            });
+            var grouped = new List<CNC.Core.VCarvePass>(passes.Count);
+            var claimed = new bool[passes.Count];
+            foreach (var outer in outers)
+                for (int i = 0; i < passes.Count; i++)
+                    if (!claimed[i] && passes[i].Path.Count > 0 && PointInRing(outer, passes[i].Path[0]))
+                    {
+                        claimed[i] = true;
+                        grouped.Add(passes[i]);
+                    }
+            // A pass no outer claims (a boundary ring's first point can sit a hair outside) still gets
+            // cut - losing the grouping nicety must never lose a cut.
+            for (int i = 0; i < passes.Count; i++)
+                if (!claimed[i])
+                    grouped.Add(passes[i]);
+            passes = grouped;
+
+            int cutPasses = 0;
+            foreach (var p in passes)
+                if (p.Depth >= 0.01d)
+                    cutPasses++;
+
+            lines.Add(string.Format(CultureInfo.InvariantCulture,
+                "(VCARVE \"{0}\" in {1}{2}{3}, cap {4:0.###} mm, {5} passes to {6:0.###} mm max at {7:0.#} deg included)",
+                // Same sanitising as BuildEngrave: grblHAL ends a comment at the FIRST ')'.
+                CommentText(tp.Text),
+                CommentText(tp.FontFamily),
+                tp.FontBold ? " bold" : string.Empty, tp.FontItalic ? " italic" : string.Empty,
+                capHeight, cutPasses, maxDepth, halfAngle * 360d / Math.PI));
+
+            // Between rings of the same carve a short hop clears the work - nothing on this operation
+            // sticks up past the stock top - where retracting to full SafeZ 193 times would spend more
+            // of the job travelling in Z than cutting. First approach and final retract still use SafeZ.
+            const double hop = 2d;
+
+            bool approached = false;
+            foreach (var pass in passes)   // already shallow to deep, outside to inside - the cut order
+            {
+                // The depth-0 boundary rings carve NOTHING - a cone at zero depth has zero width, and the
+                // groove's top edge is formed by the deeper passes' flanks anyway. Emitting them sent the
+                // machine tracing every letter outline while grazing the surface - 800 lines of motion
+                // before the first real plunge, which on the machine looked like the whole job "barely
+                // kissing the stock".
+                if (pass.Depth < 0.01d)
+                    continue;
+
+                bool first = true;
+                foreach (var p in pass.Path)
+                {
+                    double lx = p.X + ox, ly = p.Y + oy;
+                    double x = cx + lx * cos - ly * sin;
+                    double y = cy + lx * sin + ly * cos;
+
+                    if (first)
+                    {
+                        first = false;
+                        lines.Add("G0 Z" + F(approached ? hop : SafeZ()));
+                        approached = true;
+                        lines.Add("G0 X" + F(x) + " Y" + F(y));
+                        lines.Add("G1 Z" + F(-pass.Depth) + " F" + F(op.PlungeFeed));
+                    }
+                    else
+                        lines.Add("G1 X" + F(x) + " Y" + F(y) + " F" + F(op.Feed));
+                }
+            }
+            lines.Add("G0 Z" + F(SafeZ()));
+
             return lines;
         }
 
@@ -552,13 +1097,50 @@ namespace CNC.Controls
             var lines = new List<string>();
             double depth = TrueDepth(op);
             double step = op.BoreStepDown > 0d ? op.BoreStepDown : 1d;
+            double bitR = op.BitDiameter / 2d;
             var radii = BoreRadii(op);
 
             for (int i = 0; i < radii.Count; i++)
             {
                 double r = radii[i];
+
+                // A feed word on a G2/G3 governs the PROGRAMMED path - the tool CENTRE - but the cutting
+                // edge rides out at (r + bitR) and so travels (r + bitR)/r times as far per revolution.
+                // On a bore whose diameter approaches the cutter's that ratio is big: a 5mm hole with a
+                // 3.175mm cutter is 2.7x. The feed was being emitted uncorrected, so a value entered as
+                // "what the cutter should see" arrived at the edge multiplied by it - overloading the tool
+                // precisely where it is thinnest, and worst on exactly the small tapping-size bores where a
+                // 1/8" cutter is most fragile. Correcting it here makes op.Feed mean the one thing an
+                // operator can reason about: the speed of the CUTTING EDGE through the material.
+                //
+                // ONLY for a wall-following pass. This compensation is the standard one for PERIPHERAL arc
+                // milling - following a wall at some radial depth of cut, where the engaged edge genuinely
+                // does outrun the axis. It does NOT hold for a FULL-IMMERSION helix, and applying it there
+                // is a real mistake that broke a cutter:
+                //
+                //   When r <= bitR the tool covers the hole centre, so it is cutting a SLOT - 180 degrees of
+                //   engagement, centre to wall. In a full-immersion cut the chip thickness is set by how far
+                //   the tool AXIS advances per tooth, not by how fast the wall contact point sweeps round.
+                //   Halving the programmed feed there halves the actual chip, and a cutter taking a chip
+                //   thinner than its own edge radius rubs instead of shearing: fine powdery chips, chatter,
+                //   heat, then aluminium welds to the flute and it seizes.
+                //
+                //   Measured on a 5mm bore with a 2.5mm single flute at 12000 rpm: an entered 550 became a
+                //   programmed 275, an axis chip load of 0.023mm against a 0.03-0.05mm target. The workpiece
+                //   absorbed roughly ten times the energy the metal removal needed - all of it friction.
+                //
+                // So: correct only where r > bitR (an annular pass that is genuinely following a wall), and
+                // otherwise emit the feed as entered, which is what this did before the correction existed
+                // and was never the thing breaking cutters.
+                bool wallPass = r > bitR;
+                double arcFeed = wallPass && r + bitR > 1e-6 ? op.Feed * r / (r + bitR) : op.Feed;
+
                 if (radii.Count > 1)
                     lines.Add(string.Format("(helix {0} of {1} at radius {2})", i + 1, radii.Count, F(r)));
+                if (r > 1e-6)
+                    lines.Add(wallPass
+                        ? string.Format("(bore helix: wall pass, centre feed {0} so the cutting edge cuts at {1})", F(arcFeed), F(op.Feed))
+                        : string.Format("(bore helix: full immersion, feed {0} as entered - chip load is set by axis advance)", F(arcFeed)));
 
                 lines.Add("G0 Z" + F(SafeZ()));
                 lines.Add("G0 X" + F(cx + r) + " Y" + F(cy));
@@ -580,9 +1162,11 @@ namespace CNC.Controls
                     while (z < depth - 1e-6)
                     {
                         z = Math.Min(z + step, depth);
-                        lines.Add(arc + " X" + F(cx + r) + " Y" + F(cy) + " I" + F(-r) + " J0 Z" + F(-z) + " F" + F(op.Feed));
+                        lines.Add(arc + " X" + F(cx + r) + " Y" + F(cy) + " I" + F(-r) + " J0 Z" + F(-z) + " F" + F(arcFeed));
                     }
-                    lines.Add(arc + " X" + F(cx + r) + " Y" + F(cy) + " I" + F(-r) + " J0 F" + F(op.Feed));
+                    // The finishing lap - same circle, no Z - takes the same correction: it is the same
+                    // radius, so its edge outruns its centre by the same ratio.
+                    lines.Add(arc + " X" + F(cx + r) + " Y" + F(cy) + " I" + F(-r) + " J0 F" + F(arcFeed));
                 }
             }
             return lines;
@@ -594,7 +1178,10 @@ namespace CNC.Controls
         {
             var lines = new List<string>();
             var rough = WorkOrderRules.RoughingOp(tp);
-            var path = OrderForDirection(Outline(tp, cx, cy, tp.IsClosed ? op.BitDiameter / 2d : 0d), tp, op);
+            // This pass leaves the final wall, so it is the one that carries the corner reliefs (see
+            // BuildPocket, which stands down whenever a Side finish is present to do it).
+            var path = OrderForDirection(Outline(tp, cx, cy, tp.IsClosed ? op.BitDiameter / 2d : 0d,
+                                                 tp.IsClosed ? op.BitDiameter / 2d : 0d), tp, op);
             var depths = PassDepths(rough != null ? RoughDepth(tp, rough) : op.TotalDepth, rough?.DepthOfCut ?? 2d);
 
             double previousZ = 0d;
@@ -653,15 +1240,24 @@ namespace CNC.Controls
             return lines;
         }
 
-        // A countersink bit plunged straight down a round hole's centerline - the bit's own 90-deg cone does
-        // the chamfering as it descends, so there's no outline to trace at all (unlike Chamfer above).
-        // op.CountersinkDiameter is the FINISHED diameter the operator wants, not a raw depth - converted here
-        // (depth = diameter / 2, same 45-deg-per-side cone math Chamfer's V-bit uses, just specified the other
-        // way around). PlungeFeed (not Feed) since this is a genuine axial plunge, not a corner-breaking trace.
+        // A countersink bit plunged straight down a round hole's centerline - the bit's own cone does the
+        // chamfering as it descends, so there's no outline to trace at all (unlike Chamfer above).
+        // op.CountersinkDiameter is the FINISHED diameter the operator wants, not a raw depth - converted
+        // here from the TOOL'S OWN included angle: half the diameter is the radius the cone must reach, and
+        // it gains radius at tan(halfAngle) per unit of depth.
+        //
+        // This used to be a flat "depth = diameter / 2", which silently assumed every countersink was 90
+        // degrees. It is only right at 90 (tan 45 = 1); on a 60-degree bit the same formula plunges to a
+        // hole 15% too small, and on a 120 it goes nearly twice as deep as asked. See
+        // CustomTool.IncludedAngleDeg - which defaults to 90, so an already-saved tool list reproduces the
+        // old behaviour exactly.
+        // PlungeFeed (not Feed) since this is a genuine axial plunge, not a corner-breaking trace.
         private static List<string> BuildCountersink(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
         {
             var lines = new List<string>();
-            double depth = op.CountersinkDiameter / 2d;
+            var tool = CustomTools.Find(op.Tool);
+            double halfAngle = tool != null ? tool.HalfAngleRad : Math.PI / 4d;   // no tool record: the old 90-deg assumption
+            double depth = (op.CountersinkDiameter / 2d) / Math.Tan(halfAngle);
 
             lines.Add("G0 X" + F(cx) + " Y" + F(cy));
             lines.Add("G0 Z" + F(SafeZ()));
@@ -761,19 +1357,125 @@ namespace CNC.Controls
         // the work order's own real one, WorkOrderWcs) to hold that touch-off, then restores the real one
         // before returning, since WorkOrderRules.Validate only WARNS this must be the sole enabled operation
         // rather than enforcing it structurally.
-        private static List<string> BuildSurfaceEntireSpoilboard(WorkOrderOperation op)
+        /// <summary>
+        /// Cut the depth once, lift, and wait to be told to carry on.
+        ///
+        /// Surfacing commits the whole table to a number that was arrived at by measurement and arithmetic,
+        /// and the first evidence that the number is right normally arrives when the cutter is already
+        /// several hundred millimetres into the board. One plunge at the first raster point turns that into
+        /// something measurable BEFORE anything is committed: a pocket the operator can put a rule or a
+        /// depth gauge into.
+        ///
+        /// It plunges at the plunge feed rather than a rapid, so a depth that is badly wrong is a slow cut
+        /// rather than a bang, and it lands at the point the raster starts from - so the pocket is inside
+        /// the area about to be surfaced and gets removed by the pass it is checking.
+        ///
+        /// The hold is the ordinary (MBOX) one, which is deliberately non-modal: the machine sits still with
+        /// the prompt up, and the operator can jog away to look, jog back, and then answer. Cancel abandons
+        /// the run with nothing cut but the test pocket.
+        /// </summary>
+        /// <summary>
+        /// Where to take the test cut: the high point of the last height map when there is one inside the
+        /// area about to be surfaced, else wherever the raster happens to begin.
+        ///
+        /// The high point is the only place the test is fully informative. It is where the cutter takes the
+        /// most material and where Z0 was defined, so the pocket measures exactly what the pass will remove.
+        /// At a low point a shallow pass can miss the board entirely and prove nothing either way.
+        ///
+        /// Bounds-checked rather than trusted: the stored point is only meaningful while the work origin is
+        /// the one the map was taken against, and a point from another setup would put the plunge somewhere
+        /// nobody chose. Outside the area, it is ignored and the raster's own start is used.
+        /// </summary>
+        private static string TestPlungeAt(List<double[]> raster, double w, double h)
+        {
+            var cfg = HeightMapConfig.Current;
+
+            if (cfg.HasHighPoint &&
+                cfg.HighPointX >= 0d && cfg.HighPointX <= w &&
+                cfg.HighPointY >= 0d && cfg.HighPointY <= h)
+                return string.Format(CultureInfo.InvariantCulture, "X{0} Y{1}", F(cfg.HighPointX), F(cfg.HighPointY));
+
+            return XY(raster[0]);
+        }
+
+        /// <summary>
+        /// Feed for the test plunge, mm/min. Deliberately slow enough to watch and to stop: one plunge of a
+        /// millimetre or so costs a fraction of a second either way, and the whole point of the cut is to be
+        /// observed rather than completed quickly.
+        /// </summary>
+        private const double TestPlungeFeed = 300d;
+
+        private static void AppendTestPlunge(List<string> lines, double z, double plungeFeed)
+        {
+            lines.Add("(test plunge - the cut depth is reached once, then the tool lifts so it can be measured)");
+            // Genuinely slow, not merely "the plunge feed". A surfacing plunge feed is sized for production -
+            // 7920 mm/min on a real setup, and even clamped to the machine's Z maximum that is ~76 mm/s -
+            // which makes a wrong depth an impact rather than the observable cut this is supposed to be.
+            // Capped so the sentence "it plunges slowly so you can stop it" is actually true.
+            double testFeed = Math.Min(plungeFeed > 0d ? plungeFeed : TestPlungeFeed, TestPlungeFeed);
+            lines.Add(string.Format(CultureInfo.InvariantCulture, "G1 Z{0} F{1}", F(z), F(testFeed)));
+            lines.Add("G4 P0.5");
+            lines.Add("G0 Z0");
+            lines.Add("(WAITIDLE)");
+            lines.Add(string.Format(CultureInfo.InvariantCulture,
+                "(MBOX, OKCANCEL, Test plunge cut {0} mm below the high point of the board. Measure it - jogging is allowed while this is up. OK surfaces the whole board at that depth; Cancel stops with only this pocket cut.)",
+                F(-z)));
+            lines.Add("(WAITIDLE)");
+        }
+
+        private static List<string> BuildSurfaceEntireSpoilboard(WorkOrderToolpath tp, WorkOrderOperation op)
         {
             var lines = new List<string>();
             double stepover = Math.Max(0.5d, op.BitDiameter * (op.Stepover / 100d));
             double inset = EnvelopeInset();
-            double w = Math.Max(0d, AxisTravel(0) - 2d * inset);
-            double h = Math.Max(0d, AxisTravel(1) - 2d * inset);
-            double ox = EnvMin(0) + inset, oy = EnvMin(1) + inset;
+
+            // The BOARD's extent, not the machine's reach. These were derived from $130/$131, which is only
+            // the same thing when the spoilboard fills the table - on a machine with the toolsetter mounted
+            // off the front of the board it sent the raster out over the toolsetter with the cutter running.
+            // See WorkSurface: undefined still means "the whole table", so nothing changes where that is true.
+            var surface = WorkSurface.Current;
+            double ox = surface.UsableMin(0), oy = surface.UsableMin(1);
+            double w = surface.UsableSpan(0);
+            double h = surface.UsableSpan(1);
             double zTop = EnvMin(2) + AxisTravel(2) - inset;
             double z = -TrueDepth(op);
             // G10 L2's P-number addresses a WCS by slot index (P1=G54 ... P6=G59), not by G-code - has to
             // track ScratchWcs()'s own choice of slot.
             int scratchP = ScratchWcs() == "G54" ? 1 : 2;
+
+            // Two ways in. With an origin already established - the Height Map tab's "Full work surface"
+            // sets X0 Y0 on the table corner and Z0 on the highest point it probed - there is nothing to
+            // find, and touching off again would only replace a measured reference with an eyeballed one.
+            // Without it, the operation stays self-contained: park machine-referenced, touch off, anchor a
+            // scratch WCS, exactly as the retired SurfaceSpoilboardWizard did.
+            if (tp != null && tp.UseExistingOrigin)
+            {
+                lines.Add("(surface - entire spoilboard, on the existing work origin)");
+                lines.Add(WorkOrderWcs());
+                lines.Add("G0 Z" + F(SafeZ()));
+                lines.Add("(WAITIDLE)");
+                lines.Add("(MBOX, OKCANCEL, About to surface the whole board using the work origin already set - X0 Y0 at the table corner, Z0 at the highest point mapped. Fit the dust boot and check the cutter is the one that was mapped, then click OK to start. Click Cancel to abort.)");
+                lines.Add("(WAITIDLE)");
+
+                int t0 = ToolNumberFor(op);
+                lines.Add("M6 T" + N(t0));
+                double r0 = Rpm(op);
+                if (r0 > 0d)
+                    lines.Add("S" + N(r0) + " M3");
+
+                var path0 = RasterPath(w, h, stepover);
+                lines.Add("G0 " + TestPlungeAt(path0, w, h));
+                AppendTestPlunge(lines, z, op.PlungeFeed);
+                lines.Add("G0 " + XY(path0[0]));            // back to where the pass actually starts
+                AppendPlunge(lines, z, 0d, op.PlungeFeed);
+                for (int i = 1; i < path0.Count; i++)
+                    lines.Add("G1 " + XY(path0[i]) + " F" + F(op.Feed));
+
+                lines.Add("G0 Z" + F(SafeZ()));
+                if (r0 > 0d)
+                    lines.Add("M5");
+                return lines;
+            }
 
             lines.Add("(surface - entire spoilboard, machine-referenced)");
             lines.Add("G53 G0 Z" + F(zTop));
@@ -809,7 +1511,9 @@ namespace CNC.Controls
             // G10 L2 P1 above already anchored G54's origin at (ox,oy), so the raster is walked directly in
             // G54-relative coordinates starting at (0,0) - no further offset needed.
             var raster = RasterPath(w, h, stepover);
-            lines.Add("G0 " + XY(raster[0]));
+            lines.Add("G0 " + TestPlungeAt(raster, w, h));
+            AppendTestPlunge(lines, z, op.PlungeFeed);
+            lines.Add("G0 " + XY(raster[0]));               // back to where the pass actually starts
             AppendPlunge(lines, z, 0d, op.PlungeFeed);
             for (int i = 1; i < raster.Count; i++)
                 lines.Add("G1 " + XY(raster[i]) + " F" + F(op.Feed));
@@ -833,7 +1537,7 @@ namespace CNC.Controls
             // comment for why that order matters), not this generic wrapper's normal before-everything-else
             // placement.
             if (op.Kind == WorkOrderOpKind.Surface && tp.EntireSpoilboard)
-                return BuildSurfaceEntireSpoilboard(op);
+                return BuildSurfaceEntireSpoilboard(tp, op);
 
             AppendToolStart(lines, op, currentTool, spindleOn, currentRpm);
 
@@ -856,6 +1560,7 @@ namespace CNC.Controls
                     case WorkOrderOpKind.Countersink: lines.AddRange(BuildCountersink(tp, op, cx, cy)); break;
                     // EntireSpoilboard never reaches here - BuildOperation returns early for it, above.
                     case WorkOrderOpKind.Surface: lines.AddRange(BuildSurface(tp, op, cx, cy)); break;
+                    case WorkOrderOpKind.Engrave: lines.AddRange(BuildEngrave(tp, op, cx, cy)); break;
                 }
             }
 
@@ -882,12 +1587,19 @@ namespace CNC.Controls
                     var ct = CustomTools.Find(op.Tool);
                     // ct is null only for a stale op.Tool referencing a tool since deleted from the list -
                     // ParameterWarnings flags that at Generate time, this just keeps the comment generic.
+                    // A= was hardcoded to 90, so a 60-degree V-bit declared itself as 90 to the simulator and
+                    // the Fusion post that read this - the cutter shape they drew was simply the wrong cone.
+                    // It reads the tool's own angle now (CustomTool.IncludedAngleDeg, which defaults to 90,
+                    // so nothing changes for a tool whose angle was never set).
                     string type = ct == null ? "FLAT"
-                                : (ct.Kind == CustomToolKind.VBitOrChamfer || ct.Kind == CustomToolKind.Countersink) ? "VBIT A=90"
+                                : (ct.Kind == CustomToolKind.VBitOrChamfer || ct.Kind == CustomToolKind.Countersink)
+                                      ? string.Format(CultureInfo.InvariantCulture, "VBIT A={0:0.#}", ct.IncludedAngleDeg)
                                 : ct.Kind == CustomToolKind.BallEnd ? "BALL"
                                 : "FLAT";
                     string description = ct?.Name ?? ("tool " + op.Tool);
-                    yield return string.Format("(TOOL T={0} D={1:0.0##} TYPE={2} - {3})", t, EffectiveBitDiameter(tp, op), type, description);
+                    // description is the operator's own custom-tool name - a tool called
+                    // '1/4" endmill (roughing)' would truncate this comment exactly like the TOOLPATH one did.
+                    yield return string.Format("(TOOL T={0} D={1:0.0##} TYPE={2} - {3})", t, EffectiveBitDiameter(tp, op), type, CommentText(description));
                 }
         }
 
@@ -1051,6 +1763,23 @@ namespace CNC.Controls
             // established the origin on a different WCS.
             lines.Add(string.Format("(PREREQ, connected, homed, noalarm, tlo, EXPR, {0})", WorkOrderWcs()));
 
+            // Declare the stock, so anything reading the program knows what the material is rather than
+            // inferring it. The 3D view in particular was drawing the toolpath's own bounding box plus a
+            // margin and calling it the stock, which is why a 368x232 board showed up as a block the size
+            // of the lettering on it (reported 2026-08-10).
+            //
+            // Size comes from the Setup tab's Load Stock inputs - the same values the Work Order lays its
+            // toolpaths out against. OX/OY say where the stock's MINIMUM corner sits in work coordinates,
+            // which for a Work Order is the origin itself: AddToolpath centres a new toolpath at
+            // (Width/2, Height/2), so the stock spans 0..Width, 0..Height by construction. Stating it
+            // explicitly rather than letting consumers assume it keeps a Fusion program - whose origin can
+            // be anywhere on the block - reading exactly as it did before.
+            var stock = StartJobConfig.Section;
+            if (stock != null && stock.Width > 0d && stock.Height > 0d && stock.Thickness > 0d)
+                lines.Add(string.Format(CultureInfo.InvariantCulture,
+                    "(STOCK X={0:0.000} Y={1:0.000} Z={2:0.000} OX=0.000 OY=0.000)",
+                    stock.Width, stock.Height, stock.Thickness));
+
             // Needed both for the header note and to seed the spindle state below.
             int firstTool = FirstToolNumber(wo);
             bool skipFirst = wo.SkipFirstToolChange && firstTool != int.MinValue;
@@ -1070,16 +1799,17 @@ namespace CNC.Controls
             // with a low work Z origin it is a genuine collision risk rather than just an ugly move.
             //
             // Lift to machine top instead - unambiguous from any starting position, and the same first line
-            // MacroProcessor.EmitGotoG30 uses. X/Y are named explicitly (held at their current machine
-            // position) rather than writing a bare "G53 G0 Z0": see EmitGotoG30's comment - a firmware bug
-            // sign-flips a homing-direction-inverted ($23) axis's parser base after a G53 move that leaves it
-            // "unmoved", producing a false Alarm:2.
+            // MacroProcessor.EmitGotoG30 uses: a BARE "G53 G0 Z0". This line used to name X/Y at the live
+            // position via #<_abs_x>/#<_abs_y>; that was reverted here once already (0166eba6) because a
+            // parse-time read froze G30's coordinates into a mid-job rapid, and it is doubly wrong because it
+            // makes the lift fail whenever the current X/Y sits on the soft-limit boundary. See EmitGotoG30's
+            // comment for the full account, including the firmware bug that was disproven on 2026-08-11.
             //
             // Entire Spoilboard skips this entirely: it doesn't trust the work order's WCS at all (see
             // BuildSurfaceEntireSpoilboard) and its own first line is already a machine-referenced G53 rapid.
             bool entireSpoilboardOnly = wo.Toolpaths.Any(t => t.EntireSpoilboard && wo.EnabledOperations(t).Any());
             if (!entireSpoilboardOnly)
-                lines.Add("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z0");
+                lines.Add("G53 G0 Z0");
 
             // Load the machine-wide TLO-reference baseline (AppConfig.Base.TloRefBaseline, set once via
             // Machine Setup's "Reference TLO" step) as an INPUT to every M6 in this run, the same fix
@@ -1158,8 +1888,46 @@ namespace CNC.Controls
                                 ? string.Format("surface - entire spoilboard, {0:0.0} mm deep", TrueDepth(op))
                                 : string.Format("surface {0:0.0}x{1:0.0} mm, {2:0.0} mm deep", tp.Width, tp.Depth, TrueDepth(op));
                             break;
+                        case WorkOrderOpKind.Engrave:
+                            // Artwork describes itself by FILE and size - falling through to the text
+                            // wording below would report a logo as v-carve "" in , 0 mm caps.
+                            if (tp.Geometry == WorkOrderGeometryKind.Svg)
+                            {
+                                double svgH = tp.SvgWidth * SvgOutlines.AspectOf(tp.SvgFile);
+                                desc = string.Format("v-carve {0}, {1:0.#} x {2:0.#} mm",
+                                                     CommentText(string.IsNullOrEmpty(tp.SvgFile)
+                                                                 ? "(no file)" : System.IO.Path.GetFileName(tp.SvgFile)),
+                                                     tp.SvgWidth, svgH);
+                                break;
+                            }
+                            // The operator's own text goes into a g-code comment, and grblHAL ends a comment
+                            // at the FIRST ')' - so a bracket in it would truncate the block and let the rest
+                            // parse as g-code. Sanitised exactly as BuildEngrave sanitises its own.
+                            string shown = CommentText(tp.Text);
+                            // Shape text sized to fit reports the size the fit actually resolved, marked as
+                            // such - "0 mm caps" would be the field, not the cut.
+                            double descCap = tp.CapHeight;
+                            string sized = string.Empty;
+                            if (tp.HasText && tp.Geometry != WorkOrderGeometryKind.Text && WorkOrderRules.SupportsShapeText(tp.Geometry) && tp.CapHeight <= 0d)
+                            {
+                                var descFit = WorkOrderTextFit.Resolve(tp);
+                                if (descFit.Fits) { descCap = descFit.CapHeight; sized = " (sized to fit)"; }
+                            }
+                            desc = tp.IsCarved
+                                ? string.Format("v-carve \"{0}\" in {1}, {2:0.#} mm caps{3}", shown, tp.FontFamily, descCap, sized)
+                                : string.Format("engrave \"{0}\", {1:0.#} mm caps{2}, {3:0.###} mm stroke", shown, descCap, sized, op.EngraveWidth);
+                            break;
                         default:
-                            continue;
+                            // Was "continue", which SKIPPED THE WHOLE OPERATION - BuildOperation never ran,
+                            // so an operation the operator had enabled produced no g-code at all while the
+                            // header still counted it and the tool still appeared in the list. That is what
+                            // adding Engrave hit: it engraved nothing and the only clue was a 13-line file.
+                            //
+                            // A description is presentation. Losing one must never lose the CUT, so an
+                            // unrecognised kind now falls back to its own label and is emitted normally.
+                            // Every kind has a case above; this exists so the next one added cannot vanish.
+                            desc = WorkOrderRules.OpLabel(op.Kind);
+                            break;
                     }
 
                     // Whether the NEXT scheduled operation (if any) uses the same tool - if so, AppendToolEnd
@@ -1168,8 +1936,21 @@ namespace CNC.Controls
 
                     // Tool number up front in the header: it's what the operator has to have in the spindle, and
                     // ProgramView's title-bar tooltip reads these to list what's still to come.
+                    //
+                    // Timing instrumentation only. The schedule index, the description and the line count are
+                    // all already computed here, so this is also exactly the granularity a progress message
+                    // could use - measured first to confirm the time is where it looks like it is, rather than
+                    // reporting per-operation progress and discovering one operation is the whole four minutes.
+                    var swOp = System.Diagnostics.Stopwatch.StartNew();
+                    int linesBefore = lines.Count;
                     AppendSection(lines, string.Format("T{0} {1} - {2}{3}", ToolNumberFor(op), tp.Name, desc, suffix),
                         BuildOperation(tp, op, usableOpen, spindleTool, spindleOn, spindleRpm, sameToolNext));
+                    swOp.Stop();
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("workorder", string.Format(CultureInfo.InvariantCulture,
+                            "compile op {0}/{1} {2:0}ms | +{3} lines | {4} - {5}",
+                            si + 1, schedule.Count, swOp.Elapsed.TotalMilliseconds,
+                            lines.Count - linesBefore, tp.Name, desc));
                     spindleTool = ToolNumberFor(op);
                     double rpmThisOp = Rpm(op);
                     if (rpmThisOp > 0d) { spindleRpm = rpmThisOp; spindleOn = sameToolNext; }
@@ -1207,9 +1988,10 @@ namespace CNC.Controls
             // Use the shared EmitGotoG30 rather than hand-rolling it. The hand-rolled version here retracted
             // with a work-coordinate "G0 Z{SafeZ}" and then traversed - which is NOT Safe Z: with a work Z
             // origin ~113mm below machine top, "G0 Z20" left the tool ~93mm below machine top and it crossed
-            // the whole table at that height. Confirmed on real hardware 2026-08-02. It also wrote a bare
-            // "G53 G0 Z#5183" with X/Y unmoved, the exact shape of the false-Alarm:2 firmware bug EmitGotoG30
-            // names both axes to avoid.
+            // the whole table at that height. Confirmed on real hardware 2026-08-02. (It also descended with a
+            // bare "G53 G0 Z#5183"; EmitGotoG30 names X/Y on that DESCENT so the tool arrives over the G30 spot
+            // rather than wherever it happened to be - not, as this comment used to say, to dodge a firmware
+            // bug. That bug was disproven on 2026-08-11; see EmitGotoG30.)
             MacroProcessor.EmitGotoG30(lines.Add);
             // Restore whatever #<_tlo_ref> held before this program touched it - same save/restore idiom
             // StartJobView.BuildProgram uses. Only covers a CLEAN finish; an aborted/alarmed run never

@@ -11,9 +11,13 @@
     <AssemblyName>CNC.Core</AssemblyName>
     <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <WarningLevel>4</WarningLevel>
     <TargetFrameworkProfile />
+    <!-- The ATC .macro files are EmbeddedResources from ..\..\macros\ (outside this project). VS's fast
+         up-to-date check ignores external files, so a normal Build skips re-embedding edited macros (leaving
+         stale embedded/seeded/uploaded copies). Disabling it forces the real up-to-date check, which tracks
+         the EmbeddedResource inputs - so editing a macro + Build re-embeds it without needing a Clean. -->
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -37,87 +41,131 @@
     <UICulture>en-US</UICulture>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="PresentationCore" />
-    <Reference Include="PresentationFramework" />
-    <Reference Include="RP.Math">
-      <HintPath>..\..\Vector-master\RP.Math.Vector3\bin\Release\RP.Math.dll</HintPath>
-    </Reference>
-    <Reference Include="RP.Math.Vector3">
-      <HintPath>..\..\Vector-master\RP.Math.Vector3\bin\Release\RP.Math.Vector3.dll</HintPath>
-    </Reference>
+    <!-- NO WPF REFERENCES HERE, deliberately: PresentationCore, PresentationFramework, WindowsBase,
+         System.Xaml and System.Windows.Forms were all removed once the last WPF usage left this project
+         (pr/portable-core). CNC.Core is the portable half - if you find yourself adding one of these back,
+         the type you want belongs in CNC.Controls behind a hook instead (see UserPrompt, UiContext,
+         EventUtils.Pump, GrblViewModel.KeyboardFactory for the established pattern). -->
+    <!-- RP.Math dropped: its only use here was three lines of WCS rotation in GCodeEmulator, now
+         Point3D.RotateZ (verified numerically identical against the assembly over 3100 rotations).
+         It was an external net462-only DLL whose source is no longer present on this machine - the
+         build only still resolved it from a stale copy in bin\. The WPF projects still use it. -->
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
-    <Reference Include="System.Management" />
-    <Reference Include="System.Windows.Forms" />
-    <Reference Include="System.Xaml" />
+    <!-- System.Management dropped: the WMI COM-port description lookup moved to
+         CNC.Controls.SerialPortDescriptions (WMI compiles anywhere but is Windows-only at runtime).
+         Port ENUMERATION stays here - it must run where the hardware is. -->
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
-    <Reference Include="websocket-sharp, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\websocket-sharp\websocket-sharp\bin\Release\websocket-sharp.dll</HintPath>
-    </Reference>
-    <Reference Include="WindowsBase" />
+    <!-- websocket-sharp is GONE from Core: WebsocketStream now uses System.Net.WebSockets.ClientWebSocket,
+         which is in the framework on both net462 and net8.0. CNC.Controls keeps its own reference for
+         ObsBridge (OBS Studio's protocol, client functionality). Don't add it back here. -->
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The wire contract (step 6 of the client/server split). The machine-facing enums and the
+         GrblState struct live there now (same namespaces, so no call-site changes); Core builds its
+         working state out of contract types. Reference direction is one-way: everything may reference
+         CNC.Contracts, CNC.Contracts references nothing. -->
+    <ProjectReference Include="..\..\CNC Contracts\CNC.Contracts.csproj">
+      <Project>{9448A265-0B77-4235-A5F5-BDE212EC75E7}</Project>
+      <Name>CNC.Contracts</Name>
+    </ProjectReference>
+    <!-- Shared non-wire infrastructure (ViewModelBase, UiContext/SyncTarget, generic helpers) -
+         moved out so client projects can drop their CNC Core reference without losing the INPC
+         base class (referencing a type requires referencing its base's assembly). Same namespaces,
+         no call-site changes. CNC.Common references nothing. -->
+    <ProjectReference Include="..\..\CNC Common\CNC.Common.csproj">
+      <Project>{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}</Project>
+      <Name>CNC.Common</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ActionCommand.cs" />
-    <Compile Include="AppDialogs.cs" />
+    <Compile Include="GCodeRunTime.cs" />
+    <Compile Include="GCodeRunTimeIndex.cs" />
     <Compile Include="JogGate.cs" />
     <Compile Include="ConsoleLog.cs" />
+    <Compile Include="StatusLog.cs" />
     <Compile Include="DebugLog.cs" />
+    <Compile Include="LinkMonitor.cs" />
+    <Compile Include="PollDiag.cs" />
+    <Compile Include="WireLog.cs" />
+    <Compile Include="StreamCommsBase.cs" />
     <Compile Include="DemoMarker.cs" />
     <Compile Include="LogFile.cs" />
     <Compile Include="RotatingFileStore.cs" />
-    <Compile Include="ObsBridge.cs" />
     <Compile Include="SecretStore.cs" />
     <Compile Include="EltimaStream.cs" />
     <Compile Include="GCode.cs" />
     <Compile Include="GCodeEmulator.cs" />
     <Compile Include="GCodeParser.cs" />
     <Compile Include="GCodeExplainer.cs" />
+    <Compile Include="AtcMacros.cs" />
     <Compile Include="Grbl.cs" />
+    <Compile Include="GrblFilesystems.cs" />
+    <Compile Include="GrblSDCard.cs" />
+    <Compile Include="IProgramSource.cs" />
     <Compile Include="Comms.cs" />
-    <Compile Include="ControllerService.cs" />
+    <Compile Include="ConfigOverlay.cs" />
+    <Compile Include="ConfigStore.cs" />
     <Compile Include="BulkObservableCollection.cs" />
-    <Compile Include="ControllerMapper.cs" />
     <Compile Include="FeedsSpeedsExport.cs" />
     <Compile Include="FeedsSpeedsAdvisor.cs" />
-    <Compile Include="FeedsSpeedsAiReview.cs" />
     <Compile Include="GCodeJob.cs" />
+    <Compile Include="ControllerValidator.cs" />
+    <Compile Include="GCodeProgram.cs" />
+    <Compile Include="GCodeProgramComments.cs" />
     <Compile Include="GrblViewModel.cs" />
-    <Compile Include="KeypressHandler.cs" />
+    <Compile Include="MachineState.cs" />
+    <Compile Include="MachineDeltaProducer.cs" />
+    <Compile Include="MachineStateStream.cs" />
+    <Compile Include="MachineCommandChannel.cs" />
+    <Compile Include="StrokeFont.cs" />
+    <Compile Include="VCarve.cs" />
+    <Compile Include="JogController.cs" />
+    <Compile Include="LibStrings.cs" />
+    <Compile Include="MacroRunner.cs" />
+    <Compile Include="JobRunner.cs" />
+    <Compile Include="MdiDispatcher.cs" />
+    <Compile Include="StreamPump.cs" />
+    <Compile Include="WirePacer.cs" />
     <Compile Include="Machine.cs" />
     <Compile Include="MeasureViewModel.cs" />
     <Compile Include="NetworkScanner.cs" />
     <Compile Include="NGCExpr.cs" />
+    <Compile Include="PdfDocument.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SerialStream.cs" />
-    <Compile Include="ShortcutKey.cs" />
+    <Compile Include="UserPrompt.cs" />
     <Compile Include="TelnetStream.cs" />
     <Compile Include="WebsocketStream.cs" />
-    <Compile Include="XInput.cs" />
     <Compile Include="YModem.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="HelperClasses.cs" />
   </ItemGroup>
   <ItemGroup>
-    <!-- App-agnostic UI test server: AppDialogs routes the app's message boxes through it so the harness can
-         answer/read them. Published standalone at github.com/stevenrwood/WpfUiTestServer. -->
-    <PackageReference Include="WpfUiTestServer" Version="1.3.0" />
     <!-- Feeds & Speeds export/apply JSON (FeedsSpeedsExport.cs) - no JSON library existed in the solution
          before this; net462 needs the package (it's not part of the base framework there). -->
     <PackageReference Include="System.Text.Json" Version="6.0.10" />
   </ItemGroup>
   <ItemGroup>
-    <Page Include="LibStrings.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
+    <!-- Parsed at runtime by LibStrings.cs (System.Xml.Linq), NOT markup-compiled. Keeping this as a
+         <Page> is what forced CNC.Core to be a WPF project (ProjectTypeGuids + Microsoft.WinFx.targets,
+         which silently re-injects PresentationCore/PresentationFramework/WindowsBase/System.Xaml) and
+         so blocked a .NET 8 target. The x:Uid/x:Key pairs are unchanged, so the
+         Locale/<loc>/csv/CNC.Core.resources.*.csv rows and tools/locadd.py still apply. -->
+    <EmbeddedResource Include="LibStrings.xaml" />
+    <!-- ATC support macros, embedded for auto-provisioning (AtcMacros.cs). LogicalName = bare file name.
+         They live in THIS assembly because AtcMacros reads them via GetExecutingAssembly. -->
+    <EmbeddedResource Include="..\..\macros\pcorner.macro"><LogicalName>pcorner.macro</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\macros\pvisecorner.macro"><LogicalName>pvisecorner.macro</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\macros\pcenter.macro"><LogicalName>pcenter.macro</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\macros\tc.macro"><LogicalName>tc.macro</LogicalName></EmbeddedResource>
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

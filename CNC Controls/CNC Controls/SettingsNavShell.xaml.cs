@@ -16,6 +16,7 @@ using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;   // AdornerLayer - see "Highlighting the match ON the page"
 using System.Windows.Input;
 using System.Windows.Media;
 
@@ -140,6 +141,12 @@ namespace CNC.Controls
         {
             pageHost.Content = selectedNode?.Content;
             emptyHint.Visibility = selectedNode?.Content == null ? Visibility.Visible : Visibility.Collapsed;
+
+            // A new page is showing, so any marks belong to the old one. Re-run against this page - this is
+            // the call that matters when a search narrows the list and you then CHOOSE one of the survivors,
+            // which is the whole point of the highlighting. Also covers the host building content lazily and
+            // calling back in here afterwards.
+            HighlightMatchesOnPage();
         }
 
         // Re-announce computed visibility after the host has run its capability gates.
@@ -337,7 +344,177 @@ namespace CNC.Controls
 
             matchCount.Text = all ? string.Empty
                 : string.Format("{0} match{1}", MatchingPages(), MatchingPages() == 1 ? "" : "es");
+
+            searchQuery = q;
+            HighlightMatchesOnPage();
         }
+
+        #region Highlighting the match ON the page
+
+        // Narrowing the tree to the right page told you the page and nothing more: you then had to find the
+        // word yourself, and a tooltip hit could not be found by looking at all. MatchContext explains the
+        // hit in the tree, but explaining is not pointing. These mark it where it actually is.
+
+        private string searchQuery;
+
+        // The LAYER is remembered alongside each adorner, not looked up again at removal time. Re-resolving
+        // it via GetAdornerLayer(AdornedElement) fails once the page has been swapped out of pageHost - the
+        // element is no longer in a tree, the lookup returns null, and the adorner stays behind on the layer
+        // it was added to. That is a highlight that never goes away, on a page you are no longer searching.
+        private readonly List<KeyValuePair<AdornerLayer, ElementHighlightAdorner>> pageHighlights =
+            new List<KeyValuePair<AdornerLayer, ElementHighlightAdorner>>();
+
+        // Bumped by every clear. A deferred highlight pass captures it and abandons its work if it no longer
+        // matches: page changes and keystrokes can both queue a pass, and without this an older pass could
+        // land AFTER a newer clear and re-adorn a page the user has already navigated away from.
+        private int highlightGeneration;
+
+        private void ClearPageHighlights()
+        {
+            highlightGeneration++;
+            foreach (var pair in pageHighlights)
+                pair.Key.Remove(pair.Value);
+            pageHighlights.Clear();
+        }
+
+        /// <summary>
+        /// Mark every control on the current page whose text contains the query, and scroll the first into
+        /// view. Safe to call whenever the page or the query changes.
+        /// </summary>
+        private void HighlightMatchesOnPage()
+        {
+            ClearPageHighlights();
+
+            if (string.IsNullOrEmpty(searchQuery) || pageHost.Content == null)
+                return;
+
+            // A page is built lazily on FIRST show, and selection runs before that content has been through
+            // layout - inside a layout pass, in the menu-hosted case. Walking now would measure a tree with
+            // no RenderSize and adorn nothing. Loaded priority puts this after the page has arranged.
+            int generation = highlightGeneration;
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new System.Action(() =>
+            {
+                // The query or the page may have moved on while this sat in the queue.
+                if (generation != highlightGeneration || string.IsNullOrEmpty(searchQuery))
+                    return;
+
+                var root = pageHost.Content as DependencyObject;
+                if (root == null)
+                    return;
+
+                FrameworkElement firstVisible = null, firstTooltip = null;
+                foreach (var hit in MatchingElements(root, searchQuery))
+                {
+                    var layer = AdornerLayer.GetAdornerLayer(hit.Element);
+                    if (layer == null)
+                        continue;
+                    var a = new ElementHighlightAdorner(hit.Element, hit.TooltipOnly);
+                    layer.Add(a);
+                    pageHighlights.Add(new KeyValuePair<AdornerLayer, ElementHighlightAdorner>(layer, a));
+
+                    if (hit.TooltipOnly)
+                    {
+                        if (firstTooltip == null)
+                            firstTooltip = hit.Element;
+                    }
+                    else if (firstVisible == null)
+                        firstVisible = hit.Element;
+                }
+
+                // Prefer scrolling to a hit you can actually READ. Landing on a tooltip-only hit when the page
+                // also contains the word in plain sight is the same confusion in smaller form.
+                (firstVisible ?? firstTooltip)?.BringIntoView();
+
+                if (pageHighlights.Count == 0)
+                    CNC.Core.DebugLog.Write("ui", "settings search: \"" + searchQuery +
+                                            "\" matched this page but no control on it could be marked");
+            }));
+        }
+
+        // Controls on the page whose own text contains the query. Deliberately shallow about what counts as
+        // "text": the thing being pointed at is what the user can READ, which is these five. A container is
+        // skipped when a descendant of it also matches, so a hit marks the label or box itself rather than
+        // drawing a box round half the page.
+        private struct PageHit
+        {
+            public FrameworkElement Element;
+            public bool TooltipOnly;    // the query is in the tooltip, nowhere the eye can see
+        }
+
+        private static IEnumerable<PageHit> MatchingElements(DependencyObject root, string q)
+        {
+            var hits = new List<PageHit>();
+            Walk(root, q, hits);
+            return hits;
+        }
+
+        private static void Walk(DependencyObject node, string q, List<PageHit> hits)
+        {
+            int count = VisualTreeHelper.GetChildrenCount(node);
+            for (int i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(node, i);
+
+                int before = hits.Count;
+                Walk(child, q, hits);           // depth first, so the innermost match wins
+                if (hits.Count > before)
+                    continue;                    // something inside already matched - don't box the container too
+
+                var el = child as FrameworkElement;
+                if (el == null || !el.IsVisible)
+                    continue;
+
+                var kind = Classify(child, q);
+                if (kind != MatchKind.None)
+                    hits.Add(new PageHit { Element = el, TooltipOnly = kind == MatchKind.TooltipOnly });
+            }
+        }
+
+        private enum MatchKind { None, Text, TooltipOnly }
+
+        // Visible text is tested BEFORE the tooltip, and the two are reported apart rather than OR'd
+        // together: a control whose tooltip matches but whose caption does not has to be drawn differently,
+        // or its highlight looks like a wrong result until you happen to hover it.
+        private static MatchKind Classify(DependencyObject d, string q)
+        {
+            if (Contains((d as TextBlock)?.Text, q))
+                return MatchKind.Text;
+            if (Contains((d as TextBox)?.Text, q))
+                return MatchKind.Text;
+            if (Contains((d as GroupBox)?.Header as string, q))
+                return MatchKind.Text;
+
+            // CheckBox / RadioButton / Button / Label all carry their caption as Content. Only a string
+            // counts: a Content that is itself a control has already been walked as a child.
+            var cc = d as ContentControl;
+            if (cc != null && Contains(cc.Content as string, q))
+                return MatchKind.Text;
+
+            // Tooltip hits matter most of all - that text IS on the page, but only on hover, so it is the
+            // one kind of match the eye can never locate unaided.
+            var fe = d as FrameworkElement;
+            if (fe != null && Contains(ToolTipText(fe.ToolTip), q))
+                return MatchKind.TooltipOnly;
+
+            return MatchKind.None;
+        }
+
+        private static string ToolTipText(object tip)
+        {
+            var s = tip as string;
+            if (s != null)
+                return s;
+            var tt = tip as ToolTip;
+            return tt?.Content as string;
+        }
+
+        private static bool Contains(string haystack, string needle)
+        {
+            return haystack != null && needle != null &&
+                   haystack.IndexOf(needle, System.StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        #endregion
 
         // FindResource returns string.Empty (not null) for a key it does not have.
         private static string Localized(string key, string fallback)

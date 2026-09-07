@@ -58,6 +58,10 @@ namespace Grbl_Config_App
         public MainWindow()
         {
             CNC.Core.Resources.Path = AppDomain.CurrentDomain.BaseDirectory;
+            // Before InitializeComponent: MainWindow.xaml instantiates a GrblViewModel, and CNC.Core
+            // marshals to the UI thread and pumps messages through this instead of
+            // Application.Current.Dispatcher. Installs both, at Normal dispatcher priority.
+            CNC.Controls.UiPump.Register();
 
             InitializeComponent();
             Title = string.Format(Title, version);
@@ -214,7 +218,7 @@ namespace Grbl_Config_App
 
             model.Silent = true;
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                         cancellationToken,
@@ -222,10 +226,7 @@ namespace Grbl_Config_App
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         400, () => Comms.com.WriteCommand(cmd));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
             return settings.Count > 0;
         }

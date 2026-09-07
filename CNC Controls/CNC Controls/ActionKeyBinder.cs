@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ActionKeyBinder.cs - part of CNC Controls library
  *
  * UI-zoom keyboard shortcuts (Settings:App's UI scale). These are dispatched at the MAIN-WINDOW level
@@ -33,7 +33,9 @@ namespace CNC.Controls
         }
 
 
-        public static readonly ActionInfo[] Catalog = new ActionInfo[]
+        // Declared BEFORE Catalog on purpose: static field initializers run in declaration order, so
+        // filtering an array that has not been assigned yet throws at type initialization.
+        private static readonly ActionInfo[] catalog = new ActionInfo[]
         {
             new ActionInfo { Id = "UiScaleUp",   Label = "Zoom in (UI scale)",  DefaultKey = Key.OemPlus,  DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
             new ActionInfo { Id = "UiScaleDown", Label = "Zoom out (UI scale)", DefaultKey = Key.OemMinus, DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
@@ -53,27 +55,60 @@ namespace CNC.Controls
             new ActionInfo { Id = "ObsAppStart",  Label = "OBS: App/screen capture - Start recording", DefaultKey = Key.F7,  DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
             new ActionInfo { Id = "ObsAppStop",   Label = "OBS: App/screen capture - Stop recording",  DefaultKey = Key.F8,  DefaultModifiers = ModifierKeys.Control | ModifierKeys.Alt },
 
+            // Run-strip buttons as bindable actions ("Program" group - KeyMapEditor.Categorize routes an
+            // ActionKeyBinder row by the Group named here). Unbound by default for the same reason as the
+            // menu commands below. The handlers live in MainWindow and press the very button they name, so
+            // there is one implementation of each and the key cannot drift from the button.
+            // F12 by default - the key the retired "Toggle console window" action used, pointed at the
+            // console's replacement. An upgrading profile has no Program.Mdi row yet, so SeedDefaults gives it
+            // F12 and the key keeps reaching the console; it now OPENS it (Esc dismisses, as everywhere else)
+            // instead of toggling. A profile that has already bound this action keeps whatever it chose -
+            // SeedDefaults only seeds an Id that is entirely absent.
+            new ActionInfo { Id = "Program.Mdi",    Label = "MDI (open console for input)", DefaultKey = Key.F12, Group = "Program", Description = "Press the run strip's MDI button: open the console with the caret in its input box, ready to type. Never hides it - Esc closes it." },
+            new ActionInfo { Id = "Program.Status", Label = "Status (message history)",     Group = "Program", Description = "Press the run strip's Status button: show the status message history since launch." },
+
             // Main-menu commands. All unbound by default (DefaultKey = None) - these are conveniences, and
             // grabbing keys for them uninvited would collide with whatever the operator already uses. The
             // handlers live in MainWindow, which registers each one against the SAME menu item it drives and
             // refuses to act while that item is disabled, so a shortcut can never do what the menu won't.
             // The views that used to be tabs are NOT here - they keep their "Tab.*" ids (KeyMapEditor.TabTargets)
             // so a binding made while they were on the bar still works now that they are menu items.
-            new ActionInfo { Id = "Menu.Connect",        Label = "Connect...",                Group = KeyMapEditor.TopLevelGroup, Description = "Open the connection dialog." },
-            new ActionInfo { Id = "Menu.LoadProgram",    Label = "File > Load Program...",    Group = KeyMapEditor.TopLevelGroup, Description = "Open a g-code file." },
-            new ActionInfo { Id = "Menu.LoadWorkOrder",  Label = "File > Load Work Order...", Group = KeyMapEditor.TopLevelGroup, Description = "Open a saved work order." },
-            new ActionInfo { Id = "Menu.NewWorkOrder",   Label = "File > New Work Order...",  Group = KeyMapEditor.TopLevelGroup, Description = "Start a new work order." },
-            new ActionInfo { Id = "Menu.Camera",         Label = "Tools > Camera",            Group = KeyMapEditor.TopLevelGroup, Description = "Open the camera window." },
-            new ActionInfo { Id = "Menu.Wiki",           Label = "Help > Wiki",               Group = KeyMapEditor.TopLevelGroup, Description = "Open the online wiki in a browser." },
-            new ActionInfo { Id = "Menu.UsageTips",      Label = "Help > Usage tips",         Group = KeyMapEditor.TopLevelGroup, Description = "Open the usage tips page in a browser." },
-            new ActionInfo { Id = "Menu.BriefTour",      Label = "Help > A brief tour",       Group = KeyMapEditor.TopLevelGroup, Description = "Open the brief tour." },
-            new ActionInfo { Id = "Menu.VideoTutorials", Label = "Help > Video tutorials",    Group = KeyMapEditor.TopLevelGroup, Description = "Open the video tutorials." },
-            new ActionInfo { Id = "Menu.ErrorCodes",     Label = "Help > Error and alarm codes", Group = KeyMapEditor.TopLevelGroup, Description = "Open the error and alarm code reference." },
-            new ActionInfo { Id = "Menu.CheckForUpdates", Label = "Help > Check for updates...", Group = KeyMapEditor.TopLevelGroup, Description = "Check GitHub for a newer ioSender release." },
-            new ActionInfo { Id = "Menu.RollBack",       Label = "Help > Roll back to previous version...", Group = KeyMapEditor.TopLevelGroup, Description = "Swap back to the build installed before the last update." },
-            new ActionInfo { Id = "Menu.OpenDataFolder", Label = "Help > Open Application data folder", Group = KeyMapEditor.TopLevelGroup, Description = "Open the per-user folder holding App.config, key mappings and backups." },
-            new ActionInfo { Id = "Menu.About",          Label = "Help > About",              Group = KeyMapEditor.TopLevelGroup, Description = "Show the About window." },
+            new ActionInfo { Id = "Menu.Connect",        Label = "Connect...",                Group = KeyMapEditor.MenuGroup, Description = "Open the connection dialog." },
+            new ActionInfo { Id = "Menu.LoadProgram",    Label = "File > Load Program...",    Group = KeyMapEditor.MenuGroup, Description = "Open a g-code file." },
+            new ActionInfo { Id = "Menu.LoadWorkOrder",  Label = "File > Load Work Order...", Group = KeyMapEditor.MenuGroup, Description = "Open a saved work order." },
+            new ActionInfo { Id = "Menu.NewWorkOrder",   Label = "File > New Work Order...",  Group = KeyMapEditor.MenuGroup, Description = "Start a new work order." },
+            new ActionInfo { Id = "Menu.LoadSvgLaser",   Label = "File > Load SVG Laser Job...", Group = KeyMapEditor.MenuGroup, Description = "Burn an SVG with the laser." },
+            new ActionInfo { Id = "Menu.Camera",         Label = "Tools > Camera",            Group = KeyMapEditor.MenuGroup, Description = "Open the camera window." },
+            new ActionInfo { Id = "Menu.Wiki",           Label = "Help > Wiki",               Group = KeyMapEditor.MenuGroup, Description = "Open the online wiki in a browser." },
+            new ActionInfo { Id = "Menu.UsageTips",      Label = "Help > Usage tips",         Group = KeyMapEditor.MenuGroup, Description = "Open the usage tips page in a browser." },
+            new ActionInfo { Id = "Menu.BriefTour",      Label = "Help > A brief tour",       Group = KeyMapEditor.MenuGroup, Description = "Open the brief tour." },
+            new ActionInfo { Id = "Menu.VideoTutorials", Label = "Help > Video tutorials",    Group = KeyMapEditor.MenuGroup, Description = "Open the video tutorials." },
+            new ActionInfo { Id = "Menu.ErrorCodes",     Label = "Help > Error and alarm codes", Group = KeyMapEditor.MenuGroup, Description = "Open the error and alarm code reference." },
+            new ActionInfo { Id = "Menu.RestartIoSender", Label = "Help > Restart ioSender...", Group = KeyMapEditor.MenuGroup, Description = "Close and reopen ioSender, saving settings first. Asks before restarting." },
+            new ActionInfo { Id = "Menu.CheckForUpdates", Label = "Help > Check for updates...", Group = KeyMapEditor.MenuGroup, Description = "Check GitHub for a newer ioSender release." },
+            new ActionInfo { Id = "Menu.RollBack",       Label = "Help > Roll back to previous version...", Group = KeyMapEditor.MenuGroup, Description = "Swap back to the build installed before the last update." },
+            new ActionInfo { Id = "Menu.OpenDataFolder", Label = "Help > Open Application data folder", Group = KeyMapEditor.MenuGroup, Description = "Open the per-user folder holding App.config, key mappings and backups." },
+            new ActionInfo { Id = "Menu.About",          Label = "Help > About",              Group = KeyMapEditor.MenuGroup, Description = "Show the About window." },
         };
+
+        /// <summary>
+        /// The bindable actions, minus any belonging to a feature that is currently held back.
+        ///
+        /// The filter is the point: THIS catalogue - not the menu, and not registerMenuActions - is what
+        /// Settings &gt; Keyboard lists. Hiding a menu item without hiding its row here leaves the command
+        /// visible and bindable in the editor, which is exactly what e5fe6542 did to "Load SVG Laser Job":
+        /// it collapsed the menu entry and skipped the action registration, and the row stayed on screen.
+        /// </summary>
+        /// <remarks>
+        /// Computed on every read, NOT a static readonly array. Features.SvgLaserJob is set from the
+        /// command line during startup, and a static field initializer would freeze whatever the flag
+        /// held the first time this type was touched - which is a race decided by unrelated code, and
+        /// exactly the "right at startup, stale forever after" shape. Two callers, neither hot.
+        /// </remarks>
+        public static ActionInfo[] Catalog
+        {
+            get { return catalog.Where(a => a.Id != "Menu.LoadSvgLaser" || Features.SvgLaserJob).ToArray(); }
+        }
 
         private static readonly Dictionary<string, Func<Key, bool>> handlers = new Dictionary<string, Func<Key, bool>>();
 

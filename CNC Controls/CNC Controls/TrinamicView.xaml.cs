@@ -237,7 +237,7 @@ namespace CNC.Controls
             // SESSION: neither is cleared by anything short of a restart.
             try
             {
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                         cancellationToken,
@@ -245,10 +245,7 @@ namespace CNC.Controls
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         800, () => Comms.com.WriteCommand("M122" + axis));
-                }) { IsBackground = true }.Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
             }
             finally
             {

@@ -41,18 +41,18 @@ using System;
 using System.IO;
 using System.Text;
 using System.Net.Sockets;
-using System.Windows.Threading;
+using System.Threading;
 
 namespace CNC.Core
 {
-    public class TelnetStream : StreamComms
+    public class TelnetStream : StreamCommsBase, StreamComms
     {
         private TcpClient ipserver = null;
         private NetworkStream ipstream = null;
         private byte[] buffer = new byte[512];
         private volatile Comms.State state = Comms.State.ACK;
         private StringBuilder input = new StringBuilder(1024);
-        private Dispatcher Dispatcher { get; set; }
+        private SynchronizationContext SyncContext { get; set; }
 
         private readonly string hostParams;
         private readonly Reconnector reconnector;
@@ -60,14 +60,14 @@ namespace CNC.Core
 
         public event DataReceivedHandler DataReceived;
 
-        public Action<string> AckSink { get; set; }
+        public event Action<Comms.ReplyClass, string> ReplyClassified;
         public bool BlockingWrites { get; set; }   // network writes are already synchronous; no-op here
 
-        public TelnetStream(string host, Dispatcher dispatcher)
+        public TelnetStream(string host, SynchronizationContext syncContext)
         {
             Comms.com = this;
             Reply = string.Empty;
-            Dispatcher = dispatcher;
+            SyncContext = syncContext;
 
             if (!host.Contains(":"))
                 host += ":23";
@@ -155,6 +155,8 @@ namespace CNC.Core
 
         public bool IsReconnecting { get { return reconnector != null && reconnector.IsReconnecting; } }
 
+        public void NotifyLinkLost() { reconnector?.NotifyLost(); }
+
         public event System.Action ConnectionLost
         {
             add { reconnector.ConnectionLost += value; }
@@ -211,7 +213,7 @@ namespace CNC.Core
         // dropping the payload/CRC. The controller then never sees a complete block, never ACKs, and the
         // transfer times out and CANs (0-byte files). Synchronous Write serialises the bytes correctly;
         // on a local/normal connection it returns as soon as the OS buffers them.
-        public void WriteByte(byte data)
+        protected override void WriteByteRaw(byte data)
         {
             try
             {
@@ -231,7 +233,7 @@ namespace CNC.Core
             }
         }
 
-        public void WriteBytes(byte[] bytes, int len)
+        protected override void WriteBytesRaw(byte[] bytes, int len)
         {
             try
             {
@@ -268,29 +270,27 @@ namespace CNC.Core
             }
         }
 
-        public void AwaitAck()
+        // Pending predicates read this instance's own volatile state, not Comms.com's - the loops these
+        // replace all went through the global, which is only the same object by convention.
+        private bool AwaitingAck { get { return state == Comms.State.DataReceived || state == Comms.State.AwaitAck; } }
+
+        public bool AwaitAck()
         {
-            while (Comms.com.CommandState == Comms.State.DataReceived || Comms.com.CommandState == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
+            if (EventUtils.WaitWhile(() => AwaitingAck, Comms.AckTimeoutMs))
+                return true;
+
+            ConsoleLog.Write("[TelnetStream] AwaitAck: no ok/error within " + Comms.AckTimeoutMs + "ms");
+            return false;
         }
 
-        public void AwaitAck(string command)
+        public bool AwaitAck(string command)
         {
+            // This overload used to spin bare - `while (...) ;` - with no pump and no sleep: a frozen UI
+            // and a saturated core for as long as the controller stayed quiet. Serial/Eltima pumped, so
+            // the same operation behaved differently depending on how you were connected.
             WriteCommand(command);
 
-            while (Comms.com.CommandState == Comms.State.DataReceived || Comms.com.CommandState == Comms.State.AwaitAck) ;
-        }
-
-        public void AwaitResponse()
-        {
-            while (Comms.com.CommandState == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
-        }
-        public void AwaitResponse(string command)
-        {
-            WriteCommand(command);
-
-            while (Comms.com.CommandState == Comms.State.AwaitAck) ;
+            return AwaitAck();
         }
 
         public string GetReply(string command)
@@ -298,8 +298,12 @@ namespace CNC.Core
             Reply = string.Empty;
             WriteCommand(command);
 
-            while (state == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
+            // Any reply ends this wait, not just ok/error - GetReply's caller wants the response line.
+            if (!EventUtils.WaitWhile(() => state == Comms.State.AwaitAck, Comms.AckTimeoutMs))
+            {
+                ConsoleLog.Write("[TelnetStream] GetReply('" + command + "'): no reply within " + Comms.AckTimeoutMs + "ms");
+                return string.Empty;
+            }
 
             return Reply;
         }
@@ -386,16 +390,21 @@ namespace CNC.Core
             {
                 Reply = reply;
                 state = reply == "ok" ? Comms.State.ACK : (reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
-                // Tap ok/error acks straight to the streamer (when installed), bypassing the UI dispatcher.
-                if (AckSink != null && (state == Comms.State.ACK || state == Comms.State.NAK))
-                    AckSink(reply);
+                // Classified-reply tap straight to any subscriber, bypassing the UI dispatcher. Raised
+                // for every reply, not just ack/nak - see the interface doc-comment.
+                ReplyClassified?.Invoke(
+                    state == Comms.State.ACK ? Comms.ReplyClass.Ack :
+                    state == Comms.State.NAK ? Comms.ReplyClass.Nak :
+                    reply.Length > 0 && reply[0] == '<' ? Comms.ReplyClass.Status :
+                    Comms.ReplyClass.Other,
+                    reply);
                 // Marshal to the UI thread ASYNCHRONOUSLY (BeginInvoke, not Invoke): a synchronous Invoke
                 // blocks this read thread until the UI thread is free, so a busy UI (e.g. a heavy 3D view)
                 // stalls reads - and therefore the stream acks. BeginInvoke keeps reads flowing regardless
                 // of UI load; the reply value is captured per call (strings are immutable) so order and
                 // content are preserved, and dispatching outside lock(input) keeps the no-deadlock fix.
                 if (reply.Length != 0 && DataReceived != null)
-                    Dispatcher.BeginInvoke(DataReceived, reply);
+                    Comms.PostTo(SyncContext, DataReceived, reply);
             }
 
             try

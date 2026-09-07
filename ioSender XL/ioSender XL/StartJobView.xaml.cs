@@ -82,8 +82,6 @@ namespace GCode_Sender
         // Set by Run_Click when "Probe height map" is checked; consumed by Model_PropertyChanged once the
         // Start Job run's IsJobRunning transitions back to false (its own terminal state), then runs the
         // Height Map pass as a continuation. See RunHeightMapPass.
-        private bool pendingHeightMap = false;
-
         // Guards Model_PropertyChanged's PRINT-line parsing (corners/measured size/etc.) to whichever
         // StartJobView instance most recently triggered a run. Subscribe() deliberately never unsubscribes on
         // deactivate (see its own comment - a run started here must still get its results parsed even after
@@ -186,15 +184,44 @@ namespace GCode_Sender
             }
         }
 
-        // Start Job's OWN program view (the ProgramView refactor): created lazily, titled "Start Job", connected
+        // Start Job's OWN program view (the ProgramView refactor): created lazily, titled "Setup", connected
         // to the streamer stack so the overlay hosts it and the run marks it - independent of the Job-tab view.
         private CNC.Controls.ProgramView programView;
         private void EnsureProgramView()
         {
             if (programView == null)
-                programView = new CNC.Controls.ProgramView { Title = "Start Job" };
+                programView = new CNC.Controls.ProgramView { Title = "Setup" };
         }
         private string program = string.Empty;   // last generated probe program (run via the macro path)
+
+        // --- Generate-time handoff to the Job tab (2026-08-12, Work Order's shape) ---------------------
+        // Generate makes the program the loaded job and takes the operator to the Job tab to look at it
+        // BEFORE anything moves; Run (the run bar, still Setup's - see below) then streams it. This
+        // replaces switching tabs at the moment motion starts, which the operator described as the
+        // rougher half of the two.
+        //
+        // Where this DIFFERS from Work Order: Work Order hands off completely - its program is the loaded
+        // job and the Job tab's ordinary Cycle Start runs it. Setup cannot do that, because everything
+        // that makes its probe program safe to stream lives in MacroProcessor.Run (the EXPR refusal, the
+        // comment sanitizing, the macro-arm that skips the dry-run Z-shift preamble, the borrow/pop
+        // watcher, DiscardGenerated, and the onDone continuation that runs the height map). So Setup stays
+        // the ACTIVE PROGRAM owner across its own deactivation: the run bar keeps reading "Run", and
+        // pressing it still lands in Run_Click -> MacroProcessor.Run exactly as before.
+        //
+        // handedToJobTab: this tab is off-screen but still owns the run bar (set by Generate, cleared when
+        // the operator comes back or the program is dropped). It is what tells Activate(false) that this
+        // particular deactivation is OUR handoff and not a real tab-leave.
+        private bool handedToJobTab;
+        // programBorrowed/loadedProgramName: we pushed the previous job aside and loaded ours under this
+        // name. Paired the same way WorkOrderView pairs runEndWatcherArmed with a FileName test - the flag
+        // alone is never trusted, since MacroProcessor.Run's watcher may have popped already.
+        private bool programBorrowed;
+        private string loadedProgramName;
+        // The run bar is ours while the tab is focused OR while we've handed off to the Job tab. Every
+        // write to the shared MacroProcessor statics is gated on this rather than isActiveTab alone -
+        // otherwise a discard after the handoff (the run finishing, an input edit) would leave the bar
+        // reading "Run" with no program behind it.
+        private bool OwnsRunBar { get { return isActiveTab || handedToJobTab; } }
 
         // This is now THE Setup screen - one instance, one shared config section (StartJobConfig.Section) -
         // there is no more separate Odd Jobs "Setup" sub-tab instance to distinguish from (job-flow
@@ -301,6 +328,42 @@ namespace GCode_Sender
         // reveal btnCopyFromStock instead of applying anything - the operator decides. No declared comment,
         // or it matches what's already entered (within rounding), and the button just stays hidden.
         private const double StockMatchToleranceMm = 0.05d;
+
+        // Width/Height/Thickness can now be written from OUTSIDE this tab - the Work Order tab's "Apply to
+        // Setup", which hands over the blank a work order was authored for. That needs the same re-read
+        // Material already gets a few lines up in Activate, and for the same reason: LoadInputs runs ONCE
+        // per session and SaveInputs rebuilds Section wholesale from these controls on the way out, so a
+        // field still holding last session's number would write itself straight back over the applied size.
+        //
+        // Marked touched, because that is exactly what these are: an explicit size for THIS stock, chosen by
+        // the operator clicking Apply. Same reasoning as CopyFromStock_Click, which sets it for the same
+        // reason. A no-op when the values already agree, so merely visiting the tab never sets the flag.
+        private void ReloadStockSizeFromSection()
+        {
+            var s = Section;
+            if (s == null || s.Width <= 0d || s.Height <= 0d)
+                return;
+
+            if (Math.Abs(fldWidth.Value - s.Width) < StockMatchToleranceMm &&
+                Math.Abs(fldHeight.Value - s.Height) < StockMatchToleranceMm &&
+                Math.Abs(fldThickness.Value - s.Thickness) < StockMatchToleranceMm)
+                return;
+
+            loadingInputs = true;
+            try
+            {
+                fldWidth.Value = s.Width;
+                fldHeight.Value = s.Height;
+                fldThickness.Value = s.Thickness;
+                UpdateThicknessWarning();
+            }
+            finally
+            {
+                loadingInputs = false;
+            }
+            sizeFieldsTouched = true;
+        }
+
         private void CheckStockAgainstProgram()
         {
             if (btnCopyFromStock == null)
@@ -346,6 +409,12 @@ namespace GCode_Sender
         // The pcorner probe macro assumes stock <= 1 in (25.4 mm) to start its top probe
         // just above a 1 in top for speed - taller stock would be missed. Flag it when the Z estimate exceeds that.
         private const double MaxStockThicknessMm = 25.4d;
+
+        // How far below the operator's G28 park a Dynamic Rectangle pick may seek for the stock top. Same
+        // 12 mm Fixture Test position uses, and for the same reason: a dead or mis-wired probe alarms after
+        // a few millimetres instead of driving to a deep machine target. See the Rectangle branch in
+        // BuildDynamicProbeProgram.
+        private const double DynamicSearchDepthMm = 12d;
         private void UpdateThicknessWarning()
         {
             if (txtThickWarn != null)
@@ -665,19 +734,121 @@ namespace GCode_Sender
         // Drop the generated program; Cycle Start (which runs the active program) rebuilds it via Run_Click.
         // Also registered as MacroProcessor.DiscardGenerated (see Activate) - called there too, right after a
         // clean run finishes, so the Run bar reverts to "Generate" for the next job rather than re-running
-        // a stale program. Only touch the shared static while THIS tab is actually the focused one (see
-        // isActiveTab's own comment) - an input change firing after the tab was left, or a discard call that
-        // raced a tab switch, must not stomp whichever OTHER Generate-capable tab is now active.
+        // a stale program. Only touch the shared static while the run bar is actually OURS (see OwnsRunBar -
+        // focused, or handed off to the Job tab at Generate) - an input change firing after the tab was left
+        // for good, or a discard call that raced a tab switch, must not stomp whichever OTHER
+        // Generate-capable tab is now active.
         private void InvalidateProgram()
         {
             program = string.Empty;
-            if (isActiveTab)
+            ReleaseBorrowedProgram();
+            if (OwnsRunBar)
                 MacroProcessor.IsProgramGenerated = false;
             // The Run bar reverting to "Generate" (above) isn't enough on its own - the overlay's own
             // ProgramView was still showing the now-stale g-code text (Activate(false), leaving the tab
             // entirely, was the only path that ever disconnected it). Confirmed on real hardware: editing an
             // input after Generate correctly flipped the button back, but the displayed program never changed.
             programView?.Disconnect();
+        }
+
+        // Generate's tail: make the program the loaded job and take the operator to the Job tab to look at
+        // it, with the run bar still pointing back here. Called AFTER the MacroProcessor registration in
+        // Generate_Click - the tab switch runs Activate(false) synchronously (WPF tab selection is not
+        // deferred), so anything written after it would be writing to a tab that has already deactivated.
+        private void HandOffToJobTab(string name)
+        {
+            // No tab seam wired (headless/degenerate host): stay exactly as before - the program lives in
+            // this tab's own preview and Run does the switching, if anything switches at all.
+            if (model == null || string.IsNullOrWhiteSpace(program) || MacroProcessor.SwitchToTab == null)
+                return;
+
+            // Capture BEFORE the switch. handedToJobTab now stops Activate(false) from clearing `program`,
+            // but reading a field back across that synchronous switch is precisely the trap that shipped a
+            // blank Job tab on 2026-08-11 (0c457451): read it once, here, and hand the local along.
+            string toLoad = program;
+            // Program_FileChanged clears IsDryRunMode by design on every load - re-arm it around LoadText
+            // (Work Order's Generate idiom, and what MacroProcessor.Run does for the same reason).
+            bool dryRunArmed = model.IsDryRunMode;
+
+            handedToJobTab = true;   // set FIRST: Activate(false) reads it to know this is our own handoff
+            MacroProcessor.SwitchToTab(ViewType.GRBL);   // the Job tab
+
+            // Don't push a SECOND slot over our own still-loaded program - a previous Generate the operator
+            // looked at and never ran. LoadText replaces it in place. This is WorkOrderView.Generate's
+            // guard, carried over with the incident behind it: pushing again stacked snapshots and doubled
+            // watchers ("Push: depth now 2", observed live 2026-08-08).
+            if (!(programBorrowed && model.FileName == loadedProgramName))
+                CNC.Controls.GCode.File.Push();
+            CNC.Controls.GCode.File.LoadText(name, toLoad);
+            programBorrowed = true;
+            loadedProgramName = name;
+            model.IsDryRunMode = dryRunArmed;
+
+            DebugLog.Write("run", string.Format("StartJobView: Generate handed '{0}' ({1} chars) to the Job tab - waiting for Run",
+                name, toLoad.Length));
+        }
+
+        // Hand the previous job back. Everything that DROPS the generated program without running it - an
+        // input edit, leaving this tab for somewhere other than the Job tab - has to do this, or the pushed
+        // snapshot is stranded and the Job tab keeps showing a program nothing will ever run.
+        //
+        // The LOADED JOB is the test, never the flag on its own: after a real run MacroProcessor.Run's own
+        // watcher has already popped by the time it calls DiscardGenerated, so this correctly does nothing.
+        // (One case is not covered, the same one Work Order accepts: generate, then wander off to a third
+        // tab from the Job tab. This view's Activate(false) already ran, so nothing here fires and the slot
+        // is left unconsumed. The alternative - popping a program out from under a run someone may be
+        // about to start - is worse.)
+        private void ReleaseBorrowedProgram()
+        {
+            if (!programBorrowed)
+                return;
+            if (model != null && model.IsJobRunning)
+                return;   // a run owns the pop while it is in flight - leave the bookkeeping to its watcher
+            programBorrowed = false;
+            if (model != null && model.FileName == loadedProgramName)
+            {
+                DebugLog.Write("run", string.Format("StartJobView: dropping '{0}' without running it - popping the previous job back", loadedProgramName));
+                CNC.Controls.GCode.File.Pop();
+            }
+            loadedProgramName = null;
+        }
+
+        // The handoff is over (the run reached its terminal, finished or stopped): stop owning the run bar
+        // so the Job tab goes back to being about the Job tab's own program. This is the teardown
+        // Activate(false) deliberately skipped - deferring it to here is the entire point of OwnsRunBar.
+        private void EndHandoff()
+        {
+            if (!handedToJobTab)
+                return;
+            handedToJobTab = false;
+            if (!isActiveTab)
+                // keepProgram: a CLEAN finish has already dropped it (the watcher calls DiscardGenerated
+                // before this), so the only program still standing here is one whose run was stopped,
+                // halted or alarmed - and MacroProcessor.Run's deliberate polarity is that those stay, so
+                // the operator can come back to Setup and re-run the same program rather than rebuild it.
+                ReleaseRunBar(keepProgram: true);
+        }
+
+        // The shared MacroProcessor registration this tab holds while it owns the run bar. Factored out of
+        // Activate(false) because the handoff defers it (see EndHandoff) rather than skipping it forever.
+        private void ReleaseRunBar(bool keepProgram = false)
+        {
+            MacroProcessor.ActiveRun = null;
+            MacroProcessor.SupportsGenerateMode = false;
+            MacroProcessor.ActiveGenerate = null;
+            MacroProcessor.DiscardGenerated = null;
+            MacroProcessor.SupportsGenerateAndRun = false;
+            MacroProcessor.ActiveGenerateAndRun = null;
+            // Discard the generated program on tab-leave too (not just after a run finishes - see
+            // InvalidateProgram's own comment) - so the tab is always back at "Generate" next time it's
+            // focused. Not routed through InvalidateProgram() itself: its OwnsRunBar guard would block the
+            // MacroProcessor.IsProgramGenerated write, since ownership has just been given up - but this IS
+            // the moment that write belongs.
+            MacroProcessor.IsProgramGenerated = false;
+            if (!keepProgram)
+                program = string.Empty;
+            ReleaseBorrowedProgram();
+            programView?.Disconnect();                     // active program follows the focused tab
         }
 
         private void DrawingHost_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -695,9 +866,19 @@ namespace GCode_Sender
             isActiveTab = activate;
             if (activate)
             {
+                // Back in front - the run bar is ours the ordinary way again, so the deferred teardown
+                // (EndHandoff) has nothing left to defer. Any program handed to the Job tab stays loaded
+                // there; only dropping it releases it (ReleaseBorrowedProgram).
+                handedToJobTab = false;
                 if (model == null)
                     model = DataContext as GrblViewModel;
                 if (!loaded) { LoadInputs(); loaded = true; }   // restore the last estimate/options
+                // Material is now editable on the Work Order tab too (one shared value, two editors). This
+                // tab loads its inputs ONCE and then rebuilds StartJobConfig.Section wholesale from its own
+                // controls in SaveInputs on the way out - so without re-reading it here, merely visiting and
+                // leaving Setup would write the stale combo value back over an edit made in Work Order.
+                cbxMaterial.SelectedItem = cbxMaterial.Items.Cast<string>().FirstOrDefault(m => m == (Section?.Material ?? string.Empty));
+                ReloadStockSizeFromSection();
                 CheckStockAgainstProgram();
                 RefreshFixtures();
                 UpdateSizeHint();
@@ -734,19 +915,19 @@ namespace GCode_Sender
             else
             {
                 SaveInputs();
-                MacroProcessor.ActiveRun = null;
-                MacroProcessor.SupportsGenerateMode = false;
-                MacroProcessor.ActiveGenerate = null;
-                MacroProcessor.DiscardGenerated = null;
-                MacroProcessor.SupportsGenerateAndRun = false;
-                MacroProcessor.ActiveGenerateAndRun = null;
-                // Discard the generated program on tab-leave too (not just after a run finishes - see
-                // InvalidateProgram's own comment) - so the tab is always back at "Generate" next time it's
-                // focused. Not routed through InvalidateProgram() itself: its isActiveTab guard would block
-                // the MacroProcessor.IsProgramGenerated write here, since isActiveTab was already set false
-                // at the top of this same Activate() call - but this IS the moment that write belongs.
-                program = string.Empty;
-                programView?.Disconnect();                     // active program follows the focused tab
+                if (handedToJobTab)
+                {
+                    // This deactivation is OUR OWN handoff (Generate just moved the operator to the Job tab
+                    // to look at the program it loaded there), not a real tab-leave. Releasing the run bar
+                    // here would land them on the Job tab holding a Setup program with no way to start it
+                    // as a Setup run - no confirm, no EXPR gate, no macro-arm, no height-map continuation.
+                    // The teardown below is deferred to the run's terminal instead (EndHandoff).
+                    // The preview overlay still goes: the Job tab's own docked list is the display now.
+                    programView?.Disconnect();
+                    DebugLog.Write("run", "StartJobView: deactivating for the Generate handoff - keeping the run bar");
+                }
+                else
+                    ReleaseRunBar();
                 // Stay subscribed when deactivated: keep parsing the (PRINT PC OUT / LS_X/Y) result messages so
                 // the corners populate and the results popup is raised even if the tab is left mid-run. The
                 // handler only reacts to our own messages, so it's a no-op otherwise.
@@ -776,17 +957,17 @@ namespace GCode_Sender
         {
             // Re-gate Generate live: entering/leaving Alarm should enable/disable it without waiting for the
             // fixture selection to change (see UpdateFixtureWarning).
+            //
+            // RefreshCapabilities, not UpdateFixtureWarning alone: the capability warnings depend on $I, which
+            // is parsed AFTER connect, so they have to be recomputed when the controller answers. That is what
+            // RefreshCapabilities' own comment has always said happens "on connect (see Model_PropertyChanged)"
+            // - but this handler only ever refreshed the fixture warning, so it never did. The EXPR warning was
+            // therefore computed once on Activate and frozen: a controller connected later, or reconnected
+            // after a handshake that missed $I, kept being told its firmware lacks expression support while the
+            // tab happily generated and ran the program. Observed 2026-08-12 - the warning outlived the
+            // reconnect that fixed it. A comment describing a refresh is not a refresh.
             if (e.PropertyName == nameof(GrblViewModel.GrblState))
-                UpdateFixtureWarning();
-
-            // "Probe height map" continuation: fires once THIS run reaches its own terminal state (the run
-            // just started sets IsJobRunning true then false again when it completes - MacroProcessor.Run's
-            // generated program clears it, same as every other Start Job path).
-            if (e.PropertyName == nameof(GrblViewModel.IsJobRunning) && pendingHeightMap && model.IsJobRunning == false)
-            {
-                pendingHeightMap = false;
-                Dispatcher.BeginInvoke(new System.Action(RunHeightMapPass));
-            }
+                RefreshCapabilities();
 
             if (e.PropertyName != nameof(GrblViewModel.Message))
                 return;
@@ -923,7 +1104,7 @@ namespace GCode_Sender
                 "(Machine Setup > Tools) to check steps/mm on each axis.",
                 FormatLen(measuredX.Value), FormatLen(measuredY.Value), FormatLen(fldWidth.Value), FormatLen(fldHeight.Value),
                 FormatLen(SizeMismatchWarnMm), FormatLen(dx), FormatLen(dy)),
-                "Start Job", MessageBoxButton.OK, MessageBoxImage.Warning)));
+                "Setup", MessageBoxButton.OK, MessageBoxImage.Warning)));
         }
 
         // Copy the measured stock size to the clipboard as "X Y [Z]" (mm) for pasting into the Fusion
@@ -1410,6 +1591,17 @@ namespace GCode_Sender
             if (model == null)
                 return;
 
+            // Not while a program is in flight. This is purely informational and runs on every activation, so
+            // skipping one costs nothing - but it queries the controller filesystem (AtcMacros.GetStatus), and
+            // that traffic shares the wire with the g-code being streamed. On real hardware 2026-08-04 this
+            // fired during a Setup macro's own (WAITIDLE) pause and killed the run at N600 with error:9, before
+            // it could write the probed work origin. GrblSDCard.Load now refuses as well; this stops the app
+            // asking in the first place, and stops a readiness dialog popping over a running job.
+            if (model.IsJobRunning || (model.StreamingState != StreamingState.Idle &&
+                                       model.StreamingState != StreamingState.NoFile &&
+                                       model.StreamingState != StreamingState.JobFinished))
+                return;
+
             bool macrosBad = false;
             if (GrblInfo.HasFS && (GrblInfo.AtcMacrosRequired || GrblInfo.HasATC))
                 macrosBad = AtcMacros.GetStatus(model).Any(r => r.State != AtcMacros.MacroState.Installed);
@@ -1464,11 +1656,17 @@ namespace GCode_Sender
 
         private void Generate_Click(object sender, RoutedEventArgs e)
         {
+            // Entry and every refusal are logged: Generate returning without a program is what makes a
+            // Generate-and-Run end in silence, and from the outside that is indistinguishable from a
+            // button that did nothing.
+            DebugLog.Write("run", string.Format("Generate_Click: enter - unattended={0}", unattended));
+
             var p = ActiveProbe();
             if (p == null)
             {
+                DebugLog.Write("run", "Generate_Click: STOPPED - no active probe selected");
                 AppDialogs.Show(CNC.Controls.LibStrings.FindResource("HmSelectProbe"),
-                    "Start Job", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    "Setup", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
             bool touchPlate = IsTouchPlate;
@@ -1477,8 +1675,10 @@ namespace GCode_Sender
             var fx = SelectedFixture;
             if (fx == null || !fx.Implemented || !fx.PositionValidated)
             {
+                DebugLog.Write("run", string.Format("Generate_Click: STOPPED - fixture unusable (selected={0} implemented={1} validated={2})",
+                    fx?.Name ?? "(none)", fx?.Implemented, fx?.PositionValidated));
                 AppDialogs.Show("Select a fixture with a supported type and a validated position first (Machine Setup > Fixture definitions > Test position).",
-                    "Start Job", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    "Setup", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 
@@ -1494,24 +1694,54 @@ namespace GCode_Sender
                 if (!MacroProcessor.CoordinateSystemDefined("G28"))
                 {
                     if (AppDialogs.Show("G28 is not set. Jog to the position you want to probe the spoilboard Z from - clear of the stock in X/Y, within ~10mm above the spoilboard in Z - then click OK to set G28 there. Cancel aborts.",
-                            "Start Job", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
+                            "Setup", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
+                    {
+                        DebugLog.Write("run", "Generate_Click: STOPPED - operator cancelled the G28 prompt");
                         return;
-                    if (!MacroProcessor.Run(model, "Set G28", "G28.1\nM2", false))
-                        return;
+                    }
+                    // Step 7: Run is asynchronous now (the old engine's deferred start meant the $# re-read
+                    // below happened to slip out BEFORE the stream; an immediate start would collide it
+                    // mid-stream instead - the fs-listing/error:9 class of trap). So set G28, then re-enter
+                    // Generate from the run's terminal: the fresh $# read at the top of this block then sees
+                    // the new G28, this branch is skipped, and the flow continues exactly where it left off.
+                    // Everything above this point is side-effect-free validation, safe to re-run.
+                    MacroProcessor.Run(model, "Set G28", "G28.1\nM2", false,
+                        onDone: jobFinished =>
+                        {
+                            if (jobFinished)
+                                Dispatcher.BeginInvoke(new System.Action(() => Generate_Click(sender, e)));
+                        });
+                    // Deliberately returns with NO program: Generate re-enters from that run's terminal.
+                    // Harmless alone, but a Generate-and-Run caller sees only "no program" and stops - one
+                    // of the ways this whole flow can end without a word.
+                    DebugLog.Write("run", "Generate_Click: DEFERRED - setting G28 first, re-entering Generate when that run ends");
+                    return;
+                }
+
+                // Being set is only half of it: the program rapids to G28 ("G53 G0 X#5161 Y#5162"), so it
+                // also has to be somewhere soft limits will allow. Same check the (PREREQ ... G30) path
+                // applies to G30 - a stored position outside the envelope alarms mid-run, not at Generate.
+                string unreachable = MacroProcessor.StoredPositionUnreachable("G28");
+                if (unreachable != null)
+                {
+                    DebugLog.Write("run", "Generate_Click: STOPPED - G28 unreachable: " + unreachable);
+                    AppDialogs.Show(unreachable, "Setup", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    return;
                 }
             }
 
-            // Corner 1's probe now points straight at Fixture.CornerOffsetX/Y instead of locating the corner
-            // fresh (see BuildProgram) - a fixture saved/tested before that feature shipped (or one whose
-            // Coords was re-set since, which zeros both - see Fixture.Coords) has 0s here, which would aim the
-            // tight probe at a point right next to the jogged reference. Neither is ever legitimately exactly
-            // 0 (Coords is always jogged clear of the corner), so this is a safe "never actually tested under
-            // this scheme" check.
-            if (!IsG28(fx) && FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented
-                && (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d))
+            // Corner 1's probe points straight at Fixture.CornerOffsetX/Y instead of locating the corner
+            // fresh (see BuildProgram), so it must not run against offsets that were never measured - a
+            // fixture saved before that feature shipped, or one whose position has been re-set since.
+            // Fixture.CornerLocated says whether the measurement happened. It used to be inferred from
+            // "either offset is exactly 0", on the premise that Coords is always jogged clear of the
+            // corner - FALSE, and it blocked a legitimately probed fence on real hardware 2026-08-15
+            // (Test position parks AT the corner, so a 0.000 offset is a normal result). See
+            // Fixture.CornerOffsetX's comment for the full account.
+            if (!IsG28(fx) && FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented && !fx.CornerLocated)
             {
                 AppDialogs.Show("This fixture's corner position hasn't been located yet - run Test position again in Machine Setup > Fixture definitions.",
-                    "Start Job", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    "Setup", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 
@@ -1525,7 +1755,7 @@ namespace GCode_Sender
                 // carried-over size is the normal case), not a safety gate like the ones below it that still
                 // prompt even here (out-of-travel size, low Safe Z delta).
                 if (!unattended && AppDialogs.Show("Est. width/height/thickness haven't been set for this job - they're carried over from last time. Generate anyway?",
-                        "Start Job", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                        "Setup", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                     return;
                 sizeFieldsTouched = true;   // confirmed once - don't nag again this session unless the fields change
             }
@@ -1543,7 +1773,7 @@ namespace GCode_Sender
                         N(widthMm), N(heightMm), N(thicknessMm),
                         declared ? "the loaded program's declared stock size" : "this machine's travel",
                         N(bound.Value.X), N(bound.Value.Y), N(bound.Value.Z)),
-                        "Start Job", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                        "Setup", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                     return;
             }
 
@@ -1575,16 +1805,23 @@ namespace GCode_Sender
             {
                 if (AppDialogs.Show(string.Format("Safe Z delta is {0} mm - less than the recommended {1} mm minimum. Too little clearance here can clip the stock/fixture crossing between corners. Generate anyway?",
                         N(safeZDeltaMm), N(minSafeZDeltaMm)),
-                        "Start Job", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                        "Setup", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                     return;
             }
 
-            // Dynamic mode: any probe-point pick other than the default (outside corner, front-left, index 0)
-            // goes through BuildDynamicProbeProgram instead - a one-shot single probe (not the 4-corner measure
-            // system). The default pick reproduces the exact original G28/Dynamic behavior unchanged below.
+            // Dynamic mode: EVERY probe-point pick goes through BuildDynamicProbeProgram - a one-shot single
+            // probe, not the 4-corner measure system.
+            // Front-left/outside-corner used to be special-cased into BuildProgram to "reproduce the exact
+            // original G28/Dynamic behavior". That made one of four identical-looking corner buttons generate
+            // a materially different program from its three siblings - TLO reference, rotation and the
+            // 4-corner Measure on FL, a single probe on the rest - with nothing in the UI to say so. Removed
+            // 2026-08-06 at the user's request: same fixture, same geometry settings, same builder.
+            // What FL gives up, stated plainly because none of it is visible from the tab: EmitTloReference,
+            // WCS rotation, the corner 2/3/4 Measure sequence, and with them the OriginZ frame correction
+            // (a1b5d6b), which is gated on a TLO reference actually having been taken this run.
             if (IsG28(fx))
                 UpdateDynamicSelectionFromGeometry();   // pick up the Geometry panel's current state, belt-and-suspenders
-            if (IsG28(fx) && !(dynamicProbePoint == ProbePoint.OutsideCorner && dynamicIndex == 0))
+            if (IsG28(fx))
             {
                 program = BuildDynamicProbeProgram(p, widthMm, heightMm, cbxWcs.SelectedIndex + 1, IsG92, setOrigin, setTloRef, touchPlate, stockConductive, thicknessMm);
             }
@@ -1600,13 +1837,18 @@ namespace GCode_Sender
 
             // Re-arm as the active program: a previous run tears this down (handing the source back to the job),
             // so Generate must re-establish it so Cycle Start runs Start Job again without leaving the tab.
-            MacroProcessor.ActiveProgramName = "Start Job";
+            MacroProcessor.ActiveProgramName = "Setup";
             MacroProcessor.ActiveRun = () => Run_Click(null, null);
             // Start Job owns its ProgramView; the overlay hosts it and it titles itself
-            MacroProcessor.PublishGenerated("Start Job " + fx.Name, program, EnsureProgramView, () => programView);
-            // Flips the Run bar from "Generate" to "Run" (see isActiveTab's own comment on why this is gated).
-            if (isActiveTab)
+            MacroProcessor.PublishGenerated("Setup " + fx.Name, program, EnsureProgramView, () => programView);
+            // Flips the Run bar from "Generate" to "Run" (see OwnsRunBar's own comment on why this is gated).
+            if (OwnsRunBar)
                 MacroProcessor.IsProgramGenerated = true;
+
+            // ...and hand it to the Job tab to be looked at. LAST, because the tab switch inside deactivates
+            // this view synchronously - every line above would otherwise be running against a tab that has
+            // already been told it is no longer showing.
+            HandOffToJobTab("Setup " + fx.Name);
         }
 
         // Persisted as the "StartJob" section of App.config (folded in from StartJob.xml); the DTO + holder
@@ -1699,32 +1941,109 @@ namespace GCode_Sender
 
         private void Run_Click(object sender, RoutedEventArgs e)
         {
-            if (model == null)
-                return;
+            DebugLog.Write("run", string.Format("Run_Click: enter - unattended={0} program={1} chars",
+                unattended, program?.Length ?? 0));
 
-            if (string.IsNullOrWhiteSpace(program))
-                Generate_Click(sender, e);
-            if (string.IsNullOrWhiteSpace(program))
+            if (model == null)
+            {
+                DebugLog.Write("run", "Run_Click: STOPPED - no model (view not bound)");
                 return;
+            }
+
+            // Generating from inside Run is one continuous action, and it hands off to the Job tab on its
+            // way through (HandOffToJobTab) - so this run arrives there in the same breath as the operator
+            // does, and still owes them the look-before-it-moves beat. Same for "Generate and Run".
+            bool generatedInThisRun = false;
+            if (string.IsNullOrWhiteSpace(program))
+            {
+                Generate_Click(sender, e);
+                generatedInThisRun = true;
+            }
+            if (string.IsNullOrWhiteSpace(program))
+            {
+                DebugLog.Write("run", "Run_Click: STOPPED - still no program after Generate");
+                if (string.IsNullOrEmpty(model.Message))
+                    model.Message = "Setup has no program to run - Generate first.";
+                return;
+            }
 
             measureRun = chkMeasure.IsChecked == true;
             ResetResults();
 
             // "Probe height map" needs the origin Start Job is about to set (and, for the default Dynamic
-            // corner-fence run, the measured size) - queue it as a continuation once THIS run reaches its own
-            // terminal state (see Model_PropertyChanged's IsJobRunning watch).
-            pendingHeightMap = chkHeightMap.IsChecked == true && chkHeightMap.IsEnabled;
+            // corner-fence run, the measured size) - run it from the terminal callback below. Step 7: this
+            // used to be a pendingHeightMap flag consumed by an IsJobRunning->false watch, which under the
+            // old multi-burst engine could fire at a burst boundary and also fired after a CANCELLED run;
+            // onDone's jobFinished is the genuine program end, so a Stop/cancel no longer height-maps.
+            bool wantHeightMap = chkHeightMap.IsChecked == true && chkHeightMap.IsEnabled;
 
             // Run control (status, feed hold, override, MDI) is fixed at the main-window bottom and always
             // visible (Phase 2c), so the run can be driven without leaving this tab - no floating panel needed.
 
-            // Macro path: NGC-safe, keeps the program out of the loaded job, and shows the (MBOX,...)
-            // confirmation. confirm:true gives the operator a final "run?" before any motion (skipped when
-            // unattended - see GenerateAndRun). Claim result-parsing rights for THIS instance before kicking
-            // it off - see _activeRunner's own field comment for why this can't just be a start/stop bool
-            // around the call.
+            // Macro path: NGC-safe, shows the (MBOX,...) confirmation. confirm:true gives the operator a
+            // final "run?" before any motion (skipped when unattended - see GenerateAndRun). Claim
+            // result-parsing rights for THIS instance before kicking it off - see _activeRunner's own field
+            // comment for why this can't just be a start/stop bool around the call.
             _activeRunner = this;
-            MacroProcessor.Run(model, "Start Job " + (SelectedFixture?.Name ?? string.Empty), program, true, unattended);
+
+            // Capture EVERYTHING this run needs before the tab switch below. Switching away calls
+            // Activate(false) on this view SYNCHRONOUSLY, and that used to clear `program` - reading it
+            // after the switch handed the runner an empty string, and Run's own "nothing to do" early-out
+            // then reported SUCCESS while loading nothing at all: the Job tab came up empty with no error
+            // anywhere (2026-08-11, 0c457451). The handoff (handedToJobTab) now keeps the field alive
+            // across our own switch, so this is belt-and-braces rather than load-bearing - but the field
+            // is still cleared on a genuine tab-leave, and reading state back across a synchronous
+            // deactivation is the habit that caused it. Capture first, read the locals.
+            string toRun = program;
+            string runName = "Setup " + (SelectedFixture?.Name ?? string.Empty);
+
+            // Normally the operator is already ON the Job tab looking at this program: Generate put it
+            // there and took them with it (HandOffToJobTab), which is the smoother half of the two - the
+            // program is on screen before anything moves, and Run is pressed against what they can see.
+            // The switch here is now only for the paths that skipped that handoff: Run pressed after
+            // coming back to this tab, or a host with no tab seam. Ownership is taken the same way either
+            // way, so the run bar keeps pointing here until the run's terminal (EndHandoff).
+            bool switchedHere = false;
+            if (!handedToJobTab && MacroProcessor.SwitchToTab != null)
+            {
+                handedToJobTab = true;
+                MacroProcessor.SwitchToTab(ViewType.GRBL);
+                switchedHere = true;
+            }
+
+            // Three seconds between arriving on the Job tab and the first motion: enough to refocus on the
+            // view you were just moved to, and to see the toolpath before a probe cycle begins. Zero when
+            // Generate did the handoff earlier and the operator has been looking at the program since -
+            // they pressed Run against what is on screen, and a countdown there is just a delay.
+            int startDelay = switchedHere || generatedInThisRun || unattended ? 3000 : 0;
+
+            // Read AFTER any switch above (which can release the borrow): whether OUR program is still the
+            // loaded job is what decides if Run pushes another slot. MacroProcessor.Run re-checks the same
+            // thing rather than taking this on trust.
+            bool alreadyLoaded = programBorrowed && model.FileName == runName;
+
+            // The return value was discarded here, so a refused run - a gate, a cancelled confirmation,
+            // prerequisites unmet - left the operator on the Job tab watching nothing happen with no
+            // explanation offered. Reported below.
+            bool runStarted = MacroProcessor.Run(model, runName, toRun, true, unattended,
+                onDone: jobFinished =>
+                {
+                    // Terminal, clean or not: the Job tab is about the Job tab's own program again.
+                    EndHandoff();
+                    if (jobFinished && wantHeightMap)
+                        Dispatcher.BeginInvoke(new System.Action(RunHeightMapPass));
+                },
+                startDelayMs: startDelay,
+                alreadyPushed: alreadyLoaded);
+
+            if (!runStarted)
+            {
+                DebugLog.Write("run", "StartJobView: MacroProcessor.Run returned false - the run was refused");
+                // The refusing gate has usually shown its own dialog (prerequisites, busy, EXPR). This is
+                // the backstop for the ones that decline quietly, so the Job tab never just sits there.
+                if (string.IsNullOrEmpty(model.Message))
+                    model.Message = "Setup did not start - see the status log for the reason.";
+            }
         }
 
         // Backs the "Generate and Run" mode-dropdown entry (see MacroProcessor.SupportsGenerateAndRun) -
@@ -1738,9 +2057,22 @@ namespace GCode_Sender
             unattended = true;
             try
             {
+                DebugLog.Write("run", "GenerateAndRun: generating...");
                 Generate_Click(null, null);
-                if (!string.IsNullOrWhiteSpace(program))
-                    Run_Click(null, null);
+
+                if (string.IsNullOrWhiteSpace(program))
+                {
+                    // Generate produced nothing, so there is nothing to run. Whatever refused inside
+                    // Generate_Click has usually said so - but this path used to end here in silence,
+                    // which from the operator's side is a Run button that did nothing at all.
+                    DebugLog.Write("run", "GenerateAndRun: STOPPED - Generate produced no program, Run not attempted");
+                    if (model != null && string.IsNullOrEmpty(model.Message))
+                        model.Message = "Setup did not generate a program - nothing to run.";
+                    return;
+                }
+
+                DebugLog.Write("run", string.Format("GenerateAndRun: generated {0} chars, running", program.Length));
+                Run_Click(null, null);
             }
             finally
             {
@@ -2027,13 +2359,12 @@ namespace GCode_Sender
             // probe BODY off the corner while it seeks down. The edge (X/Y face) probes no longer need a
             // separate offset - pcorner.macro anchors them off the top-probe's own verified XY instead.
             double topClearance = p.MinStandoff + 9d;
-            L(string.Format("#<_ls_spoilx> = {0}", N(0d)));
-            L(string.Format("#<_ls_spoily> = {0}", N(0d)));
             L(string.Format("#<_ls_topx> = {0}", N(topClearance)));
             L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
-            // _ls_spoilz (used only by pcorner.macro's DISCOVER-mode spoilboard probe) is no longer emitted -
-            // corner 1 runs REUSE mode (below), fed #<_ls_maxz> from the fresh puck touch instead, so no call
-            // in this whole program ever takes the DISCOVER branch.
+            // _ls_spoilz (used only by pcorner.macro's DISCOVER-mode spoilboard probe) is not emitted. This
+            // comment used to claim no call here ever took the DISCOVER branch, and it was WRONG - the G28
+            // branch below emitted _ls_spoilz and called with startz 9999 right underneath it. It is true
+            // now: every call in every generator supplies its own floor, so DISCOVER is unreachable.
             L(string.Format("#<_ls_searchf> = {0}", N(SearchFeed(p))));   // fast search feed (from the 3D probe definition)
             L(string.Format("#<_ls_latchf> = {0}", N(p.LatchFeedRate)));    // slow latch/re-probe feed (from the definition)
             // Machine Z soft-limit floor (machine coords): the lowest Z the macro may POSITION a probe to. The
@@ -2046,7 +2377,7 @@ namespace GCode_Sender
             L("(park at G30 - install / confirm the probe)");
             EmitGotoG30(L);
             L("(WAITIDLE)");
-            L("(MBOX, OKCANCEL, Install and seat the probe, then click OK. Cancel aborts.)");
+            L(string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. It must MATCH what is in the spindle - the wrong tip silently shifts the work origin by half the diameter difference. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
 
             // Tool-length reference (opt-in) now runs FIRST, before any stock probing - see the TLO-baseline
             // design conversation this came from. #<_probe_z> (the puck's own machine-Z touch point, always
@@ -2066,18 +2397,19 @@ namespace GCode_Sender
             L(string.Format("(--- corner 1 = {0} (origin): reference {1} ---)", cornerName, fx.Name));
             if (IsG28(fx))
             {
-                // G28 (loose-probe synthetic fixture, see its own comment): DISCOVER mode (9999), anchored at
-                // the controller's own G28 stored position - read live via #5161/#5162/#5163 (grblHAL's G28
-                // named parameters), never known to ioSender at generate-time, unlike a real Fixture's cached
-                // Coords. pcorner.macro probes the spoilboard AND the stock top itself here (both unknown), so
-                // topx/topy use the same LOOSE topClearance corners 2-4 already fall back to - there is no tight
-                // per-fixture offset to point at. This recreates the exact behavior Start Job had before
-                // Fixture.CornerOffsetX/Y/SpoilboardZ existed (see pcorner.macro's own "old firmware G28 slot"
-                // reference).
-                L("#<_ls_spoilz> = #5163");
+                // G28 (loose-probe synthetic fixture, see its own comment), anchored at the controller's own
+                // G28 stored position - read live via #5161/#5162/#5163 (grblHAL's G28 named parameters),
+                // never known to ioSender at generate-time unlike a real Fixture's cached Coords. topx/topy
+                // use the same LOOSE topClearance corners 2-4 already fall back to - there is no tight
+                // per-fixture offset to point at.
+                // Bounded exactly like Fixture Test position (#<_bottom> = z - searchDepth,
+                // #<_ls_maxz> = z + 2), the shape every other caller uses. This was DISCOVER (9999), which
+                // sent pcorner off to PROBE THE SPOILBOARD just to derive a floor for its own top-probe
+                // seek - a question the operator has already answered by parking G28 over the stock corner.
+                L(string.Format("#<_bottom> = [#5163 - {0}]", N(DynamicSearchDepthMm)));
                 L(string.Format("#<_ls_topx> = {0}", N(topClearance)));
                 L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
-                EmitCall(id1, "#5161", "#5162", "9999");
+                EmitCall(id1, "#5161", "#5162", "0", "[#5163+2]");
             }
             else
             {
@@ -2274,8 +2606,8 @@ namespace GCode_Sender
                 // move to the probed corner in machine coords first, then zero work coords right there. No
                 // rotation (G92 has no rotation concept) and no WCS activation line (it doesn't select one).
                 L(string.Format("(--- set G92 offset at the {0} corner ---)", cornerName));
-                L("G53 G0 X[#<c1x>] Y[#<c1y>] Z[#<c1z>]");
-                L("G92 X0 Y0 Z0");
+                L("G53 G0 X[#<c1x>] Y[#<c1y>] Z[#<c1z>]");   // machine move - #<c1z>'s own raw frame, correct here
+                L(string.Format("G92 X0 Y0 Z{0}", OriginG92Z(setTloRef)));
             }
             else if (setOrigin)
             {
@@ -2283,7 +2615,8 @@ namespace GCode_Sender
                 // Origin ONLY here - never the rotation R word (that goes in the separate block below). The R word
                 // (incl. R0) only exists on ROTATION_ENABLE firmware; without it ANY "G10 L2 ... R..." errors:20 and
                 // HALTS the program. This block stays bulletproof on every controller.
-                L(string.Format("G10 L2 {0} X[#<c1x>] Y[#<c1y>] Z[#<c1z>]", pCode(wcsP)));
+                string originZ = OriginZ(L, setTloRef, "[#<c1z>]");   // emits the conversion line first, if any
+                L(string.Format("G10 L2 {0} X[#<c1x>] Y[#<c1y>] Z{1}", pCode(wcsP), originZ));
                 L(wcs + "  (activate the coordinate system)");
 
                 // Stock skew -> WCS rotation, as a SEPARATE block AFTER the origin is set and the machine has parked.
@@ -2313,7 +2646,27 @@ namespace GCode_Sender
             // left at the baseline this run loaded rather than the true prior value - safe (the baseline is
             // itself a trusted reference), just not a perfect restore. Known, accepted gap.
             if (setTloRef)
+            {
+                // Put back the tool length offset this program measured. EmitTloReference applied it, then
+                // pcorner.macro's G49 cancelled it (deliberate - its absolute G53 moves need true machine
+                // coordinates) and NOTHING restored it, so Setup used to finish in G49. The origin written
+                // above lives in the tool-length REFERENCE frame and is ONLY the work origin once a G43 is
+                // active, so leaving G49 behind means work Z0 sits TLO_probe too deep - straight into the
+                // stock. Recomputed from the same #<_tlo_ref> baseline the origin was, hence before the
+                // rollback below rather than after.
+                //
+                // It cut a spoilboard on 2026-08-06. The first run of the day survived only by accident: its
+                // job emitted an M6, and tc.macro re-probed the puck and applied a TLO of its own. The second
+                // run had the same endmill already fitted, so no M6 was emitted, nothing re-applied anything,
+                // and the job rapided to a work Z0 that was 15.432mm inside the material. "Same bit, same
+                // spindle, nothing touched" is exactly when this fires - the offset was never stale, just
+                // discarded. G43.1 sets the offset absolutely, so re-emitting it costs nothing if it somehow
+                // survived.
+                L("(--- restore the tool length offset the probe measured - see BuildProgram ---)");
+                L("G43.1 Z[#<_probe_z> - #<_tlo_ref>]");
+                L("(PRINT, LS_TLO_RESTORED tlo=[#<_probe_z> - #<_tlo_ref>])");
                 L("#<_tlo_ref> = #<_tlo_saved>");
+            }
             L("M2");
 
             return b.ToString();
@@ -2325,11 +2678,20 @@ namespace GCode_Sender
         private static readonly int[] EdgeCornerId = { 1, 2, 3, 1 };
         private static readonly int[] EdgeFaces = { 2, 1, 2, 1 };
 
-        // Dynamic mode's one-shot probe (any pick other than the default outside-corner-FL, which stays on
-        // the existing BuildProgram/4-corner path - see Generate_Click). Single pcorner/pcenter call, then the
-        // same origin-or-offset ending BuildProgram uses. Non-static (reads dynamicProbePoint/dynamicIndex and
-        // the center solid/hole radios directly) - unlike BuildProgram/BuildViseProgram, which are pure
-        // functions of their arguments.
+        // Dynamic mode's one-shot probe - EVERY pick since 2026-08-06 (front-left/outside-corner used to be
+        // special-cased onto BuildProgram's 4-corner path; see Generate_Click). Single pcorner/pcenter call,
+        // then the same origin-or-offset ending BuildProgram uses. Non-static (reads dynamicProbePoint/
+        // dynamicIndex and the center solid/hole radios directly) - unlike BuildProgram/BuildViseProgram,
+        // which are pure functions of their arguments.
+        //
+        // ⚠ setTloRef IS ACCEPTED AND NEVER USED. This builder does not call EmitTloReference, so the tab's
+        // "Set TLO reference" checkbox does nothing for ANY Dynamic pick - and since FL moved here, that is
+        // now the whole Dynamic fixture rather than three of its four corners. It was already true for those
+        // three; unifying the builders made it uniform, not new. Two honest ways out, neither taken yet
+        // because both are more than a routing change: emit the reference here (and then the OriginZ frame
+        // correction has a fresh #<_probe_z> to work from, which is exactly why it was scoped to BuildProgram
+        // in a1b5d6b), or disable the checkbox while a Dynamic fixture is selected so the operator can see it
+        // does not apply. Leaving a live-looking checkbox silently inert is the one option that is not OK.
         private string BuildDynamicProbeProgram(ProbeDefinition p, double estW, double estH, int wcsP, bool useG92, bool setOrigin, bool setTloRef, bool touchPlate, bool stockConductive, double thicknessMm)
         {
             double r = p.ProbeDiameter / 2d;
@@ -2364,8 +2726,6 @@ namespace GCode_Sender
             L(string.Format("#<_ls_mode> = {0}", touchPlate ? 1 : 0));
             L(string.Format("#<_ls_plateoffset> = {0}", N(plateOffset)));
             double topClearance = p.MinStandoff + 9d;
-            L(string.Format("#<_ls_spoilx> = {0}", N(0d)));
-            L(string.Format("#<_ls_spoily> = {0}", N(0d)));
             L(string.Format("#<_ls_topx> = {0}", N(topClearance)));
             L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
             L(string.Format("#<_ls_searchf> = {0}", N(SearchFeed(p))));
@@ -2375,7 +2735,7 @@ namespace GCode_Sender
             L("(park at G30 - install / confirm the probe)");
             EmitGotoG30(L);
             L("(WAITIDLE)");
-            L("(MBOX, OKCANCEL, Install and seat the probe, then click OK. Cancel aborts.)");
+            L(string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. It must MATCH what is in the spindle - the wrong tip silently shifts the work origin by half the diameter difference. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
 
             bool inside = dynamicProbePoint == ProbePoint.InsideCorner || dynamicProbePoint == ProbePoint.InsideEdge;
             bool isEdge = dynamicProbePoint == ProbePoint.OutsideEdge || dynamicProbePoint == ProbePoint.InsideEdge;
@@ -2413,18 +2773,31 @@ namespace GCode_Sender
                 L("#<c1y> = #<_center_y>");
                 L(string.Format("#<c1z> = [#<_ctr_top> - {0}]", N(plateOffset)));
             }
-            else if (isEdge)
-            {
-                L(string.Format("(--- {0} edge midpoint ---)", EdgeNames[dynamicIndex]));
-                EmitPcornerCall(L, EdgeCornerId[dynamicIndex], "#5161", "#5162", "9999", "0", "9999", inside, EdgeFaces[dynamicIndex]);
-                L("#<c1x> = #<_corner_x>");
-                L("#<c1y> = #<_corner_y>");
-                L("#<c1z> = #<_corner_z>");
-            }
             else
             {
-                L(string.Format("(--- {0} corner ---)", CornerNames[dynamicIndex]));
-                EmitPcornerCall(L, dynamicIndex + 1, "#5161", "#5162", "9999", "0", "9999", inside, 0);
+                // Rectangle picks (corner or edge midpoint) used to call pcorner in DISCOVER mode
+                // (startz 9999), which made the macro go and PROBE THE SPOILBOARD purely to derive a floor
+                // for its own top-probe seek. Nothing wanted that measurement; it was only ever answering
+                // "how far down am I allowed to look?" - a question the operator has already answered by
+                // parking at G28 over the stock corner. So bound it to G28's own Z instead, exactly the
+                // shape Fixture Test position uses (#<_bottom> = z - searchDepth, #<_ls_maxz> = z + 2),
+                // and let pcorner's ordinary REUSE path run its own top probe as it does for every other
+                // caller. No extra probing, one less way to drive at the spoilboard, and it drops the last
+                // requirement that the reference sit near the board.
+                // #<_ls_spacer> still applies: it is added to this floor by the caller-side emit above,
+                // so a sacrificial backer is respected the same as before.
+                L(string.Format("#<_bottom> = [#5163 - {0}]", N(DynamicSearchDepthMm)));
+                string dynMaxZ = "[#5163+2]";
+                if (isEdge)
+                {
+                    L(string.Format("(--- {0} edge midpoint ---)", EdgeNames[dynamicIndex]));
+                    EmitPcornerCall(L, EdgeCornerId[dynamicIndex], "#5161", "#5162", "0", dynMaxZ, "9999", inside, EdgeFaces[dynamicIndex]);
+                }
+                else
+                {
+                    L(string.Format("(--- {0} corner ---)", CornerNames[dynamicIndex]));
+                    EmitPcornerCall(L, dynamicIndex + 1, "#5161", "#5162", "0", dynMaxZ, "9999", inside, 0);
+                }
                 L("#<c1x> = #<_corner_x>");
                 L("#<c1y> = #<_corner_y>");
                 L("#<c1z> = #<_corner_z>");
@@ -2442,6 +2815,13 @@ namespace GCode_Sender
             else if (setOrigin)
             {
                 L("(--- set work origin at the probed point ---)");
+                // NOT frame-converted (see OriginZ). This builder never calls EmitTloReference - it takes
+                // setTloRef but has no puck-touch step - so #<_probe_z> is whatever a PREVIOUS run left,
+                // possibly for a different tool. Applying the conversion from a stale value could err in
+                // EITHER direction, including into the stock; unconverted at least always errs high.
+                // The center branch compounds it: #<_ctr_top> is read from a sender-emitted G38.2 whose
+                // active frame isn't established here, unlike pcorner's documented G49. Left alone
+                // deliberately - fix needs this path to measure the probe first.
                 L(string.Format("G10 L2 {0} X[#<c1x>] Y[#<c1y>] Z[#<c1z>]", pCode(wcsP)));
                 L(wcs + "  (activate the coordinate system)");
             }
@@ -2534,7 +2914,7 @@ namespace GCode_Sender
                     "Heads up: {0} loaded-program move(s) appear to enter the vise jaws' footprint (first at line {1}). " +
                     "This is an XY-only estimate (tool radius from the grblHAL tool table where set, otherwise centerline) " +
                     "- verify clearance before running.", hitCount, firstHitLine),
-                    "Start Job", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    "Setup", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -2619,7 +2999,7 @@ namespace GCode_Sender
             L("(park at G30 - install / confirm the probe)");
             EmitGotoG30(L);
             L("(WAITIDLE)");
-            L("(MBOX, OKCANCEL, Install and seat the probe, then click OK. Cancel aborts.)");
+            L(string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. It must MATCH what is in the spindle - the wrong tip silently shifts the work origin by half the diameter difference. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
 
             // Tool-length reference (opt-in) now runs FIRST, before the stock-top probe - same ordering and
             // reasoning as BuildProgram's own call site (see its comment). The vise's own Z-probe safety
@@ -2807,6 +3187,12 @@ namespace GCode_Sender
                 // assumption. Without Measure, fall back to the always-available fxPos.X/_stock_z as before.
                 string originX = measure ? "[#<c3x>]" : N(fxPos.X);
                 string originZ = measure ? "[#<c3z>]" : "[#<_stock_z>]";
+                // NOT frame-converted (see OriginZ), and deliberately so: unlike pcorner's output, BOTH Z
+                // sources here are read with the TLO from EmitTloReference still ACTIVE (it runs just above,
+                // and nothing cancels G43.1 before the stock-top G38.2), so #5063 - and #<_stock_z> with it -
+                // is ALREADY in the reference frame. Subtracting the probe's TLO again would double-correct
+                // and drive the tool INTO the stock. #<c3z> (the measure path) needs its own frame audit -
+                // pvisecorner may or may not cancel the offset the way pcorner does.
                 if (useG92)
                 {
                     L("(--- set G92 offset: X/Y from the probed jaw corner, Z from the stock-top probe ---)");
@@ -2877,11 +3263,71 @@ namespace GCode_Sender
                          case Corner.BackLeft: return Corner.FrontRight; default: return Corner.FrontLeft; }
         }
 
+        // --- Work-origin Z frame conversion -------------------------------------------------------
+        //
+        // pcorner.macro/pcenter.macro run their probes under G49 (see pcorner.macro's own comment at the
+        // G49/G92.1/G10 L2 P1 X0 Y0 Z0 block - deliberate, so their absolute G53 moves and probe reads are
+        // in TRUE machine coordinates) and NEVER restore the tool length offset. So every Z they hand back
+        // - #<_corner_z>, #<_ctr_top>, #<_stock_z> - is a raw SPINDLE-NOSE machine Z with the length of
+        // whatever probe was in the spindle baked into it. It is NOT in the frame a work origin lives in.
+        //
+        // A work origin has to be stored in the machine-wide REFERENCE frame (#<_tlo_ref>, the puck touch
+        // point of the notional reference tool), because that is the frame every later tool's G43.1 is
+        // measured against - tc.macro applies TLO = its own puck touch - #<_tlo_ref>.
+        //
+        // Derivation (L = a tool's tip length below the nose, t = its TLO = L_tool - L_ref):
+        //     work Z0  =>  MPos = W + t                     (WCO = G5x offset + G92 + TLO)
+        //     tip on the surface:  MPos - L_tool = rawZ - L_probe
+        //     =>  W = rawZ - (L_probe - L_ref) = rawZ - TLO_probe
+        // i.e. subtract the PROBE's own TLO. Storing rawZ unconverted leaves work Z0 exactly TLO_probe too
+        // HIGH, so every tool stops that far above the stock. Observed 2026-08-06: a Work Order drilled to
+        // work Z-0.5 and stopped ~7mm short - TLO_probe was +6.971 (probe puck touch -65.061 against the
+        // -72.032 baseline), and the origin had been written at the raw -94.068 instead of -101.039.
+        // The error is invisible whenever #<_tlo_ref> happens to sit near the probe's own touch point,
+        // which is why it survived so long; it always errs HIGH (away from the stock), never into it.
+        //
+        // Only applied when this run actually measured the probe against the puck (setTloRef): #<_probe_z>
+        // is written by EmitTloReference and by tc.macro, so without a fresh measurement this run it is
+        // either unset (reads 0 - the correction would silently vanish) or left over from a DIFFERENT tool
+        // (the correction would be wrong by the difference). Unconverted is the long-standing behaviour and
+        // errs high; a stale correction could err either way. So: correct when it can be trusted, otherwise
+        // leave exactly as before.
+        //
+        // SCOPE - used by BuildProgram ONLY, and that is deliberate. It is correct exactly where the Z came
+        // out of pcorner/pcenter (documented G49, so a raw nose Z) AND this run measured the probe:
+        //   - BuildDynamicProbeProgram never calls EmitTloReference at all, so #<_probe_z> is always stale.
+        //   - BuildViseProgram probes its stock top with EmitTloReference's G43.1 still active, so its Z is
+        //     ALREADY reference-frame and converting would double-correct - into the stock.
+        // Both carry their own comment at the origin write. Don't widen this without re-auditing the frame
+        // each Z source is actually read in; the wrong direction here cuts.
+        private const string ProbeTloExpr = "[#<_probe_z> - #<_tlo_ref>]";
+
+        // Emit the conversion (when it applies) and return the expression to use as the origin's Z word.
+        // 'rawZ' is a bracketed expression or a number, as the caller already builds it.
+        private static string OriginZ(System.Action<string> L, bool setTloRef, string rawZ)
+        {
+            if (!setTloRef)
+                return rawZ;
+
+            L(string.Format("#<_ozw> = [{0} - {1}]", rawZ, ProbeTloExpr));
+            L("(PRINT, LS_ORIGIN_Z raw=" + rawZ + " tlo=" + ProbeTloExpr + " origin=#<_ozw>)");
+            return "[#<_ozw>]";
+        }
+
+        // The G92 form of the same correction. G92 declares "the CURRENT position is work <v>", and the
+        // caller has just moved the nose to rawZ in machine coords, so WCO becomes rawZ - v. We need the
+        // pre-TLO term to be rawZ - TLO_probe, hence v = TLO_probe (not 0).
+        private static string OriginG92Z(bool setTloRef)
+        {
+            return setTloRef ? ProbeTloExpr : "0";
+        }
+
         // Safe-Z go-to G30 (probe-install / park): lift to machine top, traverse X/Y, descend - never a bare diagonal.
-        // Every G53 SPECIFIES X and Y (held at the current machine position via #<_abs_x>/#<_abs_y>, then at the G30
-        // X/Y) instead of leaving them implicit. A firmware bug sign-flips the parser base of a homing-direction-
-        // inverted ($23) axis after a G53 move, so a G53 with that axis "unmoved" (e.g. a bare "G53 G0 Z0") targets
-        // it from the flipped base -> false Alarm:2. Naming the axis uses the literal value and dodges the bug.
+        // The lift is a BARE "G53 G0 Z0"; the traverse/descend name X/Y from the stored G30 (#5181/#5182/#5183) so
+        // the tool arrives over the G30 spot. This comment used to claim every G53 must name X and Y - via
+        // #<_abs_x>/#<_abs_y> on the lift - to dodge a firmware bug that sign-flips a homing-direction-inverted
+        // ($23) axis's parser base. That bug was tested and DISPROVEN on 2026-08-11, and naming the live position
+        // there caused two real failures of its own. See MacroRunner.EmitGotoG30 for the full account.
         // Bracket only multi-term expressions; a bare param/number is assigned as-is (matches the proven
         // "#<rad>=1" form). grblHAL needs brackets around an expression but not one value.
         private static string Br(string v) { return v.IndexOf(' ') >= 0 ? "[" + v + "]" : v; }

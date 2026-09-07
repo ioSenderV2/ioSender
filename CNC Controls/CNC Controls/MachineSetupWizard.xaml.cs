@@ -115,6 +115,16 @@ namespace CNC.Controls
         private GrblViewModel model = null;
         private bool _subscribed = false;
         private bool _restoringSelection = false;   // suppress persisting while we drive the dropdowns in code
+
+        // True while LoadCurrentSettings/BuildAxes are driving the fields from the controller, so the
+        // PropertyChanged storm they cause is not mistaken for the operator typing.
+        private bool _loading = false;
+        // True once the operator has actually changed something on this page. The refresh below refuses to
+        // discard their work, and this is the only trustworthy test for that: Changes.Count is NOT, because a
+        // stale table makes Changes non-empty all by itself - which is exactly the state we need to refresh
+        // out of.
+        private bool _userEdited = false;
+        private bool _settingsHookAttached = false;
         private Window _fwInfoWindow = null;
         private FirmwareUpdateManager.ReleaseInfo _pendingFwRelease = null;
         private string _lastFirmwareKey = null;   // GrblInfo.Version+"|"+DriverSha as last shown - see Model_PropertyChanged
@@ -518,6 +528,7 @@ namespace CNC.Controls
 
                 BuildAxes();
                 LoadCurrentSettings();
+                LoadWorkSurface();   // board extent - config, not controller settings (see WorkSurface.cs)
 
                 // Machine choice is required input - restore the last machine the user picked (persisted across
                 // runs), else default to a generic 3-axis CNC. Restoring only re-selects the dropdowns; it does
@@ -526,10 +537,20 @@ namespace CNC.Controls
                 if (cbxManufacturer.SelectedItem == null)
                     RestoreOrDefaultMachine();
 
+                // Same reason as Reload's: everything above drove the fields from the controller / the saved
+                // machine pick, none of it is the operator editing. Clear it here so the page starts each
+                // activation genuinely "unedited" and the refresh below stays armed.
+                _userEdited = false;
+
                 if (!_subscribed && model != null)
                 {
                     model.PropertyChanged += Model_PropertyChanged;
                     _subscribed = true;
+                }
+                if (!_settingsHookAttached)
+                {
+                    GrblSettings.SettingsReloaded += OnSettingsReloaded;
+                    _settingsHookAttached = true;
                 }
                 UpdateLimitState();
                 UpdateApplyState();
@@ -546,6 +567,22 @@ namespace CNC.Controls
                 // switch finished - explaining why the tab looked selected-but-frozen and never recovered on
                 // its own (a mid-layout-pass exception doesn't reliably self-heal the visual tree).
                 Dispatcher.BeginInvoke((System.Action)RefreshMacroStatus, System.Windows.Threading.DispatcherPriority.Background);
+
+                // Ask the controller what it actually holds, rather than trusting the cached copy. Everything
+                // else here only learns about a change ioSender itself saw go out; a setting altered by a
+                // pendant, another sender, a controller-side macro, or any session not running this build
+                // leaves the cache confidently wrong with nothing on the wire to say so. Opening this page is
+                // the right moment to ask - it is the page whose numbers get written back to the machine, and
+                // a $$ is one cheap round trip.
+                //
+                // Real case: $130/$131 diverged from 860/846 to 889/889 during a window with no ioSender
+                // session at all, and this page went on offering 889 as a pending change afterwards.
+                //
+                // DEFERRED at Background priority for exactly the reason RefreshMacroStatus above is: this
+                // runs during the tab-switch's own layout pass, and Load() pumps the dispatcher waiting for
+                // the controller's reply - doing that mid-layout throws and leaves the tab frozen.
+                Dispatcher.BeginInvoke((System.Action)ReloadSettingsFromController, System.Windows.Threading.DispatcherPriority.Background);
+
                 UpdateSimulatorStepVisibility();
                 RefreshFirmwareVersion();
             }
@@ -555,6 +592,13 @@ namespace CNC.Controls
                 {
                     model.PropertyChanged -= Model_PropertyChanged;
                     _subscribed = false;
+                }
+                if (_settingsHookAttached)
+                {
+                    // A static event holds a strong reference to this view - unsubscribing is what stops a
+                    // menu-hosted instance being kept alive (and refreshed) after the operator has left it.
+                    GrblSettings.SettingsReloaded -= OnSettingsReloaded;
+                    _settingsHookAttached = false;
                 }
                 if (_fwInfoWindow != null)
                     _fwInfoWindow.Close();
@@ -667,7 +711,124 @@ namespace CNC.Controls
             AppConfig.Settings.Save();
         }
 
+        // Set by LoadCurrentSettingsCore when any value it wanted had not arrived yet.
+        private bool settingsIncomplete;
+
+        // How many times a load may reschedule itself before giving up. Bounded so a controller that never
+        // answers cannot leave a timer running for the life of the session.
+        private int settingsRetries;
+
         private void LoadCurrentSettings()
+        {
+            _loading = true;
+            settingsIncomplete = false;
+            try { LoadCurrentSettingsCore(); }
+            finally { _loading = false; _userEdited = false; }   // fields now mirror the controller again
+
+            if (settingsIncomplete)
+                ScheduleSettingsReload();
+            else
+                settingsRetries = 0;
+        }
+
+        /// <summary>
+        /// Come back for the settings that had not arrived.
+        ///
+        /// The page reads GrblSettings synchronously on activation, and a $$ reply can land after that -
+        /// measured at 441ms on real hardware. There is a SettingsReloaded event for exactly this, but it
+        /// did not repair the case above, and a page showing invented numbers for the machine's travel is
+        /// not something to leave resting on one mechanism.
+        ///
+        /// Gives up rather than retrying for ever, and never runs over the operator's own typing.
+        /// </summary>
+        private void ScheduleSettingsReload()
+        {
+            if (settingsRetries >= 6)
+            {
+                CNC.Core.DebugLog.Write("setup", "settings still incomplete after 6 attempts - giving up; fields left as they were");
+                return;
+            }
+
+            settingsRetries++;
+
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400d) };
+            timer.Tick += (s2, e2) =>
+            {
+                timer.Stop();
+
+                // Same guards the SettingsReloaded handler applies: not if the page has been left, and never
+                // over edits the operator has made in the meantime.
+                if (!_settingsHookAttached || _userEdited)
+                    return;
+
+                CNC.Core.DebugLog.Write("setup", string.Format("re-reading settings (attempt {0})", settingsRetries));
+                BuildAxes();
+                LoadCurrentSettings();
+                BuildReview();
+                UpdateApplyState();
+                RefreshStepColors();
+            };
+            timer.Start();
+        }
+
+        // Re-read the controller's settings into the page when they change underneath it - the wizard used to
+        // read them once per activation and then show that snapshot for as long as it stayed open, so a $130
+        // written from the MDI (or by any other view) left a table claiming the old envelope. Cosmetic it is
+        // not: Apply diffs the on-screen values against the LIVE settings, so the stale number comes back as a
+        // pending change and gets written to the machine.
+        //
+        // Refuses to run over the operator's own edits - their typing is not something an event from the
+        // controller may discard. In that case the page keeps what they typed and the pending-change list
+        // (which compares against live values) still shows them the truth before anything is written.
+        // Re-read $$ on page open (see the call site in Activate for why). Refuses in the three cases where
+        // asking would cost more than the staleness it prevents:
+        //
+        //   - not connected: nothing to ask, and Load() would just fail.
+        //   - a job is running: a $$ is ~100 lines of reply competing with the stream for the link.
+        //   - unsaved setting edits exist anywhere (the grbl settings page shares this collection): a reload
+        //     overwrites values from the controller, which would silently discard someone's typing on
+        //     ANOTHER page. GrblConfigControl.ReloadSettings pairs Load() with ClearPendingEdits precisely
+        //     because that is a deliberate, operator-initiated discard - this one is not.
+        //
+        // Load() raises SettingsReloaded on success, so the page refresh happens through the same path as
+        // every other change; there is nothing to repopulate here.
+        private void ReloadSettingsFromController()
+        {
+            if (!_settingsHookAttached)
+                return;                                   // left the page during the deferral
+            if (Comms.com == null || !Comms.com.IsOpen)
+                return;
+            if (model != null && model.IsJobRunning)
+                return;
+            if (GrblSettings.HasChanges())
+                return;
+
+            try { GrblSettings.Load(); }
+            catch (Exception ex) { CNC.Core.DebugLog.Write("config", "Machine Setup: $$ refresh failed - " + ex.Message); }
+        }
+
+        private void OnSettingsReloaded(object sender, EventArgs e)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke((System.Action)(() => OnSettingsReloaded(sender, e)));
+                return;
+            }
+
+            // _settingsHookAttached doubles as "the view is active" - it is subscribed on activate and
+            // dropped on deactivate - and still matters after the CheckAccess hop, which can land after the
+            // operator has left the page.
+            if (!_settingsHookAttached || _userEdited)
+                return;
+
+            BuildAxes();
+            LoadCurrentSettings();
+            BuildReview();
+            UpdateApplyState();
+            RefreshStepColors();
+        }
+
+        private void LoadCurrentSettingsCore()
         {
             // The travel field shows physical travel, which is the stored soft-limit travel plus the pull-off
             // clearance reserved at each end (see BuildTargets). $22 is a bit-field on grblHAL (bit0 enable,
@@ -698,12 +859,39 @@ namespace CNC.Controls
 
             foreach (var axis in Setup.Axes)
             {
+                // NaN means the setting has not arrived, which is NOT the same as a machine with no travel -
+                // and overwriting a good value with 0 because the answer is still in flight is how this page
+                // came to show a "trashed" setup while the controller was perfectly fine.
+                //
+                // Observed 2026-08-20: the page read $130-$132 at 00:55:46.328 and the controller's reply
+                // landed at 00:55:46.769, 441ms later. The read is synchronous, the dump is not.
+                //
+                // So an absent value leaves the field ALONE. Whatever was there - a real value from a
+                // previous load, or the untouched default - is a better answer than a fabricated zero,
+                // because zero is a number the operator cannot distinguish from a measurement.
                 double stored = GrblSettings.GetDouble(GrblSetting.MaxTravelBase + axis.Index);
-                axis.MaxTravel = stored > 0d ? stored : 0d;   // table value IS $13x (max travel); no pull-off fudge
+
+                if (double.IsNaN(stored))
+                {
+                    settingsIncomplete = true;
+                    CNC.Core.DebugLog.Write("setup", string.Format(
+                        "axis {0} (index {1}): ${2} has not arrived yet - field left as it was, re-read scheduled",
+                        axis.Letter, axis.Index, (int)(GrblSetting.MaxTravelBase + axis.Index)));
+                }
+                else
+                    axis.MaxTravel = stored > 0d ? stored : 0d;   // table value IS $13x (max travel); no pull-off fudge
+
                 double rate = GrblSettings.GetDouble(GrblSetting.MaxFeedRateBase + axis.Index);
-                axis.MaxRate = rate > 0d ? rate : axis.DefaultMaxRate;   // keep an existing rate, else a stepper-friendly default
+                if (double.IsNaN(rate))
+                    settingsIncomplete = true;
+                else
+                    axis.MaxRate = rate > 0d ? rate : axis.DefaultMaxRate;   // keep an existing rate, else a stepper-friendly default
+
                 double steps = GrblSettings.GetDouble(GrblSetting.TravelResolutionBase + axis.Index);
-                axis.StepsPerMm = steps > 0d ? steps : 0d;   // 0 = unknown; a preset (or the calibration tab) can fill it
+                if (double.IsNaN(steps))
+                    settingsIncomplete = true;
+                else
+                    axis.StepsPerMm = steps > 0d ? steps : 0d;   // 0 = unknown; a preset (or the calibration tab) can fill it
                 axis.InvertDirection = (dirMask & axis.Bit) != 0;
                 axis.LimitNormallyClosed = (limitMask & axis.Bit) != 0;
                 axis.HomeAtMin = (homeMask & axis.Bit) != 0;
@@ -799,6 +987,78 @@ namespace CNC.Controls
         #endregion
 
         #region Home corner picker
+
+        // ---- work surface (spoilboard extent) ----
+        //
+        // Deliberately NOT expressed by shrinking $130/$131: the machine really can reach past the board to
+        // the toolsetter, and must keep being allowed to or tc.macro can never drive there. See WorkSurface.cs.
+
+        private bool loadingWorkSurface = false;
+
+        private void LoadWorkSurface()
+        {
+            var ws = WorkSurface.Current;
+            loadingWorkSurface = true;
+            chkWorkSurfaceDefined.IsChecked = ws.Defined;
+            txtWsMinX.Text = ws.MinX.ToString("0.###", CultureInfo.InvariantCulture);
+            txtWsMaxX.Text = ws.MaxX.ToString("0.###", CultureInfo.InvariantCulture);
+            txtWsMinY.Text = ws.MinY.ToString("0.###", CultureInfo.InvariantCulture);
+            txtWsMaxY.Text = ws.MaxY.ToString("0.###", CultureInfo.InvariantCulture);
+            loadingWorkSurface = false;
+            ShowWorkSurfaceSummary();
+        }
+
+        private static double ParseOr(string text, double fallback)
+        {
+            double v;
+            return double.TryParse((text ?? string.Empty).Trim(), NumberStyles.Float | NumberStyles.AllowLeadingSign,
+                                   CultureInfo.InvariantCulture, out v) ? v : fallback;
+        }
+
+        private void WorkSurface_Changed(object sender, RoutedEventArgs e)
+        {
+            if (loadingWorkSurface)
+                return;
+
+            var ws = WorkSurface.Current;
+            ws.Defined = chkWorkSurfaceDefined.IsChecked == true;
+            ws.MinX = ParseOr(txtWsMinX.Text, ws.MinX);
+            ws.MaxX = ParseOr(txtWsMaxX.Text, ws.MaxX);
+            ws.MinY = ParseOr(txtWsMinY.Text, ws.MinY);
+            ws.MaxY = ParseOr(txtWsMaxY.Text, ws.MaxY);
+            AppConfig.Settings.Save();
+            ShowWorkSurfaceSummary();
+        }
+
+        /// <summary>
+        /// State what the numbers actually mean once clamped, rather than echoing them back. A board typed
+        /// larger than the machine is silently held inside the travel limits (WorkSurface.UsableMin/Max), and
+        /// an operator who cannot see that would be left believing an extent that will not be used.
+        /// </summary>
+        private void ShowWorkSurfaceSummary()
+        {
+            if (txtWorkSurfaceSummary == null)
+                return;
+
+            var ws = WorkSurface.Current;
+            string text = ws.Summary;
+
+            if (ws.Defined && (ws.UsableSpan(0) <= 0d || ws.UsableSpan(1) <= 0d))
+                text = "These numbers do not describe a usable area - check that 'from' is less than 'to' on both axes.";
+
+            txtWorkSurfaceSummary.Text = text;
+        }
+
+        /// <summary>Fill the near corner from the spindle's current machine position - jog there, then click.</summary>
+        private void WorkSurfaceHere_Click(object sender, RoutedEventArgs e)
+        {
+            if (model == null)
+                return;
+
+            txtWsMinX.Text = model.MachinePosition.X.ToString("0.###", CultureInfo.InvariantCulture);
+            txtWsMinY.Text = model.MachinePosition.Y.ToString("0.###", CultureInfo.InvariantCulture);
+            WorkSurface_Changed(sender, e);
+        }
 
         private void Corner_Click(object sender, RoutedEventArgs e)
         {
@@ -905,9 +1165,18 @@ namespace CNC.Controls
             // round-trip compounded across re-applies and silently shrank $13x (e.g. 120 -> 110 -> 100).
             foreach (var axis in Setup.Axes)
             {
-                double stored = Math.Max(0d, axis.MaxTravel);
-                targets[GrblSetting.MaxTravelBase + axis.Index] = stored.ToInvariantString();
-                targets[GrblSetting.MaxFeedRateBase + axis.Index] = axis.MaxRate.ToInvariantString();
+                // Only write travel when it is KNOWN, exactly as steps/mm below already did. 0 is not a
+                // travel, it is the absence of one: LoadCurrentSettingsCore stores 0 whenever $13x reads
+                // back non-positive, so an unloaded/unavailable setting was indistinguishable from a real
+                // value here and Apply would write $130=0 $131=0 $132=0 - a machine with soft limits enabled
+                // and a zero envelope, where every move is out of bounds.
+                //
+                // Found 2026-08-19 with the Axis table displaying zeros while the controller held 860/840/135;
+                // the guard was already three lines below for steps/mm and had simply never been extended up.
+                if (axis.MaxTravel > 0d)
+                    targets[GrblSetting.MaxTravelBase + axis.Index] = axis.MaxTravel.ToInvariantString();
+                if (axis.MaxRate > 0d)      // same reasoning - a zero max rate is not a rate either
+                    targets[GrblSetting.MaxFeedRateBase + axis.Index] = axis.MaxRate.ToInvariantString();
                 if (axis.StepsPerMm > 0d)   // only write steps/mm when known (current value or a preset) - never clobber with 0
                     targets[GrblSetting.TravelResolutionBase + axis.Index] = axis.StepsPerMm.ToInvariantString();
             }
@@ -994,6 +1263,9 @@ namespace CNC.Controls
         // Apply only when there is something to write.
         private void OnSetupChanged(object sender, PropertyChangedEventArgs e)
         {
+            if (!_loading)
+                _userEdited = true;   // a real edit, not us filling the fields from the controller
+
             if (e.PropertyName == nameof(AxisSetup.HomeAtMin))
                 UpdateHomeCornerText();   // keep the home-corner picture in sync when a checkbox is toggled
             UpdateApplyState();
@@ -1037,6 +1309,10 @@ namespace CNC.Controls
             RestoreOrDefaultMachine();
             Changes.Clear();
             txtStatus.Text = "Reloaded from controller.";
+            // LAST, after the machine re-apply: re-selecting the dropdowns drives the fields and so trips the
+            // edit flag. Leaving it set would quietly disable the settings-reloaded refresh for the rest of
+            // the session - the page would go stale again and nothing would say so.
+            _userEdited = false;
             UpdateApplyState();
         }
 
@@ -1292,13 +1568,19 @@ namespace CNC.Controls
         // Install/update the controller-side macros - delegates to the SD Card view's proven path, then refresh.
         private void InstallMacros_Click(object sender, RoutedEventArgs e)
         {
-            if (SDCardView.Instance != null)
-            {
-                SDCardView.Instance.InstallAtcMacros(Window.GetWindow(this));
-                RefreshMacroStatus();
-            }
-            else
-                AppDialogs.Show(Window.GetWindow(this), "The SD Card view is not available.", "Controller macros", MessageBoxButton.OK, MessageBoxImage.Information);
+            // SDCardView.Instance is set in that view's CONSTRUCTOR. It used to be constructed at app startup
+            // with every other tab, so it was always there; since the SD Card view moved off the tab bar into
+            // a menu-hosted window (2026-08-03) it is not constructed until the operator actually opens that
+            // window - so this refused with "The SD Card view is not available." purely because they had never
+            // visited it. Same class as the getTab(ViewType.X)-returns-null trap the menu-hosting change
+            // introduced elsewhere.
+            // Constructing one here is enough and is safe: the ctor only does InitializeComponent, sets
+            // ctxMenu.DataContext and assigns Instance - no comms, no event wiring. Provisioning explicitly
+            // does not need the view REALIZED either; ProvisionAtcMacros says so itself and deliberately reads
+            // Grbl.GrblViewModel rather than the view's own (still-null) DataContext.
+            var sdCard = SDCardView.Instance ?? new SDCardView();
+            sdCard.InstallAtcMacros(Window.GetWindow(this));
+            RefreshMacroStatus();
         }
 
         // Picks up (PRINT, TLOREF_Z=..) below - same (PRINT, TAG=value) idiom StartJobView.rxResult already

@@ -24,6 +24,12 @@
                     <Button x:Uid="btn_closeFileHdr" DockPanel.Dock="Right" Content="&#x2715;" Width="20" Padding="0" FontSize="12"
                             Background="Transparent" BorderThickness="0" Cursor="Hand" Click="CloseFile_Click"
                             ToolTip="Close the loaded program."/>
+                    <!-- Estimated run time, right of the close button so a long file name trims into it
+                         rather than pushing it off. Empty (and collapsed) until the estimate lands - it is
+                         computed off-thread after the load, see GCodeProgram.EstimateRunTime. -->
+                    <TextBlock x:Uid="txt_estRunTime" DockPanel.Dock="Right" Text="{Binding Path=EstimatedRunTime}"
+                               VerticalAlignment="Center" Margin="8,0,8,0" Foreground="#FF606060"
+                               ToolTip="Estimated run time at the programmed feed rates. No acceleration model, so a program of many short moves will take longer than this."/>
                     <TextBlock Text="{Binding Path=FileName, Converter={StaticResource ProgramSource}}" FontWeight="SemiBold"
                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Path=ProgramPath}"/>
                 </DockPanel>

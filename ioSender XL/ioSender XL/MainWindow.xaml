@@ -43,7 +43,17 @@
              its own top-level item, Save/Close live on the program view, Open Console is a double-click on
              the Console tab, and Transform is in the program list's right-click menu. Exit is dropped - the
              window X / Alt+F4 (both routed through Window_Closing) quit the app. -->
-        <Menu x:Name="menuMain" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" DockPanel.Dock="Top">
+        <!-- Menu row: the menu itself plus a right-aligned connection summary. It replaces the
+             bottom status bar's Target/Run time, and hides itself on a narrow window (see
+             UpdateMenuBarInfo) rather than squeezing the menu it shares the row with. -->
+        <Grid DockPanel.Dock="Top">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="lblMenuBarInfo" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                       Margin="0,0,10,0" TextWrapping="NoWrap" Foreground="#FF3C6E3C" FontWeight="SemiBold"/>
+        <Menu x:Name="menuMain" Grid.Column="0" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}">
             <MenuItem x:Uid="mnu_connect" x:Name="menuConnect" Header="Co_nnect..." Click="connectMenuItem_Click"/>
             <!-- File / Tools carry a static skeleton here; the view entries (Machine, Settings, SD Card,
                  Feeds and Speeds, ...) are appended from the tab registry by BuildViewMenus, so a
@@ -55,11 +65,15 @@
                           ToolTip="Open a saved .workorder file."/>
                 <MenuItem x:Uid="mnu_newWorkOrder" x:Name="menuNewWorkOrder" Header="_New Work Order..." Click="NewWorkOrder_Click"
                           ToolTip="Start composing a new work order."/>
+                <MenuItem x:Uid="mnu_loadSvgLaser" x:Name="menuLoadSvgLaser" Header="Load SVG Laser _Job..." Click="LoadSvgLaser_Click"
+                          ToolTip="Burn an SVG with the laser: pick the artwork, then set width, power, feed and shading. Settings are remembered between jobs."/>
                 <Separator x:Name="menuFileViewSeparator"/>
                 <!-- Machine + Settings appended here -->
             </MenuItem>
             <MenuItem x:Uid="mnu_tools" x:Name="menuTools" Header="_Tools">
                 <MenuItem x:Uid="mnu_camera" x:Name="menuCamera" Header="_Camera" Click="CameraOpen_Click"/>
+                <MenuItem x:Uid="mnu_machineMirror" x:Name="menuMachineMirror" Header="Machine _mirror" Click="machineMirror_Click"
+                          ToolTip="Read-only live view of the machine state as seen through the client/server wire protocol - a diagnostic for the split. Any disagreement with the main window is a protocol bug."/>
                 <!-- SD Card, Feeds and Speeds, the former Tools tab's tools, ... appended here -->
             </MenuItem>
             <MenuItem x:Uid="mnu_help" x:Name="menuHelp" Header="_Help">
@@ -72,124 +86,56 @@
                 <MenuItem x:Uid="mnu_videoTutorials" x:Name="menuVideoTutorials" Header="_Video tutorials" Click="videoTutorials_Click"/>
                 <MenuItem x:Uid="mnu_errorsAndAlarms" x:Name="menuErrorsAndAlarms" Header="_Error and alarm codes" Click="errorAndAlarms_Click"/>
                 <Separator/>
-                <MenuItem x:Uid="mnu_support" x:Name="menuSupport" Header="_Support">
+                <MenuItem x:Uid="mnu_support" x:Name="menuSupport" Header="_Support" SubmenuOpened="menuSupport_SubmenuOpened">
+                    <!-- Restart sits at the top, alone above the separator: it is a RECOVERY action, not a
+                         configuration one. Some controller states can only be cleared by a fresh instance -
+                         a check-mode lock, for one - and hunting for that in among the update/overlay items
+                         is the wrong shape for something you reach for when the app is misbehaving. -->
+                    <MenuItem x:Uid="mnu_restartIoSender" x:Name="menuRestartIoSender" Header="_Restart ioSender..." Click="restartIoSender_Click" ToolTip="Close and reopen ioSender. Settings are saved first. Clears anything held only in memory for this session - a stuck connection state, for example. Asks first."/>
+                    <Separator/>
                     <MenuItem x:Uid="mnu_checkForUpdates" x:Name="menuCheckForUpdates" Header="_Check for updates..." Click="checkForUpdates_Click" ToolTip="Check if a newer version of ioSender is available on GitHub."/>
                     <MenuItem x:Uid="mnu_rollbackVersion" x:Name="menuRollbackVersion" Header="_Roll back to previous version..." Click="rollbackVersion_Click" ToolTip="Swap back to the ioSender build installed before the last update. Only goes back one version - it does not work if you have not updated at least once."/>
                     <MenuItem x:Uid="mnu_openConfigFolder" x:Name="menuOpenConfigFolder" Header="Open Application _data folder" Click="openConfigFolderMenuItem_Click" ToolTip="Open the per-user folder where ioSender keeps its settings (App.config), key mappings, grbl backups and restore points."/>
+                    <Separator/>
+                    <MenuItem x:Uid="mnu_applyConfigOverlay" x:Name="menuApplyConfigOverlay" Header="Apply configuration _overlay..." Click="applyConfigOverlay_Click" ToolTip="Layer a configuration fragment (.ioconfig) onto this profile - for example to adopt a new screen layout - without disturbing your machine settings, profiles or macros. ioSender restarts to apply it, and it can be undone."/>
+                    <MenuItem x:Uid="mnu_exportConfigOverlay" x:Name="menuExportConfigOverlay" Header="E_xport configuration overlay..." Click="exportConfigOverlay_Click" ToolTip="Save this profile's screen layout as a .ioconfig fragment that someone else can apply to their own installation. Machine identity (port, network host, machine) is never included."/>
+                    <MenuItem x:Uid="mnu_undoConfigOverlay" x:Name="menuUndoConfigOverlay" Header="_Undo configuration overlay" Click="undoConfigOverlay_Click" ToolTip="Restore the configuration as it was immediately before the last overlay was applied. ioSender restarts."/>
+                    <Separator/>
                     <MenuItem x:Uid="mnu_installFusionAddin" x:Name="menuInstallFusionAddin" Header="_Install ioSenderV2 Fusion Addin..." Click="installFusionAddin_Click" ToolTip="Symlink the ioSenderV2 Fusion 360 add-in into Fusion's AddIns folder. Future ioSenderV2 updates need no reinstall - only shown when Fusion 360 is installed for this user." Visibility="Collapsed"/>
                     <MenuItem x:Uid="mnu_generateResetTestCase" Header="Generate _reset test case..." Click="generateResetTestCase_Click" ToolTip="Write a .nc file that calls an O-word subroutine several times, for reproducing controller-wedge-on-Reset bugs." Visibility="Collapsed"/>
                 </MenuItem>
                 <MenuItem x:Uid="mnu_about" x:Name="menuAbout" Header="_About" Click="aboutMenuItem_Click"/>
             </MenuItem>
         </Menu>
+        </Grid>
         <!-- Menu-overhaul: the toolbar row (file-action icons + quick-run macro buttons) was removed. The
              file icons duplicated the program-view header (Load/Close) or were dropped (Reload/Edit); macros
              still run by F-key (KeypressHandler) - a macro-name flyout is a possible future replacement. -->
-        <StatusBar DockPanel.Dock="Bottom">
-            <StatusBar.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" MinWidth="120" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                    </Grid>
-                </ItemsPanelTemplate>
-            </StatusBar.ItemsPanel>
-            <StatusBarItem>
-                <TextBlock TextWrapping="NoWrap">
-                    <TextBlock.Text>
-                        <MultiBinding Converter="{StaticResource BlocksToStringConverter}">
-                            <Binding Path="Blocks" />
-                            <Binding Path="BlockExecuting" />
-                        </MultiBinding>
-                    </TextBlock.Text>
-                </TextBlock>
-            </StatusBarItem>
-            <Separator Grid.Column="1" />
-            <StatusBarItem Grid.Column="2">
-                <!-- msgFlashBorder: a new Message briefly flashes this background light green (normal) or
-                     light red (error, GrblViewModel.IsMessageError) for 5s - see MainWindow.xaml.cs's
-                     FlashMessage - instead of the old enlarge/shrink-font animation, which shifted the whole
-                     window layout up/down every time a message arrived. lblMessage's font is now permanently
-                     large (doubled once at startup, see MainWindow_Loaded) rather than only during that window. -->
-                <Border x:Name="msgFlashBorder" Background="Transparent" Padding="2,0">
-                    <StackPanel Orientation="Horizontal">
-                        <Button x:Uid="btn_copyMessage" x:Name="btnCopyMessage" Click="CopyMessage_Click" Cursor="Hand"
-                                ToolTip="Copy the full status message to the clipboard" Focusable="False"
-                                Background="Transparent" BorderThickness="0" Padding="0" Margin="0,0,5,0" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="#FF555555"/>
-                        </Button>
-                        <TextBlock x:Uid="lbl_message" x:Name="lblMessage" Text="{Binding Path=Message}" TextWrapping="NoWrap"
-                                   VerticalAlignment="Center" ToolTipService.ShowDuration="60000" ToolTipService.InitialShowDelay="300">
-                            <TextBlock.ToolTip>
-                                <TextBlock Text="{Binding Path=Message}" TextWrapping="Wrap" MaxWidth="540"/>
-                            </TextBlock.ToolTip>
-                        </TextBlock>
-                    </StackPanel>
-                </Border>
-            </StatusBarItem>
-            <Separator Grid.Column="3" />
-            <StatusBarItem Grid.Column="4">
-                <TextBlock x:Uid="lbl_connectionTarget" TextWrapping="NoWrap" Padding="4,0" FontWeight="SemiBold">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <!-- green when a target is connected, red when not. Text is a Setter (not a local
-                                 value) so the IsConnectionLost trigger below can override it - a directly set
-                                 Text binding would win over a trigger and never show "Not connected". -->
-                            <Setter Property="Text" Value="{Binding Path=ConnectionTarget, StringFormat=Target: {0}, TargetNullValue=Not connected}"/>
-                            <Setter Property="Foreground" Value="ForestGreen"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Path=ConnectionTarget}" Value="{x:Null}">
-                                    <Setter Property="Foreground" Value="Red"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding Path=ConnectionTarget}" Value="">
-                                    <Setter Property="Foreground" Value="Red"/>
-                                </DataTrigger>
-                                <!-- socket dropped (e.g. simulator closed): the reconnect loop keeps the
-                                     target name set, so reflect the lost state here instead -->
-                                <DataTrigger Binding="{Binding Path=IsConnectionLost}" Value="True">
-                                    <Setter Property="Foreground" Value="Red"/>
-                                    <Setter Property="Text" Value="Not connected"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                    <TextBlock.ContextMenu>
-                        <ContextMenu Opened="targetContextMenu_Opened">
-                            <MenuItem x:Uid="mnu_validate" Header="_Validate controller..." Click="validateMenuItem_Click"/>
-                        </ContextMenu>
-                    </TextBlock.ContextMenu>
-                </TextBlock>
-            </StatusBarItem>
-            <Separator Grid.Column="5" />
-            <StatusBarItem Grid.Column="6">
-                <TextBlock x:Uid="lbl_runtime" Text="{Binding Path=RunTime, StringFormat={StaticResource RunTime}}" TextWrapping="NoWrap" Padding="2,0"/>
-            </StatusBarItem>
-            <Separator Grid.Column="7" />
-            <StatusBarItem Grid.Column="8">
-                <TextBlock x:Uid="lbl_jogStep" ToolTip="Distance for keyboard step jog (with &lt;CTRL&gt; modifier)." Text="{Binding Path=JogStep, StringFormat={StaticResource JogStep}}" HorizontalAlignment="Right" TextWrapping="NoWrap" Margin="4,0"/>
-            </StatusBarItem>
-        </StatusBar>
+        <!-- The bottom status bar is gone (2026-08-10). Blocks moved onto the run line, the status
+             message became the popup log, and Target/Run time became the menu-bar summary above.
+             Jog step is the Jogging group's Distance. Nothing left to justify a whole row. -->
         <!-- Single, always-visible machine-control cluster (Phase 2c) - replaced the former floating
              run-control window and the Grbl-tab's lower-left controls. Signals + Status (state/check +
-             Home/Unlock/Reset) + JobControl (Cycle Start [starts a job] / Feed Hold / Stop / Rewind) +
+             Home/Unlock/Reset) + JobControl (Cycle Start [starts a job] / Feed Hold / Stop) +
              Feed/rapid override + MDI. Docked just above the status bar, full width, present on every tab so
              Feed Hold / Stop / MDI are always reachable regardless of the active tab. -->
         <Border x:Name="runControlBorder" DockPanel.Dock="Bottom" BorderBrush="#FFCCCCCC" BorderThickness="0,1,0,0" Background="#FFF5F5F5">
             <Grid Margin="6,4">
-                <!-- Four columns: [button row | jog pad | signals+feed | overrides]. The button-row column is the
-                     star, so it grows to consume the slack up to the jog pad; the other three are content-sized and
-                     ride at the right edge, adjacent to each other. -->
+                <!-- LAYOUT PASS 2026-08-09. Five columns:
+                     [button row | jog pad | jog config | signals | feeds+overrides]
+                     The button-row column is the star, so it grows to consume the slack up to the jog pad;
+                     the other four are content-sized and ride at the right edge, adjacent to each other.
+
+                     The strip is deliberately TALLER than before: the right-hand groups are now three rows
+                     each (three overrides, three signal groups, three jog fields), which is the vertical
+                     real estate this pass was asked for. Height comes from the content, not a fixed value,
+                     so the strip grows and shrinks with what is actually in it.
+
+                     This XAML is knowingly throwaway - the desktop client retires at phase H. The point is
+                     to settle a layout worth porting to the web client, so treat it as the design surface. -->
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
@@ -197,9 +143,32 @@
                 <!-- Button-row region (col 0, star): three lines (MDI / run buttons / State), left-aligned; the
                      column grows to fill the slack up to the jog pad. -->
                 <StackPanel Grid.Column="0" Orientation="Vertical" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-                        <!-- MDI line: width tied to the button row so its right edge (Send) aligns with Program. -->
-                        <cnccontrols:MDIControl x:Name="mdiControl" Bare="True" HorizontalAlignment="Left" Margin="0,5,0,0"
-                                                Width="{Binding ElementName=buttonRow, Path=ActualWidth}"/>
+                        <!-- Run line. The MDI entry box that used to live here is gone: a single-line
+                             box on the strip was a worse place to type g-code than the console, which
+                             has history, multi-line paste and the replies right above it. The button
+                             opens that instead, focused and ready to type. -->
+                        <Grid Margin="0,5,0,0" Width="{Binding ElementName=buttonRow, Path=ActualWidth}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <cnccontrols:JobControl Grid.Column="0" x:Name="runControl" VerticalAlignment="Center"/>
+                            <!-- Block counter, moved up from the status bar: it belongs beside the run
+                                 buttons it describes, not in the far corner of the window. -->
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Margin="18,0,0,0" TextWrapping="NoWrap">
+                                <TextBlock.Text>
+                                    <MultiBinding Converter="{StaticResource BlocksToStringConverter}">
+                                        <Binding Path="Blocks" />
+                                        <Binding Path="BlockExecuting" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                            <Button x:Uid="btn_mdiConsole" x:Name="btnMdiConsole" Grid.Column="3" Content="MDI"
+                                    Padding="10,3" VerticalAlignment="Center" Click="MdiConsole_Click"
+                                    ToolTip="Open the console with the caret in its input box. Esc closes it."/>
+                        </Grid>
                         <!-- Button line: the row stretches to fill the star column so its right edge (Program) meets
                              the jog pad; the three groups (status / job / program) are pushed apart by star spacers
                              so the run buttons span the width instead of huddling at the left. -->
@@ -209,8 +178,12 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <cnccontrols:StatusControl Grid.Column="0" ShowState="False" VerticalAlignment="Top"/>
-                            <cnccontrols:JobControl Grid.Column="2" x:Name="runControl" VerticalAlignment="Top"/>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <cnccontrols:StatusControl ShowState="False" VerticalAlignment="Center"/>
+                                <!-- State moved up onto this line (2026-08-10), set well clear of Reset so
+                                     a readout is never mistaken for another button. -->
+                                <cnccontrols:StatusControl ShowButtons="False" VerticalAlignment="Center" Margin="28,0,0,0"/>
+                            </StackPanel>
                         </Grid>
                         <!-- State: / Check directly under Home/Unlock/Reset, with the Jog distance/feed preset
                              spinners on the same line. Width is tied to the button row so the selector's right
@@ -221,8 +194,21 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                                <cnccontrols:StatusControl ShowButtons="False" VerticalAlignment="Center"/>
-                                <!-- Demo-video timelapse marker toggle, right of the State field. Hidden unless
+                                <!-- Coolant as ONE line. Built here rather than hosting CoolantControl,
+                                     which stacks its two switches vertically inside its own group box -
+                                     right for a panel, too tall for a strip. The toggles are the same
+                                     control it uses, bound to the same Flood/Mist and raising the same
+                                     realtime toggle bytes, so behaviour is unchanged. -->
+                                <TextBlock x:Uid="lbl_coolant" Text="Coolant:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <cnccontrols:ToggleControl x:Uid="lbl_stripFlood" x:Name="swFlood" Tag="Flood" Label="Flood"
+                                                           IsChecked="{Binding Path=Flood, Mode=OneWay}" VerticalAlignment="Center"
+                                                           Margin="0,0,12,0" Click="Coolant_Click"
+                                                           ToolTip="Turn flood coolant on or off."/>
+                                <cnccontrols:ToggleControl x:Uid="lbl_stripMist" x:Name="swMist" Tag="Mist" Label="Mist"
+                                                           IsChecked="{Binding Path=Mist, Mode=OneWay}" VerticalAlignment="Center"
+                                                           Click="Coolant_Click"
+                                                           ToolTip="Turn mist coolant on or off."/>
+                                <!-- Demo-video timelapse marker toggle. Hidden unless
                                      launched with -demomarker (visibility set in MainWindow.xaml.cs). Marks
                                      TIMELAPSE_ON/OFF into the demo marker file; see docs/demo-videos. -->
                                 <ToggleButton x:Uid="btnTimeLapse" x:Name="btnTimeLapse" Content="Timelapse" MinWidth="80" Margin="12,0,0,0" VerticalAlignment="Center" Focusable="False" Visibility="Collapsed" ToolTip="Demo capture: mark the timelapse window. Flip ON at the moment you switch the camera to timelapse, OFF when you switch back. Auto-ON a few minutes after Run if you don't; auto-OFF at job end." Checked="TimeLapse_Toggled" Unchecked="TimeLapse_Toggled">
@@ -257,49 +243,46 @@
                                      visibility gate as Timelapse, set alongside it in MainWindow.xaml.cs). -->
                                 <ToggleButton x:Uid="btnAllRecord" x:Name="btnAllRecord" MinWidth="36" Margin="6,0,0,0" VerticalAlignment="Center" Focusable="False" Visibility="Collapsed" ToolTip="OBS Control - All: click to start/stop every camera together" Style="{StaticResource RecordToggleStyle}" Checked="AllRecord_Toggled" Unchecked="AllRecord_Toggled"/>
                             </StackPanel>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                <cnccontrols:KbdDefaultSpeedControl Margin="0,0,16,0"/>
-                                <cnccontrols:JogPresetSelector/>
-                            </StackPanel>
+                            <!-- The status MESSAGE strip is gone from the bottom bar; this opens the same
+                                 history window its click used to, so a message that scrolled past is still
+                                 reachable without a permanent strip of screen spent on it. It lives in the
+                                 grid's Auto column, right-aligned: the right edge of the left group, hard
+                                 against the DRO that starts the next column. -->
+                            <Button x:Uid="btn_viewStatus" x:Name="btnViewStatus" Grid.Column="1" Content="Status"
+                                    Padding="10,2" Margin="16,0,0,0" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    Click="ViewStatus_Click"
+                                    ToolTip="Show the status message history since launch."/>
+                            <!-- Jog distance / feed / kbd speed used to sit here, on the State line. They moved
+                                 to their own "Jog config" column in the right-hand group (2026-08-09 layout
+                                 pass) so all the jogging controls read as one cluster next to the pad. -->
                         </Grid>
                     </StackPanel>
                 <!-- Jog pad (col 1): shrunk arrows-only copy of the Jog-tab control (selection shared via JogData),
                      riding at the left of the right-hand group, just past the button-row column. -->
-                <cnccontrols:JogBaseControl x:Name="jogPad" Grid.Column="1" ArrowsOnly="True" Margin="18,0,10,0" VerticalAlignment="Center">
-                    <cnccontrols:JogBaseControl.LayoutTransform>
-                        <ScaleTransform ScaleX="0.65" ScaleY="0.65"/>
-                    </cnccontrols:JogBaseControl.LayoutTransform>
-                </cnccontrols:JogBaseControl>
-                <!-- Signals (col 2): indicators (flush to top) + current feed rate under them; butts against the jog pad. -->
-                <StackPanel Grid.Column="2" Orientation="Vertical" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                    <cnccontrols:SignalsControl VerticalAlignment="Top" Margin="0">
-                        <cnccontrols:SignalsControl.LayoutTransform>
-                            <ScaleTransform ScaleX="0.86" ScaleY="0.86"/>
-                        </cnccontrols:SignalsControl.LayoutTransform>
-                    </cnccontrols:SignalsControl>
-                    <!-- The unit label that used to sit after the readout is gone - on this bar the room is
-                         better spent on digits, so the unit moved into the tooltip (issue #21). ToolTip is on
-                         the panel so it covers the "Feed:" label and the readout alike. MinWidth is sized for
-                         the 5 digits Format="####0" can produce, allowing for the NumericTextBox style's 8px
-                         horizontal padding + 1px border.
-                         The tooltip is a composed TextBlock rather than a Binding+StringFormat on purpose:
-                         LocBaml can only reach literal values, so a StringFormat's prose would be permanently
-                         English. Splitting it lets the wording live in an x:Uid'd Run (localized like every
-                         other tooltip) while the unit stays live off FeedrateUnit. -->
-                    <StackPanel Orientation="Horizontal" Margin="2,4,0,0">
-                        <StackPanel.ToolTip>
-                            <TextBlock><Run x:Uid="txt_runFeedTip" Text="Current feed rate"/><Run Text=" ("/><Run Text="{Binding Path=FeedrateUnit, Mode=OneWay}"/><Run Text=")"/></TextBlock>
-                        </StackPanel.ToolTip>
-                        <Label Content="Feed:" Padding="0" VerticalAlignment="Center"/>
-                        <cnccontrols:NumericTextBox Value="{Binding Path=FeedRate, Mode=OneWay}" Format="####0" IsReadOnly="True" Focusable="False" MinWidth="68" Margin="4,0,0,0" VerticalAlignment="Center"/>
-                    </StackPanel>
+                <!-- DRO sits immediately left of the jog pad: where you are, right beside the thing
+                     that moves you. Scaled to the strip like the pad is. -->
+                <cnccontrols:DROControl Grid.Column="1" x:Name="stripDro" VerticalAlignment="Center" Margin="14,0,0,0">
+                    <cnccontrols:DROControl.LayoutTransform>
+                        <ScaleTransform ScaleX="0.72" ScaleY="0.72"/>
+                    </cnccontrols:DROControl.LayoutTransform>
+                </cnccontrols:DROControl>
+
+                <StackPanel Grid.Column="2" Orientation="Vertical" Margin="14,0,10,0" VerticalAlignment="Center">
+                    <cnccontrols:JogBaseControl x:Name="jogPad" ArrowsOnly="True" HorizontalAlignment="Center">
+                        <cnccontrols:JogBaseControl.LayoutTransform>
+                            <ScaleTransform ScaleX="0.65" ScaleY="0.65"/>
+                        </cnccontrols:JogBaseControl.LayoutTransform>
+                    </cnccontrols:JogBaseControl>
+<!-- Continuous moved INTO the Jogging group box (2026-08-09): one checkbox for one
+                         setting, next to the distance and speed it belongs with. -->
                 </StackPanel>
-                <!-- Right: feed / rapids override controls, given ~25% more room. -->
-                <cnccontrols:FeedControl Grid.Column="3" OverridesOnly="True" Margin="10,0,4,0" VerticalAlignment="Center">
-                    <cnccontrols:FeedControl.LayoutTransform>
-                        <ScaleTransform ScaleX="0.82" ScaleY="0.82"/>
-                    </cnccontrols:FeedControl.LayoutTransform>
-                </cnccontrols:FeedControl>
+
+                <!-- The right half, built to docs/RunStrip-Layout-Spec.md: three headed columns
+                     (Jogging | Signals | Feeds and Speeds). Replaces the separate JogPresetSelector,
+                     KbdDefaultSpeedControl, SignalsControl and FeedControl that used to occupy these
+                     columns - see that spec for why none of them fitted the shape asked for. -->
+                <cnccontrols:RunStripPanel Grid.Column="3" Grid.ColumnSpan="2" x:Name="runStripPanel"
+                                           Margin="4,0,4,0" VerticalAlignment="Center"/>
             </Grid>
         </Border>
         <!-- Top margin clears the main-nav tab STRIP (header row only) so the always-visible flyout panels

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * GrblViewModel.cs - part of CNC Controls library
  *
  * v0.47 / 2026-04-29 / Io Engineering (Terje Io)
@@ -39,7 +39,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
 using System.Linq;
-using System.Windows.Media;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using System.Threading;
@@ -49,40 +48,28 @@ namespace CNC.Core
 {
     public class GrblViewModel : MeasureViewModel
     {
-        private string _tool, _probe, _message, _WPos, _MPos, _wco, _wcs, _a, _fs, _ov, _pn, _sc, _sd, _fans, _d, _gc, _h, _thcv, _thcs, _spindle;
+        private string _message, _WPos, _MPos, _wco, _a, _fs, _ov, _pn, _sc, _sd, _fans, _d, _gc, _h, _thcv, _thcs, _spindle;
         private string _mdiCommand, _mdiText, _fileName, _fsCwd, _programPath;
         private string[] _rtState = new string[3];
         private bool has_wco = false, _hasFans = false, _multiProbe = false;
         private SDState _sdMounted = SDState.Unmounted;
-        private bool _flood, _mist, _fan0, _toolChange, _reset, _isMPos, _isJobRunning, _isProbeSuccess, _pgmEnd, _isParserStateLive, _isTloRefSet;
-        private bool _isCameraVisible = false, _responseLogVerbose = false, _isProbing = false, _autoReporting = false, _hasOutline = false, _isLoading = false;
+        private bool _flood, _mist, _fan0, _toolChange, _reset, _isJobRunning, _pgmEnd, _isParserStateLive;
+        private bool _isCameraVisible = false, _responseLogVerbose = false, _hasOutline = false, _isLoading = false;
         private bool _isDryRunMode = false;
         private bool _feedOverrideDisabled = false, _rpmOverrideDisabled = false, _feedHoldDisabled = false;
-        private bool? _mpg;
-        private int _pwm, _line, _scrollpos, _blocks = 0, _startFromBlock = 0, _executingBlock = 0, _auxinValue = -2, _autoReportInterval = 0, _spindle_num = 0;
-        private double _feedrate = 0d;
-        private double _rpm = 0d, _rpmInput = 0d, _rpmDisplay = 0d, _jogStep = 0.1d, _tloReferenceOffset = double.NaN;
-        private double _rpmActual = double.NaN;
-        private double _feedOverride = 100d;
-        private double _rapidsOverride = 100d;
-        private double _rpmOverride = 100d;
-        private double _thcVoltage = double.NaN;
+        private int _line, _scrollpos, _blocks = 0, _startFromBlock = 0, _executingBlock = 0, _auxinValue = -2, _spindle_num = 0;
+        private double _rpmInput = 0d, _rpmDisplay = 0d, _jogStep = 0.1d;
         private string _pb_avail, _rxb_avail;
-        private GrblState _grblState;
-        private LatheMode _latheMode = LatheMode.Disabled;
-        private HomedState _homedState = HomedState.Unknown;
         private GrblEncoderMode _encoder_ovr = GrblEncoderMode.Unknown;
         private StreamingState _streamingState;
         public SpindleState _spindleStatePrev = GCode.SpindleState.Off;
 
-        private Thread pollThread = null;
 
         public Action<string> OnCommandResponseReceived;
         public Action<string> OnResponseReceived;
         public Action<string> OnGrblReset;
         public Action<string> OnRealtimeStatusProcessed;
         public Action<string> OnWCOUpdated;
-        public Action<Position> OnCameraProbe;
 
         // Incremented the instant a transition INTO Alarm is parsed (see DataReceived) - a latch, not a
         // sampled value, so a caller polling GrblState.State later can miss an alarm entirely if the
@@ -99,27 +86,26 @@ namespace CNC.Core
 
         public GrblViewModel()
         {
-            _a = _pn = _fs = _sc = _tool = string.Empty;
+            _a = _pn = _fs = _sc = string.Empty;
+            State.Tool = string.Empty;
 
             Clear();
 
-            Keyboard = new KeypressHandler(this);
+            Keyboard = KeyboardFactory != null ? KeyboardFactory(this) : new JogController(this);
 
-            try
-            {
-                Controller = new ControllerService();
-                ControllerMapper = new ControllerMapper(this, Controller);
-                Controller.Start();
-            }
-            catch { /* XInput or dispatcher unavailable - controller support stays inert */ }
+            // Xbox controller input is client-side (CNC.Controls.GamepadInput) - it is a human input
+            // device, and XInput is a Windows P/Invoke. It used to be constructed here, which meant every
+            // GrblViewModel started its own 60Hz poller; MainWindow now attaches exactly one to the main model.
 
             MDICommand = new ActionCommand<string>(ExecuteMDI);
             StartFromBlock = new ActionCommand<int>(ExecuteStartFromBlock, canExecuteStartFromBlock);
 
-            pollThread = new Thread(new ThreadStart(Poller.Run));
-            pollThread.Start();
+            // Poller.Run() only constructs the System.Timers.Timer and wires its Elapsed handler - it does
+            // not loop, so it was running on a dedicated Thread that exited within microseconds of starting.
+            // Polling itself happens on timer threadpool threads.
+            Poller.Run();
 
-            _grblState.LastAlarm = 0;
+            State.GrblState.LastAlarm = 0;
 
             AxisLetter.PropertyChanged += Axisletter_PropertyChanged;
             Signals.PropertyChanged += Signals_PropertyChanged;
@@ -162,10 +148,11 @@ namespace CNC.Core
                 OnPropertyChanged(nameof(WorkPositionOffset));
         }
 
-        ~GrblViewModel()
-        {
-            pollThread.Abort();
-        }
+        // No finalizer. It called pollThread.Abort() on a thread that had already terminated - a no-op
+        // in practice, and Thread.Abort throws PlatformNotSupportedException on .NET 5+, so it was also a
+        // hard blocker for running CNC.Core on .NET 8. Polling is stopped deterministically instead, via
+        // Poller.SetState(0) on disconnect/shutdown; the timer's threads are background, so an unstopped
+        // timer cannot hold the process open either.
 
         private void ToolOffset_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
@@ -198,7 +185,7 @@ namespace CNC.Core
 
         private void SpindleState_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            _rpmDisplay = _spindleStatePrev == GCode.SpindleState.Off ? _rpmInput : _rpm;
+            _rpmDisplay = _spindleStatePrev == GCode.SpindleState.Off ? _rpmInput : State.ProgrammedRPM;
             if (!(SpindleState.Value.HasFlag(GCode.SpindleState.Off | GCode.SpindleState.CW) || SpindleState.Value.HasFlag(GCode.SpindleState.Off | GCode.SpindleState.CCW)))
             {
                 OnPropertyChanged(nameof(SpindleState));
@@ -226,18 +213,21 @@ namespace CNC.Core
         {
             _fileName = _mdiCommand = _mdiText = _programPath = string.Empty;
             _streamingState = StreamingState.NoFile;
-            _isMPos = _reset = _isJobRunning = _isProbeSuccess = _pgmEnd = _isTloRefSet = false;
+            _reset = _isJobRunning = _pgmEnd = false;
+            State.IsMachinePosition = State.IsProbeSuccess = State.IsTloReferenceSet = false;
             _feedOverrideDisabled = _rpmOverrideDisabled = _feedHoldDisabled = false;
-            _pb_avail = _rxb_avail = _rtState[0] = _rtState[1] = _rtState[2] = _spindle = _probe = string.Empty;
-            _mpg = null;
-            _line = _pwm = _scrollpos = _spindle_num = 0;
+            _pb_avail = _rxb_avail = _rtState[0] = _rtState[1] = _rtState[2] = _spindle = string.Empty;
+            State.Probe = string.Empty;
+            State.IsMPGActive = null;
+            _line = _scrollpos = _spindle_num = 0;
+            State.PWM = 0;
             _auxinValue = -2; // No value read (use a nullable type?)
 
-            _grblState.Error = 0;
-            _grblState.State = GrblStates.Unknown;
-            _grblState.Substate = 0;
-            _grblState.MPG = false;
-            GrblState = _grblState;
+            State.GrblState.Error = 0;
+            State.GrblState.State = GrblStates.Unknown;
+            State.GrblState.Substate = 0;
+            State.GrblState.MPG = false;
+            GrblState = State.GrblState;
             IsMPGActive = null; //??
 
             ClearPosition();
@@ -253,7 +243,7 @@ namespace CNC.Core
             FsCwd = "/";
             SDCardStatus = string.Empty;
             HomedState = HomedState.Unknown;
-            if (_latheMode != LatheMode.Disabled)
+            if (State.LatheMode != LatheMode.Disabled)
                 LatheMode = LatheMode.Radius;
 
             _thcv = _thcs = string.Empty;
@@ -283,9 +273,22 @@ namespace CNC.Core
         public ICommand MDICommand { get; private set; }
         public ICommand StartFromBlock { get; private set; }
 
-        public void CameraProbed(Position position)
+        // IsProbing + CameraProbed/OnCameraProbe DELETED (contracts-only discipline): they were
+        // client-to-client coordination (camera <-> probing view) riding on this model as an event
+        // hub. Both live on CNC.Client.MachineViewModel now - deleted rather than orphaned so there
+        // are not two plausible hubs with one live (the dead-KeypressHandler.cs lesson).
+
+        /// <summary>
+        /// Whether grblHAL would treat this as a G-CODE command - the only kind its alarm/jog lockout
+        /// rejects. System ($) commands, realtime bytes and jogs themselves must always get through:
+        /// gating those would break jog cancel and feed hold, which is far worse than an error:9.
+        /// </summary>
+        private static bool IsGCodeCommand(string command)
         {
-            OnCameraProbe?.Invoke(position);
+            string c = command == null ? string.Empty : command.TrimStart();
+            if (c.Length <= 1)
+                return false;       // realtime byte: 0x18/0x85/!/~/? - single characters, never g-code
+            return c[0] != '$';     // $J=, $$, $X, $TPW ... - not subject to the g-code lockout
         }
 
         private bool ApplyCommand(string command)
@@ -294,9 +297,38 @@ namespace CNC.Core
             string ucmd = command.ToUpper();
 
             if ((ok = !(GrblState.State == GrblStates.Tool && !(ucmd.StartsWith("$J=") || ucmd == "$TPW" || ucmd.Contains("G10L20")))))
-                MDI = command;
+            {
+                // A jog that has been SENT but not yet answered locks g-code out the instant it starts,
+                // while the controller still reports Idle - so this cannot be gated on GrblState, and
+                // wasn't gated at all. Zeroing Z straight after a jog returned "error:9 - G-code commands
+                // are locked out during alarm or jog state" with three Idle reports in between
+                // (2026-08-10). One seam for every caller: both the typed MDI path and the programmatic
+                // ExecuteCommand path come through here.
+                //
+                // REFUSED, never queued-and-sent-later. "G10 L20" means "make HERE read zero", and by the
+                // time the jog finishes, here has moved - in that report, a millimetre further down. A
+                // deferred zero would silently set the origin somewhere the operator never chose, which on
+                // Z is a crash or a scrapped part. Dropping it is the same doctrine JogGate already
+                // applies to jogs: the request referred to a position that no longer exists.
+                if (JogGate.Pending && IsGCodeCommand(command))
+                {
+                    ok = false;
+                    Message = "Jog still running - wait for it to stop, then try again.";
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("jobrunner", string.Format("ApplyCommand REFUSED \"{0}\" - a jog is outstanding (grblHAL would answer error:9)", command));
+                }
+                else
+                    MDI = command;
+            }
             else
+            {
                 Message = LibStrings.FindResource("JoggingOnly");
+                // Diagnostic only, 2026-08-08: the one refusal ApplyCommand itself can make - GrblState is
+                // Tool (mid tool-change) and this isn't one of the few commands allowed through anyway.
+                // Logged so a repro can rule this specific gate in or out alongside JobRunner's.
+                if (DebugLog.Enabled)
+                    DebugLog.Write("jobrunner", string.Format("ApplyCommand REFUSED \"{0}\" - GrblState is Tool", command));
+            }
 
             return ok;
         }
@@ -346,9 +378,20 @@ namespace CNC.Core
                 StartFromBlockNum = block;
         }
 
-        public KeypressHandler Keyboard { get; private set; }
-        public ControllerService Controller { get; private set; }
-        public ControllerMapper ControllerMapper { get; private set; }
+        /// <summary>
+        /// Jog configuration and execution for this model. Typed as the portable <see cref="JogController"/>;
+        /// a keyboard-capable host (the WPF client) supplies a <see cref="KeyboardFactory"/> that returns its
+        /// own subclass (CNC.Controls.KeypressHandler) so key dispatch stays out of CNC.Core. A headless host
+        /// leaves the factory null and gets plain jog control - the property is never null.
+        /// </summary>
+        public JogController Keyboard { get; private set; }
+
+        /// <summary>
+        /// Set by the host before any GrblViewModel is constructed (see CNC.Controls.KeypressHandler.Register,
+        /// called from App.OnStartup alongside AppMessageBox.Register).
+        /// </summary>
+        public static Func<GrblViewModel, JogController> KeyboardFactory;
+
 
         // Supplied by the jog panel (CNC Controls) so non-UI code (e.g. controller jogging) can use the
         // same distance/feed the on-screen jog uses. Null until the jog panel has loaded.
@@ -423,11 +466,7 @@ namespace CNC.Core
 
         private static void RunOnUIThread(System.Action action)
         {
-            var dispatcher = System.Windows.Application.Current?.Dispatcher;
-            if (dispatcher == null || dispatcher.CheckAccess())
-                action();
-            else
-                dispatcher.BeginInvoke(action);
+            UiContext.Run(action);
         }
         public bool SuspendProcessing { get; set; } = false;
         public bool IgnoreNextCycleStart { get; set; } = false;
@@ -477,18 +516,18 @@ namespace CNC.Core
         public ObservableCollection<Probe> Probes { get { return GrblInfo.Probes; } }
         public bool MultiProbe { get { return _multiProbe; } set { _multiProbe = value; OnPropertyChanged(); } }
         public ObservableCollection<string> SystemInfo { get { return GrblInfo.SystemInfo; } }
-        public string Tool { get { return _tool; } set { _tool = GrblParserState.Tool = value; OnPropertyChanged(); } }
-        public int Probe { get { return int.Parse(_probe); } set { _probe = (GrblParserState.Probe = value).ToString(); OnPropertyChanged(); } }
-        public double TloReference { get { return _tloReferenceOffset; } private set { _tloReferenceOffset = value; OnPropertyChanged(); OnPropertyChanged(nameof(TloReferenceTooltip)); } }
+        public string Tool { get { return State.Tool; } set { State.Tool = GrblParserState.Tool = value; OnPropertyChanged(); } }
+        public int Probe { get { return int.Parse(State.Probe); } set { State.Probe = (GrblParserState.Probe = value).ToString(); OnPropertyChanged(); } }
+        public double TloReference { get { return State.TloReference; } private set { State.TloReference = value; OnPropertyChanged(); OnPropertyChanged(nameof(TloReferenceTooltip)); } }
         public bool IsTloReferenceSet {
-            get { return _isTloRefSet; }
+            get { return State.IsTloReferenceSet; }
             private set
             {
-                if (_isTloRefSet != value)
+                if (State.IsTloReferenceSet != value)
                 {
-                    if (_isTloRefSet)
+                    if (State.IsTloReferenceSet)
                         TloReference = double.NaN;
-                    _isTloRefSet = value;
+                    State.IsTloReferenceSet = value;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(TloReferenceTooltip));
                 }
@@ -509,21 +548,21 @@ namespace CNC.Core
         public bool IsCameraVisible { get { return _isCameraVisible; } set { if (_isCameraVisible != value) { _isCameraVisible = value; OnPropertyChanged(); } } }
 
         //        public bool CanReset { get { return _canReset; } private set { if(value != _canReset) { _canReset = value; OnPropertyChanged(); } } }
-        public bool GrblReset { get { return _reset; } set { if ((_reset = value)) { _grblState.Error = 0; OnPropertyChanged(); Message = ""; } } }
-        public GrblState GrblState { get { return _grblState; } set { _grblState = value; OnPropertyChanged(); } }
-        public bool AutoReportingEnabled { get { return _autoReporting; } set { { _autoReporting = value; OnPropertyChanged(); } } }
-        public int AutoReportInterval { get { return _autoReportInterval; } private set { { _autoReportInterval = value; OnPropertyChanged(); } } }
-        public bool IsGCLock { get { return _grblState.State == GrblStates.Hold || _grblState.State == GrblStates.Alarm; } }
+        public bool GrblReset { get { return _reset; } set { if ((_reset = value)) { State.GrblState.Error = 0; OnPropertyChanged(); Message = ""; } } }
+        public GrblState GrblState { get { return State.GrblState; } set { State.GrblState = value; OnPropertyChanged(); } }
+        public bool AutoReportingEnabled { get { return State.AutoReportingEnabled; } set { { State.AutoReportingEnabled = value; OnPropertyChanged(); } } }
+        public int AutoReportInterval { get { return State.AutoReportInterval; } private set { { State.AutoReportInterval = value; OnPropertyChanged(); } } }
+        public bool IsGCLock { get { return State.GrblState.State == GrblStates.Hold || State.GrblState.State == GrblStates.Alarm; } }
         public bool GcodeCommandsAllowed { get { return !(IsGCLock || IsJobRunning); } }
-        public bool SystemCommandsAllowed { get { return !(_grblState.State == GrblStates.Hold || (_grblState.State == GrblStates.Alarm && !IsGrblHAL)); } }
-        public bool IsCheckMode { get { return _grblState.State == GrblStates.Check; } }
+        public bool SystemCommandsAllowed { get { return !(State.GrblState.State == GrblStates.Hold || (State.GrblState.State == GrblStates.Alarm && !IsGrblHAL)); } }
+        public bool IsCheckMode { get { return State.GrblState.State == GrblStates.Check; } }
         // Sender-side toggle (not a grbl state): the NEXT run offsets Z clear of stock (G92) and forces
         // spindle/coolant off for the whole run regardless of program content - M3/M4/M7/M8 lines are
         // neutralised as they stream (StreamPump.SendNext / JobControl.SendNextLine, via
         // GCodeBlock.HasSpindleOrCoolantOn) and M5/M9 are sent as a preamble. Cleared (G92.1) at every
         // job-end path. See JobControl.CycleStart / miDryRun_Click.
         public bool IsDryRunMode { get { return _isDryRunMode; } set { if (_isDryRunMode != value) { _isDryRunMode = value; OnPropertyChanged(); } } }
-        public bool IsSleepMode { get { return _grblState.State == GrblStates.Sleep; } }
+        public bool IsSleepMode { get { return State.GrblState.State == GrblStates.Sleep; } }
         public bool IsG92Active { get { return GrblParserState.IsActive("G92") != null; } }
         public bool IsToolOffsetActive { get { return IsGrblHAL ? GrblParserState.IsActive("G49") == null : !(double.IsNaN(ToolOffset.Z) || ToolOffset.Z == 0d); } }
         public bool IsJobRunning {
@@ -539,15 +578,27 @@ namespace CNC.Core
                 }
             }
         }
-        public bool IsProbing { get { return _isProbing; } set { _isProbing = value; OnPropertyChanged(); } }
+        // Units mode ($13) storage seam - MeasureViewModel raises the notifications, MachineState
+        // holds the value so the delta producer can put it on the wire.
+        protected override bool IsMetricStore
+        {
+            get { return State.IsMetric; }
+            set { State.IsMetric = value; }
+        }
         public bool ProgramEnd { get { return _pgmEnd; } set { _pgmEnd = value; if (_pgmEnd) OnPropertyChanged(); } }
-        public int GrblError { get { return _grblState.Error; } set { _grblState.Error = value; OnPropertyChanged(); } }
+        public int GrblError { get { return State.GrblState.Error; } set { State.GrblState.Error = value; OnPropertyChanged(); } }
         public StreamingState StreamingState { get { return _streamingState; } set { if (_streamingState != value) { _streamingState = value; OnPropertyChanged(); } } }
-        public string WorkCoordinateSystem { get { return _wcs; } private set { _wcs = value; OnPropertyChanged(); } }
-        public Position MachinePosition { get; private set; } = new Position();
-        public Position WorkPosition { get; private set; } = new Position();
-        public Position Position { get; private set; } = new Position();
-        public bool IsMachinePosition { get { return _isMPos; } private set { _isMPos = value; OnPropertyChanged(); } }
+        public string WorkCoordinateSystem { get { return State.WorkCoordinateSystem; } private set { State.WorkCoordinateSystem = value; OnPropertyChanged(); } }
+        // The machine's own state, owned separately from this view model's display concerns - step 5 of
+        // the client/server split. These properties forward to it and return the SAME instances they always
+        // did, so every binding in the app is unaffected; see MachineState's header for why composition
+        // rather than the inheritance the two earlier splits used.
+        public MachineState State { get; private set; } = new MachineState();
+
+        public Position MachinePosition { get { return State.MachinePosition; } }
+        public Position WorkPosition { get { return State.WorkPosition; } }
+        public Position Position { get { return State.Position; } }
+        public bool IsMachinePosition { get { return State.IsMachinePosition; } private set { State.IsMachinePosition = value; OnPropertyChanged(); } }
         public bool IsMachinePositionKnown { get { return MachinePosition.IsSet(GrblInfo.AxisFlags); } }
         public bool SuspendPositionNotifications
         {
@@ -555,17 +606,17 @@ namespace CNC.Core
             set { Position.SuspendNotifications = MachinePosition.SuspendNotifications = value; }
         }
 
-        public AxisLetter AxisLetter { get; private set; } = new AxisLetter();
-        public EnumFlags<AxisFlags> AxisHomed { get; private set; } = new EnumFlags<AxisFlags>(AxisFlags.None);
-        public Position HomePosition { get; private set; } = new Position();
+        public AxisLetter AxisLetter { get { return State.AxisLetter; } }
+        public EnumFlags<AxisFlags> AxisHomed { get { return State.AxisHomed; } }
+        public Position HomePosition { get { return State.HomePosition; } }
 
-        public Position WorkPositionOffset { get; private set; } = new Position();
-        public Position ToolOffset { get; private set; } = new Position();
-        public Position ProbePosition { get; private set; } = new Position();
-        public bool IsProbeSuccess { get { return _isProbeSuccess; } private set { _isProbeSuccess = value; OnPropertyChanged(); } }
-        public EnumFlags<Signals> Signals { get; private set; } = new EnumFlags<Signals>(Core.Signals.Off);
-        public EnumFlags<Signals> OptionalSignals { get; set; } = new EnumFlags<Signals>(Core.Signals.Off);
-        public EnumFlags<AxisFlags> AxisScaled { get; private set; } = new EnumFlags<AxisFlags>(AxisFlags.None);
+        public Position WorkPositionOffset { get { return State.WorkPositionOffset; } }
+        public Position ToolOffset { get { return State.ToolOffset; } }
+        public Position ProbePosition { get { return State.ProbePosition; } }
+        public bool IsProbeSuccess { get { return State.IsProbeSuccess; } private set { State.IsProbeSuccess = value; OnPropertyChanged(); } }
+        public EnumFlags<Signals> Signals { get { return State.Signals; } }
+        public EnumFlags<Signals> OptionalSignals { get { return State.OptionalSignals; } set { State.OptionalSignals = value; } }
+        public EnumFlags<AxisFlags> AxisScaled { get { return State.AxisScaled; } }
         public string FileName { get { return _fileName; } set { _fileName = value; SDRewind = false; OnPropertyChanged(); OnPropertyChanged(nameof(IsFileLoaded)); OnPropertyChanged(nameof(IsPhysicalFileLoaded)); } }
         // Full source path for display tooltips: the file path for a loaded file, or the tool/wizard name for
         // a generated program (no on-disk path). Set in GCode.
@@ -598,21 +649,21 @@ namespace CNC.Core
         public bool IsLoading { get { return _isLoading; } set { if (_isLoading != value) { _isLoading = value; OnPropertyChanged(); } } }
         public string FsCwd { get { return _fsCwd; } private set { _fsCwd = value; OnPropertyChanged(); } }
         public bool IsPhysicalFileLoaded { get { return _fileName != string.Empty && (_fileName.StartsWith(@"\\") || _fileName[1] == ':'); } }
-        public bool? IsMPGActive { get { return _mpg; } private set { if (_mpg != value) { _mpg = value; OnPropertyChanged(); } } }
+        public bool? IsMPGActive { get { return State.IsMPGActive; } private set { if (State.IsMPGActive != value) { State.IsMPGActive = value; OnPropertyChanged(); } } }
         public string Scaling { get { return _sc; } private set { _sc = value; OnPropertyChanged(); } }
         public string SDCardStatus { get { return _sd; } private set { _sd = value; OnPropertyChanged(); } }
         public SDState SDCardMountStatus { get { return _sdMounted; } set { _sdMounted = value; OnPropertyChanged(); } }
         public bool IsHomingEnabled { get { return GrblInfo.HomingEnabled; } }
-        public HomedState HomedState { get { return _homedState; } private set { _homedState = value; OnPropertyChanged(); } }
+        public HomedState HomedState { get { return State.HomedState; } private set { State.HomedState = value; OnPropertyChanged(); } }
         public LatheMode LatheMode
         {
-            get { return _latheMode; }
+            get { return State.LatheMode; }
             private set
             {
-                if (_latheMode != value)
+                if (State.LatheMode != value)
                 {
-                    _latheMode = value;
-                    if (_latheMode != LatheMode.Disabled && NumAxes == 2)
+                    State.LatheMode = value;
+                    if (State.LatheMode != LatheMode.Disabled && NumAxes == 2)
                     {
                         Position.Y = MachinePosition.Y = WorkPosition.Y = WorkPositionOffset.Y = 0d;
                     }
@@ -632,7 +683,7 @@ namespace CNC.Core
             get { return GrblInfo.AxisFlags; }
             set {
                 OnPropertyChanged();
-                if (_isMPos)
+                if (State.IsMachinePosition)
                 {
                     if (has_wco)
                         Position.Set(MachinePosition - WorkPositionOffset);
@@ -658,8 +709,8 @@ namespace CNC.Core
         public bool Fan0 { get { return _fan0; } set { _fan0 = value; OnPropertyChanged(); } }
         public int LineNumber { get { return _line; } private set { _line = value; OnPropertyChanged(); } }
 
-        public double THCVoltage { get { return _thcVoltage; } private set { _thcVoltage = value; OnPropertyChanged(); } }
-        public EnumFlags<THCSignals> THCSignals { get; private set; } = new EnumFlags<THCSignals>(Core.THCSignals.Off);
+        public double THCVoltage { get { return State.THCVoltage; } private set { State.THCVoltage = value; OnPropertyChanged(); } }
+        public EnumFlags<THCSignals> THCSignals { get { return State.THCSignals; } }
 
         #region Spindle
 
@@ -677,7 +728,7 @@ namespace CNC.Core
                 }
             }
         }
-        public EnumFlags<SpindleState> SpindleState { get; private set; } = new EnumFlags<SpindleState>(GCode.SpindleState.Off);
+        public EnumFlags<SpindleState> SpindleState { get { return State.SpindleState; } }
 
         public bool IsSpindleVariable { get { return Spindles.Count > 0 ? Spindles[_spindle_num].Variable : GrblInfo.HasVariableSpindle; } }
         public bool IsSpindleReversible { get { return Spindles.Count > 0 ? Spindles[_spindle_num].Direction : GrblInfo.HasReversableSpindle; } }
@@ -729,18 +780,18 @@ namespace CNC.Core
 
         #region FS - Feed and Speed (RPM)
 
-        public double FeedRate { get { return _feedrate; } private set { _feedrate = value; OnPropertyChanged(); } }
+        public double FeedRate { get { return State.FeedRate; } private set { State.FeedRate = value; OnPropertyChanged(); } }
         public double ProgrammedRPM
         {
-            get { return _rpm; }
+            get { return State.ProgrammedRPM; }
             set {
-                if (_rpm != value)
+                if (State.ProgrammedRPM != value)
                 {
-                    _rpm = value;
+                    State.ProgrammedRPM = value;
                     OnPropertyChanged();
 
-                    if (_rpm != 0d)
-                        _rpmInput = _rpm / (RPMOverride / 100d);
+                    if (State.ProgrammedRPM != 0d)
+                        _rpmInput = State.ProgrammedRPM / (RPMOverride / 100d);
                     else if (!IsGrblHAL && (_a == "S" || _a == "C")) // Hack for legacy Grbl no informing about spindle going off
                     {
                         _a = "";
@@ -749,7 +800,7 @@ namespace CNC.Core
 
                     if (double.IsNaN(ActualRPM))
                     {
-                        _rpmDisplay = _rpm == 0d ? _rpmInput : _rpm;
+                        _rpmDisplay = State.ProgrammedRPM == 0d ? _rpmInput : State.ProgrammedRPM;
                         OnPropertyChanged(nameof(RPM));
                     }
                 }
@@ -757,16 +808,16 @@ namespace CNC.Core
         }
         public double ActualRPM
         {
-            get { return _rpmActual; }
+            get { return State.ActualRPM; }
             private set
             {
-                if (_rpmActual != value)
+                if (State.ActualRPM != value)
                 {
-                    _rpmActual = value;
+                    State.ActualRPM = value;
                     OnPropertyChanged();
                     if (!double.IsNaN(ActualRPM))
                     {
-                        _rpmDisplay = _rpmActual == 0d ? _rpmInput : _rpmActual;
+                        _rpmDisplay = State.ActualRPM == 0d ? _rpmInput : State.ActualRPM;
                         OnPropertyChanged(nameof(RPM));
                     }
                 }
@@ -777,15 +828,15 @@ namespace CNC.Core
             set { _rpmDisplay = _rpmInput = value; OnPropertyChanged(); }
         }
 
-        public int PWM { get { return _pwm; } private set { _pwm = value; OnPropertyChanged(); } }
+        public int PWM { get { return State.PWM; } private set { State.PWM = value; OnPropertyChanged(); } }
         #endregion
 
         #region Ov - Feed and spindle overrides
 
-        public double FeedOverride { get { return _feedOverride; } private set { _feedOverride = value; OnPropertyChanged(); } }
+        public double FeedOverride { get { return State.FeedOverride; } private set { State.FeedOverride = value; OnPropertyChanged(); } }
         public bool FeedOverrideDisabled { get { return _feedOverrideDisabled; } private set { _feedOverrideDisabled = value; OnPropertyChanged(); } }
-        public double RapidsOverride { get { return _rapidsOverride; } private set { _rapidsOverride = value; OnPropertyChanged(); } }
-        public double RPMOverride { get { return _rpmOverride; } private set { _rpmOverride = value; OnPropertyChanged(); } }
+        public double RapidsOverride { get { return State.RapidsOverride; } private set { State.RapidsOverride = value; OnPropertyChanged(); } }
+        public double RPMOverride { get { return State.RPMOverride; } private set { State.RPMOverride = value; OnPropertyChanged(); } }
         public bool RPMOverrideDisabled { get { return _rpmOverrideDisabled; } private set { _rpmOverrideDisabled = value; OnPropertyChanged(); } }
         public bool FeedHoldDisabled { get { return _feedHoldDisabled; } private set { _feedHoldDisabled = value; OnPropertyChanged(); } }
 
@@ -811,6 +862,87 @@ namespace CNC.Core
         // Reset to false on every OTHER Message assignment so a stale error flag can't outlive its message.
         public bool IsMessageError { get; private set; } = false;
 
+        // Estimated run time of the loaded program, "~14 min" (see GCodeRunTime), or empty when nothing is
+        // loaded / the estimate hasn't landed yet. Computed off the UI thread after a load completes, so a
+        // big file's load is not made slower by it - it simply appears a moment later.
+        private string _estimatedRunTime = string.Empty;
+        public string EstimatedRunTime
+        {
+            get { return _estimatedRunTime; }
+            set { if (_estimatedRunTime != value) { _estimatedRunTime = value; OnPropertyChanged(); } }
+        }
+
+        // Every non-empty status message since launch, timestamped, errors marked "!". The status line
+        // shows one message at a time and later ones overwrite freely, so this is where "what did it say
+        // a minute ago" gets answered - click the status line (MainWindow) to see it. Read on demand,
+        // deliberately NOT observable: appends must stay cheap (see ConsoleControl's scrollback history
+        // for what a per-append UI rebuild does to a busy stream).
+        public System.Collections.Generic.List<string> MessageLog { get; } = new System.Collections.Generic.List<string>();
+
+        /// <summary>
+        /// Whether a message is one the log actually records - and therefore the only kind worth popping
+        /// the log window for. The window follows the LOG, not the property: assigning Message raises a
+        /// change for a clear (every tab switch does one - see ProbingView.Activate) and for firmware
+        /// bookkeeping, neither of which puts a line in the log. Popping a window to show nothing new is
+        /// exactly the bug this predicate exists to prevent, so both sides ask the same question here
+        /// rather than each keeping their own copy of the rule.
+        ///
+        /// grblHAL announces which input claimed the link ("SERIAL STREAM ACTIVE", "TELNET STREAM
+        /// ACTIVE") every time one is opened. It is firmware bookkeeping, not something an operator can
+        /// act on, and switching between serial and network makes it repeat several times per reconnect.
+        /// </summary>
+        public static bool IsLoggableMessage(string message)
+        {
+            return !string.IsNullOrWhiteSpace(message)
+                && message.IndexOf("STREAM ACTIVE", StringComparison.OrdinalIgnoreCase) < 0
+                // "Pgm End" is grblHAL's own [MSG:] at M2/M30 - the controller noting it reached the end
+                // of the program. JobRunner logs the same event with everything an operator actually wants
+                // ("Program end - <file>, runtime 00:00:23"), so keeping this too puts two lines in the log
+                // for one event, the terser of which says neither what ended nor how long it took. Still
+                // assigned to Message, so the status line and the ProgramEnd flag are unaffected - this
+                // only keeps it out of the log.
+                && !message.Equals("Pgm End", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // "firmware" while the [MSG:...] parse case is assigning Message - the one place that
+        // knows a status line came from the controller rather than this application. Read by the
+        // status log's source column, so "what did the MACHINE actually say" stays greppable.
+        private string _messageSource = "app";
+
+        /// <summary>
+        /// Append a line to the status log (and the on-screen message list) WITHOUT touching Message.
+        ///
+        /// Assigning Message is the usual way a line reaches the log, but it also replaces the one-line
+        /// status readout - so a connect that wants to report four facts can only leave the last one on
+        /// screen, and the first three read as though they were overwritten by something more important.
+        /// This is for the supporting detail under a headline that Message already set: the settings
+        /// count, the firmware's capabilities, an alarm that is already latched.
+        ///
+        /// Worth having because status.log is the ONLY log an operator sees. The empty-settings fault of
+        /// 2026-08-24 sat in front of one for hours reading as a perfectly ordinary connect; it took
+        /// debug-only instrumentation to find that GrblSettings.Count was 0. A connect that says how many
+        /// settings it actually read makes that self-evident to whoever is standing at the machine.
+        /// </summary>
+        public void LogDetail(string message, bool isError = false)
+        {
+            LogMessage(message, isError);
+        }
+
+        private void LogMessage(string message, bool isError)
+        {
+            if (!IsLoggableMessage(message))
+                return;
+
+            MessageLog.Add(string.Format("{0:HH:mm:ss}  {1}{2}", DateTime.Now, isError ? "! " : string.Empty, message));
+            if (MessageLog.Count > 1200)
+                MessageLog.RemoveRange(0, 200);
+
+            // Durable copy. MessageLog above is memory-only and drops its OLDEST 200 lines on
+            // overflow, so without this the lines explaining how a session got into trouble are
+            // the first ones lost - and none of it survived a restart.
+            StatusLog.Write(isError ? "error" : "info", _messageSource, message);
+        }
+
         public string Message
         {
             get { return _message == null ? string.Empty : _message; }
@@ -820,24 +952,33 @@ namespace CNC.Core
                 {
                     _message = value;
                     IsMessageError = false;
+                    LogMessage(value, false);
                     if(!Silent)
                         OnPropertyChanged();
                 }
             }
         }
 
-        // Sets Message flagged as an error/alarm (see IsMessageError) - the two real error sources
+        // Sets Message flagged as an error/alarm (see IsMessageError) - the controller's own error sources
         // (SetGrblError, the Alarm-state transition) go through this instead of a plain Message assignment.
         // Sets IsMessageError BEFORE raising Message's PropertyChanged (mirrors the Message setter's own
         // dedupe, deliberately NOT routed through it - that setter resets IsMessageError to false as its
         // first action, which would clobber the flag if set afterward) so a subscriber reacting to the
         // Message change (MainWindow's FlashMessage) already sees the correct flag, not a stale false.
-        private void SetErrorMessage(string message)
+        //
+        // PUBLIC (2026-08-12) because "the controller reported an error" is not the only thing an operator
+        // has to be told. A command the UI REFUSES to send - "home the machine first" - is exactly as
+        // actionable, and since the run strip lost its message line (2026-08-10) only a flagged message is
+        // displayed at all: FlashMessage pops the log window for those and merely refreshes it for the
+        // rest. A refusal written as a plain Message therefore goes into a log nobody has open, and the
+        // button that refused looks broken. If you decline to act, say so through here.
+        public void SetErrorMessage(string message)
         {
             IsMessageError = true;
             if (_message != message)
             {
                 _message = message;
+                LogMessage(message, true);
                 if (!Silent)
                     OnPropertyChanged(nameof(Message));
             }
@@ -849,11 +990,11 @@ namespace CNC.Core
             set
             {
                 _gc = value;
-                if (GrblParserState.WorkOffset != _wcs)
+                if (GrblParserState.WorkOffset != State.WorkCoordinateSystem)
                     WorkCoordinateSystem = GrblParserState.WorkOffset;
-                if (GrblParserState.Tool != _tool)
+                if (GrblParserState.Tool != State.Tool)
                     Tool = GrblParserState.Tool;
-                if (GrblParserState.LatheMode != _latheMode)
+                if (GrblParserState.LatheMode != State.LatheMode)
                     LatheMode = GrblParserState.LatheMode;
                 if (GrblParserState.IsActive("G51") != null)
                     Set("Sc", GrblParserState.IsActive("G51"));
@@ -873,68 +1014,30 @@ namespace CNC.Core
 
         public bool SetGRBLState(string newState, int substate, bool force)
         {
-            GrblStates newstate = _grblState.State;
+            GrblStates newstate = State.GrblState.State;
 
             Enum.TryParse(newState, true, out newstate);
 
-            if (newstate != _grblState.State || substate != _grblState.Substate || force)
+            if (newstate != State.GrblState.State || substate != State.GrblState.Substate || force)
             {
-                GrblStates prevState = _grblState.State;   // captured before the assignment below (demo cut markers)
-                bool checkChanged = _grblState.State == GrblStates.Check || newstate == GrblStates.Check;
-                bool sleepChanged = _grblState.State == GrblStates.Sleep || newstate == GrblStates.Sleep;
-                bool alarmChanged = _grblState.State == GrblStates.Alarm || newstate == GrblStates.Alarm;
+                GrblStates prevState = State.GrblState.State;   // captured before the assignment below (demo cut markers)
+                bool checkChanged = State.GrblState.State == GrblStates.Check || newstate == GrblStates.Check;
+                bool sleepChanged = State.GrblState.State == GrblStates.Sleep || newstate == GrblStates.Sleep;
+                bool alarmChanged = State.GrblState.State == GrblStates.Alarm || newstate == GrblStates.Alarm;
 
-                if (_grblState.State == GrblStates.Door && newstate != GrblStates.Door)
+                if (State.GrblState.State == GrblStates.Door && newstate != GrblStates.Door)
                     Message = string.Empty;
 
                 if (newstate == GrblStates.Alarm && substate > 0)
-                    _grblState.LastAlarm = substate;
+                    State.GrblState.LastAlarm = substate;
 
-                _grblState.State = newstate;
-                _grblState.Substate = substate;
+                State.GrblState.State = newstate;
+                State.GrblState.Substate = substate;
 
                 //                force = true;
 
-                switch (_grblState.State)
-                {
-
-                    case GrblStates.Run:
-                        _grblState.Color = Colors.LightGreen;
-                        break;
-
-                    case GrblStates.Alarm:
-                        _grblState.Color = Colors.Red;
-                        break;
-
-                    case GrblStates.Jog:
-                        _grblState.Color = Colors.Yellow;
-                        break;
-
-                    case GrblStates.Tool:
-                        _grblState.Color = Colors.LightSalmon;
-                        break;
-
-                    case GrblStates.Hold:
-                        _grblState.Color = Colors.LightSalmon;
-                        break;
-
-                    case GrblStates.Door:
-                        _grblState.Color = _grblState.Substate == 0 ? Colors.LightSalmon :(_grblState.Substate == 1 ? Colors.Red : Colors.Beige);
-                        break;
-
-                    case GrblStates.Home:
-                    case GrblStates.Sleep:
-                        _grblState.Color = Colors.LightSkyBlue;
-                        break;
-
-                    case GrblStates.Check:
-                        _grblState.Color = Colors.White;
-                        break;
-
-                    default:
-                        _grblState.Color = Colors.White;
-                        break;
-                }
+                // The state -> colour mapping moved to CNC.Controls' GrblStateToColorConverter: which colour
+                // represents a machine state is client presentation policy, not machine state itself.
 
                 OnPropertyChanged(nameof(GrblState));
 
@@ -1030,7 +1133,7 @@ namespace CNC.Core
             bool changed, wco_present = data.Contains("|WCO:");
             int rti = data.Contains("|WCO:") || data.Contains("|MPG:") ? 1 : (data.Contains("|Ov:") ? 2 : 0);
 
-            if ((changed = (_rtState[rti] != data) || _grblState.State == GrblStates.Unknown)) {
+            if ((changed = (_rtState[rti] != data) || State.GrblState.State == GrblStates.Unknown)) {
 
                 bool pos_changed = false;
                 string[] elements = data.TrimEnd('>').Split('|');
@@ -1055,7 +1158,7 @@ namespace CNC.Core
 
                     if (pos_changed)
                     {
-                        if(_isMPos)
+                        if(State.IsMachinePosition)
                         {
                             if (has_wco)
                                 Position.Set(MachinePosition - WorkPositionOffset);
@@ -1089,7 +1192,7 @@ namespace CNC.Core
                 case "MPos":
                     if ((pos_changed = _MPos != value))
                     {
-                        if (!_isMPos)
+                        if (!State.IsMachinePosition)
                             IsMachinePosition = true;
                         _MPos = value;
                         MachinePosition.Parse(_MPos);
@@ -1099,7 +1202,7 @@ namespace CNC.Core
                 case "WPos":
                     if ((pos_changed = _WPos != value))
                     {
-                        if (_isMPos)
+                        if (State.IsMachinePosition)
                             IsMachinePosition = false;
                         _WPos = value;
                         WorkPosition.Parse(_WPos);
@@ -1137,7 +1240,7 @@ namespace CNC.Core
                     break;
 
                 case "WCS":
-                    if (_wcs != value)
+                    if (State.WorkCoordinateSystem != value)
                         WorkCoordinateSystem = GrblParserState.WorkOffset = value;
                     break;
 
@@ -1172,11 +1275,11 @@ namespace CNC.Core
                         else try
                         {
                             double[] values = dbl.ParseList(_fs);
-                            if (_feedrate != values[0])
+                            if (State.FeedRate != values[0])
                                 FeedRate = values[0];
-                            if (_rpm != values[1])
+                            if (State.ProgrammedRPM != values[1])
                                 ProgrammedRPM = values[1];
-                            if (values.Length > 2 && _rpmActual != values[2])
+                            if (values.Length > 2 && State.ActualRPM != values[2])
                                 ActualRPM = values[2];
                         }
                         catch { }
@@ -1207,7 +1310,7 @@ namespace CNC.Core
                     break;
 
                 case "P":
-                    if (_probe != value)
+                    if (State.Probe != value)
                     {
                         var state = value.Split(',');
                         Probe = int.Parse(state[0]);
@@ -1255,11 +1358,11 @@ namespace CNC.Core
                         else try 
                         {
                             double[] values = dbl.ParseList(_ov);
-                            if (_feedOverride != values[0])
+                            if (State.FeedOverride != values[0])
                                 FeedOverride = values[0];
-                            if (_rapidsOverride != values[1])
+                            if (State.RapidsOverride != values[1])
                                 RapidsOverride = values[1];
-                            if (_rpmOverride != values[2])
+                            if (State.RPMOverride != values[2])
                                 RPMOverride = values[2];
                         }
                         catch { }
@@ -1327,7 +1430,7 @@ namespace CNC.Core
                     break;
 
                 case "T":
-                    if (_tool != value)
+                    if (State.Tool != value)
                         Tool = value == "0" ? GrblConstants.NO_TOOL : value;
                     break;
 
@@ -1344,8 +1447,8 @@ namespace CNC.Core
                     break;
 
                 case "MPG":
-                    GrblInfo.MPGMode = _grblState.MPG = value == "1";
-                    IsMPGActive = _grblState.MPG;
+                    GrblInfo.MPGMode = State.GrblState.MPG = value == "1";
+                    IsMPGActive = State.GrblState.MPG;
                     if (IsMPGActive == false && AutoReportingEnabled)
                     {
                         AutoReportingEnabled = false;
@@ -1426,6 +1529,35 @@ namespace CNC.Core
 
         public void DataReceived(string data)
         {
+            if (PollDiag.Enabled)
+            {
+                // Wrapped rather than instrumented inline: this method has a dozen early returns, and a
+                // measurement that misses half of them is worse than none. See PollDiag's header.
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                try { DataReceivedCore(data); }
+                finally { PollDiag.Processed(sw.Elapsed.TotalMilliseconds); }
+                return;
+            }
+
+            DataReceivedCore(data);
+        }
+
+        /// <summary>
+        /// This model's hot-event subscriber counts, for the periodic PollDiag line. If these climb across a
+        /// session, handlers are being added on tab activation without being removed and every status report
+        /// is doing more work than the last - which is the leading theory for the latency drift PollDiag was
+        /// written to measure.
+        /// </summary>
+        internal string DiagSubscriberCounts()
+        {
+            return string.Format("resp={0} status={1} propchg={2}",
+                PollDiag.Subscribers(OnCommandResponseReceived),
+                PollDiag.Subscribers(OnRealtimeStatusProcessed),
+                PollDiag.Subscribers(PropertyChangedHandler));
+        }
+
+        private void DataReceivedCore(string data)
+        {
             if (data.Length == 0)
                 return;
 
@@ -1439,6 +1571,11 @@ namespace CNC.Core
 
             if (data.First() == '<')
             {
+                // The controller is answering - which is the only thing the jog back-pressure gate actually
+                // needs to know, and the one thing it cannot learn from a jog's own "ok" (grblHAL withholds
+                // that when the $J arrives during Jog state). See JogGate.Alive.
+                JogGate.Alive();
+
                 stateChanged = ParseStatus(data);
 
                 OnRealtimeStatusProcessed?.Invoke(data);
@@ -1497,6 +1634,9 @@ namespace CNC.Core
 
                     case "MSG":
                         var msg = data.Substring(5).Trim().TrimEnd(']');
+                        // Everything this case writes to Message came from the controller - tag
+                        // the status log accordingly (reset below, same case, every path).
+                        _messageSource = "firmware";
                         if (msg == "'$H'|'$X' to unlock")
                             Message = LibStrings.FindResource(GrblInfo.IsGrblHAL ? "ContUnlock" : "ContHomeUnlock");
                         else if (GrblState.State == GrblStates.Alarm && msg != "Caution: Unlocked")
@@ -1522,6 +1662,7 @@ namespace CNC.Core
                         }
                         else
                             Message = msg;
+                            _messageSource = "app";
                             if (msg == "Pgm End")
                             {
                                 ProgramEnd = true;
@@ -1537,12 +1678,20 @@ namespace CNC.Core
             {
                 if(Poller != null)
                     Poller.SetState(0);
-                _grblState.State = GrblStates.Unknown;
+                State.GrblState.State = GrblStates.Unknown;
                 var msg = Message;
+                // Capture BEFORE GrblReset, whose Message = "" runs the setter and clears the flag.
+                // The save/restore below exists so transient status text (the reconnect notice, say)
+                // survives the controller's banner. An ERROR must not: a soft reset is the operator
+                // explicitly clearing one, and restoring it made Reset look completely dead - confirmed
+                // on real hardware 2026-08-04, where "G-code commands are locked out during alarm or jog
+                // state" sat in the message bar through repeated resets with the machine plainly Idle.
+                bool wasError = IsMessageError;
                 GrblReset = true;
                 IsJobRunning = false;
                 OnGrblReset?.Invoke(data);
-                Message = msg;
+                if (!wasError)
+                    Message = msg;
                 _reset = false;
                 OnPropertyChanged(nameof(IsCheckMode));
                 OnPropertyChanged(nameof(IsSleepMode));
@@ -1595,8 +1744,8 @@ namespace CNC.Core
 
             if (!inAlarm && GrblState.State == GrblStates.Alarm) {
                 System.Threading.Interlocked.Increment(ref AlarmEventCounter);
-                SetErrorMessage(GrblAlarms.GetMessage(_grblState.Substate.ToString()));
-                ResponseLog.Add(string.Format("Alarm:{0} - {1}", _grblState.Substate, Message));
+                SetErrorMessage(GrblAlarms.GetMessage(State.GrblState.Substate.ToString()));
+                ResponseLog.Add(string.Format("Alarm:{0} - {1}", State.GrblState.Substate, Message));
             }
             else if ((!Silent || isBootBanner) && (ResponseLogVerbose || mdiQueryReply || !(data.First() == '<' || data.First() == '$' || data.First() == 'o' || (data.First() == '[' && (data.StartsWith("[GC") || DataIsEnumeration(data)))) || data.StartsWith("error")))
             {
