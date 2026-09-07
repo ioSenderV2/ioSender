@@ -160,7 +160,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>315 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>321 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -364,6 +364,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Every toolpath draws in its own colour and is named by a lettered balloon &mdash; on screen and on the saved drawing &mdash; and the feature table repeats the same balloon, so finding a feature is matching a mark rather than reading one.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr304">304</a></td></tr>
 <tr><td>A contour&rsquo;s envelope now shows the band it actually removes instead of filling the whole area, and text/artwork envelopes draw the real glyphs rather than a 40&times;25&nbsp;mm rectangle read from fields neither geometry ever sets.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr305">305</a></td></tr>
 <tr><td>Stock size lives in the .workorder file and the diagram is drawn against it, so loading a work order composed for a different blank no longer shows a layout that looks wrong for no visible reason. Setup is offered the size, never given it silently.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr306">306</a></td></tr>
+<tr><td>The PREREQ guard that warns when a stored G28/G30/G59.3 is outside the soft limits now actually runs - it had never once evaluated</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr317">317</a></td></tr>
+<tr><td>A racked laser gantry is squared in software: enter the two diagonals and the side of a burned square, and every SVG job is sheared to match</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr320">320</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -421,6 +423,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>One header comment opened '(' and never closed it, and the loader refused the whole saved .nc after the first block.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr312">312</a></td></tr>
 <tr><td>The per-copy power ramp wrote an assignment before copy 1 that set the constant to the value the header had already given it.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr313">313</a></td></tr>
 <tr><td>The dialog's X/Y offsets are declared once as #&lt;x_org&gt; / #&lt;y_org&gt; instead of being added to every coordinate, so a job can be re-placed by editing two lines.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr314">314</a></td></tr>
+<tr><td>The lift before a G30 park no longer names X/Y at the live position - a parse-time read and a soft-limit trap</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr316">316</a></td></tr>
+<tr><td>SVG-to-laser now lives in CNC.Svg, a WPF-free assembly with a net8 portability probe, so the EngravingBox appliance can build the same files on a Raspberry Pi</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr318">318</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -447,6 +451,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>From the second connect onward the log repeated the last connection&rsquo;s line &mdash; a serial connect could report a network address &mdash; and the new connect detail never appeared.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr281">281</a></td></tr>
 <tr><td>Settings &gt; Keyboard listed fifteen File and Help commands interleaved with the tabs. They now sit in their own group directly above.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr282">282</a></td></tr>
 <tr><td>The most explicit statement the app ever makes was the one thing that could not be recovered afterwards &mdash; and a dialog still <em>open</em> is exactly the state worth diagnosing.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr299">299</a></td></tr>
+<tr><td>Typing an MDI command left the console at the end of the log instead of snapping it to the top once the scrollback was full</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr319">319</a></td></tr>
+<tr><td>Opening a program with (PROMPT param, default, label) rows asks for the values once, on every controller; [brackets] over constants fold to numbers so a parametric file runs on stock Grbl</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr321">321</a></td></tr>
 </table>
 
 <h3>Polish, onboarding &amp; docs</h3>
@@ -867,7 +873,13 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">313</td><td><a href="#pr313">SVG laser ramp: no redundant re-declaration</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+30</span> <span class="del">-2</span></td></tr>
 <tr><td class="n">314</td><td><a href="#pr314">SVG laser placement as x_org / y_org</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+151</span> <span class="del">-18</span></td></tr>
 <tr><td class="n">315</td><td><a href="#pr315">-enableSVGLaserJob replaces the committed flag</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+36</span> <span class="del">-11</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (315 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">2735</span> <span class="del">32</span> <span class="add">+270</span><br><span class="k">Lines:</span> <span class="add">+115931</span> <span class="del">-26977</span></td></tr>
+<tr><td class="n">316</td><td><a href="#pr316">Park lift: bare G53 G0 Z0, not #<_abs_x>/#<_abs_y></a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+44</span> <span class="del">-26</span></td></tr>
+<tr><td class="n">317</td><td><a href="#pr317">Stored-position reachability guard was dead code (HomedMask race)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+52</span> <span class="del">-3</span></td></tr>
+<tr><td class="n">318</td><td><a href="#pr318">CNC.Svg - portable SVG import + laser emitter (for EngravingBox)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">15</span> <span class="del">0</span> <span class="add">+10</span><br><span class="k">Lines:</span> <span class="add">+2348</span> <span class="del">-433</span></td></tr>
+<tr><td class="n">319</td><td><a href="#pr319">Console: an MDI command no longer resets the scrollback to line 0</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+25</span> <span class="del">-0</span></td></tr>
+<tr><td class="n">320</td><td><a href="#pr320">Laser skew compensation (D1 / D2 / Side from a test square)</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">11</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+194</span> <span class="del">-14</span></td></tr>
+<tr><td class="n">321</td><td><a href="#pr321">Parametric programs - PROMPT at load + bracket folding on stock Grbl</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">6</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+466</span> <span class="del">-28</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (321 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">2774</span> <span class="del">32</span> <span class="add">+280</span><br><span class="k">Lines:</span> <span class="add">+119060</span> <span class="del">-27481</span></td></tr>
 </table>
 </div>
 
@@ -5947,6 +5959,87 @@ G92.1</pre><ul><li><strong>It is a rapid, not <code>G92 X#&lt;x_org&gt; Y#&lt;y_
 <tr><td class="mono">ioSender XL/ioSender XL/App.xaml.cs</td><td class="num add">10</td><td class="num">0</td></tr>
 </table>
 <div class="desc"><p><code>Features.SvgLaserJob</code> had been committed <strong>true</strong> with a comment saying it must be reverted before the branch was pushed - a note that only works if whoever pushes reads it. The shipped default is now the held-back one, and daily use is a launch flag:</p><pre>.\build.ps1 -Launch -enableSVGLaserJob</pre><ul><li><strong>Matched case-insensitively</strong>, not as a switch label. It is typed by a human, its natural spelling mixes cases, and a flag that silently does nothing when you type <code>-enablesvglaserjob</code> is worse than no flag.</li><li><strong>It is no longer a <code>const</code>.</strong> A const is inlined into every reading assembly at compile time, so no command line could move it - the readers would keep the value they were built against.</li><li><strong><code>ActionKeyBinder.Catalog</code> stopped being a snapshot.</strong> It was a <code>static readonly</code> array that filtered on the flag, which was safe only while the flag was compile-time. Against a value set during startup it becomes a snapshot taken whenever that type is first touched - a race decided by unrelated code. It is computed per read now; two callers, neither hot.</li></ul><p>One switch still governs all three places the feature shows itself: the File menu entry, its keyboard action registration, and its row in Settings &gt; Keyboard.</p></div>
+</div>
+<!-- ===== #316 ===== -->
+<div class="pr">
+<h2 id="pr316"><span class="badge">#316</span>Park lift is a bare <code>G53 G0 Z0</code>, not the live machine position</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/MacroRunner.cs</td><td class="num add">24</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderCompiler.cs</td><td class="num add">10</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/StepperCalibrationProbeWizard.xaml.cs</td><td class="num add">5</td><td class="num del">7</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">5</td><td class="num del">4</td></tr>
+</table>
+<div class="desc"><p>Every generator that parks at G30 opened with <code>G53 G0 X[#&lt;_abs_x&gt;] Y[#&lt;_abs_y&gt;] Z0</code> - lift Z, hold X/Y at the live position. Naming the live position failed twice over.</p><ul><li><strong>Parse-time read.</strong> grblHAL evaluates <code>#&lt;_abs_x&gt;</code> when the block is parsed, not when the machine gets there. In a streamed program with a full planner buffer it froze G30's coordinates into a later rapid.</li><li><strong>Soft-limit trap.</strong> grblHAL's jog clamp (<code>$40=1</code>) parks an axis exactly on the envelope boundary, and re-commanding that coordinate is refused: Alarm:2 on the park line, machine motionless. Observed with Y clamped to -839.004 against a -839.000 floor.</li><li><strong>The justification was a disproven firmware bug.</strong> The comments claimed a bare Z-only G53 sign-flips a $23-inverted axis. That was tested and disproven on 2026-08-11; bare <code>G53 G0 Z0</code> was already in production at six other sites.</li><li>The hand-rolled copy in the stepper calibration wizard now uses the shared <code>EmitGotoG30</code>.</li></ul><p class="foot">Hardware-verified on the mill: Setup runs through the park it used to alarm on.</p></div>
+</div>
+<!-- ===== #317 ===== -->
+<div class="pr">
+<h2 id="pr317"><span class="badge">#317</span>Soft-limit reachability guard never evaluated - it read a homed mask that <code>Get()</code> had just cleared</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">24</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/MacroRunner.cs</td><td class="num add">28</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p><code>StoredPositionUnreachable</code> exists so a G59.3 stored outside the soft-limit envelope is refused with a dialog before the program starts, instead of an Alarm:2 mid-run with the probe already fitted. Across the entire log history it had logged <em>SKIP - HomedMask -1</em> four times out of four: it had only ever failed open.</p><ul><li><strong>Cause.</strong> <code>GrblWorkParameters.Get()</code> cleared <code>HomedMask</code> to -1 on entry and let the <code>[HOME:]</code> parse set it. Every reader treats -1 as "can't know" and fails open, so anything reading it between the clear and the report being consumed had its check silently disabled. The $# reply carried <code>[HOME:...:7]</code> and the guard still read -1 three milliseconds later.</li><li><strong>Fix.</strong> The mask is staged and published once the report is consumed, so a concurrent reader gets the previous (real) value rather than "unknown"; -1 now means only that the read failed. Every <code>Get()</code> logs the published value and calls out a completed report with no <code>[HOME:]</code>.</li><li><strong>Belt and braces.</strong> The guard falls back to the live <code>HomedState</code> when the mask is unknown, mirroring what the <code>homed</code> PREREQ already did.</li></ul><p class="foot">Verified on the mill: the G59.3 stored 4 &micro;m outside the floor is now refused at the PREREQ with the reachability text instead of alarming on the park line.</p></div>
+</div>
+<!-- ===== #318 ===== -->
+<div class="pr">
+<h2 id="pr318"><span class="badge">#318</span><code>CNC.Svg</code>: the SVG importer and laser emitter as a portable assembly - no WPF, no native dependencies</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Svg/SvgPath.cs</td><td class="num add">570</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Svg/SvgLaserProgram.cs</td><td class="num add">395</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Svg/SvgLaserOptions.cs</td><td class="num add">115</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Svg/SvgMatrix.cs</td><td class="num add">111</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Svg/SvgOutlines.cs (moved from CNC Controls)</td><td class="num add">50</td><td class="num del">85</td></tr>
+<tr><td class="mono">CNC Svg/SvgLaserFill.cs (moved from CNC Converters)</td><td class="num add">2</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Svg/CNC.Svg.csproj, CNC.Svg.net8.csproj, Directory.Build.props</td><td class="num add">126</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Common/NgcConstants.cs (moved from CNC Core)</td><td class="num add">8</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Common/Geometry.cs</td><td class="num add">25</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Converters/SvgToLaser.cs</td><td class="num add">20</td><td class="num del">326</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SvgLaserSettings.cs</td><td class="num add">48</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/TrueTypeOutlines.cs</td><td class="num add">4</td><td class="num del">15</td></tr>
+<tr><td class="mono">CNC Controls/WorkOrder{Compiler,Model,View} (3 files)</td><td class="num add">3</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Common / CNC Controls / CNC Converters / CNC Core .csproj + .sln (5 files)</td><td class="num add">20</td><td class="num del">3</td></tr>
+<tr><td class="mono">tools/svg-compare (3 files)</td><td class="num add">851</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The SVG-to-laser converter could only run on Windows: <code>SvgOutlines</code> leaned on WPF's <code>Geometry.Parse</code> + <code>GetFlattenedPathGeometry</code>, and PresentationCore has no Linux build. That put it out of reach of the EngravingBox appliance that actually burns the files.</p><ul><li><strong>One thing replaced.</strong> <code>SvgPath</code> parses the SVG <code>d</code> grammar and flattens B&eacute;ziers and elliptical arcs itself (adaptive subdivision, transform applied before flattening so the tolerance keeps its meaning under scale). <code>SvgMatrix</code> keeps WPF's row-vector semantics exactly, because the transform walk's Append/Prepend calls are only correct for that convention. Written rather than taken from SkiaSharp so nothing ships a per-architecture native <code>.so</code>.</li><li><strong>Everything else moved as it was:</strong> <code>SvgOutlines</code>, <code>SvgLaserFill</code>, and the emitter lifted out of <code>SvgToLaser</code> as <code>SvgLaserProgram</code> returning lines behind a plain <code>SvgLaserOptions</code>. ioSender keeps its dialogs and delegates via <code>SvgLaserSettings.ToOptions()</code>.</li><li><strong>Kept off the comms assembly.</strong> <code>OutlineContour</code> and <code>NgcConstants</code> moved to <code>CNC.Common</code> (same namespace, no call-site churn) so the appliance takes one small DLL, not CNC Core.</li><li><strong>The net8 probe is the acceptance test:</strong> <code>CNC.Svg.net8.csproj</code> fails the moment a Windows-only reference creeps in.</li><li><strong>Proven, not compiled.</strong> <code>tools/svg-compare</code> holds the original WPF implementation verbatim and diffs it geometrically against the port: identical contour counts, outer/hole classification and bounds on both test files and the real 42-contour logo, areas within 0.003%. Point counts differ by design - a different flattener subdivides differently.</li></ul><p class="foot">Builds for net462 and net8.0. Not yet run on ARM64/Linux - pure managed, so expected to be a straight xcopy, but unverified there.</p></div>
+</div>
+<!-- ===== #319 ===== -->
+<div class="pr">
+<h2 id="pr319"><span class="badge">#319</span>Console: an MDI command no longer resets the scrollback to line 0</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ConsoleControl.xaml.cs</td><td class="num add">25</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p><code>FlushLog</code> rebuilds the whole TextBox text on every log change. Assigning Text snaps the internal ScrollViewer to offset 0, and the follow-the-bottom behaviour infers "the user scrolled" from a ScrollChanged event whose extent did not change - which is exactly what that snap looks like once the 2000-line scrollback is full (one line trimmed off the top per line added). It recorded the snap as a manual scroll to the top and stopped following.</p><ul><li>The console now reads "were we at the bottom?" from its own scroll state <em>before</em> the text is replaced and restores it afterwards.</li><li>An MDI Enter always jumps to the end, scrolled-up or not - typing a command means "show me what happens".</li></ul><p class="foot">Reported and fixed while squaring the laser; verified on the next restart.</p></div>
+</div>
+<!-- ===== #320 ===== -->
+<div class="pr">
+<h2 id="pr320"><span class="badge">#320</span>Laser skew compensation from a burned test square</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/SvgLaserSettings.cs</td><td class="num add">53</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Svg/SvgLaserOptions.cs</td><td class="num add">35</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Svg/SvgLaserProgram.cs</td><td class="num add">20</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Converters/SvgLaserDialog.xaml</td><td class="num add">16</td><td class="num del">5</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">70</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The 400&times;400 diode machine's gantry is racked about 0.45&deg; and would not hold a mechanical correction - belt phase and frame push both failed to move it over two days of trying. A commanded square burned as a parallelogram.</p><ul><li><strong>The shear.</strong> <code>SvgLaserOptions.SkewXY</code>, Y added per mm of X, applied at the emitter's one coordinate formatter as <code>Y' = Y + s&middot;X</code>. Y is sheared by X because that is what a racked gantry physically does; the square test cannot distinguish the two shears and the other differs only by a rotation of the whole job, which a fence built to the machine's own etch absorbs.</li><li><strong>Measured, not typed.</strong> The Burn tab of the SVG-to-laser dialog takes the three numbers the operator actually reads off a burned square - D1 (home corner to far corner), D2, Side - and derives <code>s = (D1&sup2; &minus; D2&sup2;) / (4&middot;side&sup2;)</code>. Only the difference of the diagonals matters, so a ruler that reads both a few millimetres short against charred corners cancels out. Persisted; zero any field to switch it off.</li><li>The three fields were side by side at first and the third clipped clean off the 400 px dialog; now one per row.</li></ul><p class="foot">Hardware-verified 2026-09-06: an uncompensated 395 square read 560/555; a compensated 385 square read 543/543. Skew is a per-machine property living in a global slot for now - it moves to the machine profile when the profile store is built.</p></div>
+</div>
+<!-- ===== #321 ===== -->
+<div class="pr">
+<h2 id="pr321"><span class="badge">#321</span>Parametric programs: <code>(PROMPT)</code> fields answered at load, bracket arithmetic folded for controllers without EXPR</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Common/NgcConstants.cs</td><td class="num add">231</td><td class="num del">21</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeProgram.cs</td><td class="num add">58</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeJob.cs</td><td class="num add">57</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/JobRunner.cs</td><td class="num add">14</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">6</td><td class="num del">1</td></tr>
+<tr><td class="mono">tools/ngc-roundtrip/Program.cs</td><td class="num add">100</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>One <code>square.nc</code> for every test size, with the sizes asked for when the file is opened - runnable on a controller with no expression support.</p><ul><li><strong>PROMPT already existed</strong> - collected by JobRunner before Cycle Start, values sent as an EXPR preamble or substituted at send time. On a non-EXPR controller that path never worked: the loader resolves constants at load, so <code>#&lt;_name&gt;</code> references were refused as system parameters, or the file's defaults were baked in and the operator's answers never reached the wire.</li><li><strong>Now the dialog fires at load, on every controller.</strong> Both file loads and in-memory programs collect the fields after <code>Action.New</code>, ask once on the calling thread before the background parse, and install the answers before line 1 is resolved. Non-EXPR: references resolve to the answers and the 3D preview shows the real geometry. EXPR: the file's declarations are rewritten to the answers so the preamble is not undone by the program's own default. JobRunner sees <code>PromptedAtLoad</code> and does not ask twice; unattended macro runs keep the defaults; Cancel loads the defaults.</li><li><strong>Bracket folding</strong> in <code>NgcConstants</code> (CNC.Common, so EngravingBox gets it too): <code>[#&lt;inset&gt; + #&lt;side&gt;]</code> with + &minus; * /, unary sign, nesting and precedence, both as an assignment and inline. A function, <code>**</code>, <code>MOD</code>, or any name without a value still refuses the whole line - the class's refuse-don't-guess rule is untouched.</li><li><code>Raw</code> keeps the parametric form, so Save writes the variables back out.</li></ul><p class="foot">Proven by tools/ngc-roundtrip (folding incl. nested precedence, a refused SIN, an answer beating a declaration, a seeded name with no declaration, LoadText collecting fields) and on the laser: square.nc prompted on open and burned the answered size.</p></div>
 </div>
 </section>
 
