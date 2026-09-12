@@ -186,12 +186,17 @@ namespace CNC.Core
                         spine.Add(new VCarvePass { Depth = depth, Path = ring });
                 }
             }
-            if (spine.Count > 0)
-            {
-                passes.AddRange(spine);
-                // Restore shallow-to-deep; List.Sort is unstable, so keep it deterministic by depth only.
-                passes.Sort((a, b) => a.Depth.CompareTo(b.Depth));
-            }
+            // The spine passes go AFTER the stepped rings and the flat clearing, not merged into the
+            // shallow-to-deep sequence by depth. Merging them was harmless for lettering, where each
+            // glyph is regrouped anyway, but it put every hairline spine in a whole design ahead of the
+            // first real ring: a negative-carved logo (one region, so no regrouping) spent the first 45%
+            // of its program tracing 0.1-0.4 mm slivers between the letters and the frame, and its 8 mm
+            // panel floor was the last 5% - three runs were hand-stopped as "barely touching" before
+            // anyone saw depth. Physically the order is free: a spine pass sits at its own region's
+            // maximum distance, so every ring in that region is shallower and still precedes it, and a
+            // spine with no rings at all is a hairline plunge into solid stock whichever way round.
+            // Sorted by depth among themselves; List.Sort is unstable, so depth only, deterministic.
+            spine.Sort((a, b) => a.Depth.CompareTo(b.Depth));
             msRidge = swPhase.Elapsed.TotalMilliseconds;
             swPhase.Restart();
 
@@ -218,6 +223,7 @@ namespace CNC.Core
             }
             msFlats = swPhase.Elapsed.TotalMilliseconds;
 
+            passes.AddRange(spine);
             return passes;
 
             }

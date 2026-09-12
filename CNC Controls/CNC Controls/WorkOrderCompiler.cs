@@ -958,7 +958,8 @@ namespace CNC.Controls
             // machine hopped letter to letter at every depth level, filling in bits and pieces until the
             // very end. Passes are regrouped by the outer glyph contour that contains them, letters
             // ordered left to right along the (unrotated) baseline, keeping the original relative order -
-            // regular passes shallow to deep, then that glyph's clearing generations - inside each.
+            // stepped rings shallow to deep, that glyph's clearing generations, then its spine detail
+            // passes (see VCarve.Build for why the spines come last) - inside each.
             var outers = new List<List<Point2D>>();
             foreach (var c in outline)
                 if (c.IsOuter)
@@ -1005,7 +1006,7 @@ namespace CNC.Controls
             const double hop = 2d;
 
             bool approached = false;
-            foreach (var pass in passes)   // already shallow to deep, outside to inside - the cut order
+            foreach (var pass in passes)   // rings shallow to deep, flats, then spines - the cut order
             {
                 // The depth-0 boundary rings carve NOTHING - a cone at zero depth has zero width, and the
                 // groove's top edge is formed by the deeper passes' flanks anyway. Emitting them sent the
