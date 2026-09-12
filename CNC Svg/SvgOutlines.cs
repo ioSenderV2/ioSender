@@ -166,6 +166,58 @@ namespace CNC.Svg
         }
 
         /// <summary>
+        /// The NEGATIVE of the artwork: a rectangular frame <paramref name="borderMm"/> outside the
+        /// ink bounding box, enclosing every contour. The artwork's contours are returned unchanged
+        /// after it.
+        /// </summary>
+        /// <remarks>
+        /// This is the whole of "carve the background instead of the logo". The carve engine's inside
+        /// test is even-odd containment parity over all contours together (VCarve.DistanceField.Inside),
+        /// and the preview fills with the same rule - so one more contour around everything flips every
+        /// point inside the frame: the background becomes the carved region, the logo's outer shapes
+        /// become islands standing proud of it, and their counters become carved pockets again. Nothing
+        /// downstream has to know it happened. Where the background is wider than the cone can span at
+        /// the depth cap, the engine's own clearFlats generations floor it - so the cap (or the bit's
+        /// limit) is what sets the panel depth, and the frame's edge gets the same V-wall any carved
+        /// edge does.
+        ///
+        /// The frame is the only contour marked <see cref="OutlineContour.IsOuter"/>: the compiler groups
+        /// passes by the outer that contains their first point, and here everything sits inside the one
+        /// frame, so the letter-by-letter grouping degenerates to engine order - which for a single
+        /// connected region is the right order anyway.
+        /// </remarks>
+        public static List<OutlineContour> Negative(List<OutlineContour> contours, double borderMm)
+        {
+            var result = new List<OutlineContour>(contours.Count + 1);
+            if (contours.Count == 0)
+                return result;
+
+            double minX = double.MaxValue, maxX = double.MinValue, minY = double.MaxValue, maxY = double.MinValue;
+            foreach (var c in contours)
+                foreach (var p in c.Points)
+                {
+                    if (p.X < minX) minX = p.X;
+                    if (p.X > maxX) maxX = p.X;
+                    if (p.Y < minY) minY = p.Y;
+                    if (p.Y > maxY) maxY = p.Y;
+                }
+            if (borderMm < 0d)
+                borderMm = 0d;
+            minX -= borderMm; maxX += borderMm; minY -= borderMm; maxY += borderMm;
+
+            var frame = new OutlineContour { IsOuter = true, SignedArea = (maxX - minX) * (maxY - minY) };
+            frame.Points.Add(new Point2D(minX, minY));
+            frame.Points.Add(new Point2D(maxX, minY));
+            frame.Points.Add(new Point2D(maxX, maxY));
+            frame.Points.Add(new Point2D(minX, maxY));
+            result.Add(frame);
+
+            foreach (var c in contours)
+                result.Add(new OutlineContour { Points = c.Points, SignedArea = c.SignedArea, IsOuter = false });
+            return result;
+        }
+
+        /// <summary>
         /// Read <paramref name="path"/> and scale the artwork so its bounding box is
         /// <paramref name="targetWidthMm"/> wide, preserving aspect. A target of 0 keeps the file's
         /// own user units as millimetres.

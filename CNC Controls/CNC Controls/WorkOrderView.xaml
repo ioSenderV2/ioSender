@@ -178,6 +178,14 @@
                         </StackPanel>
                         <local:NumericField x:Uid="fld_wosvgwidth" x:Name="fldSvgWidth" Label="Artwork width:" ColonAt="150" Format="###0.0##" Unit="mm"
                                             ToolTip="How wide the artwork itself is - measured across the drawing's own ink, not its page, so padding around the logo does not count. The height follows from the artwork's proportions."/>
+                        <!-- Negative: carve the background instead of the artwork - the logo stands proud inside a
+                             recessed panel. One extra contour (the panel frame) does it, see SvgOutlines.Negative. -->
+                        <StackPanel x:Name="pnlSvgNegativeRow" Orientation="Horizontal" Margin="154,0,0,2">
+                            <CheckBox x:Uid="chk_wosvgnegative" x:Name="chkSvgNegative" Content="Negative" VerticalAlignment="Center" Click="chkSvgNegative_Click"
+                                      ToolTip="Carve the space AROUND the artwork instead of the artwork itself, so the logo stands proud of a recessed panel. The panel floor is the carve depth cap - set one on the Engrave operation, or the bit cuts as deep as it can."/>
+                        </StackPanel>
+                        <local:NumericField x:Uid="fld_wosvgborder" x:Name="fldSvgBorder" Label="Border:" ColonAt="150" Format="###0.0##" Unit="mm"
+                                            ToolTip="How far the recessed panel extends past the artwork's ink on every side. The panel edge gets the same sloped wall as any carved edge, so allow for the bit's flank."/>
                         <StackPanel x:Name="pnlSvgInfoRow" Orientation="Horizontal" Margin="154,0,0,4">
                             <TextBlock x:Name="txtSvgInfo" Foreground="#FF606060" FontSize="11" TextWrapping="Wrap" MaxWidth="240"/>
                         </StackPanel>

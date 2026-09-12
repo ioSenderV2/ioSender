@@ -301,6 +301,14 @@ namespace CNC.Controls
         // across the stave" is the measurement an operator actually has.
         public double SvgWidth = 100d;
 
+        // Carve the NEGATIVE: the background around the artwork is cut away and the logo stands proud,
+        // inside a rectangular panel SvgBorder mm outside the ink on every side. Done by handing the
+        // carve engine one more contour - the panel's frame - which flips its even-odd inside test for
+        // everything within (see SvgOutlines.Negative). The panel floor is the carve depth cap, or the
+        // bit's own limit if no cap is set, so a negative without a cap goes as deep as the bit can.
+        public bool SvgNegative = false;
+        public double SvgBorder = 5d;
+
         // Corner reliefs ("dogbones") - Square/Rect only. A round cutter leaves a radiused inside corner,
         // so a square-cornered part will not seat in the pocket it was cut for. Ticking this pokes the
         // cutter out along each corner's diagonal far enough that its circle passes through the true
@@ -419,8 +427,9 @@ namespace CNC.Controls
                     case WorkOrderGeometryKind.Text:
                         return (IsCarved ? TrueTypeOutlines.Measure(Text, FontFamily, CapHeight, FontBold, FontItalic)
                                          : CNC.Core.StrokeFont.Measure(Text, CapHeight)).X / 2d;
-                    // The operator names the artwork's width outright, so no measuring needed here.
-                    case WorkOrderGeometryKind.Svg: return SvgWidth / 2d;
+                    // The operator names the artwork's width outright, so no measuring needed here. A
+                    // negative's extent is the panel, not the ink - the border is cut too.
+                    case WorkOrderGeometryKind.Svg: return SvgWidth / 2d + (SvgNegative ? SvgBorder : 0d);
                     default: return 0d;
                 }
             }
@@ -443,7 +452,7 @@ namespace CNC.Controls
                     // Height comes from the file's own ink aspect (cached) - the artwork decides its
                     // proportions, the operator decides its width. Aspect 0 (unreadable file) yields 0
                     // rather than a guessed square, so an anchor never shifts by an invented dimension.
-                    case WorkOrderGeometryKind.Svg: return SvgWidth * SvgOutlines.AspectOf(SvgFile) / 2d;
+                    case WorkOrderGeometryKind.Svg: return SvgWidth * SvgOutlines.AspectOf(SvgFile) / 2d + (SvgNegative ? SvgBorder : 0d);
                     default: return 0d;
                 }
             }
@@ -1426,6 +1435,8 @@ namespace CNC.Controls
                                                        label, System.IO.Path.GetFileName(tp.SvgFile), probe.Describe()));
                         else if (tp.SvgWidth <= 0d)
                             warnings.Add(label + "SVG width must be greater than zero.");
+                        else if (tp.SvgNegative && tp.SvgBorder < 0d)
+                            warnings.Add(label + "negative border cannot be less than zero.");
                     }
                 }
 
@@ -1535,7 +1546,8 @@ namespace CNC.Controls
                     // toolpath's unused rect defaults. Names the FILE, since that is the identity here.
                     string f = string.IsNullOrEmpty(tp.SvgFile)
                              ? "(no file)" : System.IO.Path.GetFileName(tp.SvgFile);
-                    return string.Format("{0} {1:0.#} mm wide", f, tp.SvgWidth);
+                    return string.Format("{0} {1:0.#} mm wide{2}", f, tp.SvgWidth,
+                                         tp.SvgNegative ? string.Format(", negative +{0:0.#} mm", tp.SvgBorder) : string.Empty);
                 default:
                     return string.Format("rect {0:0.#}x{1:0.#}{2}", tp.Width, tp.Depth, withText);
             }

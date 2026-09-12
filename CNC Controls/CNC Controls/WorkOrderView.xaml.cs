@@ -122,7 +122,7 @@ namespace CNC.Controls
             // ValueChanged -> CaptureFields, so one left out is a field that silently does nothing.
             // fldSvgWidth was, and editing the artwork width changed neither the model nor the preview.
             return new[] { fldX, fldY, fldLength, fldAngle, fldDiameter, fldSize, fldWidth, fldDepthY, fldCapHeight, fldEngraveWidth,
-                           fldCarveMaxDepth, fldSvgWidth,
+                           fldCarveMaxDepth, fldSvgWidth, fldSvgBorder,
                            fldColumns, fldColumnSpacing, fldRows, fldRowSpacing,
                            fldPatternCount, fldPatternRadius, fldPatternStartAngle, fldPatternArcSpan,
                            fldHoleDiameter, fldTotalDepth, fldDepthOfCut, fldPeckDepth, fldBoreStepDown, fldStepover,
@@ -975,6 +975,7 @@ namespace CNC.Controls
             fldWidth.Value = tp.Width; fldDepthY.Value = tp.Depth;
             txtEngraveText.Text = tp.Text ?? string.Empty; fldCapHeight.Value = tp.CapHeight;
             txtSvgFile.Text = tp.SvgFile ?? string.Empty; fldSvgWidth.Value = tp.SvgWidth;
+            chkSvgNegative.IsChecked = tp.SvgNegative; fldSvgBorder.Value = tp.SvgBorder;
             // A family saved on another machine may not be installed here. Adding it to the list rather
             // than falling back to index 0 keeps the choice intact - silently reverting to the stroke font
             // would change the MODE of the cut just by opening the file. (WPF itself falls back to Arial
@@ -1024,6 +1025,8 @@ namespace CNC.Controls
             bool isSvg = tp.Geometry == WorkOrderGeometryKind.Svg;
             Show(pnlSvgFileRow, isSvg);
             Show(fldSvgWidth, isSvg);
+            Show(pnlSvgNegativeRow, isSvg);
+            Show(fldSvgBorder, isSvg && tp.SvgNegative);
             Show(pnlSvgInfoRow, isSvg);
             if (isSvg)
                 UpdateSvgInfo();
@@ -1269,6 +1272,7 @@ namespace CNC.Controls
                     tp.Length = fldLength.Value; tp.Angle = fldAngle.Value;
                     tp.Text = txtEngraveText.Text; tp.CapHeight = fldCapHeight.Value;
                     tp.SvgFile = txtSvgFile.Text; tp.SvgWidth = fldSvgWidth.Value;
+                    tp.SvgBorder = fldSvgBorder.Value;   // SvgNegative itself is toggled in chkSvgNegative_Click
                     tp.FontFamily = cbxFont.SelectedIndex > 0 ? (string)cbxFont.SelectedItem : string.Empty;
                     tp.FontBold = chkFontBold.IsChecked == true; tp.FontItalic = chkFontItalic.IsChecked == true;
                     // HasText itself is toggled in chkHasText_Click (it adds/removes the Engrave op);
@@ -1345,7 +1349,13 @@ namespace CNC.Controls
                 txtSvgInfo.Text = string.Format("Artwork is {0:0.00}:1. At {1:0.#} mm wide it cuts {1:0.#} x {2:0.#} mm, {3} outline{4}.",
                                                 r.HeightMm > 0d ? r.WidthMm / r.HeightMm : 0d,
                                                 r.WidthMm, r.HeightMm, r.Contours.Count,
-                                                r.Contours.Count == 1 ? string.Empty : "s");
+                                                r.Contours.Count == 1 ? string.Empty : "s")
+                                 + (chkSvgNegative.IsChecked == true
+                                    // The panel is what the machine actually cuts, so that is the size that
+                                    // has to fit the stock - not the ink.
+                                    ? string.Format(" Negative: a {0:0.#} x {1:0.#} mm panel is carved and the artwork stands proud.",
+                                                    r.WidthMm + 2d * fldSvgBorder.Value, r.HeightMm + 2d * fldSvgBorder.Value)
+                                    : string.Empty);
         }
 
         private void btnSvgBrowse_Click(object sender, RoutedEventArgs e)
@@ -1399,6 +1409,21 @@ namespace CNC.Controls
                 return;
 
             tp.CornerReliefs = chkCornerReliefs.IsChecked == true;
+            OnWorkOrderChanged();
+        }
+
+        // Negative artwork on/off. Same shape as corner reliefs: no operation is added or removed, the
+        // Engrave op just carves the other side of the outline. The Border field only means something
+        // when it is on, so it shows and hides with the tick; the readout restates the panel size.
+        private void chkSvgNegative_Click(object sender, RoutedEventArgs e)
+        {
+            var tp = selectedToolpath;
+            if (loadingFields || tp == null)
+                return;
+
+            tp.SvgNegative = chkSvgNegative.IsChecked == true;
+            Show(fldSvgBorder, tp.SvgNegative);
+            UpdateSvgInfo();
             OnWorkOrderChanged();
         }
 
@@ -2828,8 +2853,11 @@ namespace CNC.Controls
             if (svg.Error != null || !svg.IsComplete)
                 return;
             // SvgOutlines puts the origin at the artwork's bottom-left; the shared drawer centres on the
-            // outline's own bounds, so no extra offset is needed here.
-            AddFilledOutline(center, svg.Contours, scale, brush, tp.Angle, 0d, 0d);
+            // outline's own bounds, so no extra offset is needed here. A negative previews as the same
+            // even-odd fill of the same contour set the compiler carves - frame included - so the
+            // preview shows the panel filled and the logo as holes in it, which is what gets cut.
+            AddFilledOutline(center, tp.SvgNegative ? SvgOutlines.Negative(svg.Contours, tp.SvgBorder) : svg.Contours,
+                             scale, brush, tp.Angle, 0d, 0d);
         }
 
         private void AddFilledOutline(Point center, List<OutlineContour> outline, double scale, Brush brush,

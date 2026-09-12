@@ -807,8 +807,12 @@ namespace CNC.Controls
             if (hash == null)
                 return null;
 
+            // Negative and its border change the contour set the engine sees, so they are inputs too -
+            // leaving them out is exactly how SvgWidth went missing from this key once already.
             return string.Join(KeySep, "svg", tp.SvgFile ?? string.Empty,
-                tp.SvgWidth.ToString("R", CultureInfo.InvariantCulture), hash);
+                tp.SvgWidth.ToString("R", CultureInfo.InvariantCulture), hash,
+                tp.SvgNegative ? "neg" : "pos",
+                tp.SvgBorder.ToString("R", CultureInfo.InvariantCulture));
         }
 
         // What this carve is OF, for the debug trace - a HIT/MISS line that does not name its source
@@ -818,6 +822,7 @@ namespace CNC.Controls
             return tp.Geometry == WorkOrderGeometryKind.Svg
                 ? "svg=\"" + (string.IsNullOrEmpty(tp.SvgFile) ? "(none)" : System.IO.Path.GetFileName(tp.SvgFile))
                   + "\" w=" + tp.SvgWidth.ToString("0.###", CultureInfo.InvariantCulture) + "mm"
+                  + (tp.SvgNegative ? " negative border=" + tp.SvgBorder.ToString("0.###", CultureInfo.InvariantCulture) + "mm" : string.Empty)
                 : "text=\"" + tp.Text + "\"";
         }
 
@@ -896,7 +901,9 @@ namespace CNC.Controls
                     return new List<string> { "(VCARVE skipped - "
                         + CommentText(System.IO.Path.GetFileName(tp.SvgFile) + " uses features this build cannot import: "
                                       + svg.Describe()) + ")" };
-                outline = svg.Contours;
+                // A negative is the same artwork plus one enclosing frame - the engine's even-odd
+                // inside test does the inversion (see SvgOutlines.Negative). Nothing below changes.
+                outline = tp.SvgNegative ? SvgOutlines.Negative(svg.Contours, tp.SvgBorder) : svg.Contours;
             }
             else
                 outline = TrueTypeOutlines.Render(tp.Text, tp.FontFamily, capHeight, tp.FontBold, tp.FontItalic);
@@ -1894,10 +1901,12 @@ namespace CNC.Controls
                             if (tp.Geometry == WorkOrderGeometryKind.Svg)
                             {
                                 double svgH = tp.SvgWidth * SvgOutlines.AspectOf(tp.SvgFile);
-                                desc = string.Format("v-carve {0}, {1:0.#} x {2:0.#} mm",
+                                desc = string.Format("v-carve {0}{3}, {1:0.#} x {2:0.#} mm",
                                                      CommentText(string.IsNullOrEmpty(tp.SvgFile)
                                                                  ? "(no file)" : System.IO.Path.GetFileName(tp.SvgFile)),
-                                                     tp.SvgWidth, svgH);
+                                                     tp.SvgWidth + (tp.SvgNegative ? 2d * tp.SvgBorder : 0d),
+                                                     svgH + (tp.SvgNegative ? 2d * tp.SvgBorder : 0d),
+                                                     tp.SvgNegative ? " negative" : string.Empty);
                                 break;
                             }
                             // The operator's own text goes into a g-code comment, and grblHAL ends a comment
