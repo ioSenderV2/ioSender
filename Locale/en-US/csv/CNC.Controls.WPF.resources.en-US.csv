@@ -1652,3 +1652,5 @@ CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_wosvgnegative:System.W
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wosvgborder:CNC.Controls.NumericField.Label,None,False,True,,Border:
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wosvgborder:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wosvgborder:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"How far the recessed panel extends past the artwork's ink on every side. The panel edge gets the same sloped wall as any carved edge, so allow for the bit's flank."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,lbl_wosvgpanel:System.Windows.Controls.ContentControl.Content,Label,True,True,,Panel:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,cbx_wosvgpanel:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,What bounds the carved panel. Rectangle: a frame the Border distance outside the artwork on every side. Artwork outline: the artwork's own enclosing outline - a badge's border circle - and nothing outside it is touched. Needs artwork with a single outline around all of it.

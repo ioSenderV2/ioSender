@@ -92,6 +92,17 @@ namespace CNC.Controls
                 cbxTextVAlign.Items.Add(label);
             cbxTextHAlign.SelectionChanged += (s, e) => CaptureFields();
             cbxTextVAlign.SelectionChanged += (s, e) => CaptureFields();
+            // Order matches SvgPanelKind. The Border field only means something for Rectangle, so it
+            // follows the choice; the info line restates what the choice does to this file.
+            foreach (var label in new[] { "Rectangle", "Artwork outline" })
+                cbxSvgPanel.Items.Add(label);
+            cbxSvgPanel.SelectionChanged += (s, e) =>
+            {
+                if (loadingFields || selectedToolpath == null)
+                    return;
+                Show(fldSvgBorder, selectedToolpath.SvgNegative && cbxSvgPanel.SelectedIndex == (int)SvgPanelKind.Rectangle);
+                CaptureFields();
+            };
 
             // Same list, same source, as the Setup tab's own Material dropdown - there is one material
             // table (FeedsSpeedsAdvisor) and this is a second editor of the one shared value, not a copy.
@@ -976,6 +987,7 @@ namespace CNC.Controls
             txtEngraveText.Text = tp.Text ?? string.Empty; fldCapHeight.Value = tp.CapHeight;
             txtSvgFile.Text = tp.SvgFile ?? string.Empty; fldSvgWidth.Value = tp.SvgWidth;
             chkSvgNegative.IsChecked = tp.SvgNegative; fldSvgBorder.Value = tp.SvgBorder;
+            cbxSvgPanel.SelectedIndex = (int)tp.SvgPanel;
             // A family saved on another machine may not be installed here. Adding it to the list rather
             // than falling back to index 0 keeps the choice intact - silently reverting to the stroke font
             // would change the MODE of the cut just by opening the file. (WPF itself falls back to Arial
@@ -1026,7 +1038,8 @@ namespace CNC.Controls
             Show(pnlSvgFileRow, isSvg);
             Show(fldSvgWidth, isSvg);
             Show(pnlSvgNegativeRow, isSvg);
-            Show(fldSvgBorder, isSvg && tp.SvgNegative);
+            Show(pnlSvgPanelRow, isSvg && tp.SvgNegative);
+            Show(fldSvgBorder, isSvg && tp.SvgNegative && tp.SvgPanel == SvgPanelKind.Rectangle);
             Show(pnlSvgInfoRow, isSvg);
             if (isSvg)
                 UpdateSvgInfo();
@@ -1273,6 +1286,7 @@ namespace CNC.Controls
                     tp.Text = txtEngraveText.Text; tp.CapHeight = fldCapHeight.Value;
                     tp.SvgFile = txtSvgFile.Text; tp.SvgWidth = fldSvgWidth.Value;
                     tp.SvgBorder = fldSvgBorder.Value;   // SvgNegative itself is toggled in chkSvgNegative_Click
+                    if (cbxSvgPanel.SelectedIndex >= 0) tp.SvgPanel = (SvgPanelKind)cbxSvgPanel.SelectedIndex;
                     tp.FontFamily = cbxFont.SelectedIndex > 0 ? (string)cbxFont.SelectedItem : string.Empty;
                     tp.FontBold = chkFontBold.IsChecked == true; tp.FontItalic = chkFontItalic.IsChecked == true;
                     // HasText itself is toggled in chkHasText_Click (it adds/removes the Engrave op);
@@ -1350,12 +1364,23 @@ namespace CNC.Controls
                                                 r.HeightMm > 0d ? r.WidthMm / r.HeightMm : 0d,
                                                 r.WidthMm, r.HeightMm, r.Contours.Count,
                                                 r.Contours.Count == 1 ? string.Empty : "s")
-                                 + (chkSvgNegative.IsChecked == true
-                                    // The panel is what the machine actually cuts, so that is the size that
-                                    // has to fit the stock - not the ink.
-                                    ? string.Format(" Negative: a {0:0.#} x {1:0.#} mm panel is carved and the artwork stands proud.",
-                                                    r.WidthMm + 2d * fldSvgBorder.Value, r.HeightMm + 2d * fldSvgBorder.Value)
-                                    : string.Empty);
+                                 + NegativeInfo(r);
+        }
+
+        // The negative's own line of the info text. The panel is what the machine actually cuts, so
+        // for a Rectangle that is the size that has to fit the stock - not the ink. For Outline the
+        // one thing worth saying is whether THIS file can do it at all, since the choice is only
+        // honest for artwork with a single enclosing outline, and the operator picks it blind otherwise.
+        private string NegativeInfo(SvgImportResult r)
+        {
+            if (chkSvgNegative.IsChecked != true)
+                return string.Empty;
+            if (cbxSvgPanel.SelectedIndex == (int)SvgPanelKind.Outline)
+                return SvgOutlines.EnclosingContour(r.Contours) >= 0
+                    ? " Negative within the artwork's outline: only the inside of it is carved, the artwork stands proud."
+                    : " CANNOT CUT: no single outline encloses all of this artwork - choose the Rectangle panel.";
+            return string.Format(" Negative: a {0:0.#} x {1:0.#} mm panel is carved and the artwork stands proud.",
+                                 r.WidthMm + 2d * fldSvgBorder.Value, r.HeightMm + 2d * fldSvgBorder.Value);
         }
 
         private void btnSvgBrowse_Click(object sender, RoutedEventArgs e)
@@ -1422,7 +1447,8 @@ namespace CNC.Controls
                 return;
 
             tp.SvgNegative = chkSvgNegative.IsChecked == true;
-            Show(fldSvgBorder, tp.SvgNegative);
+            Show(pnlSvgPanelRow, tp.SvgNegative);
+            Show(fldSvgBorder, tp.SvgNegative && tp.SvgPanel == SvgPanelKind.Rectangle);
             UpdateSvgInfo();
             OnWorkOrderChanged();
         }
@@ -2854,10 +2880,14 @@ namespace CNC.Controls
                 return;
             // SvgOutlines puts the origin at the artwork's bottom-left; the shared drawer centres on the
             // outline's own bounds, so no extra offset is needed here. A negative previews as the same
-            // even-odd fill of the same contour set the compiler carves - frame included - so the
-            // preview shows the panel filled and the logo as holes in it, which is what gets cut.
-            AddFilledOutline(center, tp.SvgNegative ? SvgOutlines.Negative(svg.Contours, tp.SvgBorder) : svg.Contours,
-                             scale, brush, tp.Angle, 0d, 0d);
+            // even-odd fill of the same contour set the compiler carves - frame added or outline
+            // dropped - so the preview shows the panel filled and the logo as holes in it, which is
+            // what gets cut. A choice this file cannot honour draws nothing, like an incomplete import.
+            string why;
+            var contours = tp.CarveContours(svg, out why);
+            if (contours == null)
+                return;
+            AddFilledOutline(center, contours, scale, brush, tp.Angle, 0d, 0d);
         }
 
         private void AddFilledOutline(Point center, List<OutlineContour> outline, double scale, Brush brush,

@@ -218,6 +218,56 @@ namespace CNC.Svg
         }
 
         /// <summary>
+        /// Index of the ONE contour that encloses every other contour - the border of a badge-style
+        /// logo - or -1 when there is no such contour (bare lettering, several top-level shapes).
+        /// </summary>
+        /// <remarks>
+        /// Tested by containment of each other contour's first point, the same probe
+        /// ClassifyByContainment uses, so the answer agrees with the IsOuter flags. A single contour is
+        /// its own enclosure only in the degenerate sense and is reported as none: a negative inside it
+        /// would carve its whole interior flat, which no one asks for by name.
+        /// </remarks>
+        public static int EnclosingContour(List<OutlineContour> contours)
+        {
+            if (contours.Count < 2)
+                return -1;
+            for (int i = 0; i < contours.Count; i++)
+            {
+                bool all = true;
+                for (int j = 0; j < contours.Count && all; j++)
+                    if (j != i && !PointInRing(contours[i].Points, contours[j].Points[0].X, contours[j].Points[0].Y))
+                        all = false;
+                if (all)
+                    return i;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// The NEGATIVE bounded by the artwork's own outline: the enclosing contour (see
+        /// <see cref="EnclosingContour"/>) is DROPPED and everything inside it inverts. Returns null
+        /// when the artwork has no single enclosing contour - the caller must say so, not guess.
+        /// </summary>
+        /// <remarks>
+        /// Removing a contour lowers the containment depth of everything inside it by one, so parity
+        /// flips exactly there and nowhere else: outside the old border nothing is cut, the region
+        /// just inside it (a logo's rim, if it has one) stands, the next level is carved, the artwork
+        /// stands again. For the same reason every remaining contour's IsOuter flips. Compare
+        /// <see cref="Negative"/>, which ADDS a frame to invert everything within a rectangle.
+        /// </remarks>
+        public static List<OutlineContour> NegativeWithinOutline(List<OutlineContour> contours)
+        {
+            int drop = EnclosingContour(contours);
+            if (drop < 0)
+                return null;
+            var result = new List<OutlineContour>(contours.Count - 1);
+            for (int i = 0; i < contours.Count; i++)
+                if (i != drop)
+                    result.Add(new OutlineContour { Points = contours[i].Points, SignedArea = contours[i].SignedArea, IsOuter = !contours[i].IsOuter });
+            return result;
+        }
+
+        /// <summary>
         /// Read <paramref name="path"/> and scale the artwork so its bounding box is
         /// <paramref name="targetWidthMm"/> wide, preserving aspect. A target of 0 keeps the file's
         /// own user units as millimetres.

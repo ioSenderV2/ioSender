@@ -184,6 +184,11 @@
                             <CheckBox x:Uid="chk_wosvgnegative" x:Name="chkSvgNegative" Content="Negative" VerticalAlignment="Center" Click="chkSvgNegative_Click"
                                       ToolTip="Carve the space AROUND the artwork instead of the artwork itself, so the logo stands proud of a recessed panel. The panel floor is the carve depth cap - set one on the Engrave operation, or the bit cuts as deep as it can."/>
                         </StackPanel>
+                        <StackPanel x:Name="pnlSvgPanelRow" Orientation="Horizontal" Margin="0,2,0,2">
+                            <Label x:Uid="lbl_wosvgpanel" Content="Panel:" Width="150" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                            <ComboBox x:Uid="cbx_wosvgpanel" x:Name="cbxSvgPanel" MinWidth="180" MinHeight="22" VerticalAlignment="Center"
+                                      ToolTip="What bounds the carved panel. Rectangle: a frame the Border distance outside the artwork on every side. Artwork outline: the artwork's own enclosing outline - a badge's border circle - and nothing outside it is touched. Needs artwork with a single outline around all of it."/>
+                        </StackPanel>
                         <local:NumericField x:Uid="fld_wosvgborder" x:Name="fldSvgBorder" Label="Border:" ColonAt="150" Format="###0.0##" Unit="mm"
                                             ToolTip="How far the recessed panel extends past the artwork's ink on every side. The panel edge gets the same sloped wall as any carved edge, so allow for the bit's flank."/>
                         <StackPanel x:Name="pnlSvgInfoRow" Orientation="Horizontal" Margin="154,0,0,4">

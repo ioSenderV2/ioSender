@@ -811,7 +811,7 @@ namespace CNC.Controls
             // leaving them out is exactly how SvgWidth went missing from this key once already.
             return string.Join(KeySep, "svg", tp.SvgFile ?? string.Empty,
                 tp.SvgWidth.ToString("R", CultureInfo.InvariantCulture), hash,
-                tp.SvgNegative ? "neg" : "pos",
+                tp.SvgNegative ? "neg-" + tp.SvgPanel : "pos",
                 tp.SvgBorder.ToString("R", CultureInfo.InvariantCulture));
         }
 
@@ -822,7 +822,9 @@ namespace CNC.Controls
             return tp.Geometry == WorkOrderGeometryKind.Svg
                 ? "svg=\"" + (string.IsNullOrEmpty(tp.SvgFile) ? "(none)" : System.IO.Path.GetFileName(tp.SvgFile))
                   + "\" w=" + tp.SvgWidth.ToString("0.###", CultureInfo.InvariantCulture) + "mm"
-                  + (tp.SvgNegative ? " negative border=" + tp.SvgBorder.ToString("0.###", CultureInfo.InvariantCulture) + "mm" : string.Empty)
+                  + (!tp.SvgNegative ? string.Empty
+                     : tp.SvgPanel == SvgPanelKind.Outline ? " negative within outline"
+                     : " negative border=" + tp.SvgBorder.ToString("0.###", CultureInfo.InvariantCulture) + "mm")
                 : "text=\"" + tp.Text + "\"";
         }
 
@@ -901,9 +903,16 @@ namespace CNC.Controls
                     return new List<string> { "(VCARVE skipped - "
                         + CommentText(System.IO.Path.GetFileName(tp.SvgFile) + " uses features this build cannot import: "
                                       + svg.Describe()) + ")" };
-                // A negative is the same artwork plus one enclosing frame - the engine's even-odd
-                // inside test does the inversion (see SvgOutlines.Negative). Nothing below changes.
-                outline = tp.SvgNegative ? SvgOutlines.Negative(svg.Contours, tp.SvgBorder) : svg.Contours;
+                // A negative is the same artwork with one contour added (a frame) or one removed (its
+                // own outline) - the engine's even-odd inside test does the inversion either way (see
+                // SvgOutlines.Negative / NegativeWithinOutline). Nothing below changes. An outline
+                // negative on artwork with no enclosing outline is refused by name, like an incomplete
+                // import - a rectangle it did not ask for is not a fallback.
+                string why;
+                outline = tp.CarveContours(svg, out why);
+                if (outline == null)
+                    return new List<string> { "(VCARVE skipped - "
+                        + CommentText(System.IO.Path.GetFileName(tp.SvgFile) + ": " + why) + ")" };
             }
             else
                 outline = TrueTypeOutlines.Render(tp.Text, tp.FontFamily, capHeight, tp.FontBold, tp.FontItalic);
@@ -1905,9 +1914,10 @@ namespace CNC.Controls
                                 desc = string.Format("v-carve {0}{3}, {1:0.#} x {2:0.#} mm",
                                                      CommentText(string.IsNullOrEmpty(tp.SvgFile)
                                                                  ? "(no file)" : System.IO.Path.GetFileName(tp.SvgFile)),
-                                                     tp.SvgWidth + (tp.SvgNegative ? 2d * tp.SvgBorder : 0d),
-                                                     svgH + (tp.SvgNegative ? 2d * tp.SvgBorder : 0d),
-                                                     tp.SvgNegative ? " negative" : string.Empty);
+                                                     tp.SvgWidth + 2d * tp.SvgNegativeReach,
+                                                     svgH + 2d * tp.SvgNegativeReach,
+                                                     !tp.SvgNegative ? string.Empty
+                                                     : tp.SvgPanel == SvgPanelKind.Outline ? " negative within outline" : " negative");
                                 break;
                             }
                             // The operator's own text goes into a g-code comment, and grblHAL ends a comment

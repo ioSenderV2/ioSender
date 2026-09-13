@@ -65,6 +65,13 @@ namespace CNC.Controls
     public enum WorkOrderTextHAlign { Left, Center, Right }
     public enum WorkOrderTextVAlign { Top, Center, Bottom }
 
+    // What bounds a NEGATIVE artwork carve (see WorkOrderToolpath.SvgNegative). Rectangle: a frame
+    // SvgBorder mm outside the ink on every side, everything within it inverts. Outline: the artwork's
+    // own single enclosing contour is the boundary - a badge logo's border circle - and only what is
+    // inside it inverts; nothing outside is touched. Outline needs such a contour to exist, which
+    // Validate checks; bare lettering has none.
+    public enum SvgPanelKind { Rectangle, Outline }
+
     // Conventional cuts against the cutter's rotation (chip thins to nothing at the end of the cut) - more
     // forgiving of a machine with backlash/flex, since the cutter is always being pushed away from new
     // material rather than pulled into it. Climb cuts with the rotation (chip starts thick, thins to zero) -
@@ -307,7 +314,30 @@ namespace CNC.Controls
         // everything within (see SvgOutlines.Negative). The panel floor is the carve depth cap, or the
         // bit's own limit if no cap is set, so a negative without a cap goes as deep as the bit can.
         public bool SvgNegative = false;
-        public double SvgBorder = 5d;
+        public SvgPanelKind SvgPanel = SvgPanelKind.Rectangle;
+        public double SvgBorder = 5d;   // Rectangle panel only
+
+        /// <summary>The negative's extra reach past the ink on each side: the border for a Rectangle panel, nothing for Outline.</summary>
+        public double SvgNegativeReach { get { return SvgNegative && SvgPanel == SvgPanelKind.Rectangle ? SvgBorder : 0d; } }
+
+        /// <summary>
+        /// The contour set an Engrave operation actually carves for this artwork: the file's own,
+        /// framed, or bounded by its outline - the ONE place the panel choice is applied, asked by the
+        /// compiler and the preview alike so they cannot disagree. Null (with <paramref name="why"/>
+        /// set) when the choice cannot be honoured, which the caller must report, never paper over.
+        /// </summary>
+        public List<OutlineContour> CarveContours(SvgImportResult svg, out string why)
+        {
+            why = null;
+            if (!SvgNegative)
+                return svg.Contours;
+            if (SvgPanel == SvgPanelKind.Rectangle)
+                return SvgOutlines.Negative(svg.Contours, SvgBorder);
+            var r = SvgOutlines.NegativeWithinOutline(svg.Contours);
+            if (r == null)
+                why = "the artwork has no single outline enclosing all of it, so a negative bounded by its outline is not possible - choose the Rectangle panel";
+            return r;
+        }
 
         // Corner reliefs ("dogbones") - Square/Rect only. A round cutter leaves a radiused inside corner,
         // so a square-cornered part will not seat in the pocket it was cut for. Ticking this pokes the
@@ -429,7 +459,7 @@ namespace CNC.Controls
                                          : CNC.Core.StrokeFont.Measure(Text, CapHeight)).X / 2d;
                     // The operator names the artwork's width outright, so no measuring needed here. A
                     // negative's extent is the panel, not the ink - the border is cut too.
-                    case WorkOrderGeometryKind.Svg: return SvgWidth / 2d + (SvgNegative ? SvgBorder : 0d);
+                    case WorkOrderGeometryKind.Svg: return SvgWidth / 2d + SvgNegativeReach;
                     default: return 0d;
                 }
             }
@@ -452,7 +482,7 @@ namespace CNC.Controls
                     // Height comes from the file's own ink aspect (cached) - the artwork decides its
                     // proportions, the operator decides its width. Aspect 0 (unreadable file) yields 0
                     // rather than a guessed square, so an anchor never shifts by an invented dimension.
-                    case WorkOrderGeometryKind.Svg: return SvgWidth * SvgOutlines.AspectOf(SvgFile) / 2d + (SvgNegative ? SvgBorder : 0d);
+                    case WorkOrderGeometryKind.Svg: return SvgWidth * SvgOutlines.AspectOf(SvgFile) / 2d + SvgNegativeReach;
                     default: return 0d;
                 }
             }
@@ -1435,8 +1465,12 @@ namespace CNC.Controls
                                                        label, System.IO.Path.GetFileName(tp.SvgFile), probe.Describe()));
                         else if (tp.SvgWidth <= 0d)
                             warnings.Add(label + "SVG width must be greater than zero.");
-                        else if (tp.SvgNegative && tp.SvgBorder < 0d)
+                        else if (tp.SvgNegative && tp.SvgPanel == SvgPanelKind.Rectangle && tp.SvgBorder < 0d)
                             warnings.Add(label + "negative border cannot be less than zero.");
+                        else if (tp.SvgNegative && tp.SvgPanel == SvgPanelKind.Outline
+                                 && SvgOutlines.EnclosingContour(probe.Contours) < 0)
+                            warnings.Add(string.Format("{0}{1} has no single outline enclosing all of it, so a negative bounded by its outline is not possible - choose the Rectangle panel.",
+                                                       label, System.IO.Path.GetFileName(tp.SvgFile)));
                     }
                 }
 
@@ -1547,7 +1581,9 @@ namespace CNC.Controls
                     string f = string.IsNullOrEmpty(tp.SvgFile)
                              ? "(no file)" : System.IO.Path.GetFileName(tp.SvgFile);
                     return string.Format("{0} {1:0.#} mm wide{2}", f, tp.SvgWidth,
-                                         tp.SvgNegative ? string.Format(", negative +{0:0.#} mm", tp.SvgBorder) : string.Empty);
+                                         !tp.SvgNegative ? string.Empty
+                                         : tp.SvgPanel == SvgPanelKind.Outline ? ", negative within outline"
+                                         : string.Format(", negative +{0:0.#} mm", tp.SvgBorder));
                 default:
                     return string.Format("rect {0:0.#}x{1:0.#}{2}", tp.Width, tp.Depth, withText);
             }
