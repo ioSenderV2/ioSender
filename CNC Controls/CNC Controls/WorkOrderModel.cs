@@ -147,6 +147,12 @@ namespace CNC.Controls
 
         public double WallStockToLeave = 0.3d;    // SideFinish
         public double FloorStockToLeave = 0.3d;   // BottomFinish
+        // ClearFloor: how far BELOW the V-carve's floor the mill cuts. At exactly the carve's depth the
+        // mill's end face rides a surface the V-bit already finished, removing nothing but the ridge
+        // tops, and a face that rubs instead of cutting burns hardwood - seen as scorched channel
+        // bottoms on the first maple badge. A tenth below means a continuous thin chip across the
+        // whole face; the step it leaves at the wall toe is invisible.
+        public double FloorBelow = 0.1d;
         public double ChamferDepth = 0.5d;        // Chamfer
 
         // Engrave - the WIDTH of the cut stroke in mm, which is what an operator can see and measure. The
@@ -1669,6 +1675,8 @@ namespace CNC.Controls
                     return string.Format("Side finish - Ø{0:0.##}, leaves {1:0.0##} mm", op.BitDiameter, op.WallStockToLeave);
                 case WorkOrderOpKind.BottomFinish:
                     return string.Format("Bottom finish - Ø{0:0.##}, leaves {1:0.0##} mm", op.BitDiameter, op.FloorStockToLeave);
+                case WorkOrderOpKind.ClearFloor:
+                    return string.Format("Clear floor - Ø{0:0.##}, {1:0.0##} mm below the carve floor", op.BitDiameter, op.FloorBelow);
                 case WorkOrderOpKind.Chamfer:
                     return string.Format("Chamfer - {0:0.0#} mm deep", op.ChamferDepth);
                 case WorkOrderOpKind.Countersink:

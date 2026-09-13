@@ -138,7 +138,7 @@ namespace CNC.Controls
                            fldPatternCount, fldPatternRadius, fldPatternStartAngle, fldPatternArcSpan,
                            fldHoleDiameter, fldTotalDepth, fldDepthOfCut, fldPeckDepth, fldBoreStepDown, fldStepover,
                            fldNumTabs, fldTabWidth, fldTabHeight,
-                           fldWallStockToLeave, fldFloorStockToLeave, fldChamferDepth, fldCountersinkDiameter };
+                           fldWallStockToLeave, fldFloorStockToLeave, fldFloorBelow, fldChamferDepth, fldCountersinkDiameter };
         }
 
         private bool placing = false;
@@ -1135,6 +1135,7 @@ namespace CNC.Controls
             fldNumTabs.Value = op.NumTabs; fldTabWidth.Value = op.TabWidth; fldTabHeight.Value = op.TabHeight;
             fldWallStockToLeave.Value = op.WallStockToLeave;
             fldFloorStockToLeave.Value = op.FloorStockToLeave;
+            fldFloorBelow.Value = op.FloorBelow;
             fldChamferDepth.Value = op.ChamferDepth;
             fldEngraveWidth.Value = op.EngraveWidth;
             fldCarveMaxDepth.Value = op.CarveMaxDepth;
@@ -1182,6 +1183,7 @@ namespace CNC.Controls
                            || (op.Kind == WorkOrderOpKind.Bore && WorkOrderRules.NeedsSteppedBore(op.HoleDiameter, op.BitDiameter)));
             Show(fldWallStockToLeave, op.Kind == WorkOrderOpKind.SideFinish);
             Show(fldFloorStockToLeave, op.Kind == WorkOrderOpKind.BottomFinish);
+            Show(fldFloorBelow, op.Kind == WorkOrderOpKind.ClearFloor);
             Show(fldChamferDepth, op.Kind == WorkOrderOpKind.Chamfer);
 
             // Engraving asks for a stroke WIDTH, but what gets cut is a depth - so show the depth the
@@ -1212,17 +1214,18 @@ namespace CNC.Controls
                 // Same arithmetic as the compiler's PassDepths: a depth of cut at or past the floor is one
                 // pass, 0 too; anything shallower splits it - said here because "2 mm" against a 2.5 mm
                 // floor reads as a depth, and it is a step.
+                double total = floor == null ? 0d : floor.DepthMm + Math.Max(0d, op.FloorBelow);
                 int passes = floor == null ? 0
                            : op.DepthOfCut <= 0d || op.DepthOfCut >= floor.DepthMm - 1e-6 ? 1
-                           : (int)Math.Ceiling(floor.DepthMm / op.DepthOfCut - 1e-6);
+                           : (int)Math.Ceiling(floor.DepthMm / op.DepthOfCut - 1e-6);   // the last pass absorbs the extra
                 txtEngraveDepth.Text = floor == null
                     ? "Needs an Engrave operation with a V-bit on this toolpath - this flattens that carve's floor."
                     : string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                        "Flattens the {0:0.#}° carve's floor at {1:0.###} mm in {3} pass{4}{2}. Anything narrower than the mill stays the V-bit's.",
-                        floor.IncludedDeg, floor.DepthMm,
+                        "Cuts to {1:0.###} mm, {5:0.##} mm below the {0:0.#}° carve's floor, in {3} pass{4}{2}. Anything narrower than the mill stays the V-bit's.",
+                        floor.IncludedDeg, total,
                         mill != null && (mill.Kind == CustomToolKind.VBitOrChamfer || mill.Kind == CustomToolKind.Countersink || mill.Kind == CustomToolKind.Drill)
                             ? "  Pick an end mill for this operation." : string.Empty,
-                        passes, passes == 1 ? string.Empty : "es");
+                        passes, passes == 1 ? string.Empty : "es", Math.Max(0d, op.FloorBelow));
             }
             if (isEngrave)
             {
@@ -1295,6 +1298,7 @@ namespace CNC.Controls
                 op.NumTabs = fldNumTabs.Value; op.TabWidth = fldTabWidth.Value; op.TabHeight = fldTabHeight.Value;
                 op.WallStockToLeave = fldWallStockToLeave.Value;
                 op.FloorStockToLeave = fldFloorStockToLeave.Value;
+                op.FloorBelow = fldFloorBelow.Value;
                 op.ChamferDepth = fldChamferDepth.Value;
                 op.EngraveWidth = fldEngraveWidth.Value;
                 op.CarveMaxDepth = fldCarveMaxDepth.Value;
@@ -1872,6 +1876,8 @@ namespace CNC.Controls
                 s += string.Format(" - {0:0.0##} mm wall stock to leave", op.WallStockToLeave);
             else if (op.Kind == WorkOrderOpKind.BottomFinish)
                 s += string.Format(" - {0:0.0##} mm floor stock to leave", op.FloorStockToLeave);
+            else if (op.Kind == WorkOrderOpKind.ClearFloor)
+                s += string.Format(" - {0:0.0##} mm below the carve floor, {1:0}% stepover", op.FloorBelow, op.Stepover);
 
             return s;
         }

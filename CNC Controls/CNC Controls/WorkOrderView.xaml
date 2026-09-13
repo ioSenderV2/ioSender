@@ -282,6 +282,8 @@
                                             ToolTip="How much material the roughing operation leaves on the wall for this pass to remove. Roughing's wall is inset by this; this pass cuts to the true outline."/>
                         <local:NumericField x:Uid="fld_wofloorleave" x:Name="fldFloorStockToLeave" Label="Floor stock to leave:" ColonAt="150" Format="##0.0##" Unit="mm"
                                             ToolTip="How much material the roughing operation leaves on the floor for this pass to remove. Roughing's depth stops this far short of true depth."/>
+                        <local:NumericField x:Uid="fld_wofloorbelow" x:Name="fldFloorBelow" Label="Below carve floor:" ColonAt="150" Format="##0.0##" Unit="mm"
+                                            ToolTip="How far past the V-carve's floor the mill cuts. At exactly the carve's depth the mill's end face rides a finished surface and rubs, which burns hardwood - a tenth below keeps it taking a chip. The step it leaves at the wall is invisible."/>
                         <local:NumericField x:Uid="fld_wochamferdepth" x:Name="fldChamferDepth" Label="Chamfer depth:" ColonAt="150" Format="##0.0##" Unit="mm"/>
                         <local:NumericField x:Uid="fld_woengravewidth" x:Name="fldEngraveWidth" Label="Stroke width:" ColonAt="150" Format="##0.0##" Unit="mm"
                                             ToolTip="How wide the engraved line should be. The plunge depth is worked out from this and the V-bit's included angle, because width is what you can measure on the part - the same 0.8 mm line is 0.40 mm deep on a 90 degree bit but 0.69 mm on a 60 degree one."/>

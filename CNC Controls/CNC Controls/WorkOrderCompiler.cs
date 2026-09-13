@@ -1164,11 +1164,20 @@ namespace CNC.Controls
                 return lines;
             }
 
+            // The rings are placed for the carve's floor; the cut goes FloorBelow past it so the end face
+            // always takes a chip (see WorkOrderOperation.FloorBelow). A depth of cut at or past the
+            // carve's floor means one pass to the bottom - the extra tenth must not turn it into two.
+            double below = Math.Max(0d, op.FloorBelow);
+            double total = floor.DepthMm + below;
+            // Passes are stepped over the CARVE's depth and the last one absorbs the extra - stepping
+            // over the total would add a tenth-of-a-millimetre final pass whenever the step divides the
+            // carve depth exactly.
             var depths = PassDepths(floor.DepthMm, op.DepthOfCut);
+            depths[depths.Count - 1] = -total;
             lines.Add(string.Format(CultureInfo.InvariantCulture,
-                "(CLEAR FLOOR {0:0.###} mm mill, {1} rings at {2:0.###} mm in {3} pass{4}, {5:0.##} mm stepover - the {6:0.#} deg carve's floor)",
-                op.BitDiameter, rings.Count, floor.DepthMm, depths.Count, depths.Count == 1 ? string.Empty : "es",
-                stepMm, floor.IncludedDeg));
+                "(CLEAR FLOOR {0:0.###} mm mill, {1} rings at {2:0.###} mm in {3} pass{4}, {5:0.##} mm stepover - {6:0.##} mm below the {7:0.#} deg carve's floor)",
+                op.BitDiameter, rings.Count, total, depths.Count, depths.Count == 1 ? string.Empty : "es",
+                stepMm, below, floor.IncludedDeg));
 
             // Same anchor and rotation as BuildVCarve: bounding-box centre on the anchor, then rotate
             // about it, shape text shifted by the fit's offsets first.
@@ -2065,7 +2074,7 @@ namespace CNC.Controls
                                 var floor = WorkOrderRules.CarveFloorOf(tp);
                                 desc = string.Format("clear floor with Ø{0:0.###} mm mill{1}, {2:0}% stepover",
                                                      op.BitDiameter,
-                                                     floor != null ? string.Format(" at {0:0.0#} mm", floor.DepthMm) : " (no carve to follow)",
+                                                     floor != null ? string.Format(" at {0:0.0#} mm", floor.DepthMm + Math.Max(0d, op.FloorBelow)) : " (no carve to follow)",
                                                      op.Stepover > 0d ? op.Stepover : 40d);
                                 break;
                             }
