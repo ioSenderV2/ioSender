@@ -330,9 +330,17 @@ namespace CNC.Controls
                     op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("facing", material);
                     break;
                 case WorkOrderOpKind.ClearFloor:
-                    // A small end mill flattening a carve's floor is a finishing cut in every sense.
-                    op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("finishing", material);
-                    break;
+                    {
+                        // A small end mill flattening a carve's floor is a finishing cut in every sense.
+                        op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("finishing", material);
+                        // Run after the V-bit, which is the normal order, the mill only ever skims the ridges
+                        // the V-bit left - half a depth step tall - so one pass straight to the floor is the
+                        // right default. The generic 2 mm split a 2.5 mm floor into two passes for nothing.
+                        var floor = WorkOrderRules.CarveFloorOf(tp);
+                        if (floor != null && floor.DepthMm > 0d)
+                            op.DepthOfCut = floor.DepthMm;
+                        break;
+                    }
             }
 
             // The operation's diameter follows whatever tool was just chosen - the definition is the
@@ -1196,13 +1204,20 @@ namespace CNC.Controls
             {
                 var floor = WorkOrderRules.CarveFloorOf(selectedToolpath);
                 var mill = CustomTools.Find(op.Tool);
+                // Same arithmetic as the compiler's PassDepths: a depth of cut at or past the floor is one
+                // pass, 0 too; anything shallower splits it - said here because "2 mm" against a 2.5 mm
+                // floor reads as a depth, and it is a step.
+                int passes = floor == null ? 0
+                           : op.DepthOfCut <= 0d || op.DepthOfCut >= floor.DepthMm - 1e-6 ? 1
+                           : (int)Math.Ceiling(floor.DepthMm / op.DepthOfCut - 1e-6);
                 txtEngraveDepth.Text = floor == null
                     ? "Needs an Engrave operation with a V-bit on this toolpath - this flattens that carve's floor."
                     : string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                        "Flattens the {0:0.#}° carve's floor at {1:0.###} mm{2}. Anything narrower than the mill stays the V-bit's.",
+                        "Flattens the {0:0.#}° carve's floor at {1:0.###} mm in {3} pass{4}{2}. Anything narrower than the mill stays the V-bit's.",
                         floor.IncludedDeg, floor.DepthMm,
                         mill != null && (mill.Kind == CustomToolKind.VBitOrChamfer || mill.Kind == CustomToolKind.Countersink || mill.Kind == CustomToolKind.Drill)
-                            ? "  Pick an end mill for this operation." : string.Empty);
+                            ? "  Pick an end mill for this operation." : string.Empty,
+                        passes, passes == 1 ? string.Empty : "es");
             }
             if (isEngrave)
             {
