@@ -58,7 +58,9 @@ namespace CNC.Controls
     // Repeats a whole toolpath - geometry AND every operation on it - at a set of offsets.
     public enum WorkOrderPatternKind { None, Grid, Circular }
 
-    public enum WorkOrderOpKind { Pocket, Contour, Drill, Bore, SideFinish, BottomFinish, Chamfer, Countersink, Surface, Engrave }
+    // ClearFloor: an end mill flattens the floor a V-carve leaves at its depth cap - see
+    // WorkOrderRules.CarveFloor and VCarve.FloorRings. Only offered where the toolpath V-carves.
+    public enum WorkOrderOpKind { Pocket, Contour, Drill, Bore, SideFinish, BottomFinish, Chamfer, Countersink, Surface, Engrave, ClearFloor }
 
     // Where fitted text sits inside its shape when it is smaller than the space available (see
     // WorkOrderTextFit). Vertical is +Y ("Top" = the back of the machine as drawn, the top on screen).
@@ -71,6 +73,15 @@ namespace CNC.Controls
     // inside it inverts; nothing outside is touched. Outline needs such a contour to exist, which
     // Validate checks; bare lettering has none.
     public enum SvgPanelKind { Rectangle, Outline }
+
+    /// <summary>What a V-carve's floor is - see WorkOrderRules.CarveFloorOf.</summary>
+    public class CarveFloor
+    {
+        public double DepthMm;
+        public double HalfAngleRad;
+        public double IncludedDeg;
+        public WorkOrderOperation Engrave;
+    }
 
     // Conventional cuts against the cutter's rotation (chip thins to nothing at the end of the cut) - more
     // forgiving of a machine with backlash/flex, since the cutter is always being pushed away from new
@@ -1245,6 +1256,7 @@ namespace CNC.Controls
                 case WorkOrderOpKind.Chamfer: return "Chamfer the top edge";
                 case WorkOrderOpKind.Countersink: return "Countersink (plunge to a target diameter)";
                 case WorkOrderOpKind.Surface: return "Surface (face the whole area)";
+                case WorkOrderOpKind.ClearFloor: return "Clear floor (end mill flattens the V-carve's floor)";
                 default: return kind.ToString();
             }
         }
@@ -1277,6 +1289,27 @@ namespace CNC.Controls
         public static bool IsRepeatable(WorkOrderOpKind kind)
         {
             return kind == WorkOrderOpKind.Drill || kind == WorkOrderOpKind.Bore;
+        }
+
+        /// <summary>
+        /// The floor a Clear floor operation flattens: the depth the toolpath's Engrave operation
+        /// V-carves to (its cap, clamped to what its V-bit can do) and that bit's half angle - resolved
+        /// from the Engrave operation and its tool, never stored on the Clear floor operation, so the
+        /// mill's floor and the V-bit's floor are the same number by construction. Null when the
+        /// toolpath has no Engrave operation with a V-bit to follow.
+        /// </summary>
+        public static CarveFloor CarveFloorOf(WorkOrderToolpath tp)
+        {
+            if (tp == null || !tp.CarvesOutlines)
+                return null;
+            var engrave = tp.Operations.FirstOrDefault(o => o.Kind == WorkOrderOpKind.Engrave);
+            if (engrave == null)
+                return null;
+            var vtool = CustomTools.Find(engrave.Tool);
+            if (vtool == null || vtool.Kind != CustomToolKind.VBitOrChamfer)
+                return null;
+            var depth = vtool.CarveDepthFor(engrave.CarveMaxDepth);
+            return new CarveFloor { DepthMm = depth.Depth, HalfAngleRad = vtool.HalfAngleRad, IncludedDeg = vtool.IncludedAngleDeg, Engrave = engrave };
         }
 
         // Pocket and Contour are two answers to the same question - clear the area, or just follow its
@@ -1312,6 +1345,10 @@ namespace CNC.Controls
             if (tp.Geometry == WorkOrderGeometryKind.Text || tp.Geometry == WorkOrderGeometryKind.Svg)
             {
                 yield return WorkOrderOpKind.Engrave;
+                // A V-carve floors any region wider than its cone with ridged tip passes; an end mill can
+                // flatten that. A stroke-font engrave has no floor, so it is not offered one.
+                if (tp.CarvesOutlines)
+                    yield return WorkOrderOpKind.ClearFloor;
                 yield break;
             }
 
@@ -1479,6 +1516,17 @@ namespace CNC.Controls
                 {
                     if (!allowed.Contains(op.Kind) && !(op.Kind == WorkOrderOpKind.Pocket || op.Kind == WorkOrderOpKind.Contour))
                         warnings.Add(label + OpLabel(op.Kind) + " is not possible on this geometry.");
+
+                    // Clear floor follows the Engrave's V-bit and cap for its depth, so without one there is
+                    // no floor to flatten; and its own tool has to be able to cut a flat.
+                    if (op.Kind == WorkOrderOpKind.ClearFloor)
+                    {
+                        if (CarveFloorOf(tp) == null)
+                            warnings.Add(label + "Clear floor needs an Engrave operation with a V-bit on this toolpath - it flattens that carve's floor.");
+                        var mill = CustomTools.Find(op.Tool);
+                        if (mill != null && (mill.Kind == CustomToolKind.VBitOrChamfer || mill.Kind == CustomToolKind.Countersink || mill.Kind == CustomToolKind.Drill))
+                            warnings.Add(label + "Clear floor: pick an end mill - a pointed bit cannot flatten a floor.");
+                    }
 
                     // ADVISORY, not blocking - see the overload's own comment. The size list is a list of
                     // what usually exists, not of what is in this operator's rack, so it can say "use a

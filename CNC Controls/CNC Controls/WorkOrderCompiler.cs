@@ -610,23 +610,71 @@ namespace CNC.Controls
         // Single pass on purpose: a V-bit at engraving depths removes very little, and stepping down would
         // just retrace the same groove. DepthOfCut is not consulted, and no tabs - there is nothing being
         // cut free.
+        // Where the text/artwork frame comes from: the toolpath's own cap height and angle, or for shape
+        // text the fit resolver's - the SAME one WorkOrderRules.Validate ran to gate Generate. Shared by
+        // every operation that draws on the carve (Engrave, Clear floor) so they place it identically;
+        // false with an error when shape text does not fit, which is defense against a caller that
+        // skipped validation rather than a second opinion.
+        private static bool ResolveCarveFrame(WorkOrderToolpath tp, out double capHeight, out double angleDeg,
+                                              out double fitDx, out double fitDy, out string error)
+        {
+            capHeight = tp.CapHeight; angleDeg = tp.Angle; fitDx = 0d; fitDy = 0d; error = null;
+            bool shapeText = tp.HasText && tp.Geometry != WorkOrderGeometryKind.Text
+                          && WorkOrderRules.SupportsShapeText(tp.Geometry);
+            if (!shapeText)
+                return true;
+            var fit = WorkOrderTextFit.Resolve(tp);
+            if (!fit.Fits)
+            {
+                error = fit.Error;
+                return false;
+            }
+            capHeight = fit.CapHeight; angleDeg = fit.Angle; fitDx = fit.OffsetX; fitDy = fit.OffsetY;
+            return true;
+        }
+
+        // The contours a carve is OF. Where they come from is the ONLY difference between carving a word
+        // and carving a logo - everything downstream is the same code (docs/Architecture-SVG-Import.md).
+        // Null with a comment-safe reason when the artwork cannot be carved at all: an import that
+        // dropped elements must NOT cut the remainder (a partial logo looks plausible in the preview and
+        // is wrong in the wood), and an outline negative on artwork with no enclosing outline is refused
+        // by name - a rectangle it did not ask for is not a fallback.
+        private static List<OutlineContour> CarveOutlineFor(WorkOrderToolpath tp, double capHeight, out string skipReason)
+        {
+            skipReason = null;
+            if (tp.Geometry != WorkOrderGeometryKind.Svg)
+                return TrueTypeOutlines.Render(tp.Text, tp.FontFamily, capHeight, tp.FontBold, tp.FontItalic);
+
+            var svg = SvgOutlines.Load(tp.SvgFile, tp.SvgWidth);
+            if (svg.Error != null)
+            {
+                skipReason = CommentText(svg.Error);
+                return null;
+            }
+            if (!svg.IsComplete)
+            {
+                skipReason = CommentText(System.IO.Path.GetFileName(tp.SvgFile) + " uses features this build cannot import: " + svg.Describe());
+                return null;
+            }
+            string why;
+            var outline = tp.CarveContours(svg, out why);
+            if (outline == null)
+                skipReason = CommentText(System.IO.Path.GetFileName(tp.SvgFile) + ": " + why);
+            return outline;
+        }
+
         private static List<string> BuildEngrave(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
         {
             // Shape text (HasText on a Line/Circle/Oval/Square/Rect): size, placement and baseline angle
             // come from the fit resolver - the SAME one WorkOrderRules.Validate ran to gate Generate, so
             // by the time we are here it fits; the refusal below is defense against a caller that skipped
             // validation, not a second opinion.
-            double capHeight = tp.CapHeight, angleDeg = tp.Angle, fitDx = 0d, fitDy = 0d;
+            double capHeight, angleDeg, fitDx, fitDy;
+            string fitError;
+            if (!ResolveCarveFrame(tp, out capHeight, out angleDeg, out fitDx, out fitDy, out fitError))
+                return new List<string> { "(ENGRAVE skipped - text does not fit: " + CommentText(fitError) + ")" };
             bool shapeText = tp.HasText && tp.Geometry != WorkOrderGeometryKind.Text
                           && WorkOrderRules.SupportsShapeText(tp.Geometry);
-            if (shapeText)
-            {
-                var fit = WorkOrderTextFit.Resolve(tp);
-                if (!fit.Fits)
-                    return new List<string> { "(ENGRAVE skipped - text does not fit: "
-                        + CommentText(fit.Error) + ")" };
-                capHeight = fit.CapHeight; angleDeg = fit.Angle; fitDx = fit.OffsetX; fitDy = fit.OffsetY;
-            }
 
             // One op kind, two ways of cutting it. Artwork has no stroke-font equivalent - an SVG IS
             // outlines - so it always carves whatever the engrave width says; text carves when it carries
@@ -889,33 +937,14 @@ namespace CNC.Controls
             var lines = new List<string>();
 
             // Where the contours come from is the ONLY difference between carving a word and carving a
-            // logo - everything below this point is the same code (see docs/Architecture-SVG-Import.md).
-            List<OutlineContour> outline;
-            if (tp.Geometry == WorkOrderGeometryKind.Svg)
-            {
-                var svg = SvgOutlines.Load(tp.SvgFile, tp.SvgWidth);
-                if (svg.Error != null)
-                    return new List<string> { "(VCARVE skipped - " + CommentText(svg.Error) + ")" };
-                // An import that dropped elements must NOT cut the remainder. A partial logo looks
-                // plausible in the preview and is wrong in the wood, and the operator has no way to see
-                // which half went missing - so refuse, and name what was skipped.
-                if (!svg.IsComplete)
-                    return new List<string> { "(VCARVE skipped - "
-                        + CommentText(System.IO.Path.GetFileName(tp.SvgFile) + " uses features this build cannot import: "
-                                      + svg.Describe()) + ")" };
-                // A negative is the same artwork with one contour added (a frame) or one removed (its
-                // own outline) - the engine's even-odd inside test does the inversion either way (see
-                // SvgOutlines.Negative / NegativeWithinOutline). Nothing below changes. An outline
-                // negative on artwork with no enclosing outline is refused by name, like an incomplete
-                // import - a rectangle it did not ask for is not a fallback.
-                string why;
-                outline = tp.CarveContours(svg, out why);
-                if (outline == null)
-                    return new List<string> { "(VCARVE skipped - "
-                        + CommentText(System.IO.Path.GetFileName(tp.SvgFile) + ": " + why) + ")" };
-            }
-            else
-                outline = TrueTypeOutlines.Render(tp.Text, tp.FontFamily, capHeight, tp.FontBold, tp.FontItalic);
+            // logo - everything below this point is the same code (see CarveOutlineFor). A negative is
+            // the same artwork with one contour added (a frame) or one removed (its own outline) - the
+            // engine's even-odd inside test does the inversion either way (SvgOutlines.Negative /
+            // NegativeWithinOutline), so nothing below knows it happened.
+            string skip;
+            var outline = CarveOutlineFor(tp, capHeight, out skip);
+            if (outline == null)
+                return new List<string> { "(VCARVE skipped - " + skip + ")" };
 
             if (outline.Count == 0)
                 return lines;   // blank text or an unresolvable family - emit nothing rather than a bare plunge
@@ -1046,6 +1075,131 @@ namespace CNC.Controls
             }
             lines.Add("G0 Z" + F(SafeZ()));
 
+            return lines;
+        }
+
+        // The floor field is coarser than the carve's: it drives a mill of a few mm, not a V-bit's tip,
+        // and it has to reach the middle of the region rather than one cone-width in. 0.25 mm keeps a
+        // 60 mm badge under half a second (measured 418 ms at 195 ring points) while placing the toe
+        // ring within a tenth or so - see VCarve.FloorRings for the overlap that absorbs that.
+        private const double FloorResolution = 0.25d;
+        private static readonly Dictionary<string, List<List<Point2D>>> floorRingCache = new Dictionary<string, List<List<Point2D>>>();
+
+        private static List<List<Point2D>> CachedFloorRings(WorkOrderToolpath tp, double capHeight, double halfAngle,
+                                                            double maxDepth, double radius, double stepMm,
+                                                            List<IList<Point2D>> polys)
+        {
+            // Same source identity as the carve (so a re-exported logo misses here too), plus everything
+            // FloorRings reads: the cone, the floor depth, the mill and its stepover.
+            string source = CarveSourceKey(tp, capHeight);
+            string key = source == null ? null : string.Join(KeySep, "floor", source,
+                halfAngle.ToString("R", CultureInfo.InvariantCulture),
+                maxDepth.ToString("R", CultureInfo.InvariantCulture),
+                radius.ToString("R", CultureInfo.InvariantCulture),
+                stepMm.ToString("R", CultureInfo.InvariantCulture));
+
+            List<List<Point2D>> rings;
+            if (key != null && floorRingCache.TryGetValue(key, out rings))
+                return rings;
+            rings = CNC.Core.VCarve.FloorRings(polys, halfAngle, maxDepth, FloorResolution, radius, stepMm);
+            if (key != null)
+            {
+                if (floorRingCache.Count >= CarveCacheMax)
+                    floorRingCache.Clear();
+                floorRingCache[key] = rings;
+            }
+            return rings;
+        }
+
+        // An end mill flattens the floor the V-carve above leaves at its cap. A V-bit floors a wide
+        // region with rings of its tip, whose flanks meet in ridges half the depth step tall - this
+        // pockets the same region flat with a mill that can. The floor's depth and the cone come from
+        // the Engrave operation's V-bit and cap (WorkOrderRules.CarveFloorOf), never from this
+        // operation, so the two floors are one number; the contours and the placement are resolved by
+        // the same helpers BuildVCarve uses, so the mill lands exactly where the V-bit did. The V-bit
+        // keeps its own floor passes: anything narrower than the mill's diameter stays its job.
+        private static List<string> BuildClearFloor(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
+        {
+            var lines = new List<string>();
+            var floor = WorkOrderRules.CarveFloorOf(tp);
+            if (floor == null)
+                return new List<string> { "(CLEAR FLOOR skipped - no Engrave operation with a V-bit on this toolpath to follow)" };
+
+            double capHeight, angleDeg, fitDx, fitDy;
+            string fitError;
+            if (!ResolveCarveFrame(tp, out capHeight, out angleDeg, out fitDx, out fitDy, out fitError))
+                return new List<string> { "(CLEAR FLOOR skipped - text does not fit: " + CommentText(fitError) + ")" };
+            string skip;
+            var outline = CarveOutlineFor(tp, capHeight, out skip);
+            if (outline == null)
+                return new List<string> { "(CLEAR FLOOR skipped - " + skip + ")" };
+            if (outline.Count == 0)
+                return lines;
+
+            double radius = op.BitDiameter / 2d;
+            if (radius <= 0d)
+                return new List<string> { "(CLEAR FLOOR skipped - bit diameter must be greater than 0)" };
+            double stepMm = op.BitDiameter * (op.Stepover > 0d ? op.Stepover : 40d) / 100d;
+
+            var polys = new List<IList<Point2D>>();
+            double minX = double.MaxValue, maxX = double.MinValue, minY = double.MaxValue, maxY = double.MinValue;
+            foreach (var c in outline)
+            {
+                polys.Add(c.Points);
+                foreach (var p in c.Points)
+                {
+                    if (p.X < minX) minX = p.X;
+                    if (p.X > maxX) maxX = p.X;
+                    if (p.Y < minY) minY = p.Y;
+                    if (p.Y > maxY) maxY = p.Y;
+                }
+            }
+
+            var rings = CachedFloorRings(tp, capHeight, floor.HalfAngleRad, floor.DepthMm, radius, stepMm, polys);
+            if (rings.Count == 0)
+            {
+                lines.Add(string.Format(CultureInfo.InvariantCulture,
+                    "(CLEAR FLOOR - nothing on this floor is wide enough for the {0:0.###} mm mill - the V-bit's own floor passes stand)",
+                    op.BitDiameter));
+                return lines;
+            }
+
+            var depths = PassDepths(floor.DepthMm, op.DepthOfCut);
+            lines.Add(string.Format(CultureInfo.InvariantCulture,
+                "(CLEAR FLOOR {0:0.###} mm mill, {1} rings at {2:0.###} mm in {3} pass{4}, {5:0.##} mm stepover - the {6:0.#} deg carve's floor)",
+                op.BitDiameter, rings.Count, floor.DepthMm, depths.Count, depths.Count == 1 ? string.Empty : "es",
+                stepMm, floor.IncludedDeg));
+
+            // Same anchor and rotation as BuildVCarve: bounding-box centre on the anchor, then rotate
+            // about it, shape text shifted by the fit's offsets first.
+            double ox = -(minX + maxX) / 2d + fitDx, oy = -(minY + maxY) / 2d + fitDy;
+            double rad = angleDeg * Math.PI / 180d;
+            double cos = Math.Cos(rad), sin = Math.Sin(rad);
+            const double hop = 2d;
+
+            bool approached = false;
+            foreach (double z in depths)
+                foreach (var ring in rings)   // inside-out: a side cut at the stepover, the toe ring last
+                {
+                    bool first = true;
+                    foreach (var p in ring)
+                    {
+                        double lx = p.X + ox, ly = p.Y + oy;
+                        double x = cx + lx * cos - ly * sin;
+                        double y = cy + lx * sin + ly * cos;
+                        if (first)
+                        {
+                            first = false;
+                            lines.Add("G0 Z" + F(approached ? hop : SafeZ()));
+                            approached = true;
+                            lines.Add("G0 X" + F(x) + " Y" + F(y));
+                            lines.Add("G1 Z" + F(z) + " F" + F(op.PlungeFeed));
+                        }
+                        else
+                            lines.Add("G1 X" + F(x) + " Y" + F(y) + " F" + F(op.Feed));
+                    }
+                }
+            lines.Add("G0 Z" + F(SafeZ()));
             return lines;
         }
 
@@ -1578,6 +1732,7 @@ namespace CNC.Controls
                     // EntireSpoilboard never reaches here - BuildOperation returns early for it, above.
                     case WorkOrderOpKind.Surface: lines.AddRange(BuildSurface(tp, op, cx, cy)); break;
                     case WorkOrderOpKind.Engrave: lines.AddRange(BuildEngrave(tp, op, cx, cy)); break;
+                    case WorkOrderOpKind.ClearFloor: lines.AddRange(BuildClearFloor(tp, op, cx, cy)); break;
                 }
             }
 
@@ -1905,6 +2060,15 @@ namespace CNC.Controls
                                 ? string.Format("surface - entire spoilboard, {0:0.0} mm deep", TrueDepth(op))
                                 : string.Format("surface {0:0.0}x{1:0.0} mm, {2:0.0} mm deep", tp.Width, tp.Depth, TrueDepth(op));
                             break;
+                        case WorkOrderOpKind.ClearFloor:
+                            {
+                                var floor = WorkOrderRules.CarveFloorOf(tp);
+                                desc = string.Format("clear floor with Ø{0:0.###} mm mill{1}, {2:0}% stepover",
+                                                     op.BitDiameter,
+                                                     floor != null ? string.Format(" at {0:0.0#} mm", floor.DepthMm) : " (no carve to follow)",
+                                                     op.Stepover > 0d ? op.Stepover : 40d);
+                                break;
+                            }
                         case WorkOrderOpKind.Engrave:
                             // Artwork describes itself by FILE and size - falling through to the text
                             // wording below would report a logo as v-carve "" in , 0 mm caps.

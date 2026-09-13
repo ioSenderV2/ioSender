@@ -241,6 +241,79 @@ namespace CNC.Core
             }
         }
 
+        /// <summary>
+        /// Pocketing rings for an END MILL to flatten the floor a V-carve of <paramref name="contours"/>
+        /// leaves at <paramref name="maxDepth"/>. Every ring is cut at that depth. Ordered inside-out:
+        /// the innermost rings first, the ring hugging the V-wall's toe last.
+        /// </summary>
+        /// <remarks>
+        /// A V-bit floors a wide region with rings of its tip at the cap depth, and the flanks of
+        /// adjacent rings meet in a ridge half the depth step tall - a 1.5 mm step leaves 0.75 mm
+        /// corrugations. The mill's job is those ridges. Its centre path is the same distance field's
+        /// iso-contour at the V-bit's tip distance (maxDepth x tan) plus the mill's radius, so the mill's
+        /// edge reaches exactly the toe of the V-wall; further rings step inward by
+        /// <paramref name="stepoverMm"/> until none remain. Anything narrower than the mill's diameter
+        /// stays the V-bit's - the caller keeps the V-bit's own floor passes for that reason.
+        /// The field has to reach far deeper into the region than a carve's (which only ever needs the
+        /// cone's own reach), so it is built to the region's half-diagonal; the nearest-search early-out
+        /// keeps that affordable because only the deepest cells walk far.
+        /// </remarks>
+        public static List<List<Point2D>> FloorRings(IList<IList<Point2D>> contours, double halfAngleRad,
+                                                     double maxDepth, double resolutionMm,
+                                                     double toolRadiusMm, double stepoverMm)
+        {
+            var rings = new List<List<Point2D>>();
+            double tan = Math.Tan(halfAngleRad);
+            if (tan <= 1e-9 || maxDepth <= 0d || toolRadiusMm <= 0d)
+                return rings;
+            if (stepoverMm <= 1e-6)
+                stepoverMm = toolRadiusMm;
+
+            double minX = double.MaxValue, maxX = double.MinValue, minY = double.MaxValue, maxY = double.MinValue;
+            foreach (var c in contours)
+                foreach (var p in c)
+                {
+                    if (p.X < minX) minX = p.X;
+                    if (p.X > maxX) maxX = p.X;
+                    if (p.Y < minY) minY = p.Y;
+                    if (p.Y > maxY) maxY = p.Y;
+                }
+            if (minX > maxX)
+                return rings;
+            double maxDist = Math.Sqrt((maxX - minX) * (maxX - minX) + (maxY - minY) * (maxY - minY)) / 2d + resolutionMm;
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var field = DistanceField.Build(contours, resolutionMm, maxDist);
+            double msField = sw.Elapsed.TotalMilliseconds;
+            if (field == null)
+                return rings;
+
+            // Half a cell of overlap into the wall's toe: marching squares places a ring within about
+            // that of the true level, and a ring that falls short leaves a ridge at the toe 0.87x the
+            // shortfall tall, while one that overreaches only nicks the sloped wall by that much.
+            double first = maxDepth * tan + toolRadiusMm - resolutionMm * 0.5d;
+            var levels = new List<List<List<Point2D>>>();
+            for (double level = first; ; level += stepoverMm)
+            {
+                var at = new List<List<Point2D>>();
+                foreach (var ring in field.IsoContours(level))
+                    if (ring.Count >= 4)
+                        at.Add(ring);
+                if (at.Count == 0)
+                    break;
+                levels.Add(at);
+            }
+            for (int i = levels.Count - 1; i >= 0; i--)
+                rings.AddRange(levels[i]);
+
+            if (DebugLog.Enabled)
+                DebugLog.Write("vcarve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "floor total={0:0}ms | field={1:0}ms ({2} cells, reach {3:0.#}mm) | {4} levels, {5} rings | r={6:0.###} step={7:0.###} at {8:0.###}mm",
+                    sw.Elapsed.TotalMilliseconds, msField, field.CellCount, maxDist, levels.Count, rings.Count,
+                    toolRadiusMm, stepoverMm, maxDepth));
+            return rings;
+        }
+
         // ---------------------------------------------------------------------------------------------
         // Distance field
         // ---------------------------------------------------------------------------------------------

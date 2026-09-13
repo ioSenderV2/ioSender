@@ -329,6 +329,10 @@ namespace CNC.Controls
                 case WorkOrderOpKind.Surface:
                     op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("facing", material);
                     break;
+                case WorkOrderOpKind.ClearFloor:
+                    // A small end mill flattening a carve's floor is a finishing cut in every sense.
+                    op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("finishing", material);
+                    break;
             }
 
             // The operation's diameter follows whatever tool was just chosen - the definition is the
@@ -1143,7 +1147,7 @@ namespace CNC.Controls
             // wherever a region reaches full depth - a deeper pass's flank runs through the tip of the one
             // above, so the deepest pass alone recreates the whole V. See WorkOrderCompiler.CarveStep.
             Show(fldDepthOfCut, op.Kind == WorkOrderOpKind.Pocket || op.Kind == WorkOrderOpKind.Contour
-                             || op.Kind == WorkOrderOpKind.Engrave);
+                             || op.Kind == WorkOrderOpKind.Engrave || op.Kind == WorkOrderOpKind.ClearFloor);
             Show(fldPeckDepth, op.Kind == WorkOrderOpKind.Drill);
             Show(fldBoreStepDown, op.Kind == WorkOrderOpKind.Bore);
 
@@ -1161,6 +1165,7 @@ namespace CNC.Controls
             // Stepover only matters where an enclosed area gets cleared - a pocket, a floor lap, or a bore
             // wide enough to need more than one helix.
             Show(fldStepover, op.Kind == WorkOrderOpKind.Pocket || op.Kind == WorkOrderOpKind.BottomFinish || op.Kind == WorkOrderOpKind.Surface
+                           || op.Kind == WorkOrderOpKind.ClearFloor
                            || (op.Kind == WorkOrderOpKind.Bore && WorkOrderRules.NeedsSteppedBore(op.HoleDiameter, op.BitDiameter)));
             Show(fldWallStockToLeave, op.Kind == WorkOrderOpKind.SideFinish);
             Show(fldFloorStockToLeave, op.Kind == WorkOrderOpKind.BottomFinish);
@@ -1183,7 +1188,22 @@ namespace CNC.Controls
             // only thing that HAS a depth worth capping (a stroke engrave's depth already follows from
             // the width above it).
             Show(fldCarveMaxDepth, isEngrave && isCarve);
-            Show(txtEngraveDepth, isEngrave);
+            // Clear floor has no depth of its own to show - it follows the carve's - so the same note
+            // says what it will follow, or that there is nothing to follow yet.
+            bool isClearFloor = op.Kind == WorkOrderOpKind.ClearFloor;
+            Show(txtEngraveDepth, isEngrave || isClearFloor);
+            if (isClearFloor)
+            {
+                var floor = WorkOrderRules.CarveFloorOf(selectedToolpath);
+                var mill = CustomTools.Find(op.Tool);
+                txtEngraveDepth.Text = floor == null
+                    ? "Needs an Engrave operation with a V-bit on this toolpath - this flattens that carve's floor."
+                    : string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "Flattens the {0:0.#}° carve's floor at {1:0.###} mm{2}. Anything narrower than the mill stays the V-bit's.",
+                        floor.IncludedDeg, floor.DepthMm,
+                        mill != null && (mill.Kind == CustomToolKind.VBitOrChamfer || mill.Kind == CustomToolKind.Countersink || mill.Kind == CustomToolKind.Drill)
+                            ? "  Pick an end mill for this operation." : string.Empty);
+            }
             if (isEngrave)
             {
                 var vtool = CustomTools.Find(op.Tool);
@@ -1719,7 +1739,8 @@ namespace CNC.Controls
             bool isBore = op.Kind == WorkOrderOpKind.Bore;
             bool isCountersink = op.Kind == WorkOrderOpKind.Countersink;
             bool showDoc = op.Kind == WorkOrderOpKind.Pocket || op.Kind == WorkOrderOpKind.Contour
-                        || op.Kind == WorkOrderOpKind.Chamfer || isDrill || isBore || isCountersink;
+                        || op.Kind == WorkOrderOpKind.Chamfer || op.Kind == WorkOrderOpKind.ClearFloor
+                        || isDrill || isBore || isCountersink;
 
             string docLabel = op.Kind == WorkOrderOpKind.Chamfer ? "Chamfer depth:"
                             : isCountersink ? "Countersink diameter:"
