@@ -330,17 +330,9 @@ namespace CNC.Controls
                     op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("facing", material);
                     break;
                 case WorkOrderOpKind.ClearFloor:
-                    {
-                        // A small end mill flattening a carve's floor is a finishing cut in every sense.
-                        op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("finishing", material);
-                        // Run after the V-bit, which is the normal order, the mill only ever skims the ridges
-                        // the V-bit left - half a depth step tall - so one pass straight to the floor is the
-                        // right default. The generic 2 mm split a 2.5 mm floor into two passes for nothing.
-                        var floor = WorkOrderRules.CarveFloorOf(tp);
-                        if (floor != null && floor.DepthMm > 0d)
-                            op.DepthOfCut = floor.DepthMm;
-                        break;
-                    }
+                    // A small end mill flattening a carve's floor is a finishing cut in every sense.
+                    op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("finishing", material);
+                    break;
             }
 
             // The operation's diameter follows whatever tool was just chosen - the definition is the
@@ -361,6 +353,19 @@ namespace CNC.Controls
                 if (remembered.Feed > 0d) op.Feed = remembered.Feed;
                 if (remembered.PlungeFeed > 0d) op.PlungeFeed = remembered.PlungeFeed;
                 if (remembered.DepthOfCut > 0d) op.DepthOfCut = remembered.DepthOfCut;
+            }
+
+            // AFTER the recall, so it wins. Run after the V-bit, which is the normal order, the mill only
+            // ever skims the ridges the V-bit left - half a depth step tall - so one pass straight to the
+            // floor is the right default. The remembered depth of cut is the tool's general step for
+            // pockets, and it split a 2.5 mm floor into two passes for nothing; seeding this in the
+            // switch above was silently overwritten by that recall, and a harness with an empty memory
+            // never saw it.
+            if (kind == WorkOrderOpKind.ClearFloor)
+            {
+                var floor = WorkOrderRules.CarveFloorOf(tp);
+                if (floor != null && floor.DepthMm > 0d)
+                    op.DepthOfCut = floor.DepthMm;
             }
             return op;
         }
