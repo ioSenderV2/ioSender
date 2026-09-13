@@ -1455,18 +1455,20 @@ namespace CNC.Controls
                 cut.Clamped ? " - limited to the bit's own width" : string.Empty,
                 op.MarkDashed ? string.Format(CultureInfo.InvariantCulture, ", dashed {0} x {1:0.##} mm", pieces.Count, op.MarkDash) : string.Empty));
 
-            var depths = PassDepths(depth, op.DepthOfCut);
+            // ONE pass, always. The depth follows from the width and the bit, so it is at most a couple
+            // of millimetres, which any material takes in one lap of a V-bit. This used to step by the
+            // operation's depth of cut - a field the editor does not even show for a Mark - and the tool
+            // memory's recalled 0.2 mm for the V-bit turned a 1 mm groove into five invisible laps.
             const double hop = 2d;
             bool approached = false;
-            foreach (double z in depths)
-                foreach (var piece in pieces)
-                {
-                    lines.Add("G0 Z" + F(approached ? hop : SafeZ()));
-                    approached = true;
-                    lines.Add("G0 " + XY(piece[0]));
-                    lines.Add("G1 Z" + F(z) + " F" + F(op.PlungeFeed));
-                    AppendPath(lines, piece, z, op.Feed, null);
-                }
+            foreach (var piece in pieces)
+            {
+                lines.Add("G0 Z" + F(approached ? hop : SafeZ()));
+                approached = true;
+                lines.Add("G0 " + XY(piece[0]));
+                lines.Add("G1 Z" + F(-depth) + " F" + F(op.PlungeFeed));
+                AppendPath(lines, piece, -depth, op.Feed, null);
+            }
             lines.Add("G0 Z" + F(SafeZ()));
             return lines;
         }
