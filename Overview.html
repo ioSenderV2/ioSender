@@ -160,7 +160,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>327 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>328 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -372,6 +372,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>A new <strong>Clear floor</strong> operation on V-carved toolpaths pockets the carve's floor flat with an end mill, at exactly the depth the V-bit floored it &mdash; the raised-logo panel comes out smooth instead of ridged.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr325">325</a></td></tr>
 <tr><td>The end mill's face rode the surface the V-bit had already finished and rubbed rather than cut, scorching the floor of the first maple badge &mdash; a new <strong>Below carve floor</strong> field (0.1&nbsp;mm) keeps it taking a chip, and a new Clear floor starts at one pass.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr326">326</a></td></tr>
 <tr><td>A new <strong>Mark</strong> operation on every shape geometry: a V-bit's tip rides the outline itself, as deep as the chosen groove width makes it on that bit &mdash; a 1&nbsp;mm marking circle around a badge, a border on a rectangle.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr327">327</a></td></tr>
+<tr><td>A <strong>Dashed</strong> tick on the Mark operation, with Dash and Gap lengths: a closed shape gets a whole number of periods so the pattern meets itself, a line gets a dash at each end, and every dash is its own plunge.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr328">328</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -891,7 +892,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">325</td><td><a href="#pr325">Work Order: Clear floor - an end mill flattens a V-carve's floor</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+348</span> <span class="del">-40</span></td></tr>
 <tr><td class="n">326</td><td><a href="#pr326">Clear floor: cuts a tenth below the carve floor, one pass by default</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">11</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+86</span> <span class="del">-10</span></td></tr>
 <tr><td class="n">327</td><td><a href="#pr327">Work Order: Mark - a V-bit traces the outline as a shallow groove</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+90</span> <span class="del">-8</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (327 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">2819</span> <span class="del">32</span> <span class="add">+280</span><br><span class="k">Lines:</span> <span class="add">+119927</span> <span class="del">-27575</span></td></tr>
+<tr><td class="n">328</td><td><a href="#pr328">Mark: Dashed lines</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+245</span> <span class="del">-20</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (328 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">2831</span> <span class="del">32</span> <span class="add">+280</span><br><span class="k">Lines:</span> <span class="add">+120172</span> <span class="del">-27595</span></td></tr>
 </table>
 </div>
 
@@ -6127,6 +6129,20 @@ G92.1</pre><ul><li><strong>It is a rapid, not <code>G92 X#&lt;x_org&gt; Y#&lt;y_
 <tr><td class="mono">CNC Controls/CNC Controls/OddJobsFeedsSpeedsDialog.xaml.cs</td><td class="num add">1</td><td class="num del">1</td></tr>
 </table>
 <div class="desc"><p>The badge (#324, #325) wanted a 1&nbsp;mm groove on a 63.5&nbsp;mm circle around it, marking where the stamp ends. Contour is the wrong operation for that: it offsets the path by an end mill's radius, cuts to a total depth, and does not offer a V-bit at all.</p><ul><li><strong>Mark is a marking line along the outline.</strong> It is offered on every shape geometry &mdash; circle, square, rectangle, oval, line &mdash; and the V-bit's tip rides the nominal outline with no offset. The one thing to set is the groove's <em>width</em>; the depth follows from it and the bit's angle, by the same answer a stroke engrave uses, including the clamp at the bit's own diameter. The editor's note says what that depth will be on the chosen bit.</li><li><strong>Same seams as the rest.</strong> Cut direction applies, the depth of cut steps it if asked, the feeds dialog offers the V-bits, Validate wants a V-bit and a positive width, and the preview's envelope shows the groove's width rather than the V-bit's shank &mdash; a 12.5&nbsp;mm bit drawing a 12.5&nbsp;mm band around a 1&nbsp;mm line would have hidden the geometry it marks.</li></ul><p class="foot">Harness: a 63.5 mm circle with the 60° bit and a 1 mm width - every emitted point on the 31.75 mm radius, one plunge at -0.866 mm, Validate clean. UI flow hand-off verified only.</p></div>
+</div>
+<!-- ===== #328 ===== -->
+<div class="pr">
+<h2 id="pr328"><span class="badge">#328</span>Mark: Dashed &mdash; a dash-and-gap line along the outline, with whole periods on a closed shape</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml.cs</td><td class="num add">78</td><td class="num del">12</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/OddJobsGeometry.cs</td><td class="num add">73</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderCompiler.cs</td><td class="num add">24</td><td class="num del">8</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml</td><td class="num add">9</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderModel.cs</td><td class="num add">5</td><td class="num">0</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">56</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>A marking line (#327) is often better dashed: a cut-here line, a fold line, a stitching guide, or a border that reads as decoration rather than an edge. Since the mark is already a polyline along the outline, dashing it is a matter of where to lift.</p><ul><li><strong>Dash and Gap are lengths along the line</strong>, defaults 4 and 2&nbsp;mm, shown only when Dashed is ticked. A dash can run round a rectangle's corner, which is what a marking line looks like and avoids any rule about where dashes may start.</li><li><strong>The pattern closes on itself.</strong> A circle or rectangle is divided into a whole number of dash-plus-gap periods, the pitch stretched or shrunk by under half a period so the last gap meets the first dash without a stub. A line gets a dash at each end with the gaps fitted between.</li><li><strong>Each dash is its own plunge</strong>, with the V-carve's 2&nbsp;mm hop over the gap. A 63.5&nbsp;mm circle at the defaults is 33 short plunges, well under a minute at a normal plunge feed.</li><li><strong>The preview shows the dashes</strong> &mdash; a dashed stroke at the groove's width on the nominal outline &mdash; when a toolpath's only operations are Marks and one is dashed. Mixed with anything else the envelope band stays, since it is the more important thing to see.</li></ul><p class="foot">Harness: the 63.5 mm circle at 4/2 gives 33 dashes of exactly 4 mm at a 6.045 mm pitch and the pattern meets itself; a 50 mm line gives 9 dashes from one end to the other; the emitted g-code plunges 33 times at -0.866 mm with 32 hops. Preview hand-off verified only.</p></div>
 </div>
 </section>
 
