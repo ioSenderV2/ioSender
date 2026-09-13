@@ -284,6 +284,15 @@
                                             ToolTip="How much material the roughing operation leaves on the floor for this pass to remove. Roughing's depth stops this far short of true depth."/>
                         <local:NumericField x:Uid="fld_wofloorbelow" x:Name="fldFloorBelow" Label="Below carve floor:" ColonAt="150" Format="##0.0##" Unit="mm"
                                             ToolTip="How far past the V-carve's floor the mill cuts. At exactly the carve's depth the mill's end face rides a finished surface and rubs, which burns hardwood - a tenth below keeps it taking a chip. The step it leaves at the wall is invisible."/>
+                        <!-- Mark only: a dashed line instead of a continuous one. Whole periods on a closed shape. -->
+                        <StackPanel x:Name="pnlMarkDashedRow" Orientation="Horizontal" Margin="154,0,0,2">
+                            <CheckBox x:Uid="chk_womarkdashed" x:Name="chkMarkDashed" Content="Dashed" VerticalAlignment="Center" Click="chkMarkDashed_Click"
+                                      ToolTip="Cut the line as dashes. On a closed shape the pitch is adjusted a hair so a whole number of dashes goes round and the pattern meets itself; a line gets a dash at each end. Every dash is its own plunge."/>
+                        </StackPanel>
+                        <local:NumericField x:Uid="fld_womarkdash" x:Name="fldMarkDash" Label="Dash:" ColonAt="150" Format="##0.0#" Unit="mm"
+                                            ToolTip="Length of each dash, measured along the line - a dash can run round a corner."/>
+                        <local:NumericField x:Uid="fld_womarkgap" x:Name="fldMarkGap" Label="Gap:" ColonAt="150" Format="##0.0#" Unit="mm"
+                                            ToolTip="Length of the gap between dashes, measured along the line."/>
                         <local:NumericField x:Uid="fld_wochamferdepth" x:Name="fldChamferDepth" Label="Chamfer depth:" ColonAt="150" Format="##0.0##" Unit="mm"/>
                         <local:NumericField x:Uid="fld_woengravewidth" x:Name="fldEngraveWidth" Label="Stroke width:" ColonAt="150" Format="##0.0##" Unit="mm"
                                             ToolTip="How wide the engraved line should be. The plunge depth is worked out from this and the V-bit's included angle, because width is what you can measure on the part - the same 0.8 mm line is 0.40 mm deep on a 90 degree bit but 0.69 mm on a 60 degree one."/>

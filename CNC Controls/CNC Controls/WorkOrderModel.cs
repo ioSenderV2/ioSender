@@ -156,6 +156,11 @@ namespace CNC.Controls
         // bottoms on the first maple badge. A tenth below means a continuous thin chip across the
         // whole face; the step it leaves at the wall toe is invisible.
         public double FloorBelow = 0.1d;
+        // Mark: a dashed line instead of a continuous one - a "cut here", a fold line, a decorative
+        // border. Dash and gap are lengths along the outline; on a closed shape the pitch is stretched a
+        // hair so a whole number of periods closes on itself (see OddJobsGeometry.Dashes).
+        public bool MarkDashed = false;
+        public double MarkDash = 4d, MarkGap = 2d;
         public double ChamferDepth = 0.5d;        // Chamfer
 
         // Engrave - the WIDTH of the cut stroke in mm, which is what an operator can see and measure. The

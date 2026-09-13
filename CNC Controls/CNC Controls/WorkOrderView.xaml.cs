@@ -138,7 +138,7 @@ namespace CNC.Controls
                            fldPatternCount, fldPatternRadius, fldPatternStartAngle, fldPatternArcSpan,
                            fldHoleDiameter, fldTotalDepth, fldDepthOfCut, fldPeckDepth, fldBoreStepDown, fldStepover,
                            fldNumTabs, fldTabWidth, fldTabHeight,
-                           fldWallStockToLeave, fldFloorStockToLeave, fldFloorBelow, fldChamferDepth, fldCountersinkDiameter };
+                           fldWallStockToLeave, fldFloorStockToLeave, fldFloorBelow, fldMarkDash, fldMarkGap, fldChamferDepth, fldCountersinkDiameter };
         }
 
         private bool placing = false;
@@ -1143,6 +1143,7 @@ namespace CNC.Controls
             fldWallStockToLeave.Value = op.WallStockToLeave;
             fldFloorStockToLeave.Value = op.FloorStockToLeave;
             fldFloorBelow.Value = op.FloorBelow;
+            chkMarkDashed.IsChecked = op.MarkDashed; fldMarkDash.Value = op.MarkDash; fldMarkGap.Value = op.MarkGap;
             fldChamferDepth.Value = op.ChamferDepth;
             fldEngraveWidth.Value = op.EngraveWidth;
             fldCarveMaxDepth.Value = op.CarveMaxDepth;
@@ -1191,6 +1192,9 @@ namespace CNC.Controls
             Show(fldWallStockToLeave, op.Kind == WorkOrderOpKind.SideFinish);
             Show(fldFloorStockToLeave, op.Kind == WorkOrderOpKind.BottomFinish);
             Show(fldFloorBelow, op.Kind == WorkOrderOpKind.ClearFloor);
+            Show(pnlMarkDashedRow, op.Kind == WorkOrderOpKind.Mark);
+            Show(fldMarkDash, op.Kind == WorkOrderOpKind.Mark && op.MarkDashed);
+            Show(fldMarkGap, op.Kind == WorkOrderOpKind.Mark && op.MarkDashed);
             Show(fldChamferDepth, op.Kind == WorkOrderOpKind.Chamfer);
 
             // Engraving asks for a stroke WIDTH, but what gets cut is a depth - so show the depth the
@@ -1309,6 +1313,7 @@ namespace CNC.Controls
                 op.WallStockToLeave = fldWallStockToLeave.Value;
                 op.FloorStockToLeave = fldFloorStockToLeave.Value;
                 op.FloorBelow = fldFloorBelow.Value;
+                op.MarkDash = fldMarkDash.Value; op.MarkGap = fldMarkGap.Value;   // MarkDashed itself is toggled in chkMarkDashed_Click
                 op.ChamferDepth = fldChamferDepth.Value;
                 op.EngraveWidth = fldEngraveWidth.Value;
                 op.CarveMaxDepth = fldCarveMaxDepth.Value;
@@ -1488,6 +1493,19 @@ namespace CNC.Controls
                 return;
 
             tp.CornerReliefs = chkCornerReliefs.IsChecked == true;
+            OnWorkOrderChanged();
+        }
+
+        // Dashed mark on/off. The dash and gap fields only mean something when it is on.
+        private void chkMarkDashed_Click(object sender, RoutedEventArgs e)
+        {
+            var op = selectedOp;
+            if (loadingFields || op == null)
+                return;
+
+            op.MarkDashed = chkMarkDashed.IsChecked == true;
+            Show(fldMarkDash, op.MarkDashed);
+            Show(fldMarkGap, op.MarkDashed);
             OnWorkOrderChanged();
         }
 
@@ -1889,7 +1907,8 @@ namespace CNC.Controls
             else if (op.Kind == WorkOrderOpKind.ClearFloor)
                 s += string.Format(" - {0:0.0##} mm below the carve floor, {1:0}% stepover", op.FloorBelow, op.Stepover);
             else if (op.Kind == WorkOrderOpKind.Mark)
-                s += string.Format(" - {0:0.0##} mm wide", op.EngraveWidth);
+                s += string.Format(" - {0:0.0##} mm wide{1}", op.EngraveWidth,
+                                   op.MarkDashed ? string.Format(", dashed {0:0.#}/{1:0.#} mm", op.MarkDash, op.MarkGap) : string.Empty);
 
             return s;
         }
@@ -2175,6 +2194,29 @@ namespace CNC.Controls
                     extra = Math.Max(extra, (op.CountersinkDiameter - tp.Diameter) / 2d);
             }
             return extra;
+        }
+
+        // The dashed Mark this toolpath previews as, when every operation on it is a Mark and one is
+        // dashed. Mixed with anything else the band is the more important thing to see, so null then.
+        private static WorkOrderOperation DashedMarkOf(WorkOrderToolpath tp)
+        {
+            WorkOrderOperation dashed = null;
+            foreach (var op in tp.Operations)
+            {
+                if (op.Kind != WorkOrderOpKind.Mark)
+                    return null;
+                if (op.MarkDashed && dashed == null)
+                    dashed = op;
+            }
+            return dashed;
+        }
+
+        // WPF measures a dash array in multiples of the stroke's thickness, so the mm lengths are scaled
+        // to pixels and then divided by the stroke drawn.
+        private static DoubleCollection DashArray(WorkOrderOperation mark, double scale, double thicknessPx)
+        {
+            double t = Math.Max(0.1d, thicknessPx);
+            return new DoubleCollection { Math.Max(0.1d, mark.MarkDash * scale / t), Math.Max(0.1d, mark.MarkGap * scale / t) };
         }
 
         // Half-width of the swath a LINE toolpath cuts - the tool center rides the line itself, so it removes a
@@ -2762,9 +2804,13 @@ namespace CNC.Controls
 
             // A line has no interior to clear or spare: the bit rides the line and sweeps a slot a full
             // diameter wide, so its envelope was always a band and stays one.
+            // A dashed mark previews as the dashes themselves, at the groove's width on the nominal
+            // outline - a solid band would say "continuous line" about a line that is not.
+            var dashedMark = DashedMarkOf(tp);
             if (tp.Geometry == WorkOrderGeometryKind.Line)
             {
-                AddLine(center, tp, scale, fill, Math.Max(1d, LineHalfWidthMm(tp) * 2d * scale));
+                double w = Math.Max(1d, LineHalfWidthMm(tp) * 2d * scale);
+                AddLine(center, tp, scale, dashedMark != null ? edge : fill, w, dashedMark != null ? DashArray(dashedMark, scale, w) : null);
                 return;
             }
 
@@ -2790,6 +2836,13 @@ namespace CNC.Controls
             if (tp.Geometry == WorkOrderGeometryKind.Svg)
             {
                 AddSvgOutline(center, tp, scale, fill);
+                return;
+            }
+
+            if (dashedMark != null)
+            {
+                double w = Math.Max(1d, dashedMark.EngraveWidth * scale);
+                AddOffsetOutline(center, tp, scale, 0d, edge, w, null, DashArray(dashedMark, scale, w));
                 return;
             }
 
@@ -2822,7 +2875,7 @@ namespace CNC.Controls
         // place the envelope's shape-per-geometry switch lives, so the band's three passes (body, outer
         // edge, inner edge) and the filled case cannot drift into describing different shapes.
         private void AddOffsetOutline(Point center, WorkOrderToolpath tp, double scale, double offsetMm,
-                                      Brush stroke, double thickness, Brush fill)
+                                      Brush stroke, double thickness, Brush fill, DoubleCollection dashes = null)
         {
             double o = offsetMm * scale;
             switch (tp.Geometry)
@@ -2830,35 +2883,38 @@ namespace CNC.Controls
                 case WorkOrderGeometryKind.Circle:
                 {
                     double r = Math.Max(0.5d, tp.Diameter / 2d * scale + o);
-                    AddEllipse(center, r, r, stroke, thickness, fill);
+                    AddEllipse(center, r, r, stroke, thickness, fill, dashes);
                     break;
                 }
                 case WorkOrderGeometryKind.Oval:
                     AddEllipse(center, Math.Max(0.5d, tp.Width / 2d * scale + o),
-                                       Math.Max(0.5d, tp.Depth / 2d * scale + o), stroke, thickness, fill);
+                                       Math.Max(0.5d, tp.Depth / 2d * scale + o), stroke, thickness, fill, dashes);
                     break;
                 case WorkOrderGeometryKind.Square:
                     AddRect(center, Math.Max(0.5d, tp.Size / 2d * scale + o),
-                                    Math.Max(0.5d, tp.Size / 2d * scale + o), stroke, thickness, fill);
+                                    Math.Max(0.5d, tp.Size / 2d * scale + o), stroke, thickness, fill, dashes);
                     break;
                 default:
                     AddRect(center, Math.Max(0.5d, tp.Width / 2d * scale + o),
-                                    Math.Max(0.5d, tp.Depth / 2d * scale + o), stroke, thickness, fill);
+                                    Math.Max(0.5d, tp.Depth / 2d * scale + o), stroke, thickness, fill, dashes);
                     break;
             }
         }
 
-        private void AddLine(Point center, WorkOrderToolpath tp, double scale, Brush stroke, double thickness)
+        private void AddLine(Point center, WorkOrderToolpath tp, double scale, Brush stroke, double thickness, DoubleCollection dashes = null)
         {
             double a = tp.Angle * Math.PI / 180d;
             double dx = Math.Cos(a) * tp.Length / 2d * scale, dy = Math.Sin(a) * tp.Length / 2d * scale;
-            drawTarget.Children.Add(new Line
+            var line = new Line
             {
                 X1 = center.X - dx, Y1 = center.Y + dy,   // screen Y grows downward
                 X2 = center.X + dx, Y2 = center.Y - dy,
                 Stroke = stroke, StrokeThickness = thickness,
-                StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round
-            });
+                StrokeStartLineCap = dashes == null ? PenLineCap.Round : PenLineCap.Flat,
+                StrokeEndLineCap = dashes == null ? PenLineCap.Round : PenLineCap.Flat
+            };
+            if (dashes != null) line.StrokeDashArray = dashes;
+            drawTarget.Children.Add(line);
         }
 
         // Draw the engraving exactly as it will be cut - the real glyph strokes, not a bounding box. The
@@ -2994,16 +3050,18 @@ namespace CNC.Controls
             drawTarget.Children.Add(new System.Windows.Shapes.Path { Data = geo, Fill = brush });
         }
 
-        private void AddEllipse(Point center, double rx, double ry, Brush stroke, double thickness, Brush fill)
+        private void AddEllipse(Point center, double rx, double ry, Brush stroke, double thickness, Brush fill, DoubleCollection dashes = null)
         {
             var el = new Ellipse { Width = rx * 2, Height = ry * 2, Stroke = stroke, StrokeThickness = thickness, Fill = fill };
+            if (dashes != null) el.StrokeDashArray = dashes;
             Canvas.SetLeft(el, center.X - rx); Canvas.SetTop(el, center.Y - ry);
             drawTarget.Children.Add(el);
         }
 
-        private void AddRect(Point center, double hw, double hh, Brush stroke, double thickness, Brush fill)
+        private void AddRect(Point center, double hw, double hh, Brush stroke, double thickness, Brush fill, DoubleCollection dashes = null)
         {
             var r = new Rectangle { Width = hw * 2, Height = hh * 2, Stroke = stroke, StrokeThickness = thickness, Fill = fill };
+            if (dashes != null) r.StrokeDashArray = dashes;
             Canvas.SetLeft(r, center.X - hw); Canvas.SetTop(r, center.Y - hh);
             drawTarget.Children.Add(r);
         }

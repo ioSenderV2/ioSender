@@ -1439,20 +1439,34 @@ namespace CNC.Controls
             if (path.Count < 2)
                 return lines;
 
+            // Dashed: the same outline cut as separate pieces, each its own plunge, a short hop between
+            // (the V-carve's hop - nothing on the stock is above the surface). Whole periods on a closed
+            // shape so the pattern meets itself - see OddJobsGeometry.Dashes.
+            bool closed = path.Count > 2 && Math.Abs(path[0][0] - path[path.Count - 1][0]) < 1e-6
+                                         && Math.Abs(path[0][1] - path[path.Count - 1][1]) < 1e-6;
+            var pieces = op.MarkDashed ? OddJobsGeometry.Dashes(path, closed, op.MarkDash, op.MarkGap)
+                                       : new List<List<double[]>> { path };
+            if (pieces.Count == 0)
+                return lines;
+
             lines.Add(string.Format(CultureInfo.InvariantCulture,
-                "(MARK {0:0.###} mm wide -> {1:0.###} mm deep at {2:0.#} deg included{3})",
+                "(MARK {0:0.###} mm wide -> {1:0.###} mm deep at {2:0.#} deg included{3}{4})",
                 cut.Width, depth, halfAngle * 360d / Math.PI,
-                cut.Clamped ? " - limited to the bit's own width" : string.Empty));
+                cut.Clamped ? " - limited to the bit's own width" : string.Empty,
+                op.MarkDashed ? string.Format(CultureInfo.InvariantCulture, ", dashed {0} x {1:0.##} mm", pieces.Count, op.MarkDash) : string.Empty));
 
             var depths = PassDepths(depth, op.DepthOfCut);
-            lines.Add("G0 Z" + F(SafeZ()));
-            lines.Add("G0 " + XY(path[0]));
-            double previousZ = 0d;
+            const double hop = 2d;
+            bool approached = false;
             foreach (double z in depths)
-            {
-                previousZ = AppendPlunge(lines, z, previousZ, op.PlungeFeed);
-                AppendPath(lines, path, z, op.Feed, null);
-            }
+                foreach (var piece in pieces)
+                {
+                    lines.Add("G0 Z" + F(approached ? hop : SafeZ()));
+                    approached = true;
+                    lines.Add("G0 " + XY(piece[0]));
+                    lines.Add("G1 Z" + F(z) + " F" + F(op.PlungeFeed));
+                    AppendPath(lines, piece, z, op.Feed, null);
+                }
             lines.Add("G0 Z" + F(SafeZ()));
             return lines;
         }

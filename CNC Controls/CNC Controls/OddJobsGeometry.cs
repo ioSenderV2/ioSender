@@ -123,6 +123,80 @@ namespace CNC.Controls
         // sample is inserted exactly at each window edge so the Z step lands at the right XY (no ramp - a
         // short vertical face at each tab edge, same as a typical no-ramp CAM tab). numTabs <= 0 or
         // tabHeight <= 0 returns the path unchanged at floorZ (no tabs).
+        /// <summary>
+        /// Split a polyline into dashes measured along it: pieces <paramref name="dash"/> long separated
+        /// by <paramref name="gap"/>. Closed paths (last point == first) get a whole number of periods, the
+        /// pitch stretched or shrunk by under half a period so the last gap meets the first dash without a
+        /// stub; open paths start and end with a dash. Dashes run through corners - they are lengths along
+        /// the path, not per segment. Each returned piece is an open polyline with the dash's endpoints
+        /// interpolated exactly.
+        /// </summary>
+        public static List<List<double[]>> Dashes(List<double[]> path, bool closed, double dash, double gap)
+        {
+            var result = new List<List<double[]>>();
+            if (path == null || path.Count < 2 || dash <= 0d)
+                return result;
+            if (gap < 0d)
+                gap = 0d;
+
+            var seg = new List<double>(path.Count);   // cumulative length at each vertex
+            double total = 0d;
+            seg.Add(0d);
+            for (int i = 1; i < path.Count; i++)
+            {
+                double dx = path[i][0] - path[i - 1][0], dy = path[i][1] - path[i - 1][1];
+                total += Math.Sqrt(dx * dx + dy * dy);
+                seg.Add(total);
+            }
+            if (total <= dash)
+            {
+                result.Add(new List<double[]>(path));
+                return result;
+            }
+
+            double pitch = dash + gap;
+            int n;
+            double dashLen;
+            if (closed)
+            {
+                n = Math.Max(1, (int)Math.Round(total / pitch));
+                pitch = total / n;
+                dashLen = Math.Min(dash, pitch);
+            }
+            else
+            {
+                // Dashes at both ends: n dashes, n-1 gaps. Fit the gap so the pattern spans the length.
+                n = Math.Max(2, (int)Math.Round((total + gap) / pitch));
+                dashLen = Math.Min(dash, total / n);
+                pitch = n > 1 ? (total - dashLen) / (n - 1) : total;
+            }
+
+            for (int k = 0; k < n; k++)
+            {
+                double s0 = k * pitch, s1 = Math.Min(total, s0 + dashLen);
+                var piece = new List<double[]>();
+                piece.Add(PointAt(path, seg, s0));
+                for (int i = 1; i < path.Count; i++)
+                    if (seg[i] > s0 && seg[i] < s1)
+                        piece.Add(path[i]);
+                piece.Add(PointAt(path, seg, s1));
+                result.Add(piece);
+            }
+            return result;
+        }
+
+        private static double[] PointAt(List<double[]> path, List<double> seg, double s)
+        {
+            int i = 1;
+            while (i < seg.Count - 1 && seg[i] < s)
+                i++;
+            double len = seg[i] - seg[i - 1];
+            double t = len > 1e-12 ? (s - seg[i - 1]) / len : 0d;
+            t = t < 0d ? 0d : t > 1d ? 1d : t;
+            return new[] { path[i - 1][0] + t * (path[i][0] - path[i - 1][0]),
+                           path[i - 1][1] + t * (path[i][1] - path[i - 1][1]) };
+        }
+
         public static List<double[]> ApplyTabs(List<double[]> path, double floorZ, double tabHeight, int numTabs, double tabWidth)
         {
             var outPts = new List<double[]>();

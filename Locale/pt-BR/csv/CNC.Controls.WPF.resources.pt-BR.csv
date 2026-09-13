@@ -1895,3 +1895,11 @@ CNC.Controls.WPF.g.en-US.resources:workorderview.baml,cbx_wosvgpanel:System.Wind
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wofloorbelow:CNC.Controls.NumericField.Label,None,False,True,,Below carve floor:
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wofloorbelow:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_wofloorbelow:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"How far past the V-carve's floor the mill cuts. At exactly the carve's depth the mill's end face rides a finished surface and rubs, which burns hardwood - a tenth below keeps it taking a chip. The step it leaves at the wall is invisible."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_womarkdashed:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Dashed
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_womarkdashed:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Cut the line as dashes. On a closed shape the pitch is adjusted a hair so a whole number of dashes goes round and the pattern meets itself; a line gets a dash at each end. Every dash is its own plunge.
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_womarkdash:CNC.Controls.NumericField.Label,None,False,True,,Dash:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_womarkdash:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_womarkdash:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Length of each dash, measured along the line - a dash can run round a corner."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_womarkgap:CNC.Controls.NumericField.Label,None,False,True,,Gap:
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_womarkgap:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_womarkgap:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Length of the gap between dashes, measured along the line."
