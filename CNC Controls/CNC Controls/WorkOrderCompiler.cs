@@ -1420,6 +1420,43 @@ namespace CNC.Controls
             return lines;
         }
 
+        // A V-bit's tip along the geometry's own outline - no offset - as deep as the requested groove
+        // width comes out on this bit: the same depth-from-width answer a stroke engrave uses
+        // (CustomTool.EngraveCutFor), clamp at the bit's own diameter included. A marking line around a
+        // badge, a decorative border. Feed rather than PlungeFeed for the trace, PlungeFeed for the
+        // entry, like every other pass.
+        private static List<string> BuildMark(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
+        {
+            var lines = new List<string>();
+            var tool = CustomTools.Find(op.Tool);
+            var cut = tool != null ? tool.EngraveCutFor(op.EngraveWidth)
+                                   : new EngraveCut { Width = Math.Max(0.01d, op.EngraveWidth), MaxWidth = double.MaxValue,
+                                                      Depth = Math.Max(0.01d, op.EngraveWidth) / 2d };
+            double halfAngle = tool != null ? tool.HalfAngleRad : Math.PI / 4d;
+            double depth = Math.Max(0.01d, cut.Depth);
+
+            var path = OrderForDirection(Outline(tp, cx, cy, 0d), tp, op);
+            if (path.Count < 2)
+                return lines;
+
+            lines.Add(string.Format(CultureInfo.InvariantCulture,
+                "(MARK {0:0.###} mm wide -> {1:0.###} mm deep at {2:0.#} deg included{3})",
+                cut.Width, depth, halfAngle * 360d / Math.PI,
+                cut.Clamped ? " - limited to the bit's own width" : string.Empty));
+
+            var depths = PassDepths(depth, op.DepthOfCut);
+            lines.Add("G0 Z" + F(SafeZ()));
+            lines.Add("G0 " + XY(path[0]));
+            double previousZ = 0d;
+            foreach (double z in depths)
+            {
+                previousZ = AppendPlunge(lines, z, previousZ, op.PlungeFeed);
+                AppendPath(lines, path, z, op.Feed, null);
+            }
+            lines.Add("G0 Z" + F(SafeZ()));
+            return lines;
+        }
+
         // A countersink bit plunged straight down a round hole's centerline - the bit's own cone does the
         // chamfering as it descends, so there's no outline to trace at all (unlike Chamfer above).
         // op.CountersinkDiameter is the FINISHED diameter the operator wants, not a raw depth - converted
@@ -1742,6 +1779,7 @@ namespace CNC.Controls
                     case WorkOrderOpKind.Surface: lines.AddRange(BuildSurface(tp, op, cx, cy)); break;
                     case WorkOrderOpKind.Engrave: lines.AddRange(BuildEngrave(tp, op, cx, cy)); break;
                     case WorkOrderOpKind.ClearFloor: lines.AddRange(BuildClearFloor(tp, op, cx, cy)); break;
+                    case WorkOrderOpKind.Mark: lines.AddRange(BuildMark(tp, op, cx, cy)); break;
                 }
             }
 
@@ -2061,6 +2099,13 @@ namespace CNC.Controls
                         case WorkOrderOpKind.Chamfer:
                             desc = string.Format("chamfer, {0:0.0#} mm", op.ChamferDepth);
                             break;
+                        case WorkOrderOpKind.Mark:
+                            {
+                                var vee = CustomTools.Find(op.Tool);
+                                double d = vee != null ? vee.EngraveCutFor(op.EngraveWidth).Depth : op.EngraveWidth / 2d;
+                                desc = string.Format("mark {0:0.0##} mm wide, {1:0.0##} mm deep", op.EngraveWidth, d);
+                                break;
+                            }
                         case WorkOrderOpKind.Countersink:
                             desc = string.Format("countersink, Ø{0:0.##} mm target", op.CountersinkDiameter);
                             break;

@@ -60,7 +60,10 @@ namespace CNC.Controls
 
     // ClearFloor: an end mill flattens the floor a V-carve leaves at its depth cap - see
     // WorkOrderRules.CarveFloor and VCarve.FloorRings. Only offered where the toolpath V-carves.
-    public enum WorkOrderOpKind { Pocket, Contour, Drill, Bore, SideFinish, BottomFinish, Chamfer, Countersink, Surface, Engrave, ClearFloor }
+    // Mark: a V-bit's tip traces the geometry's outline itself (no offset), as deep as the requested
+    // groove width makes it on that bit - a Contour offsets by an end mill's radius and cuts to a total
+    // depth, which is the wrong tool for a 1 mm marking line around a badge.
+    public enum WorkOrderOpKind { Pocket, Contour, Drill, Bore, SideFinish, BottomFinish, Chamfer, Countersink, Surface, Engrave, ClearFloor, Mark }
 
     // Where fitted text sits inside its shape when it is smaller than the space available (see
     // WorkOrderTextFit). Vertical is +Y ("Top" = the back of the machine as drawn, the top on screen).
@@ -1263,6 +1266,7 @@ namespace CNC.Controls
                 case WorkOrderOpKind.Countersink: return "Countersink (plunge to a target diameter)";
                 case WorkOrderOpKind.Surface: return "Surface (face the whole area)";
                 case WorkOrderOpKind.ClearFloor: return "Clear floor (end mill flattens the V-carve's floor)";
+                case WorkOrderOpKind.Mark: return "Mark (a V-bit traces the outline as a shallow groove)";
                 default: return kind.ToString();
             }
         }
@@ -1378,6 +1382,8 @@ namespace CNC.Controls
             if (tp.IsClosed)
                 yield return WorkOrderOpKind.BottomFinish;
             yield return WorkOrderOpKind.Chamfer;
+            // A marking line along the outline - the tip on the line, width from the bit's angle.
+            yield return WorkOrderOpKind.Mark;
 
             // Shape text: the checkbox on the geometry is what makes Engrave meaningful here - the
             // engraved thing is the fitted text, cut by this op's own V-bit and stroke width.
@@ -1534,6 +1540,16 @@ namespace CNC.Controls
                             warnings.Add(label + "Clear floor: pick an end mill - a pointed bit cannot flatten a floor.");
                     }
 
+                    // A groove's depth comes from its width and the bit's angle, so it needs an angle.
+                    if (op.Kind == WorkOrderOpKind.Mark)
+                    {
+                        var vee = CustomTools.Find(op.Tool);
+                        if (vee != null && vee.Kind != CustomToolKind.VBitOrChamfer)
+                            warnings.Add(label + "Mark: pick a V-bit - the groove's depth follows from its width and the bit's angle.");
+                        if (op.EngraveWidth <= 0d)
+                            warnings.Add(label + "Mark width must be greater than zero.");
+                    }
+
                     // ADVISORY, not blocking - see the overload's own comment. The size list is a list of
                     // what usually exists, not of what is in this operator's rack, so it can say "use a
                     // Bore instead" about a bit they are holding. Worth saying, never worth refusing.
@@ -1677,6 +1693,8 @@ namespace CNC.Controls
                     return string.Format("Bottom finish - Ø{0:0.##}, leaves {1:0.0##} mm", op.BitDiameter, op.FloorStockToLeave);
                 case WorkOrderOpKind.ClearFloor:
                     return string.Format("Clear floor - Ø{0:0.##}, {1:0.0##} mm below the carve floor", op.BitDiameter, op.FloorBelow);
+                case WorkOrderOpKind.Mark:
+                    return string.Format("Mark - {0:0.0##} mm wide", op.EngraveWidth);
                 case WorkOrderOpKind.Chamfer:
                     return string.Format("Chamfer - {0:0.0#} mm deep", op.ChamferDepth);
                 case WorkOrderOpKind.Countersink:

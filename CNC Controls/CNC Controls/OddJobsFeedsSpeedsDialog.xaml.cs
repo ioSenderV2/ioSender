@@ -163,7 +163,7 @@ namespace CNC.Controls
             // NEGATION of the special cases - a new operation kind that nobody adds to this list silently
             // becomes a milling operation, which is how Engrave first shipped offering end mills and hiding
             // the V-bit, the exact opposite of what it needs.
-            bool isVeeTool = kind == WorkOrderOpKind.Chamfer || kind == WorkOrderOpKind.Engrave;
+            bool isVeeTool = kind == WorkOrderOpKind.Chamfer || kind == WorkOrderOpKind.Engrave || kind == WorkOrderOpKind.Mark;
             bool isSurface = kind == WorkOrderOpKind.Surface;
             bool isMill = !isDrill && !isCountersink && !isVeeTool && !isSurface;
 

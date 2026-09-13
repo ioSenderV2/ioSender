@@ -333,6 +333,13 @@ namespace CNC.Controls
                     // A small end mill flattening a carve's floor is a finishing cut in every sense.
                     op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("finishing", material);
                     break;
+                case WorkOrderOpKind.Mark:
+                    // Same tool class as Chamfer and Engrave - the point of a V-bit. 1 mm is the marking
+                    // line it was asked for; the stroke-engrave default of 0.8 is a lettering width.
+                    op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("chamfer", material);
+                    op.Feed = 500d;
+                    op.EngraveWidth = 1d;
+                    break;
             }
 
             // The operation's diameter follows whatever tool was just chosen - the definition is the
@@ -1198,7 +1205,10 @@ namespace CNC.Controls
             // stroke plunge depth. It is the same property BuildEngrave routes on, so the editor and the
             // cut cannot disagree about what this toolpath is.
             bool isCarve = isEngrave && selectedToolpath != null && selectedToolpath.CarvesOutlines;
-            Show(fldEngraveWidth, isEngrave && !isCarve);
+            // A mark is the stroke branch of an engrave applied to the geometry's outline: same width
+            // field, same depth-from-width note, never a carve.
+            bool isMark = op.Kind == WorkOrderOpKind.Mark;
+            Show(fldEngraveWidth, (isEngrave && !isCarve) || isMark);
             // The mirror image of the width field: a carve has no stroke width to ask for, but it is the
             // only thing that HAS a depth worth capping (a stroke engrave's depth already follows from
             // the width above it).
@@ -1206,7 +1216,7 @@ namespace CNC.Controls
             // Clear floor has no depth of its own to show - it follows the carve's - so the same note
             // says what it will follow, or that there is nothing to follow yet.
             bool isClearFloor = op.Kind == WorkOrderOpKind.ClearFloor;
-            Show(txtEngraveDepth, isEngrave || isClearFloor);
+            Show(txtEngraveDepth, isEngrave || isClearFloor || isMark);
             if (isClearFloor)
             {
                 var floor = WorkOrderRules.CarveFloorOf(selectedToolpath);
@@ -1227,7 +1237,7 @@ namespace CNC.Controls
                             ? "  Pick an end mill for this operation." : string.Empty,
                         passes, passes == 1 ? string.Empty : "es", Math.Max(0d, op.FloorBelow));
             }
-            if (isEngrave)
+            if (isEngrave || isMark)
             {
                 var vtool = CustomTools.Find(op.Tool);
                 double half = vtool != null ? vtool.HalfAngleRad : Math.PI / 4d;
@@ -1878,6 +1888,8 @@ namespace CNC.Controls
                 s += string.Format(" - {0:0.0##} mm floor stock to leave", op.FloorStockToLeave);
             else if (op.Kind == WorkOrderOpKind.ClearFloor)
                 s += string.Format(" - {0:0.0##} mm below the carve floor, {1:0}% stepover", op.FloorBelow, op.Stepover);
+            else if (op.Kind == WorkOrderOpKind.Mark)
+                s += string.Format(" - {0:0.0##} mm wide", op.EngraveWidth);
 
             return s;
         }
@@ -2157,6 +2169,8 @@ namespace CNC.Controls
             {
                 if (op.Kind == WorkOrderOpKind.Chamfer)
                     extra = Math.Max(extra, op.ChamferDepth);
+                else if (op.Kind == WorkOrderOpKind.Mark)
+                    extra = Math.Max(extra, op.EngraveWidth / 2d);   // the tip rides the line, the groove straddles it
                 else if (op.Kind == WorkOrderOpKind.Countersink)
                     extra = Math.Max(extra, (op.CountersinkDiameter - tp.Diameter) / 2d);
             }
@@ -2169,7 +2183,9 @@ namespace CNC.Controls
         {
             double half = 0d;
             foreach (var op in tp.Operations)
-                half = Math.Max(half, op.BitDiameter / 2d + (op.Kind == WorkOrderOpKind.Chamfer ? op.ChamferDepth : 0d));
+                half = Math.Max(half, op.Kind == WorkOrderOpKind.Mark
+                                      ? op.EngraveWidth / 2d   // a V-bit's tip on the line opens only the groove's width, not its shank's
+                                      : op.BitDiameter / 2d + (op.Kind == WorkOrderOpKind.Chamfer ? op.ChamferDepth : 0d));
             return half;
         }
 
@@ -2695,6 +2711,7 @@ namespace CNC.Controls
                     case WorkOrderOpKind.Contour:
                     case WorkOrderOpKind.SideFinish:
                     case WorkOrderOpKind.Chamfer:
+                    case WorkOrderOpKind.Mark:
                         break;
                     default:
                         // Pocket/Surface clear the area; Drill/Bore/Countersink make a hole; BottomFinish
