@@ -1,4 +1,4 @@
-/*
+﻿/*
  * CalibrationView.xaml.cs - part of CNC Controls library
  *
  * The three machine-calibration wizards as a top-level view: stepper calibration by probing a
@@ -64,19 +64,21 @@ namespace CNC.Controls
 
         #endregion
 
-        // Stepper calibration (probe) needs a real 3D probe to do anything useful - it probes the faces of an
-        // unwired reference block, which a tool setter (Z only, fixed position) and a touch plate (the plate
-        // IS the sensor) cannot do. Disable the sub-tab rather than letting the operator in to a page whose
-        // every action refuses. The scratch wizard beside it needs no probe at all, which is the whole reason
-        // it was restored - so there is always a way to calibrate steps/mm.
+        // Stepper calibration (probe) needs a 3D probe OR a touch plate. It was 3D-only until 2026-09-13, on
+        // my reasoning that a touch plate cannot feel an unwired block - which is wrong, and was disproven on
+        // real hardware through Setup's own Measure option: the plate is handheld, so the program simply
+        // pauses at safe Z to let it be moved to each corner. A tool setter still does not qualify (Z only,
+        // fixed position, nothing to bring to a corner). The scratch wizard beside it needs no probe at all,
+        // which is why it exists - so there is always a way to calibrate steps/mm.
         private void UpdateProbeAvailability()
         {
-            bool has3d = ProbeDefinitions.Items.Any(p => p.ProbeType == ProbeType.ThreeDProbe);
-            tabCalStepper.IsEnabled = has3d;
+            bool canProbe = ProbeDefinitions.Items.Any(p => p.ProbeType == ProbeType.ThreeDProbe
+                                                         || p.ProbeType == ProbeType.TouchPlate);
+            tabCalStepper.IsEnabled = canProbe;
 
             // Never leave the selection sitting on a tab that has just been disabled - a disabled TabItem
             // keeps its selection and shows its (dead) content, which reads as the app having hung.
-            if (!has3d && tabCalibration.SelectedItem == tabCalStepper)
+            if (!canProbe && tabCalibration.SelectedItem == tabCalStepper)
                 tabCalibration.SelectedItem = tabCalScratch;
         }
 

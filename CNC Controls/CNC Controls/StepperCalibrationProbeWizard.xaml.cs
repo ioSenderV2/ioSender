@@ -168,6 +168,7 @@ namespace CNC.Controls
             if (activate)
             {
                 RefreshFixtures();
+                RefreshProbeChoices();   // probe definitions may have been edited since this tab was last shown
                 if (!subscribed && model != null)
                 {
                     model.PropertyChanged += Model_PropertyChanged;
@@ -222,11 +223,12 @@ namespace CNC.Controls
             if (!isActiveTab)
                 return;
             bool isZ = rbAxisZ.IsChecked == true;
-            MacroProcessor.IsGenerateReady = isZ ? ActiveProbe() != null : SelectedFixture != null;
+            bool haveProbe = ActiveProbe() != null;
+            MacroProcessor.IsGenerateReady = haveProbe && (isZ || SelectedFixture != null);
             // After the gate, never before: setting it ready clears the reason (see MacroProcessor).
             if (!MacroProcessor.IsGenerateReady)
-                MacroProcessor.GenerateBlockedReason = isZ
-                    ? "Z calibration needs a 3D probe - define one in Machine Setup > Probe definitions."
+                MacroProcessor.GenerateBlockedReason = !haveProbe
+                    ? "No " + (IsTouchPlate ? "touch plate" : "3D probe") + " is defined - add one in Machine Setup > Probe definitions."
                     : "Select a validated Corner Fence fixture first (Machine Setup > Fixture definitions).";
         }
 
@@ -256,6 +258,19 @@ namespace CNC.Controls
         }
 
         private Fixture SelectedFixture { get { return cbxFixture.SelectedItem as Fixture; } }
+
+        // Changing the probe type changes the generated program (pcorner mode, plate/lip offsets, and
+        // whether it pauses to let the plate be moved), so a program built for the other type is stale -
+        // same treatment as changing the fixture.
+        private void cbxProbeType_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            btnSave.IsEnabled = false;
+            newStepsX = newStepsY = newStepsZ = null;
+            RefreshProbeChoices();
+            Persist();
+            DiscardProgram();
+            RefreshGenerateReady();
+        }
 
         private void cbxFixture_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -517,9 +532,49 @@ namespace CNC.Controls
             }
         }
 
-        private ProbeDefinition ActiveProbe()
+        // Probe type picker (index 0 = 3D Probe, 1 = Touch Plate) - mirrors StartJobView.IsTouchPlate, whose
+        // Measure option is where corner-probing with a touch plate was proven on real hardware.
+        private bool IsTouchPlate
+        {
+            get { return cbxProbeType != null && cbxProbeType.SelectedIndex == 1; }
+            set { if (cbxProbeType != null) cbxProbeType.SelectedIndex = value ? 1 : 0; }
+        }
+
+        private static ProbeDefinition ThreeDProbe()
         {
             return ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.ThreeDProbe);
+        }
+
+        // Touch plate: probes by electrical continuity through the same probe input (pcorner.macro's
+        // _ls_mode = 1). Unlike a spindle-mounted 3D probe it is handheld and has to be moved to each corner,
+        // which is the one behavioural difference in the generated program - see BuildProgram's pauses.
+        private static ProbeDefinition TouchPlateProbe()
+        {
+            return ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.TouchPlate);
+        }
+
+        private ProbeDefinition ActiveProbe()
+        {
+            return IsTouchPlate ? TouchPlateProbe() : ThreeDProbe();
+        }
+
+        // Offer only the probe types actually defined, and never leave the picker on one that is not - the
+        // same rule (and the same fallback) StartJobView.UpdateProbeWarning follows.
+        private void RefreshProbeChoices()
+        {
+            if (cbxProbeType == null)
+                return;
+
+            bool has3d = ThreeDProbe() != null, hasTouch = TouchPlateProbe() != null;
+            cbiProbe3d.IsEnabled = has3d;
+            cbiProbeTouch.IsEnabled = hasTouch;
+
+            if (IsTouchPlate && !hasTouch && has3d)
+                IsTouchPlate = false;
+            else if (!IsTouchPlate && !has3d && hasTouch)
+                IsTouchPlate = true;
+
+            txtNoProbe.Visibility = ActiveProbe() == null ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void Generate()
@@ -552,7 +607,7 @@ namespace CNC.Controls
             var p = ActiveProbe();
             if (p == null)
             {
-                txtWarnings.Text = "Define a 3D probe first (Machine Setup > Probe definitions).";
+                txtWarnings.Text = "Define a " + (IsTouchPlate ? "touch plate" : "3D probe") + " first (Machine Setup > Probe definitions).";
                 return;
             }
 
@@ -569,7 +624,7 @@ namespace CNC.Controls
             btnSave.IsEnabled = false;
             ShowResult();
 
-            program = BuildProgram(fx, p, trueW, trueH, CornerTravelMarginMm);
+            program = BuildProgram(fx, p, trueW, trueH, CornerTravelMarginMm, IsTouchPlate);
             MacroProcessor.PublishGenerated("Stepper calibration (probe) XY", program, EnsureProgramView, () => programView);
             if (isActiveTab)
                 MacroProcessor.IsProgramGenerated = true;   // flips the shared Run bar from "Generate" to "Run"
@@ -580,7 +635,7 @@ namespace CNC.Controls
             var p = ActiveProbe();
             if (p == null)
             {
-                txtWarnings.Text = "Define a 3D probe first (Machine Setup > Probe definitions).";
+                txtWarnings.Text = "Define a " + (IsTouchPlate ? "touch plate" : "3D probe") + " first (Machine Setup > Probe definitions).";
                 return;
             }
 
@@ -604,7 +659,7 @@ namespace CNC.Controls
             btnSave.IsEnabled = false;
             ShowResult();
 
-            program = BuildProgramZ(p, g1, g2, g3, reuseStartPos && hasStartPos, startPosX, startPosY, startPosZ);
+            program = BuildProgramZ(p, g1, g2, g3, reuseStartPos && hasStartPos, startPosX, startPosY, startPosZ, IsTouchPlate);
             MacroProcessor.PublishGenerated("Stepper calibration (probe) Z", program, EnsureProgramView, () => programView);
             if (isActiveTab)
                 MacroProcessor.IsProgramGenerated = true;   // flips the shared Run bar from "Generate" to "Run"
@@ -696,7 +751,8 @@ namespace CNC.Controls
         // both tight/"exact" references derived from the ENTERED true size - the whole premise of this
         // tool is that size is already precisely known, so there's no need for a loose locate pass. Same
         // "5mm inset" anchor formula as StartJobView.BuildProgram's own exact-size corners 2/3.
-        private static string BuildProgram(Fixture fx, ProbeDefinition p, double trueWidthMm, double trueHeightMm, double cornerTravelMarginMm)
+        private static string BuildProgram(Fixture fx, ProbeDefinition p, double trueWidthMm, double trueHeightMm,
+                                          double cornerTravelMarginMm, bool touchPlate)
         {
             const double insetMm = 5d;
             double r = p.ProbeDiameter / 2d;
@@ -721,9 +777,13 @@ namespace CNC.Controls
             // conservative (matching the approach height's own worst-case "assume <=1in" fallback) rather
             // than 0, which would under-size the clearance now that the global is actually used again.
             b.AppendLine("#<_ls_thickness> = 25.4");
-            b.AppendLine("#<_ls_mode> = 0");
-            b.AppendLine("#<_ls_plateoffset> = 0");
-            b.AppendLine("#<_ls_lipoffset> = 0");   // always the 3D probe here
+            // 2026-09-13: these were hardcoded to 0 with "always the 3D probe here". A touch plate works
+            // perfectly well against a reference block - demonstrated on hardware through Setup's own Measure
+            // option - it is just handheld rather than spindle-mounted. Same three variables, same meanings,
+            // as StartJobView's own corner probing, which is the proven caller of this macro.
+            b.AppendLine(string.Format("#<_ls_mode> = {0}", touchPlate ? 1 : 0));
+            b.AppendLine(string.Format("#<_ls_plateoffset> = {0}", (touchPlate ? p.PlateThickness : 0d).ToInvariantString("0.0##")));
+            b.AppendLine(string.Format("#<_ls_lipoffset> = {0}", (touchPlate ? p.LipWidth : 0d).ToInvariantString("0.0##")));
             b.AppendLine("#<_ls_edgemargin> = 10");   // see pcorner.macro's own comment - slop against an unconfirmed edge
             b.AppendLine(string.Format("#<_ls_searchf> = {0}", searchF));
             b.AppendLine(string.Format("#<_ls_latchf> = {0}", latchF));
@@ -737,7 +797,9 @@ namespace CNC.Controls
             b.AppendLine("(park at G30 - install / confirm the probe)");
             MacroProcessor.EmitGotoG30(l => b.AppendLine(l));
             b.AppendLine("(WAITIDLE)");
-            b.AppendLine(string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. It must MATCH what is in the spindle - the wrong tip silently shifts the work origin by half the diameter difference. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
+            b.AppendLine(touchPlate
+                ? string.Format("(MBOX, OKCANCEL, Using touch plate: {0}. Fit the {1} bit or dowel it is set up for, clip the lead to the stock, and place the plate on the FIRST corner of the reference block. Click OK. Cancel aborts.)", p.Name, p.TipDescription)
+                : string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. It must MATCH what is in the spindle - the wrong tip silently shifts the work origin by half the diameter difference. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
 
             // Corner 1 (origin, FrontLeft) - REUSE mode, corner offset only (no locate pass). #<_bottom> falls
             // back to the machine's own Z floor rather than a cached spoilboard reading (see the TLO-baseline
@@ -761,6 +823,14 @@ namespace CNC.Controls
             b.AppendLine("#<c1z> = #<_corner_z>");
             b.AppendLine(string.Format("#<c1_maxz> = [#<c1z> + {0}]", cornerTravelMarginMm.ToInvariantString("0.0##")));
 
+            // A touch plate is handheld: it has to be physically carried to each corner between calls, unlike
+            // a 3D probe that stays in the spindle for the whole run. pcorner.macro leaves the machine clear
+            // of the block after each corner, so this prompt IS the pause at safe Z. Not needed before corner
+            // 1 (that placement happens at the install prompt above) or after corner 3 (nothing left to
+            // probe). Same pattern, same reason, as StartJobView's own Measure sequence.
+            if (touchPlate)
+                b.AppendLine("(MBOX, OK, Move the touch plate to the X-neighbour corner (along the true WIDTH from the first corner), then click OK.)");
+
             // Corner 2 (X-neighbour, FrontRight, id=2) - tight reference from the ENTERED true width.
             b.AppendLine("(--- corner 2 (X-neighbour) ---)");
             b.AppendLine("#<_ls_topx> = 15");
@@ -775,6 +845,9 @@ namespace CNC.Controls
             b.AppendLine("#<c2x> = #<_corner_x>");
             b.AppendLine("#<size_x> = [#<c2x> - #<c1x>]");
             b.AppendLine("(PRINT, CAL_X=#<size_x>)");
+
+            if (touchPlate)
+                b.AppendLine("(MBOX, OK, Move the touch plate to the Y-neighbour corner (along the true HEIGHT from the first corner), then click OK.)");
 
             // Corner 3 (Y-neighbour, BackLeft, id=3) - tight reference from the ENTERED true height.
             b.AppendLine("(--- corner 3 (Y-neighbour) ---)");
@@ -810,8 +883,14 @@ namespace CNC.Controls
         // capture) rapids straight to that saved position instead of prompting for a manual jog - the
         // position is re-captured (and re-printed) either way, right after whichever path got there, so it
         // keeps tracking wherever the operator last actually confirmed, automated or not.
+        //
+        // touchPlate: the plate sits on the spoilboard for the baseline and on the block for each size, so
+        // its thickness appears in BOTH readings and CANCELS - every value this produces is a delta from the
+        // baseline (see Recompute's regression-through-the-origin comment), so no plate offset is applied
+        // here. What the plate does need is somewhere to be moved to between probes, which the existing
+        // per-size prompts already provide; only their wording changes.
         private static string BuildProgramZ(ProbeDefinition p, double g1Mm, double g2Mm, double g3Mm,
-            bool reuseStartPos, double startX, double startY, double startZ)
+            bool reuseStartPos, double startX, double startY, double startZ, bool touchPlate)
         {
             const double clearanceMm = 10d;
             const double jogSearchMm = 25d;    // step 1: operator jogged "within 10mm" by eye - generous margin
@@ -835,7 +914,9 @@ namespace CNC.Controls
             b.AppendLine("(park at G30 - install / confirm the probe)");
             MacroProcessor.EmitGotoG30(l => b.AppendLine(l));
             b.AppendLine("(WAITIDLE)");
-            b.AppendLine(string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. It must MATCH what is in the spindle - the wrong tip silently shifts the work origin by half the diameter difference. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
+            b.AppendLine(touchPlate
+                ? string.Format("(MBOX, OKCANCEL, Using touch plate: {0}. Fit the {1} bit or dowel it is set up for and clip the lead on. The plate goes on the SPOILBOARD for the baseline, then on top of the gauge block for each size - its thickness cancels out. Click OK. Cancel aborts.)", p.Name, p.TipDescription)
+                : string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. It must MATCH what is in the spindle - the wrong tip silently shifts the work origin by half the diameter difference. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
 
             b.AppendLine("(--- spoilboard baseline ---)");
             if (reuseStartPos)
@@ -858,7 +939,9 @@ namespace CNC.Controls
                 b.AppendLine("(WAITIDLE)");
             }
             else
-                b.AppendLine("(MBOX, OKCANCEL, Manually jog the probe to within 10mm of the spoilboard - clear of any obstructions - then click OK. Cancel aborts.)");
+                b.AppendLine(touchPlate
+                    ? "(MBOX, OKCANCEL, Place the touch plate flat on the spoilboard and jog the tool to within 10mm above it - clear of any obstructions - then click OK. Cancel aborts.)"
+                    : "(MBOX, OKCANCEL, Manually jog the probe to within 10mm of the spoilboard - clear of any obstructions - then click OK. Cancel aborts.)");
             // Capture the pre-descent position into NGC vars now (this IS the "starting point"), but don't
             // PRINT/persist it yet - only once the probe below actually PROVES it found the spoilboard (a
             // real trigger, #<_gz0> assigned). Saving on mere arrival - before the probe result is known -
@@ -886,8 +969,11 @@ namespace CNC.Controls
             for (int i = 0; i < 3; i++)
             {
                 b.AppendLine(string.Format("(--- gauge size {0} ({1}) ---)", i + 1, sizeLabel[i]));
-                b.AppendLine(string.Format("(MBOX, OKCANCEL, Position the gauge block under the probe tip - its {0} ({1}mm) side up. Only one orientation fits here. Click OK. Cancel aborts.)",
-                    sizeLabel[i], g[i].ToInvariantString("0.0##")));
+                b.AppendLine(touchPlate
+                    ? string.Format("(MBOX, OKCANCEL, Position the gauge block under the tool - its {0} ({1}mm) side up - and put the touch plate flat on top of it. Only one orientation fits here. Click OK. Cancel aborts.)",
+                        sizeLabel[i], g[i].ToInvariantString("0.0##"))
+                    : string.Format("(MBOX, OKCANCEL, Position the gauge block under the probe tip - its {0} ({1}mm) side up. Only one orientation fits here. Click OK. Cancel aborts.)",
+                        sizeLabel[i], g[i].ToInvariantString("0.0##")));
                 b.AppendLine("G91");
                 b.AppendLine(string.Format("G38.2 Z-{0} F[{1}]", probeSearchMm.ToInvariantString("0.0##"), searchF));
                 b.AppendLine("G0 Z2");
@@ -933,6 +1019,7 @@ namespace CNC.Controls
             TrueHeight = p.TrueHeight;
             CornerTravelMarginMm = p.CornerTravelMarginMm;
             restoreFixtureName = p.FixtureName;
+            IsTouchPlate = p.Probe == "TouchPlate";
             GaugeSize1 = p.GaugeSize1;
             GaugeSize2 = p.GaugeSize2;
             GaugeSize3 = p.GaugeSize3;
@@ -959,6 +1046,7 @@ namespace CNC.Controls
                 TrueHeight = TrueHeight,
                 CornerTravelMarginMm = CornerTravelMarginMm,
                 FixtureName = SelectedFixture?.Name ?? restoreFixtureName,
+                Probe = IsTouchPlate ? "TouchPlate" : "ThreeDProbe",
                 CalibrateZ = rbAxisZ.IsChecked == true,
                 GaugeSize1 = GaugeSize1,
                 GaugeSize2 = GaugeSize2,
@@ -987,6 +1075,10 @@ namespace CNC.Controls
         public double TrueWidth = 400d, TrueHeight = 400d;
         public double CornerTravelMarginMm = 15d;
         public string FixtureName = string.Empty;
+        // "ThreeDProbe" or "TouchPlate" - same two spellings StartJobSettings.Probe uses, so the two tools
+        // describe the same choice the same way. RefreshProbeChoices overrides it on load if the saved type
+        // is no longer defined.
+        public string Probe = "ThreeDProbe";
         public bool CalibrateZ = false;
         public double GaugeSize1 = 25.4d, GaugeSize2 = 50.8d, GaugeSize3 = 76.2d;
         public bool GaugeIsImperial = true;
