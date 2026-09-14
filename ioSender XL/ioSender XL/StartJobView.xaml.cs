@@ -788,7 +788,7 @@ namespace GCode_Sender
             // watcher are all MacroProcessor.HandOffToJobTab now, shared with the other four Generate-first
             // tabs. The one thing that stays here is the sentence above: this tab is the only one that keeps
             // owning the run bar across its own deactivation.
-            MacroProcessor.HandOffToJobTab(model, name, program, ViewType.StartJob);
+            MacroProcessor.HandOffToJobTab(model, name, program, ViewType.StartJob, onHandoffEnd: EndHandoff);
         }
 
         // Hand the previous job back. Everything that DROPS the generated program without running it - an
@@ -1833,8 +1833,6 @@ namespace GCode_Sender
             // so Generate must re-establish it so Cycle Start runs Start Job again without leaving the tab.
             MacroProcessor.ActiveProgramName = "Setup";
             MacroProcessor.ActiveRun = () => Run_Click(null, null);
-            // Start Job owns its ProgramView; the overlay hosts it and it titles itself
-            MacroProcessor.PublishGenerated("Setup " + fx.Name, program, EnsureProgramView, () => programView);
             // Flips the Run bar from "Generate" to "Run" (see OwnsRunBar's own comment on why this is gated).
             if (OwnsRunBar)
                 MacroProcessor.IsProgramGenerated = true;
@@ -1842,6 +1840,11 @@ namespace GCode_Sender
             // ...and hand it to the Job tab to be looked at. LAST, because the tab switch inside deactivates
             // this view synchronously - every line above would otherwise be running against a tab that has
             // already been told it is no longer showing.
+            //
+            // The PublishGenerated call that used to sit here is gone: it stamped the diagnostic copy and
+            // bumped the program version (HandOffToJobTab does both now) and then connected this tab's own
+            // preview ProgramView - which the very next line disconnected again on its way to the Job tab.
+            // A preview that exists for one frame is not a preview.
             HandOffToJobTab("Setup " + fx.Name);
         }
 
@@ -2023,8 +2026,9 @@ namespace GCode_Sender
             bool runStarted = MacroProcessor.Run(model, runName, toRun, true, unattended,
                 onDone: jobFinished =>
                 {
-                    // Terminal, clean or not: the Job tab is about the Job tab's own program again.
-                    EndHandoff();
+                    // EndHandoff is the handoff's own onHandoffEnd now (it runs just before this, for every
+                    // Generate-first tab), so it is no longer called from here - it was the prototype the
+                    // shared callback was generalised from.
                     if (jobFinished && wantHeightMap)
                         Dispatcher.BeginInvoke(new System.Action(RunHeightMapPass));
                 },

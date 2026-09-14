@@ -52,14 +52,10 @@ namespace CNC.Controls
 
         public GrblConfigType GrblConfigType { get { return GrblConfigType.AutoSquare; } }
 
-        // This tool's own program view (ProgramView refactor): created lazily, titled, connected to the streamer
-        // stack so the overlay hosts it and the run marks it - independent of the Job-tab view.
-        private ProgramView programView;
-        private void EnsureProgramView()
-        {
-            if (programView == null)
-                programView = new ProgramView { Title = "Auto Square" };
-        }
+        // This tool no longer owns a ProgramView of its own. Generate hands the program to the Job tab as
+        // the loaded job (MacroProcessor.HandOffToJobTab), so the display is the Job tab's docked list and
+        // its jobProgramView - the same one every loaded file uses - rather than a floating overlay shown
+        // over whatever tab happened to be underneath.
 
         public void Activate(bool activate)
         {
@@ -68,12 +64,6 @@ namespace CNC.Controls
             {
                 DetectOffsetSetting();
                 UpdateComputed();
-                if (!string.IsNullOrEmpty(program))
-                {
-                    EnsureProgramView();
-                    programView.SetProgramText(program);
-                    programView.Connect();     // this tool's own view shows in the overlay
-                }
                 MacroProcessor.ActiveRun = Run;                                     // Cycle Start runs it
 
                 // Generate-mode registration (see MacroProcessor's own comments / StartJobView for the
@@ -85,7 +75,12 @@ namespace CNC.Controls
                 MacroProcessor.IsProgramGenerated = !string.IsNullOrEmpty(program);
                 RefreshReadout();   // (re)establishes MacroProcessor.IsGenerateReady for the bar
             }
-            else
+            // Our OWN handoff switching away to the Job tab, not the operator leaving: keep the run bar
+            // and keep the program. Tearing down here would land them on the Job tab holding an Auto Square
+            // program with no way to start it AS an Auto Square run - no confirmation, and no ReuseZ0
+            // arming when it finishes. The teardown is deferred to the run's terminal, where the shared
+            // watcher switches back here and Activate(true) above re-registers everything.
+            else if (!MacroProcessor.IsHandoffPending(ViewType.Calibration))
             {
                 MacroProcessor.ActiveRun = null;
                 MacroProcessor.SupportsGenerateMode = false;
@@ -97,7 +92,7 @@ namespace CNC.Controls
                 // MacroProcessor.IsProgramGenerated write here, since isActiveTab was already set false at
                 // the top of this same Activate() call - but this IS the moment that write belongs.
                 program = string.Empty;
-                programView?.Disconnect();                     // active program follows the focused tab
+                MacroProcessor.ReleaseHandoff(model);   // a program generated and never run gives the previous job back
             }
 
             if (model != null)
@@ -108,6 +103,29 @@ namespace CNC.Controls
         // statics (shared across all Generate-first tabs) so a stale event firing after this tab was left
         // can't stomp whichever OTHER tab is now focused. See StartJobView.isActiveTab's own comment.
         private bool isActiveTab = false;
+
+        // The run bar is ours while this tab is focused OR while our Generate has handed the program to the
+        // Job tab - across that handoff the bar keeps pointing here, so every write to the shared
+        // MacroProcessor statics has to be gated on this rather than isActiveTab alone. StartJobView's own
+        // OwnsRunBar, same reasoning; it just reads the shared handoff record instead of a private flag.
+        private bool OwnsRunBar { get { return isActiveTab || MacroProcessor.IsHandoffPending(ViewType.Calibration); } }
+
+
+        // The handoff is over - the run reached its terminal. On a CLEAN finish the shared watcher has
+        // already switched back here and Activate(true) re-registered everything, so this no-ops. On an
+        // ABORT it deliberately leaves the operator on the Job tab, and the run bar would go on pointing at
+        // this off-screen tab: the next Cycle Start over a file of their own would run THIS program instead
+        // of it. Give the bar back; the program itself is kept, so coming back here still offers Run.
+        private void EndHandoff()
+        {
+            if (isActiveTab)
+                return;
+            MacroProcessor.ActiveRun = null;
+            MacroProcessor.SupportsGenerateMode = false;
+            MacroProcessor.ActiveGenerate = null;
+            MacroProcessor.DiscardGenerated = null;
+            MacroProcessor.IsProgramGenerated = false;
+        }
 
         // The coarse live-readiness gate for the shared Run bar's "Generate" button - mirrors Generate()'s
         // own first precondition check (travel legs known).
@@ -123,12 +141,23 @@ namespace CNC.Controls
             }
         }
 
+        // The name this tool's program is loaded under. It is an IDENTITY, not a label: the handoff record
+        // and its watcher both test the loaded job against it to decide whether a terminal is ours to pop,
+        // so Generate and Run must name the program identically. They did not - Generate published
+        // "Auto square X" while Run streamed "Auto square holes X" - which under the shared handoff would
+        // have read as a foreign program and pushed a second slot over the first.
+        private string ProgramName
+        {
+            get { return (DryRun ? "Auto square dry run " : "Auto square holes ") + "XYZ"[_gangedAxis]; }
+        }
+
         // Drop the generated program; also registered as MacroProcessor.DiscardGenerated (see Activate) -
         // called right after a clean run finishes so the Run bar reverts to "Generate" for the next job.
         private void DiscardProgram()
         {
             program = string.Empty;
-            if (isActiveTab)
+            MacroProcessor.ReleaseHandoff(model);   // no-op after a run: its watcher popped before calling us
+            if (OwnsRunBar)
                 MacroProcessor.IsProgramGenerated = false;
         }
 
@@ -669,9 +698,14 @@ namespace CNC.Controls
                 return;
             }
             program = string.Join("\r\n", BuildProgram());
-            MacroProcessor.PublishGenerated("Auto square " + "XYZ"[_gangedAxis], program, EnsureProgramView, () => programView);   // refresh + show this tool's own view
-            if (isActiveTab)
-                MacroProcessor.IsProgramGenerated = true;   // flips the shared Run bar from "Generate" to "Run"
+            // Hand it to the Job tab as the loaded job and take the operator there to look at it, run bar
+            // still pointing back here - the same tail Work Order and Setup use.
+            MacroProcessor.HandOffToJobTab(model, ProgramName, program, ViewType.Calibration, onHandoffEnd: EndHandoff);
+            // OwnsRunBar, not isActiveTab: the handoff's tab switch has already run this tab's own
+            // Activate(false) synchronously by now, so isActiveTab is false and this write - the one that
+            // flips the bar from "Generate" to "Run" - would simply be skipped.
+            if (OwnsRunBar)
+                MacroProcessor.IsProgramGenerated = true;
         }
 
         private void Run()
@@ -688,7 +722,10 @@ namespace CNC.Controls
             // blocking Run's true return meant the touch-off had actually happened, so arming ReuseZ0 from
             // "started" would wrongly arm it when the operator cancels at a hold mid-run. jobFinished=true
             // is the genuine program end, which is when the touch-off is a fact.
-            MacroProcessor.Run(model, (DryRun ? "Auto square dry run " : "Auto square holes ") + "XYZ"[_gangedAxis], program, true,
+            // ProgramName, not a second spelling of it: MacroProcessor.Run matches this against the handoff
+            // record to know the program is already loaded, and a name that differs by one word reads as a
+            // foreign program - a second pushed slot over the first.
+            MacroProcessor.Run(model, ProgramName, program, true,
                 onDone: jobFinished => { if (jobFinished) ReuseZ0 = true; });
         }
 

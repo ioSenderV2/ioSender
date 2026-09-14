@@ -69,14 +69,10 @@ namespace CNC.Controls
 
         public GrblConfigType GrblConfigType { get { return GrblConfigType.StepperCalibrationScratch; } }
 
-        // This tool's own program view (ProgramView refactor): created lazily, titled, connected to the streamer
-        // stack so the overlay hosts it and the run marks it - independent of the Job-tab view.
-        private ProgramView programView;
-        private void EnsureProgramView()
-        {
-            if (programView == null)
-                programView = new ProgramView { Title = "Stepper Calibration" };
-        }
+        // This tool no longer owns a ProgramView of its own. Generate hands the program to the Job tab as
+        // the loaded job (MacroProcessor.HandOffToJobTab), so the display is the Job tab's docked list and
+        // its jobProgramView - the same one every loaded file uses - rather than a floating overlay shown
+        // over whatever tab happened to be underneath.
 
         public void Activate(bool activate)
         {
@@ -104,12 +100,6 @@ namespace CNC.Controls
                 if (CalAxes.Count > 0 && CalAxes.FirstOrDefault(a => a.Index == Axis) == null)
                     Axis = CalAxes[0].Index;
                 getAxisDetails(Axis);
-                if (!string.IsNullOrEmpty(program))
-                {
-                    EnsureProgramView();
-                    programView.SetProgramText(program);
-                    programView.Connect();     // this tool's own view shows in the overlay
-                }
                 MacroProcessor.ActiveRun = Run;                                             // Run runs it
 
                 // Generate-mode registration (see MacroProcessor's own comments / StartJobView for the
@@ -121,7 +111,12 @@ namespace CNC.Controls
                 MacroProcessor.IsProgramGenerated = !string.IsNullOrEmpty(program);
                 RefreshGenerateReady();
             }
-            else
+            // Our OWN handoff switching away to the Job tab, not the operator leaving: keep the run bar and
+            // keep the program. Tearing down here would land them on the Job tab holding a scratch program
+            // with no way to start it AS a scratch run - no confirmation, and no discard when it finishes.
+            // The teardown is deferred to the run's terminal, where the shared watcher switches back here
+            // and Activate(true) above re-registers everything.
+            else if (!MacroProcessor.IsHandoffPending(ViewType.Calibration))
             {
                 MacroProcessor.ActiveRun = null;
                 MacroProcessor.SupportsGenerateMode = false;
@@ -133,7 +128,7 @@ namespace CNC.Controls
                 // MacroProcessor.IsProgramGenerated write here, since isActiveTab was already set false at
                 // the top of this same Activate() call - but this IS the moment that write belongs.
                 program = string.Empty;
-                programView?.Disconnect();                     // active program follows the focused tab
+                MacroProcessor.ReleaseHandoff(model);   // a program generated and never run gives the previous job back
             }
 
             if (model != null)
@@ -368,6 +363,34 @@ namespace CNC.Controls
         private bool isActiveTab = false;
         private bool subscribed = false;
 
+        // The run bar is ours while this tab is focused OR while our Generate has handed the program to the
+        // Job tab - across that handoff the bar keeps pointing here, so every write to the shared
+        // MacroProcessor statics has to be gated on this rather than isActiveTab alone. StartJobView's own
+        // OwnsRunBar, same reasoning; it just reads the shared handoff record instead of a private flag.
+        private bool OwnsRunBar { get { return isActiveTab || MacroProcessor.IsHandoffPending(ViewType.Calibration); } }
+
+        // The name this tool's program is loaded under. It is an IDENTITY, not a label: the handoff record
+        // and its watcher both test the loaded job against it to decide whether a terminal is ours to pop,
+        // so Generate and Run must name the program identically.
+        private string ProgramName { get { return "Stepper calibration " + GrblInfo.AxisIndexToLetter(Axis); } }
+
+
+        // The handoff is over - the run reached its terminal. On a CLEAN finish the shared watcher has
+        // already switched back here and Activate(true) re-registered everything, so this no-ops. On an
+        // ABORT it deliberately leaves the operator on the Job tab, and the run bar would go on pointing at
+        // this off-screen tab: the next Cycle Start over a file of their own would run THIS program instead
+        // of it. Give the bar back; the program itself is kept, so coming back here still offers Run.
+        private void EndHandoff()
+        {
+            if (isActiveTab)
+                return;
+            MacroProcessor.ActiveRun = null;
+            MacroProcessor.SupportsGenerateMode = false;
+            MacroProcessor.ActiveGenerate = null;
+            MacroProcessor.DiscardGenerated = null;
+            MacroProcessor.IsProgramGenerated = false;
+        }
+
         // The coarse live-readiness gate for the shared Run bar's "Generate" button - mirrors Generate()'s
         // own first precondition check.
         private void RefreshGenerateReady()
@@ -403,7 +426,8 @@ namespace CNC.Controls
         private void DiscardProgram()
         {
             program = string.Empty;
-            if (isActiveTab)
+            MacroProcessor.ReleaseHandoff(model);   // no-op after a run: its watcher popped before calling us
+            if (OwnsRunBar)
                 MacroProcessor.IsProgramGenerated = false;
         }
 
@@ -769,7 +793,7 @@ namespace CNC.Controls
             // consulting jobFinished: the program is a fixed pattern that regenerates instantly, and
             // re-running a stale one is the exact hazard this whole tool has been tripping over. There is no
             // resume to protect either - ActiveRun always streams from the first line.
-            MacroProcessor.Run(model, "Stepper calibration " + GrblInfo.AxisIndexToLetter(Axis), program, true,
+            MacroProcessor.Run(model, ProgramName, program, true,
                                onDone: _ => DiscardProgram());
         }
 
@@ -795,9 +819,14 @@ namespace CNC.Controls
 
             // Build the program and preview it in the bottom Program View (pops it open); Run streams it.
             program = string.Join("\r\n", BuildProgram());
-            MacroProcessor.PublishGenerated("Stepper calibration " + GrblInfo.AxisIndexToLetter(Axis), program, EnsureProgramView, () => programView);
-            if (isActiveTab)
-                MacroProcessor.IsProgramGenerated = true;   // flips the shared Run bar from "Generate" to "Run"
+            // Hand it to the Job tab as the loaded job and take the operator there to look at it, run bar
+            // still pointing back here - the same tail Work Order and Setup use.
+            MacroProcessor.HandOffToJobTab(model, ProgramName, program, ViewType.Calibration, onHandoffEnd: EndHandoff);
+            // OwnsRunBar, not isActiveTab: the handoff's tab switch has already run this tab's own
+            // Activate(false) synchronously by now, so isActiveTab is false and this write - the one that
+            // flips the bar from "Generate" to "Run" - would simply be skipped.
+            if (OwnsRunBar)
+                MacroProcessor.IsProgramGenerated = true;
         }
 
         private void Save()

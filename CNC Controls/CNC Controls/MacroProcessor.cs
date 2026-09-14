@@ -226,6 +226,9 @@ namespace CNC.Controls
         // Filled in by Run() when the tab finally starts the borrowed program - the handoff watcher owns
         // the terminal, so it is the one that has to make the caller's completion callback.
         private static System.Action<bool> _borrowedOnDone;
+        // The originating tab's teardown for the moment the handoff is over - see HandOffToJobTab's own
+        // parameter docs. Held with the rest of the record so it is cleared by exactly the same paths.
+        private static System.Action _borrowedOnEnd;
 
         /// <summary>The name a Generate-first tab's program is currently loaded under, or null when
         /// nothing is borrowed.</summary>
@@ -243,11 +246,37 @@ namespace CNC.Controls
         }
 
         /// <summary>
+        /// True when the tab identified by <paramref name="originTab"/> is the one whose program is
+        /// currently handed to the Job tab - so an Activate(false) arriving now is OUR OWN handoff
+        /// switching away, not the operator leaving the tab for good.
+        /// </summary>
+        /// <remarks>
+        /// A Generate-first tab must NOT tear down its run-bar registration or clear its own `program`
+        /// field on that deactivation. The bar keeps pointing back at it across the handoff, and that is
+        /// the whole point: pressing Run on the Job tab still runs the program AS that tab's run, with its
+        /// confirmation, its completion hook and its result parsing. Clearing the field and reading it back
+        /// across the switch is what shipped a blank Job tab on 2026-08-11 (0c457451).
+        /// </remarks>
+        public static bool IsHandoffPending(ViewType originTab)
+        {
+            return _borrowedName != null && _borrowedOrigin == originTab;
+        }
+
+        /// <summary>
         /// Generate's tail for every Generate-first tab: make <paramref name="program"/> the loaded job,
         /// take the operator to the Job tab to look at it, and arm the watcher that gives the previous job
         /// back and returns them to <paramref name="originTab"/> once the run is over.
         /// </summary>
-        public static void HandOffToJobTab(GrblViewModel model, string name, string program, ViewType originTab, string stats = null)
+        /// <param name="onHandoffEnd">
+        /// The originating tab's own teardown, run at the terminal just before <c>onDone</c>. It exists for
+        /// the ABORT path: a clean finish switches back to that tab and its Activate(true) re-registers
+        /// everything, but a stopped or alarmed run deliberately leaves the operator on the Job tab - and
+        /// the run bar would go on pointing at an off-screen tab, so the next Cycle Start over a file of
+        /// their own would run the generated program instead of it. Every implementation no-ops when its
+        /// tab is the active one, which is exactly the clean-finish case.
+        /// </param>
+        public static void HandOffToJobTab(GrblViewModel model, string name, string program, ViewType originTab,
+                                           string stats = null, System.Action onHandoffEnd = null)
         {
             if (model == null || string.IsNullOrWhiteSpace(program))
             {
@@ -276,6 +305,7 @@ namespace CNC.Controls
             bool replacingOurOwn = IsHandedOff(model, name);
             _borrowedName = name;
             _borrowedOrigin = originTab;
+            _borrowedOnEnd = onHandoffEnd;
 
             SwitchToTab?.Invoke(ViewType.GRBL);   // the Job tab
 
@@ -313,6 +343,7 @@ namespace CNC.Controls
             string name = _borrowedName;
             _borrowedName = null;
             _borrowedOnDone = null;
+            _borrowedOnEnd = null;
             if (_borrowedHandler != null && model != null)
             {
                 model.PropertyChanged -= _borrowedHandler;
@@ -372,8 +403,10 @@ namespace CNC.Controls
                 string name = _borrowedName;
                 var origin = _borrowedOrigin;
                 var onDone = _borrowedOnDone;
+                var onEnd = _borrowedOnEnd;
                 _borrowedName = null;
                 _borrowedOnDone = null;
+                _borrowedOnEnd = null;
 
                 // Self-disarm without popping when the loaded job is no longer ours - the operator
                 // generated, then loaded a different file instead of running. Popping now would yank THEIR
@@ -404,12 +437,22 @@ namespace CNC.Controls
                 // switch-back (that one moved you off the failure).
                 if (!sawError)
                 {
-                    ProgramView.Active?.Disconnect();
+                    // NOT the loaded job's own view. GCode.File.Pop() above ends in RaiseFileChanged, which
+                    // reconnects jobProgramView SYNCHRONOUSLY (MainWindow.OnJobFileChanged) - so by the time we
+                    // reach here the active view IS the restored job, and disconnecting it detached the Job tab's
+                    // own view from the program it had just put back. What this line is for is a tool's TRANSIENT
+                    // preview; the loaded job is never that.
+                    if (ProgramView.Active != null && !ProgramView.Active.IsLoadedJob)
+                        ProgramView.Active.Disconnect();
                     if (jobFinished && SupportsGenerateMode)
                         DiscardGenerated?.Invoke();
                     SwitchToTab?.Invoke(origin);
                 }
 
+                // BEFORE onDone, not after: a tab's onDone may queue follow-on work of its own (Setup's
+                // height-map pass), and that has to run against a tab whose run-bar ownership has already
+                // been settled one way or the other.
+                onEnd?.Invoke();
                 onDone?.Invoke(jobFinished);
             };
             model.PropertyChanged += _borrowedHandler;
@@ -837,8 +880,13 @@ namespace CNC.Controls
                 // go through the same ProgramView.Active/Disconnect mechanism. On a failed run (see the
                 // sawError latch above) the view is left up on purpose, so the operator can see
                 // where/what failed - same polarity as the old code's Error/Halted branch.
-                if (!sawError)
-                    ProgramView.Active?.Disconnect();
+                // NOT the loaded job's own view. GCode.File.Pop() above ends in RaiseFileChanged, which
+                // reconnects jobProgramView SYNCHRONOUSLY (MainWindow.OnJobFileChanged) - so by the time we
+                // reach here the active view IS the restored job, and disconnecting it detached the Job tab's
+                // own view from the program it had just put back. What this line is for is a tool's TRANSIENT
+                // preview; the loaded job is never that.
+                if (!sawError && ProgramView.Active != null && !ProgramView.Active.IsLoadedJob)
+                    ProgramView.Active.Disconnect();
                 // A Generate-first tool tab's run just finished cleanly: drop the in-memory program and
                 // revert the Run bar to "Generate" - the operator re-generates for the next job rather
                 // than re-running a stale program. RestoreSourceOnEnd's clean-finish behavior, preserved
