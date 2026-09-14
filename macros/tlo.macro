@@ -33,8 +33,19 @@
 ;   #<_probe_z>        the probed machine Z of this tool against the puck.
 ;   G43.1 applied (or #<_tlo_ref> set), and $TLR sent either way.
 ;
-; Leaves the machine AT the puck, lifted 10mm. The caller owns getting somewhere useful afterwards -
-; tc.macro returns to G30; a sender-generated program does whatever it needs next.
+; 🔴 LEAVES THE MACHINE STANDING ON THE PUCK, lifted 10mm, and may leave G59.3 active (see the
+; instrumented capture below). BOTH are lethal to a caller that just carries on:
+;
+;   - a 60 degree V-bit was driven into this very toolsetter and destroyed it, 2026-09-14, because the
+;     calling program went straight to "S18000 M3" then "G0 Z15" - a WORK Z, far below the puck - after
+;     someone (me) removed the caller's G30 park as "a pointless round trip". It was the only thing
+;     standing the spindle off the puck.
+;   - and pcorner's face seek is not a G53 move, so with G59.3 still active it asked for a target
+;     816mm outside travel: Alarm:2.
+;
+; So a caller MUST get itself somewhere safe and name its own WCS afterwards. tc.macro returns to G30
+; on its own. Generated programs go through MacroProcessor.EmitTloReference, which now does both for
+; every caller by construction - read its remarks before changing anything here.
 ; ---------------------------------------------------------------------------------------------
 
 (PRINT, TLO01 ENTER tool=#<_tlo_toolid> ref=#<_tlo_ref> touchplate=#<_tc_touchplate>)
@@ -46,6 +57,14 @@
 ; under the wrong WCS after its own mid-program tool change - its first move, computed in G59 and
 ; executed under G54, landed outside travel and hit a soft limit.
 #<_tlo_wcs> = #5220
+; INSTRUMENTED 2026-09-14. On this machine the o120 restore below did NOT take: the wire log shows
+; WCS:G59.3 from the moment this macro first ran and never anything else again, which put every later
+; non-G53 move in the puck's frame (pcorner's face seek then asked for a target 816mm outside travel).
+; #5220 is real - ngc_params.c returns gc_state.modal.g5x_offset.id + 1, and CoordinateSystem_G54 is 0,
+; so G54 must read as exactly 1. Printing what was actually captured rather than theorising about it.
+; The callers no longer DEPEND on this restore (they name their own WCS after the CALL), so this print
+; is here to explain the failure, not to paper over it.
+(PRINT, TLO01b captured wcs=#<_tlo_wcs>)
 
 ; Suspend any active G92 for the duration, restored at the end. WCO = G5x + G92 + TLO, so a leftover
 ; G92 shifts every non-G53 move here - including the "G0 Z0" over the puck, which is NOT a machine
@@ -93,6 +112,7 @@ G90
 G65 P5 Q0
 
 ; Restore the caller's own WCS - see #<_tlo_wcs> above for why this must NOT be a hardcoded G54.
+(PRINT, TLO04b restoring wcs=#<_tlo_wcs>)
 o120 IF [#<_tlo_wcs> EQ 1]
   G54
 o120 ELSEIF [#<_tlo_wcs> EQ 2]

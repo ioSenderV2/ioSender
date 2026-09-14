@@ -469,7 +469,12 @@ namespace CNC.Controls
                 // The V-bit is a rigid cutting tool, so any id but 8 - tlo.macro reads that as "pushes the
                 // puck's own switch, use the toolsetter input". Pass the configured tool number when there
                 // is one so the macro's own PRINT names the right tool.
-                MacroProcessor.EmitTloReference(lines.Add, tool > 0 && tool != 8 ? tool : 1);
+                // The WCS to come back to is whichever one is ACTIVE - this program runs against the origin
+                // already set and must not be dumped into the puck's G59.3 on the way out. Falls back to G54
+                // only when the model cannot say, which is the same frame the rest of the program assumes.
+                string wcs = model != null && !string.IsNullOrEmpty(model.WorkCoordinateSystem)
+                           ? model.WorkCoordinateSystem : "G54";
+                MacroProcessor.EmitTloReference(lines.Add, tool > 0 && tool != 8 ? tool : 1, wcs);
             }
 
             if (tool > 0)

@@ -710,13 +710,11 @@ namespace CNC.Controls
         ///
         /// G92.2/G92.3 are tlo.macro's own, so a caller needs no coordinate-frame ceremony around this.
         ///
-        /// LEAVES THE MACHINE AT THE PUCK, lifted 10mm - going home is the CALLER's business, because where
-        /// home is depends on what the caller does next. tc.macro returns to G30 on its own. Start Job needs
-        /// G30 too (corner 1's own #&lt;_ls_appz&gt; override exists because "the TLO-ref detour just parked at
-        /// G30") and emits it in its own forwarder. A program that simply cuts next wants neither, and had a
-        /// pointless round trip to G30 while this emitter did it for everybody.
+        /// LEAVES THE MACHINE PARKED AT G30, IN <paramref name="returnWcs"/>. That is a guarantee, not a
+        /// convenience: tlo.macro itself ends standing on the puck in G59.3, and a caller that continues
+        /// from there in a work frame drives into the toolsetter. Do not "optimise away" either line.
         /// </remarks>
-        public static void EmitTloReference(System.Action<string> L, int toolId)
+        public static void EmitTloReference(System.Action<string> L, int toolId, string returnWcs)
         {
             L("(--- reference the loaded tool at the puck - see tlo.macro ---)");
             L(string.Format("#<_tlo_toolid> = {0}", toolId));
@@ -725,6 +723,28 @@ namespace CNC.Controls
             // job, so without a sync point here a puck probe that alarms does not actually stop it - the
             // controller halts and the sender keeps feeding lines that quietly error. Same reason Setup has
             // one after every corner probe.
+            L("(WAITIDLE)");
+
+            // ---- SAFE POST-CONDITION, AND IT IS NOT THE CALLER'S TO REMEMBER --------------------------
+            // This emitter leaves the machine PARKED AT G30 IN THE CALLER'S OWN WCS. Both halves are here
+            // because both were got wrong on 2026-09-14 and each cost real hardware:
+            //
+            // The WCS. tlo.macro selects G59.3 to reach the puck and restores the caller's frame from
+            // #5220 on the way out. On this machine that restore did not take - the wire log has WCS:G59.3
+            // from the moment tlo.macro first ran and never anything else again - so the next program line
+            // that was not a G53 addressed the puck's frame instead of the job's. pcorner's face seek is
+            // exactly such a line, and it asked for a target 816mm outside travel: Alarm:2. Naming the WCS
+            // here does not replace the macro's restore, it makes the macro's restore not load-bearing.
+            //
+            // The park. tlo.macro deliberately ends AT THE PUCK, lifted 10mm, and I made that a documented
+            // post-condition and then removed the caller-side G30 from a program as "a pointless round
+            // trip". It was the only thing standing the spindle off the puck. What followed was S18000 M3
+            // and a G0 to a WORK Z that sits far below the puck, so a 60-degree V-bit at 15000 rpm was
+            // driven into the toolsetter and destroyed it. A few seconds of travel is not a cost worth
+            // weighing against that, and no caller should have to know it is standing on the puck.
+            if (!string.IsNullOrEmpty(returnWcs))
+                L(returnWcs);
+            EmitGotoG30(L);
             L("(WAITIDLE)");
         }
 

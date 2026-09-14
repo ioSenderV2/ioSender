@@ -2431,7 +2431,7 @@ namespace GCode_Sender
             // needed - see EmitTloReference's own comment.
             if (setTloRef)
             {
-                EmitTloReference(L, p, touchPlate);
+                EmitTloReference(L, p, touchPlate, wcsP);
                 // Full retract before crossing to corner 1's own reference - the puck (G59.3) and corner 1's
                 // saved Coords are unrelated locations, so there is no "trusted previous height" to reuse yet
                 // the way corners 2-4 reuse corner 1's own #<c1_maxz> below.
@@ -3040,7 +3040,7 @@ namespace GCode_Sender
                 // No lift here: EmitTloReference already ends parked at G30, and the stock-top block below
                 // opens with its own "G53 G0 Z0". Lifting in both places meant descending to G30 Z and
                 // immediately climbing back to machine top, twice over.
-                EmitTloReference(L, p, touchPlate);
+                EmitTloReference(L, p, touchPlate, wcsP);
             }
 
             // Clear G54 so the Z probe below runs in machine coordinates (same reasoning as pcorner.macro).
@@ -3476,14 +3476,18 @@ namespace GCode_Sender
         // T8 is the 3D probe stylus; a touch plate means a rigid, non-self-triggering tool is in the
         // spindle, which is what every non-8 id means to tlo.macro. The probe INPUT choice is the macro's
         // to make - passing the tool is passing the fact, not the decision.
-        private static void EmitTloReference(System.Action<string> L, ProbeDefinition p, bool touchPlate)
+        // The G30 park is the shared emitter's own guarantee now, not this file's to add - see its remarks
+        // for why that moved back. wcsP is this program's WCS (1..6 => G54..G59); handing it over is what
+        // stops the run continuing in the puck's G59.3 if tlo.macro's own restore does not take.
+        private static void EmitTloReference(System.Action<string> L, ProbeDefinition p, bool touchPlate, int wcsP)
         {
-            MacroProcessor.EmitTloReference(L, touchPlate ? 1 : 8);
-            // Home to G30 afterwards - THIS file's post-condition, not the shared emitter's. Both of this
-            // file's call sites want it: corner 1 follows with its own full retract, and corner 2's
-            // #<_ls_appz> override exists precisely because the detour parked at G30 rather than somewhere
-            // inside the fixture's footprint.
-            MacroProcessor.EmitGotoG30(L);
+            MacroProcessor.EmitTloReference(L, touchPlate ? 1 : 8, WcsWord(wcsP));
+        }
+
+        // "G54".."G59" from the 1-based selector the rest of this file already carries.
+        private static string WcsWord(int wcsP)
+        {
+            return "G" + (53 + Math.Min(Math.Max(wcsP, 1), 6)).ToString(CultureInfo.InvariantCulture);
         }
 
         private static string pCode(int wcsP) { return "P" + Math.Min(Math.Max(wcsP, 1), 6).ToString(CultureInfo.InvariantCulture); }
