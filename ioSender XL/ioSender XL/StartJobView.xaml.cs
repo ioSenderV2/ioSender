@@ -3473,9 +3473,12 @@ namespace GCode_Sender
         // hardcoded F500/F25, matching every other Start Job probe move.
         // Moved to MacroProcessor 2026-09-14 so the calibration wizards use THIS sequence rather than
         // growing a copy of it. Kept as a forwarder so this file's call sites read unchanged.
+        // T8 is the 3D probe stylus; a touch plate means a rigid, non-self-triggering tool is in the
+        // spindle, which is what every non-8 id means to tlo.macro. The probe INPUT choice is the macro's
+        // to make - passing the tool is passing the fact, not the decision.
         private static void EmitTloReference(System.Action<string> L, ProbeDefinition p, bool touchPlate)
         {
-            MacroProcessor.EmitTloReference(L, p, touchPlate);
+            MacroProcessor.EmitTloReference(L, touchPlate ? 1 : 8);
         }
 
         private static string pCode(int wcsP) { return "P" + Math.Min(Math.Max(wcsP, 1), 6).ToString(CultureInfo.InvariantCulture); }

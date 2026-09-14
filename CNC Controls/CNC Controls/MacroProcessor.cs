@@ -687,49 +687,40 @@ namespace CNC.Controls
         /// Give the tool currently in the spindle a tool length offset by touching the puck - no tool
         /// change, so no operator prompt and no swap.
         /// </summary>
-        public static void EmitTloReference(System.Action<string> L, ProbeDefinition p, bool touchPlate)
+        /// <summary>
+        /// Give the tool currently in the spindle a tool length offset by touching the puck - no tool
+        /// change, so no operator prompt and no swap.
+        /// </summary>
+        /// <param name="toolId">
+        /// What is in the spindle. 8 is the 3D probe stylus, which probes the MAIN input because it must
+        /// not bear down on the puck; anything else is a rigid cutting tool and pushes the puck's own
+        /// switch on the TOOLSETTER input. tlo.macro makes that choice - do not pre-decide it here.
+        /// </param>
+        /// <remarks>
+        /// This USED to emit the whole sequence inline, as a copy of tc.macro's puck section. The copy had
+        /// drifted: it probed Z-80 where the macro had been raised to Z-90 after a short V-bit threw
+        /// Alarm:5 five mm short of the puck on real hardware; it restored a hardcoded G54 where the macro
+        /// restores the caller's own WCS and says in as many words that it must not be hardcoded; and it
+        /// selected the toolsetter input unconditionally where the macro branches three ways.
+        ///
+        /// The last two could never have been right in a streamed program - both need o-word branching, and
+        /// o-word flow control cannot be streamed to grblHAL (a bare ELSE/ENDIF is dropped by the line
+        /// pipeline and wedges the controller's o-word engine). So the copy was not merely at risk of
+        /// drifting, it was structurally incapable of matching. It is a CALL now, like pcorner.
+        ///
+        /// G92.2/G92.3 are tlo.macro's own, so a caller needs no coordinate-frame ceremony around this.
+        /// </remarks>
+        public static void EmitTloReference(System.Action<string> L, int toolId)
         {
-            L("(--- reference TLO at the puck, against the machine-wide baseline ---)");
-            if (touchPlate)
-            {
-                L("(touch plate - no self-triggering probe in the spindle, use the toolsetter input directly)");
-                L("G53 G0 Z-5");
-                L("G59.3");
-                L("G0 X0 Y0");
-                L("G0 Z0");
-                L("G65 P5 Q1");   // select the TOOLSETTER input (tc.macro's non-T8/rigid-tool convention)
-                L("G91");
-                L(string.Format("G38.2 Z-80 F{0}", N(System.Math.Max(p.ProbeFeedRate, 200d))));
-                L("G0 Z2");
-                L(string.Format("G38.2 Z-5 F{0}", N(p.LatchFeedRate)));
-                L("#<_probe_z> = #5063");
-                // $TLR - the REAL grblHAL system command that commits the tool length reference to the
-                // controller's own native TLR flag (GrblViewModel.IsTloReferenceSet / the status report's
-                // TLR: field) - same one the Probing tab's own Tool Length flow uses (ToolLengthControl.xaml.cs).
-                // Sent here, machine still AT the touched Z, matching ToolLengthControl's own timing (right
-                // after the probe stops, before any retraction).
-                L("$TLR");
-                L("G0 Z10");
-                L("G90");
-                L("G65 P5 Q0");   // restore the main/default probe input
-                L("G54");
-                // Apply G43.1 relative to the ALREADY-loaded baseline rather than overwriting #<_tlo_ref>
-                // with this tool's own reading - the same computation tc.macro's "not the first tool this
-                // session" branch does, now the only branch that ever runs since #<_tlo_ref> starts non-zero.
-                L("G43.1 Z[#<_probe_z> - #<_tlo_ref>]");
-                L("(PRINT, LS_TLO_APPLIED tlo=[#<_probe_z> - #<_tlo_ref>])");
-                L("G53 G0 Z-5");
-                L("G53 G0 X#5181 Y#5182");
-                L("G53 G0 Z#5183");
-            }
-            else
-            {
-                // M6 T8 runs tc.macro, which does its own probe of the puck and applies G43.1 relative to
-                // whatever #<_tlo_ref> already holds - the baseline loaded above, not a fresh "first tool
-                // this session" value tc.macro would otherwise set.
-                L("(3D probe already in spindle - M6 T8 selects the main probe input itself, see tc.macro)");
-                L("M6 T8");
-            }
+            L("(--- reference the loaded tool at the puck - see tlo.macro ---)");
+            L(string.Format("#<_tlo_toolid> = {0}", toolId));
+            L("O<tlo> CALL");
+            // BACK TO G30 before returning. tlo.macro deliberately leaves the machine at the puck - tc.macro
+            // makes its own way home afterwards and would only undo a return baked into the macro. But BOTH
+            // of the inline branches this replaced ended at G30, and StartJobView depends on it: corner 2's
+            // #<_ls_appz> override exists precisely because "the TLO-ref detour just parked at G30". Dropping
+            // it would have left the next corner call starting from over the puck.
+            EmitGotoG30(L);
             L("(WAITIDLE)");
         }
 

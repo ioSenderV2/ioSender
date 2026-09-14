@@ -459,15 +459,17 @@ namespace CNC.Controls
             //
             // Instead, when asked, give the loaded bit its OWN offset by touching the puck. No tool change,
             // so no prompt and no swap - which is the whole point of running with Tool = Loaded.
-            var setter = ReferenceTlo ? ProbeDefinitions.Items.FirstOrDefault(d => d.ProbeType == ProbeType.ToolSetter) : null;
-            if (setter != null)
+            // Gated on a toolsetter being DEFINED, not on its feeds: the puck probe's own feeds live in
+            // tlo.macro now, where the puck is.
+            bool referenceTlo = ReferenceTlo && ProbeDefinitions.Items.Any(d => d.ProbeType == ProbeType.ToolSetter);
+            if (referenceTlo)
             {
                 MacroProcessor.EmitTloBaseline(lines.Add, model != null && model.IsTloReferenceSet,
                                                AppConfig.Settings.Base.TloRefBaseline);
-                // touchPlate:true is the right branch for a CUTTING tool, not a statement about probes - it
-                // is the "nothing in the spindle triggers by itself, drive the toolsetter input directly"
-                // path. A V-bit is exactly that case; the M6 T8 branch beside it expects a 3D probe.
-                MacroProcessor.EmitTloReference(lines.Add, setter, true);
+                // The V-bit is a rigid cutting tool, so any id but 8 - tlo.macro reads that as "pushes the
+                // puck's own switch, use the toolsetter input". Pass the configured tool number when there
+                // is one so the macro's own PRINT names the right tool.
+                MacroProcessor.EmitTloReference(lines.Add, tool > 0 && tool != 8 ? tool : 1);
             }
 
             if (tool > 0)
@@ -507,7 +509,7 @@ namespace CNC.Controls
             if (SpindleRPM > 0d)
                 lines.Add("M5");
             lines.Add("G0 Z" + F(SafeZ));
-            if (setter != null)
+            if (referenceTlo)
                 MacroProcessor.EmitTloRestore(lines.Add);
             lines.Add("M30");
 
