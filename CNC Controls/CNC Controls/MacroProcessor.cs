@@ -654,6 +654,105 @@ namespace CNC.Controls
             MacroRunner.EmitGotoG30(L);
         }
 
+        // ---- tool length offset for the tool ALREADY in the spindle ------------------------------------
+        //
+        // Moved here from StartJobView 2026-09-14, unchanged, so the stepper-calibration wizards can use the
+        // same sequence instead of growing a second copy of it. Setup is the proven caller; these three are
+        // its implementation, not a reimplementation of it.
+        //
+        // The three are a SET and are used in order - baseline, reference, restore. What they solve is
+        // "the right bit is already fitted, so no M6 will run, so nothing gives it a tool length offset".
+        // That is not a theoretical gap: per StartJobView's own account it cut a spoilboard on 2026-08-06,
+        // when a second run with the same endmill already fitted emitted no M6, nothing re-applied the
+        // offset, and the job rapided to a work Z0 15.432mm inside the material. The offset was never
+        // stale - it was discarded.
+
+        /// <summary>
+        /// Load the machine-wide TLO baseline, saving whatever <c>#&lt;_tlo_ref&gt;</c> held.
+        /// </summary>
+        /// <remarks>
+        /// <paramref name="tloAlreadyReferenced"/> comes from the controller's own $TLR report
+        /// (GrblViewModel.IsTloReferenceSet) and is decided in C#, NOT with an O-word IF in the streamed
+        /// program: a bare ELSE/ENDIF line is silently dropped by the streaming pipeline, leaving the
+        /// controller's o-word engine waiting for an ENDIF that never comes - it keeps acking lines and
+        /// stops queuing motion for the rest of the session. Confirmed on real hardware 2026-08-01.
+        /// </remarks>
+        public static void EmitTloBaseline(System.Action<string> L, bool tloAlreadyReferenced, double baseline)
+        {
+            L(tloAlreadyReferenced ? "#<_tlo_saved> = #<_tlo_ref>" : "#<_tlo_saved> = 0");
+            L(string.Format("#<_tlo_ref> = {0}", N(baseline)));
+        }
+
+        /// <summary>
+        /// Give the tool currently in the spindle a tool length offset by touching the puck - no tool
+        /// change, so no operator prompt and no swap.
+        /// </summary>
+        public static void EmitTloReference(System.Action<string> L, ProbeDefinition p, bool touchPlate)
+        {
+            L("(--- reference TLO at the puck, against the machine-wide baseline ---)");
+            if (touchPlate)
+            {
+                L("(touch plate - no self-triggering probe in the spindle, use the toolsetter input directly)");
+                L("G53 G0 Z-5");
+                L("G59.3");
+                L("G0 X0 Y0");
+                L("G0 Z0");
+                L("G65 P5 Q1");   // select the TOOLSETTER input (tc.macro's non-T8/rigid-tool convention)
+                L("G91");
+                L(string.Format("G38.2 Z-80 F{0}", N(System.Math.Max(p.ProbeFeedRate, 200d))));
+                L("G0 Z2");
+                L(string.Format("G38.2 Z-5 F{0}", N(p.LatchFeedRate)));
+                L("#<_probe_z> = #5063");
+                // $TLR - the REAL grblHAL system command that commits the tool length reference to the
+                // controller's own native TLR flag (GrblViewModel.IsTloReferenceSet / the status report's
+                // TLR: field) - same one the Probing tab's own Tool Length flow uses (ToolLengthControl.xaml.cs).
+                // Sent here, machine still AT the touched Z, matching ToolLengthControl's own timing (right
+                // after the probe stops, before any retraction).
+                L("$TLR");
+                L("G0 Z10");
+                L("G90");
+                L("G65 P5 Q0");   // restore the main/default probe input
+                L("G54");
+                // Apply G43.1 relative to the ALREADY-loaded baseline rather than overwriting #<_tlo_ref>
+                // with this tool's own reading - the same computation tc.macro's "not the first tool this
+                // session" branch does, now the only branch that ever runs since #<_tlo_ref> starts non-zero.
+                L("G43.1 Z[#<_probe_z> - #<_tlo_ref>]");
+                L("(PRINT, LS_TLO_APPLIED tlo=[#<_probe_z> - #<_tlo_ref>])");
+                L("G53 G0 Z-5");
+                L("G53 G0 X#5181 Y#5182");
+                L("G53 G0 Z#5183");
+            }
+            else
+            {
+                // M6 T8 runs tc.macro, which does its own probe of the puck and applies G43.1 relative to
+                // whatever #<_tlo_ref> already holds - the baseline loaded above, not a fresh "first tool
+                // this session" value tc.macro would otherwise set.
+                L("(3D probe already in spindle - M6 T8 selects the main probe input itself, see tc.macro)");
+                L("M6 T8");
+            }
+            L("(WAITIDLE)");
+        }
+
+        /// <summary>
+        /// Re-apply the measured offset and put <c>#&lt;_tlo_ref&gt;</c> back.
+        /// </summary>
+        /// <remarks>
+        /// G43.1 sets the offset absolutely, so re-emitting it costs nothing if it somehow survived - and
+        /// it does not survive a pcorner call, whose absolute G53 moves need true machine coordinates and
+        /// so cancel it. Only covers a CLEAN finish; an aborted run leaves #&lt;_tlo_ref&gt; at the baseline
+        /// this run loaded rather than the true prior value - safe, since the baseline is itself a trusted
+        /// reference, just not a perfect restore. Known, accepted gap.
+        /// </remarks>
+        public static void EmitTloRestore(System.Action<string> L)
+        {
+            L("(--- restore the tool length offset the probe measured ---)");
+            L("G43.1 Z[#<_probe_z> - #<_tlo_ref>]");
+            L("(PRINT, LS_TLO_RESTORED tlo=[#<_probe_z> - #<_tlo_ref>])");
+            L("#<_tlo_ref> = #<_tlo_saved>");
+        }
+
+        private static string N(double v) { return v.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture); }
+
         public static bool CoordinateSystemDefined(string code)
         {
             return MacroRunner.CoordinateSystemDefined(code);

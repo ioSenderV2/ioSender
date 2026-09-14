@@ -277,6 +277,27 @@ namespace CNC.Controls
         // (points-1) x row spacing + line length + 2 x margin across it.
         // The live work origin this run will use, and whether the pattern fits from there - shown in the
         // editor in place of the prompt that used to ask the operator to set one mid-run.
+        /// <summary>
+        /// Give the V-bit already in the spindle a tool length offset by touching the puck, before cutting.
+        /// </summary>
+        /// <remarks>
+        /// This program does not change tools, so nothing else would. On this machine a work Z0 is only
+        /// meaningful together with the loaded tool's G43.1 - tc.macro applies one on every M6, computed
+        /// against the machine-wide baseline - so a bit fitted by hand has no offset and Z0 means whatever
+        /// the PREVIOUS tool made it mean. StartJobView's own comment records what that costs: a spoilboard
+        /// cut on 2026-08-06 when a second run with the same endmill already fitted emitted no M6, so
+        /// nothing re-applied the offset and the job rapided to a work Z0 15.432mm inside the material.
+        ///
+        /// Uses Setup's sequence, not a copy of it - MacroProcessor.EmitTloBaseline/Reference/Restore were
+        /// lifted out of StartJobView for exactly this.
+        /// </remarks>
+        public static readonly DependencyProperty ReferenceTloProperty = DependencyProperty.Register(nameof(ReferenceTlo), typeof(bool), typeof(StepperCalibrationScratchWizard), new PropertyMetadata(true));
+        public bool ReferenceTlo
+        {
+            get { return (bool)GetValue(ReferenceTloProperty); }
+            set { SetValue(ReferenceTloProperty, value); }
+        }
+
         public static readonly DependencyProperty OriginTextProperty = DependencyProperty.Register(nameof(OriginText), typeof(string), typeof(StepperCalibrationScratchWizard), new PropertyMetadata(""));
         public string OriginText
         {
@@ -427,12 +448,28 @@ namespace CNC.Controls
                 tool > 0 ? string.Empty : "Fit the V-bit. ", Results.Count, F(span), F(m), F(ScratchDepth)));
             lines.Add("(WAITIDLE)");
 
-            // G49 cancels any tool length offset. Without it a TLO left live by an earlier probe or tool
-            // change shifts every Z here by its own length - and the whole cut is a sub-millimetre scratch,
-            // so any offset at all either buries the V-bit or leaves it marking air. The probe wizard has
-            // always emitted this; this one did not.
             lines.Add("G90 G94 G17 G21");
-            lines.Add("G49");
+
+            // NO G49 HERE. It was added on 2026-09-14 reasoning that a stale tool length offset would wreck
+            // a sub-millimetre scratch - which is backwards on this machine. The offset is not incidental,
+            // it is what makes one work Z0 mean the same thing for every tool: tc.macro applies a G43.1 on
+            // every M6, computed against the machine-wide baseline. Cancelling it leaves Z0 referenced to
+            // whatever tool last had an offset. StartJobView records what that costs - a spoilboard cut on
+            // 2026-08-06, "the offset was never stale, just discarded".
+            //
+            // Instead, when asked, give the loaded bit its OWN offset by touching the puck. No tool change,
+            // so no prompt and no swap - which is the whole point of running with Tool = Loaded.
+            var setter = ReferenceTlo ? ProbeDefinitions.Items.FirstOrDefault(d => d.ProbeType == ProbeType.ToolSetter) : null;
+            if (setter != null)
+            {
+                MacroProcessor.EmitTloBaseline(lines.Add, model != null && model.IsTloReferenceSet,
+                                               AppConfig.Settings.Base.TloRefBaseline);
+                // touchPlate:true is the right branch for a CUTTING tool, not a statement about probes - it
+                // is the "nothing in the spindle triggers by itself, drive the toolsetter input directly"
+                // path. A V-bit is exactly that case; the M6 T8 branch beside it expects a 3D probe.
+                MacroProcessor.EmitTloReference(lines.Add, setter, true);
+            }
+
             if (tool > 0)
                 lines.Add("M6 T" + tool.ToString(CultureInfo.InvariantCulture));
             if (SpindleRPM > 0d)
@@ -470,6 +507,8 @@ namespace CNC.Controls
             if (SpindleRPM > 0d)
                 lines.Add("M5");
             lines.Add("G0 Z" + F(SafeZ));
+            if (setter != null)
+                MacroProcessor.EmitTloRestore(lines.Add);
             lines.Add("M30");
 
             return lines;
@@ -740,14 +779,14 @@ namespace CNC.Controls
         protected override DependencyProperty[] PersistedProperties => new[] {
             SpanProperty, DeltaProperty, PointsProperty, ScratchDepthProperty, PlungeFeedProperty,
             ScratchFeedProperty, SafeZProperty, LineLengthProperty, RowSpacingProperty,
-            EdgeMarginProperty, SpindleRPMProperty, ToolNumberProperty };
+            EdgeMarginProperty, SpindleRPMProperty, ToolNumberProperty, ReferenceTloProperty };
 
         protected override void ApplyConfig(ScratchParams p)
         {
             Span = p.Span; Delta = p.Delta; Points = p.Points; ScratchDepth = p.ScratchDepth;
             PlungeFeed = p.PlungeFeed; ScratchFeed = p.ScratchFeed; SafeZ = p.SafeZ;
             LineLength = p.LineLength; RowSpacing = p.RowSpacing; EdgeMargin = p.EdgeMargin;
-            SpindleRPM = p.SpindleRPM; ToolNumber = p.ToolNumber;
+            SpindleRPM = p.SpindleRPM; ToolNumber = p.ToolNumber; ReferenceTlo = p.ReferenceTlo;
         }
 
         protected override ScratchParams CaptureConfig()
@@ -755,7 +794,8 @@ namespace CNC.Controls
             return new ScratchParams {
                 Span = Span, Delta = Delta, Points = Points, ScratchDepth = ScratchDepth,
                 PlungeFeed = PlungeFeed, ScratchFeed = ScratchFeed, SafeZ = SafeZ, LineLength = LineLength,
-                RowSpacing = RowSpacing, EdgeMargin = EdgeMargin, SpindleRPM = SpindleRPM, ToolNumber = ToolNumber
+                RowSpacing = RowSpacing, EdgeMargin = EdgeMargin, SpindleRPM = SpindleRPM, ToolNumber = ToolNumber,
+                ReferenceTlo = ReferenceTlo
             };
         }
 
@@ -786,6 +826,8 @@ namespace CNC.Controls
         // spoilboard actually is, and a pair with one mark missing cannot be measured at all. Depth does not
         // affect the result - see the field's own tooltip - so erring deep costs nothing. Only affects NEW
         // profiles; an existing one keeps whatever it has saved.
+        // Reference the LOADED bit at the puck before cutting - see the wizard's ReferenceTlo property.
+        public bool ReferenceTlo = true;
         public double Span = 400d, Delta = 0.010d, Points = 3d, ScratchDepth = 0.5d, PlungeFeed = 100d,
                       ScratchFeed = 500d, SafeZ = 5d, LineLength = 5d, RowSpacing = 15d, EdgeMargin = 10d,
                       SpindleRPM = 18000d, ToolNumber = 1d;

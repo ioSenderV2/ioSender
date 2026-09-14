@@ -2366,8 +2366,7 @@ namespace GCode_Sender
                 // motion for the rest of the session, only clearing on a reboot. tc.macro's own o199/o200
                 // IF/ELSE/ENDIF is fine since it's uploaded as a raw file (YModem), never tokenized/streamed
                 // through this path - do not add O-word branching to any program built here.
-                L(tloAlreadyReferenced ? "#<_tlo_saved> = #<_tlo_ref>" : "#<_tlo_saved> = 0");
-                L(string.Format("#<_tlo_ref> = {0}", N(AppConfig.Settings.Base.TloRefBaseline)));
+                MacroProcessor.EmitTloBaseline(L, tloAlreadyReferenced, AppConfig.Settings.Base.TloRefBaseline);
             }
             // Select the probe input for the chosen probe (tool setter -> 1, else the main probe -> 0), the same
             // rule the Probing page uses (SelectControllerProbe). Guards against a stale selection from an
@@ -2697,10 +2696,7 @@ namespace GCode_Sender
                 // spindle, nothing touched" is exactly when this fires - the offset was never stale, just
                 // discarded. G43.1 sets the offset absolutely, so re-emitting it costs nothing if it somehow
                 // survived.
-                L("(--- restore the tool length offset the probe measured - see BuildProgram ---)");
-                L("G43.1 Z[#<_probe_z> - #<_tlo_ref>]");
-                L("(PRINT, LS_TLO_RESTORED tlo=[#<_probe_z> - #<_tlo_ref>])");
-                L("#<_tlo_ref> = #<_tlo_saved>");
+                MacroProcessor.EmitTloRestore(L);
             }
             L("M2");
 
@@ -3023,8 +3019,7 @@ namespace GCode_Sender
                 // See BuildProgram's own comment - #<_tlo_ref> can be undefined on a truly first-ever
                 // session, and O-word IF/ELSE/ENDIF is unsafe in a streamed (not raw-uploaded) program;
                 // decided in C# via tloAlreadyReferenced instead.
-                L(tloAlreadyReferenced ? "#<_tlo_saved> = #<_tlo_ref>" : "#<_tlo_saved> = 0");
-                L(string.Format("#<_tlo_ref> = {0}", N(AppConfig.Settings.Base.TloRefBaseline)));
+                MacroProcessor.EmitTloBaseline(L, tloAlreadyReferenced, AppConfig.Settings.Base.TloRefBaseline);
             }
             if (GrblInfo.HasToolSetter)
                 L(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
@@ -3476,60 +3471,15 @@ namespace GCode_Sender
         // probe-the-puck sequence it uses for a rigid tool (its non-T8 branch, tc.macro:76-90), explicitly
         // selecting the TOOLSETTER input instead - using the probe definition's OWN feeds rather than tc.macro's
         // hardcoded F500/F25, matching every other Start Job probe move.
+        // Moved to MacroProcessor 2026-09-14 so the calibration wizards use THIS sequence rather than
+        // growing a copy of it. Kept as a forwarder so this file's call sites read unchanged.
         private static void EmitTloReference(System.Action<string> L, ProbeDefinition p, bool touchPlate)
         {
-            L("(--- reference TLO at the puck, against the machine-wide baseline ---)");
-            if (touchPlate)
-            {
-                L("(touch plate - no self-triggering probe in the spindle, use the toolsetter input directly)");
-                L("G53 G0 Z-5");
-                L("G59.3");
-                L("G0 X0 Y0");
-                L("G0 Z0");
-                L("G65 P5 Q1");   // select the TOOLSETTER input (tc.macro's non-T8/rigid-tool convention)
-                L("G91");
-                L(string.Format("G38.2 Z-80 F{0}", N(SearchFeed(p))));
-                L("G0 Z2");
-                L(string.Format("G38.2 Z-5 F{0}", N(p.LatchFeedRate)));
-                L("#<_probe_z> = #5063");
-                // $TLR - the REAL grblHAL system command that commits the tool length reference to the
-                // controller's own native TLR flag (GrblViewModel.IsTloReferenceSet / the status report's
-                // TLR: field) - same one the Probing tab's own Tool Length flow uses (ToolLengthControl.xaml.cs).
-                // Sent here, machine still AT the touched Z, matching ToolLengthControl's own timing (right
-                // after the probe stops, before any retraction).
-                L("$TLR");
-                L("G0 Z10");
-                L("G90");
-                L("G65 P5 Q0");   // restore the main/default probe input
-                L("G54");
-                // Apply G43.1 relative to the ALREADY-loaded baseline (BuildProgram's own top-of-program load)
-                // rather than overwriting #<_tlo_ref> with this tool's own reading - same computation
-                // tc.macro's "not the first tool this session" branch already does (tc.macro:136), now the
-                // ONLY branch that ever runs, since #<_tlo_ref> starts non-zero every job.
-                L("G43.1 Z[#<_probe_z> - #<_tlo_ref>]");
-                L("(PRINT, LS_TLO_APPLIED tlo=[#<_probe_z> - #<_tlo_ref>])");
-                L("G53 G0 Z-5");
-                L("G53 G0 X#5181 Y#5182");
-                L("G53 G0 Z#5183");
-            }
-            else
-            {
-                // M6 T8 runs tc.macro, which does its own probe of the puck and applies G43.1 relative to
-                // whatever #<_tlo_ref> already holds - the baseline BuildProgram loaded at the top of the
-                // program, not a fresh "first tool this session" value tc.macro would otherwise set (its own
-                // #<_tlo_ref> EQ 0 branch never fires anymore once a real baseline exists).
-                L("(3D probe already in spindle - M6 T8 selects the main probe input itself, see tc.macro)");
-                L("M6 T8");
-            }
-            L("(WAITIDLE)");
+            MacroProcessor.EmitTloReference(L, p, touchPlate);
         }
 
-        // P-word for G10 L2 (P1=G54..P6=G59).
         private static string pCode(int wcsP) { return "P" + Math.Min(Math.Max(wcsP, 1), 6).ToString(CultureInfo.InvariantCulture); }
 
-        // Floor the probe definition's search (fast/coarse) feed at 200 mm/min - a slower configured value
-        // makes a multi-mm search take long enough to look stalled/hung rather than just slow. Search-only;
-        // latch feed is deliberately slow for accuracy and is NOT clamped here.
         private static double SearchFeed(ProbeDefinition p) { return Math.Max(p.ProbeFeedRate, 200d); }
 
         // "baseExpr + mag" or "baseExpr - mag" depending on dir (keeps generated expressions clean - no "- -5").
