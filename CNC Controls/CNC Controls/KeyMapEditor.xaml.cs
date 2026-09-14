@@ -683,6 +683,7 @@ namespace CNC.Controls
             new TabTarget("Tab.MachineSetup", "Machine Setup",  "Show Machine Setup, wherever it lives - main tab or File menu."),
             new TabTarget("Tab.HeightMap",    "Height Map",     "Show Height Map, wherever it lives - main tab or Tools menu."),
             new TabTarget("Tab.LatheWizard",  "Lathe Tools",    "Show Lathe Tools, wherever it lives - main tab or Tools menu."),
+            new TabTarget("Tab.Calibration",  "Calibration",    "Show Calibration (stepper calibration and squareness), wherever it lives - main tab or Tools menu."),
 
             // The three tools the dissolved Tools tab used to carry. Their ids keep the old "Tab.Tools." prefix
             // so bindings made while they were sub-tabs still work; each is now a view in its own right (a

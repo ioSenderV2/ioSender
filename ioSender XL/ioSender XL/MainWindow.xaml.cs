@@ -1137,8 +1137,16 @@ namespace GCode_Sender
                 return getView(tab) as CNC.Controls.MachineSetupView;
             }
 
+            // Machine Setup needs the run strip too - its Probe definitions and Fixture definitions steps
+            // jog the machine to locate things, and the jog pad lives on the strip - so it materializes as a
+            // tab rather than a window even when the operator has it in the File menu.
             var d = TabRegistry.DescriptorFor(ViewType.MachineSetup);
-            if (d == null || ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this) == null)
+            if (d == null)
+                return null;
+            if (d.RequiresRunStrip)
+                return showViewAsTab(d) as CNC.Controls.MachineSetupView;
+
+            if (ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this) == null)
                 return null;
 
             return ViewHostWindow.ViewInstance(ViewType.MachineSetup) as CNC.Controls.MachineSetupView;
@@ -2191,6 +2199,8 @@ namespace GCode_Sender
             var d = TabRegistry.DescriptorFor(view);
             if (d == null)
                 return null;
+            if (d.RequiresRunStrip)
+                return showViewAsTab(d);
             ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this);
             return ViewHostWindow.ViewInstance(view);
         }
@@ -3173,14 +3183,16 @@ namespace GCode_Sender
             // tabs (Setup, Offsets, Probing, Height Map, SD Card, Lathe) need a live controller, so they are
             // disabled until connect and re-enabled by UpdateConnectionGatedViews on the connect transition.
             // --- the main tab bar: the three views used while a job is actually being run ---
-            TabRegistry.Register(new TabDescriptor(ViewType.StartJob, TabLabel("TabSetup", "Setup"), () => new StartJobView(), 30, enabledWhenDisconnected: false));
+            TabRegistry.Register(new TabDescriptor(ViewType.StartJob, TabLabel("TabSetup", "Setup"), () => new StartJobView(), 30, enabledWhenDisconnected: false,
+                requiresRunStrip: true));
             TabRegistry.Register(new TabDescriptor(ViewType.GRBL, TabLabel("TabJob", "Job"), () => new JobView(), 40, enabledWhenDisconnected: true, alwaysVisible: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.WorkOrder, TabLabel("TabWorkOrder", "Work Order"), () => new WorkOrderView(), 45, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.WorkOrder, TabLabel("TabWorkOrder", "Work Order"), () => new WorkOrderView(), 45, enabledWhenDisconnected: true,
+                requiresRunStrip: true));
             TabRegistry.Register(new TabDescriptor(ViewType.Offsets, TabLabel("TabOffsets", "Offsets"), () => new OffsetView(), 50, enabledWhenDisconnected: false));
 
             // --- File menu: the two configuration destinations ---
             TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, TabLabel("TabMachineSetup", "Machine"), () => new MachineSetupView(), 10, enabledWhenDisconnected: true, alwaysVisible: true,
-                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.File));
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.File, requiresRunStrip: true));
             TabRegistry.Register(new TabDescriptor(ViewType.GRBLConfig, TabLabel("TabSettings", "Settings"), () => new GrblConfigView(), 20, enabledWhenDisconnected: true, alwaysVisible: true,
                 presentation: ViewPresentation.MenuWindow, menu: ViewMenu.File));
 
@@ -3198,6 +3210,10 @@ namespace GCode_Sender
                 presentation: ViewPresentation.MenuWindow, menu: ViewMenu.Tools));
             TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, TabLabel("TabLatheWizards", "Lathe Tools"), () => new CNC.Controls.Lathe.LatheWizardsView(), 60, enabledWhenDisconnected: false,
                 presentation: ViewPresentation.MenuWindow, menu: ViewMenu.Tools));
+            // Was Machine Setup's step 8 until 2026-09-13. All three of its wizards are Generate-first, so it
+            // must be a tab when opened - see TabDescriptor.RequiresRunStrip and CalibrationView's header.
+            TabRegistry.Register(new TabDescriptor(ViewType.Calibration, TabLabel("TabCalibration", "Calibration"), () => new CalibrationView(), 30, enabledWhenDisconnected: false,
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.Tools, requiresRunStrip: true));
             // ToolsView is dissolved: its three children (tool table, Trinamic tuner, PID tuner) are
             // listed directly in the Tools menu by BuildViewMenus, so the wrapper tab is gone.
         }
@@ -3254,34 +3270,9 @@ namespace GCode_Sender
                 // No Presentation check here on purpose: the TREE is the placement authority. A view
                 // the registry defaults to a menu still becomes a tab if the user dragged it back to
                 // the tabs slot in Settings > Main Page.
-                var ctl = d.Create?.Invoke();
-                if (ctl == null)
+                var tabItem = buildViewTab(d, node.Component);
+                if (tabItem == null)
                     continue;
-                d.Configure?.Invoke(ctl);
-
-                var tabItem = new TabItem
-                {
-                    Content = ctl,
-                    IsEnabled = d.EnabledWhenDisconnected,
-                    Tag = node.Component,
-                    // x:Uid is a markup-only directive, and these tabs are built in code, so they have no
-                    // authored Uid. Set it explicitly from the registry key (unique + stable) so the UI test
-                    // server can address the nav tabs by Uid and select one via its SelectionItem peer.
-                    Uid = "tab_" + node.Component
-                };
-
-                // Bindable main-page tabs get a live shortcut badge (upper-right) + a right-click "Bind to Key"
-                // menu; other tabs (e.g. the Trinamic tuner, not an ICNCView) keep a plain text header.
-                string tabId = ctl is ICNCView icv
-                    ? tabViewIds.FirstOrDefault(kv => kv.Value == icv.ViewType).Key
-                    : null;
-                if (tabId != null)
-                {
-                    tabItem.Header = new CNC.Controls.TabHeaderControl(d.Label, tabId);
-                    TabKeyBinder.AttachBindMenu(tabItem, tabId);
-                }
-                else
-                    tabItem.Header = d.Label;
 
                 tabMode.Items.Add(tabItem);
             }
@@ -3353,6 +3344,80 @@ namespace GCode_Sender
             }
         }
 
+        // Build (but do not add) the TabItem for a registered view. Split out of BuildTabs 2026-09-13 so a
+        // tab can also be created ON DEMAND - see showViewAsTab.
+        private TabItem buildViewTab(TabDescriptor d, string componentKey)
+        {
+            var ctl = d.Create?.Invoke();
+            if (ctl == null)
+                return null;
+            d.Configure?.Invoke(ctl);
+
+            var tabItem = new TabItem
+            {
+                Content = ctl,
+                IsEnabled = d.EnabledWhenDisconnected,
+                Tag = componentKey,
+                // x:Uid is a markup-only directive, and these tabs are built in code, so they have no
+                // authored Uid. Set it explicitly from the registry key (unique + stable) so the UI test
+                // server can address the nav tabs by Uid and select one via its SelectionItem peer.
+                Uid = "tab_" + componentKey
+            };
+
+            // Bindable main-page tabs get a live shortcut badge (upper-right) + a right-click "Bind to Key"
+            // menu; other tabs (e.g. the Trinamic tuner, not an ICNCView) keep a plain text header.
+            string tabId = ctl is ICNCView icv
+                ? tabViewIds.FirstOrDefault(kv => kv.Value == icv.ViewType).Key
+                : null;
+            if (tabId != null)
+            {
+                tabItem.Header = new CNC.Controls.TabHeaderControl(d.Label, tabId);
+                TabKeyBinder.AttachBindMenu(tabItem, tabId);
+            }
+            else
+                tabItem.Header = d.Label;
+
+            return tabItem;
+        }
+
+        /// <summary>
+        /// Show a view as a TAB, creating the tab on demand if the operator's layout has it in a menu.
+        /// Returns the hosted control, or null if it could not be built.
+        /// </summary>
+        /// <remarks>
+        /// For a view whose descriptor sets RequiresRunStrip. The shared Run bar - Generate/Run, Feed Hold,
+        /// Stop, and the jog pad - is docked in THIS window and exists nowhere else, so opening such a view
+        /// in a ViewHostWindow puts it in a separate top-level window with none of that reachable: the
+        /// calibration wizards' only Generate button, and Machine Setup's Probe/Fixture steps' only jog
+        /// controls, are all on the strip. The menu entry stays exactly where the operator put it - it is
+        /// only the PRESENTATION that is forced, so the tab strip does not have to carry these permanently.
+        ///
+        /// A tab created here is not written to the layout tree: it lasts for the session, and the next
+        /// launch rebuilds from the saved placement as before.
+        /// </remarks>
+        private UserControl showViewAsTab(TabDescriptor d)
+        {
+            if (d == null)
+                return null;
+
+            TabItem tab = getTab(d.ViewType);
+            if (tab == null)
+            {
+                tab = buildViewTab(d, d.Name);
+                if (tab == null)
+                    return null;
+
+                // BuildTabs' own Setup pass has long since run over the tabs that existed at startup, so a
+                // tab added now has to be set up here or its view never receives the model at all.
+                (tab.Content as ICNCView)?.Setup(UIViewModel, AppConfig.Settings);
+                tabMode.Items.Add(tab);
+            }
+
+            tab.IsEnabled = true;
+            tabMode.SelectedItem = tab;
+            return tab.Content as UserControl;
+        }
+
         private MenuItem NewViewMenuItem(TabDescriptor d)
         {
             var item = new MenuItem
@@ -3364,7 +3429,15 @@ namespace GCode_Sender
                 Tag = d.Name,
                 IsEnabled = d.EnabledWhenDisconnected
             };
-            item.Click += (s, e) => ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this);
+            // A view that drives the shared Run bar opens as a TAB, not a window - the bar is docked in this
+            // window and nowhere else, so a popup would leave its Generate/jog/Feed Hold controls unreachable.
+            item.Click += (s, e) =>
+            {
+                if (d.RequiresRunStrip)
+                    showViewAsTab(d);
+                else
+                    ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this);
+            };
             // Show the view's shortcut here too. It is the SAME "Tab.<Name>" id a tab header badges, because
             // the binding names the view rather than its current home - so the key a user set while this was
             // a tab is the key this menu entry now advertises.
@@ -3685,6 +3758,7 @@ namespace GCode_Sender
             { "Tab.MachineSetup", ViewType.MachineSetup },
             { "Tab.HeightMap",    ViewType.HeightMap },
             { "Tab.LatheWizard",  ViewType.LatheWizards },
+            { "Tab.Calibration",  ViewType.Calibration },
         };
 
         // The three ex-Tools-tab tools. They are plain layout components (no ViewType, no ICNCView), so they
@@ -3776,7 +3850,27 @@ namespace GCode_Sender
                 // window, then drill in exactly as the tab path does. ViewHostWindow.Open caches the view
                 // instance, so ViewInstance() is the same control the window is showing.
                 var d = TabRegistry.DescriptorFor(vt);
-                if (d == null || ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this) == null)
+                if (d == null)
+                    return false;
+
+                // A view that drives the shared Run bar becomes a tab instead of a window - the bar is
+                // docked in this window only (see showViewAsTab). The tab it creates then satisfies the
+                // nested drill-in below through the ordinary tab path.
+                if (d.RequiresRunStrip)
+                {
+                    var asTab = showViewAsTab(d);
+                    if (asTab == null)
+                        return false;
+                    if (secondDot > 0)
+                    {
+                        var tabHost = asTab as ITabBindingHost;
+                        if (tabHost == null || !tabHost.SelectSubTab(id))
+                            return false;
+                    }
+                    return true;
+                }
+
+                if (ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this) == null)
                     return false;
 
                 if (secondDot > 0)

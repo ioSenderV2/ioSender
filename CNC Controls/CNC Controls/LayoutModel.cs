@@ -1,4 +1,4 @@
-/*
+﻿/*
  * LayoutModel.cs - part of CNC Controls library
  *
  * Hierarchical layout model (Phase 2b of the registration architecture refactor, see
@@ -68,7 +68,9 @@ namespace CNC.Controls
         public const string Grbl = "GRBL", StartJob = "StartJob", Offsets = "Offsets",
                             Settings = "GRBLConfig", Probing = "Probing", SDCard = "SDCard",
                             LatheWizards = "LatheWizards", Tools = "Tools", MachineSetup = "MachineSetup",
-                            HeightMap = "HeightMap", FeedsAndSpeeds = "FeedsAndSpeeds", WorkOrder = "WorkOrder";
+                            HeightMap = "HeightMap", FeedsAndSpeeds = "FeedsAndSpeeds", WorkOrder = "WorkOrder",
+                            // 2026-09-13: Machine Setup's step 8 promoted to a top-level view - see CalibrationView.
+                            Calibration = "Calibration";
         // OddJobs (the old container tab) is retired (2026-07-31) - Work Order was its only remaining sub-tab
         // (Setup fixup already folded into the Setup tab itself), so it's promoted to a bare top-level leaf
         // (WorkOrder, above) instead of a tab-inside-a-tab. OddJobs/SlotOddJobs/OddJobsWorkOrder/OddJobsSetup
@@ -142,6 +144,7 @@ namespace CNC.Controls
                 // stay here too - they came off the default bar on 2026-07-26 (Start Job's Dynamic mode
                 // folds their functionality in), so restoring the old bar does not bring them back.
                 new LayoutSlot(LayoutKeys.SlotMenuTools,
+                    new LayoutNode(LayoutKeys.Calibration),
                     new LayoutNode(LayoutKeys.Probing),
                     new LayoutNode(LayoutKeys.HeightMap),
                     new LayoutNode(LayoutKeys.ToolTable),

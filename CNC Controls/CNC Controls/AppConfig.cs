@@ -1552,6 +1552,11 @@ namespace CNC.Controls
                 { LayoutKeys.Probing,        LayoutKeys.SlotMenuTools },
                 { LayoutKeys.HeightMap,      LayoutKeys.SlotMenuTools },
                 { LayoutKeys.LatheWizards,   LayoutKeys.SlotMenuTools },
+                // New 2026-09-13. EnforceMenuPlacement adds anything in this map that the tree does not
+                // already mention, so an EXISTING profile - which cannot know about a view that did not
+                // exist when it was written - picks the Calibration entry up on its next load rather than
+                // being left with no way to reach it at all.
+                { LayoutKeys.Calibration,    LayoutKeys.SlotMenuTools },
                 { LayoutKeys.ToolTable,      LayoutKeys.SlotMenuTools },
                 { LayoutKeys.Trinamic,       LayoutKeys.SlotMenuTools },
                 { LayoutKeys.PID,            LayoutKeys.SlotMenuTools },

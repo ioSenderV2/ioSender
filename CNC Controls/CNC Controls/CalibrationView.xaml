@@ -1,0 +1,33 @@
+<UserControl x:Class="CNC.Controls.CalibrationView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="560" d:DesignWidth="1000">
+    <!-- Machine Setup's step 8 lifted out whole (2026-09-13). It lived there because calibration is part of
+         commissioning a machine, but Machine Setup defaults to a MENU entry, and a menu entry opens in a
+         ViewHostWindow - a separate top-level window. All three of these wizards are Generate-first tools
+         whose only Generate button is the shared Run bar docked in MainWindow, so in a popup the wizard and
+         the button that drives it were in different windows. As a top-level view it can be a tab, where the
+         Run bar is directly underneath it. See TabDescriptor.RequiresRunStrip. -->
+    <local:StretchTabControl x:Name="tabCalibration" Background="Transparent"
+                             HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                             HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                             SelectionChanged="Calibration_SelectionChanged"
+                             ItemContainerStyle="{StaticResource SubNavTabItemStyle}">
+        <TabItem x:Uid="tabcal_stepper" x:Name="tabCalStepper" ToolTip="Correct steps/mm by probing a reference block of known size against a validated Corner Fence.">
+            <TabItem.Header><TextBlock x:Uid="cal_stepper" Text="Stepper calibration (probe)"/></TabItem.Header>
+            <local:StepperCalibrationProbeWizard x:Name="calStepperWizard"/>
+        </TabItem>
+        <TabItem x:Uid="tabcal_scratch" x:Name="tabCalScratch" ToolTip="Correct steps/mm by scratching test lines with a V-bit and measuring them with calipers. Needs no probe and no fixture.">
+            <TabItem.Header><TextBlock x:Uid="cal_scratch" Text="Stepper calibration (scratch)"/></TabItem.Header>
+            <local:StepperCalibrationScratchWizard x:Name="calScratchWizard"/>
+        </TabItem>
+        <TabItem x:Uid="tabcal_squareness" x:Name="tabCalSquareness" ToolTip="Check and correct gantry squareness.">
+            <TabItem.Header><TextBlock x:Uid="cal_squareness" Text="Squareness"/></TabItem.Header>
+            <local:AutoSquareWizard x:Name="calSquarenessWizard"/>
+        </TabItem>
+    </local:StretchTabControl>
+</UserControl>
