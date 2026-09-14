@@ -709,18 +709,22 @@ namespace CNC.Controls
         /// drifting, it was structurally incapable of matching. It is a CALL now, like pcorner.
         ///
         /// G92.2/G92.3 are tlo.macro's own, so a caller needs no coordinate-frame ceremony around this.
+        ///
+        /// LEAVES THE MACHINE AT THE PUCK, lifted 10mm - going home is the CALLER's business, because where
+        /// home is depends on what the caller does next. tc.macro returns to G30 on its own. Start Job needs
+        /// G30 too (corner 1's own #&lt;_ls_appz&gt; override exists because "the TLO-ref detour just parked at
+        /// G30") and emits it in its own forwarder. A program that simply cuts next wants neither, and had a
+        /// pointless round trip to G30 while this emitter did it for everybody.
         /// </remarks>
         public static void EmitTloReference(System.Action<string> L, int toolId)
         {
             L("(--- reference the loaded tool at the puck - see tlo.macro ---)");
             L(string.Format("#<_tlo_toolid> = {0}", toolId));
             L("O<tlo> CALL");
-            // BACK TO G30 before returning. tlo.macro deliberately leaves the machine at the puck - tc.macro
-            // makes its own way home afterwards and would only undo a return baked into the macro. But BOTH
-            // of the inline branches this replaced ended at G30, and StartJobView depends on it: corner 2's
-            // #<_ls_appz> override exists precisely because "the TLO-ref detour just parked at G30". Dropping
-            // it would have left the next corner call starting from over the puck.
-            EmitGotoG30(L);
+            // Immediately after the CALL, before anything else this caller emits. The program streams as ONE
+            // job, so without a sync point here a puck probe that alarms does not actually stop it - the
+            // controller halts and the sender keeps feeding lines that quietly error. Same reason Setup has
+            // one after every corner probe.
             L("(WAITIDLE)");
         }
 

@@ -3479,6 +3479,11 @@ namespace GCode_Sender
         private static void EmitTloReference(System.Action<string> L, ProbeDefinition p, bool touchPlate)
         {
             MacroProcessor.EmitTloReference(L, touchPlate ? 1 : 8);
+            // Home to G30 afterwards - THIS file's post-condition, not the shared emitter's. Both of this
+            // file's call sites want it: corner 1 follows with its own full retract, and corner 2's
+            // #<_ls_appz> override exists precisely because the detour parked at G30 rather than somewhere
+            // inside the fixture's footprint.
+            MacroProcessor.EmitGotoG30(L);
         }
 
         private static string pCode(int wcsP) { return "P" + Math.Min(Math.Max(wcsP, 1), 6).ToString(CultureInfo.InvariantCulture); }
