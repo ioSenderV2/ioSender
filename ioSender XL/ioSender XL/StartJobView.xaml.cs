@@ -2301,7 +2301,34 @@ namespace GCode_Sender
             // controller runs the four CALLs back-to-back under flow control (each publishes its globals before
             // the next reads them) - which keeps Feed Hold/Stop live and the UI responsive. Results still stream
             // back as (PRINT ...) messages.
-            void EmitCall(int cornerId, string refx, string refy, string startz, string maxz = "0", string appz = "9999") { EmitPcornerCall(L, cornerId, refx, refy, startz, maxz, appz); }
+            // A touch plate is a handheld continuity block: it sits on ONE corner at a time and has to be
+            // carried to the next one. A 3D probe rides in the spindle and needs none of this.
+            //
+            // CRASHED THE PLATE 2026-09-14, and this is the second time the same omission has bitten. The
+            // prompts used to be written out by hand beside corners 3 and 4, with a comment explaining that
+            // corner 2 needed none because "the initial placement happens before Run is even pressed". That
+            // explains why no prompt is needed BEFORE corner 1. It says nothing about after it - and after
+            // corner 1 the machine travels to corner 2, where the plate is not. From the wire log: corner 1
+            // went Idle at 02:01:52.672 and corner 2 was being set up 0.2s later. With no plate under it the
+            // probe could not trigger, so the tool drove 36mm down into the stock to the seek floor and
+            // ALARM:5'd there.
+            //
+            // So it is emitted HERE rather than at the call sites: every corner after the first gets its
+            // pause by construction, and a corner cannot be added without one. pcorner leaves the machine
+            // clear of the stock at its trusted height when it returns, so this IS the pause at safe Z.
+            int cornersEmitted = 0;
+            void EmitCall(int cornerId, string refx, string refy, string startz, string maxz = "0", string appz = "9999")
+            {
+                if (touchPlate && cornersEmitted > 0)
+                {
+                    // pcorner.macro corner ids: 1=FL 2=FR 3=BL 4=BR (see CornerId).
+                    string to = cornerId == 1 ? "front-left" : cornerId == 2 ? "front-right"
+                              : cornerId == 3 ? "back-left" : "back-right";
+                    L(string.Format("(MBOX, OK, Move the touch plate to the {0} corner, then click OK.)", to));
+                }
+                cornersEmitted++;
+                EmitPcornerCall(L, cornerId, refx, refy, startz, maxz, appz);
+            }
 
             L(string.Format("(Start Job - probe corners via pcorner.macro, set origin{0})", measure ? " + measure size" : ""));
             // Split across short lines - grblHAL rejects a line over its receive-buffer size ("Max characters
@@ -2547,14 +2574,6 @@ namespace GCode_Sender
                 L("#<c2y> = #<_corner_y>");
                 L("(WAITIDLE)");   // abort the whole run on an alarmed probe here - see the same note after corner 1
 
-                // Touch plate is a handheld continuity block, not a fixed installed probe - it has to be
-                // physically moved to each new corner between calls (unlike the 3D probe, mounted in the
-                // spindle for the whole run). Pause here and again after corner 3 so there's time to move it;
-                // not needed after corner 1 (the initial placement happens before Run is even pressed) or
-                // after corner 4 (nothing left to probe).
-                if (touchPlate)
-                    L(string.Format("(MBOX, OK, Move the touch plate to the {0} corner, then click OK.)", Name(yn)));
-
                 string c3refx, c3refy, c4refx, c4refy;
                 if (exactSize)
                 {
@@ -2589,9 +2608,6 @@ namespace GCode_Sender
                 L("#<c3x> = #<_corner_x>");
                 L("#<c3y> = #<_corner_y>");
                 L("(WAITIDLE)");   // abort the whole run on an alarmed probe here - see the same note after corner 1
-
-                if (touchPlate)
-                    L(string.Format("(MBOX, OK, Move the touch plate to the {0} corner, then click OK.)", Name(dg)));
 
                 L(string.Format("(--- corner 4 = {0} (diagonal) ---)", Name(dg)));
                 EmitCall(CornerId(dg), c4refx, c4refy, "#<_start_z>", maxz);
@@ -3154,6 +3170,14 @@ namespace GCode_Sender
                 L("#<c4y> = #<_corner_y>");
 
                 double refYOut2 = fxPos.Y - estH - refMarginMm;
+
+                // The plate is handheld and has just been probed at the corner above - it has to be carried
+                // here before this corner can trigger. Same omission that crashed the Corner Fence path on
+                // 2026-09-14 (see BuildProgram's EmitCall): without it the probe cannot fire, so the tool
+                // drives to the seek floor through whatever is in the way and ALARM:5s there.
+                // ANY new pcorner caller that probes more than one corner needs this.
+                if (touchPlate)
+                    L("(MBOX, OK, Move the touch plate to the front-right corner, then click OK.)");
 
                 L("(--- corner 2 = front-right (diagonal from the jaw origin) ---)");
                 EmitPcornerCall(L, 2, N(refXOut), N(refYOut2), "0", "#<_lv_safe_z>");
