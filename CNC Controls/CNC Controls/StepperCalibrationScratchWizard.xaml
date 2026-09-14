@@ -1,4 +1,4 @@
-<local:ConfigPanel x:TypeArguments="local:ScratchParams" x:Class="CNC.Controls.StepperCalibrationScratchWizard"
+﻿<local:ConfigPanel x:TypeArguments="local:ScratchParams" x:Class="CNC.Controls.StepperCalibrationScratchWizard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -54,6 +54,16 @@
                 Value="{Binding RowSpacing, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
             <local:NumericField x:Uid="fld_scmargin" Label="Edge margin:" ColonAt="120"
                 Value="{Binding EdgeMargin, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                <Label x:Uid="lbl_scorigin" Content="Work origin:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding OriginText, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" VerticalAlignment="Center" FontWeight="SemiBold"
+                           ToolTip="The work offset this run will use - whichever coordinate system is active right now. The program does not change it and does not set it; touch off on the stock corner first (Z0 = stock top)."/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                <Label x:Uid="lbl_scfit" Content="Pattern:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding FitText, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" VerticalAlignment="Center" TextWrapping="Wrap"
+                           ToolTip="Where the scratch pattern reaches from that origin, checked against the machine envelope (travel less the homing pull-off)."/>
+            </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                 <Label Content="Min stock:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding MinStockText, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" VerticalAlignment="Center" FontWeight="SemiBold"

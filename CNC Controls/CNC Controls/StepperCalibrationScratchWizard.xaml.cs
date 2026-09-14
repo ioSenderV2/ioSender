@@ -91,6 +91,15 @@ namespace CNC.Controls
 
             if (activate)
             {
+                // The origin readout has to FOLLOW the machine, not snapshot it. Without this the panel shows
+                // whatever the offset was when the tab opened and keeps showing it after the operator touches
+                // off - which is the failure mode where the display says one thing and the run does another.
+                if (!subscribed && model != null)
+                {
+                    model.PropertyChanged += Model_PropertyChanged;
+                    subscribed = true;
+                }
+
                 // Default to the first in-plane (X/Y) axis if not yet selected.
                 if (CalAxes.Count > 0 && CalAxes.FirstOrDefault(a => a.Index == Axis) == null)
                     Axis = CalAxes[0].Index;
@@ -259,6 +268,22 @@ namespace CNC.Controls
 
         // Minimum stock the pattern needs: span + 2 x margin along the axis, and
         // (points-1) x row spacing + line length + 2 x margin across it.
+        // The live work origin this run will use, and whether the pattern fits from there - shown in the
+        // editor in place of the prompt that used to ask the operator to set one mid-run.
+        public static readonly DependencyProperty OriginTextProperty = DependencyProperty.Register(nameof(OriginText), typeof(string), typeof(StepperCalibrationScratchWizard), new PropertyMetadata(""));
+        public string OriginText
+        {
+            get { return (string)GetValue(OriginTextProperty); }
+            set { SetValue(OriginTextProperty, value); }
+        }
+
+        public static readonly DependencyProperty FitTextProperty = DependencyProperty.Register(nameof(FitText), typeof(string), typeof(StepperCalibrationScratchWizard), new PropertyMetadata(""));
+        public string FitText
+        {
+            get { return (string)GetValue(FitTextProperty); }
+            set { SetValue(FitTextProperty, value); }
+        }
+
         public static readonly DependencyProperty MinStockTextProperty = DependencyProperty.Register(nameof(MinStockText), typeof(string), typeof(StepperCalibrationScratchWizard), new PropertyMetadata(""));
         public string MinStockText
         {
@@ -296,16 +321,36 @@ namespace CNC.Controls
         // statics (shared across all Generate-first tabs) so a stale event firing after this tab was left
         // can't stomp whichever OTHER tab is now focused. See StartJobView.isActiveTab's own comment.
         private bool isActiveTab = false;
+        private bool subscribed = false;
 
         // The coarse live-readiness gate for the shared Run bar's "Generate" button - mirrors Generate()'s
         // own first precondition check.
         private void RefreshGenerateReady()
         {
-            if (isActiveTab)
-                MacroProcessor.IsGenerateReady = CurrentResolution > 0d;
-                // After the gate, never before: setting it ready clears the reason (see MacroProcessor).
-                if (CurrentResolution <= 0d)
-                    MacroProcessor.GenerateBlockedReason = LibStrings.FindResource("ScNoAxisResolution");
+            // BRACED, deliberately. This was a braceless "if (isActiveTab)" guarding only the line directly
+            // under it, so when a blocked reason was added beside the gate it landed OUTSIDE the guard and
+            // wrote MacroProcessor's SHARED statics from a tab that was not active - the exact stomp
+            // isActiveTab exists to prevent (see its own comment above).
+            if (!isActiveTab)
+                return;
+
+            string why = CurrentResolution > 0d ? CheckOrigin() : LibStrings.FindResource("ScNoAxisResolution");
+            MacroProcessor.IsGenerateReady = why == null;
+            // After the gate, never before: setting it ready clears the reason (see MacroProcessor).
+            if (why != null)
+                MacroProcessor.GenerateBlockedReason = why;
+        }
+
+        // Re-read the origin whenever the machine's own offset or homed state moves under us. WorkPosition
+        // fires on every status poll, so filter to the properties that actually change the answer.
+        private void Model_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (!isActiveTab)
+                return;
+            if (e.PropertyName == nameof(GrblViewModel.WorkPositionOffset)
+             || e.PropertyName == nameof(GrblViewModel.WorkCoordinateSystem)
+             || e.PropertyName == nameof(GrblViewModel.HomedState))
+                RefreshGenerateReady();
         }
 
         // Drop the generated program; also registered as MacroProcessor.DiscardGenerated (see Activate) -
@@ -346,16 +391,30 @@ namespace CNC.Controls
             lines.Add(string.Format("(ioSender stepper calibration - {0} axis - V-bit scratch lines)", axis));
             lines.Add(string.Format("(span {0} mm, current steps/mm {1}, measure spacing between the two lines of each pair)", F(span), FR(s0)));
 
-            // Prereq + fit/position prompt (mirrors the other generated programs): confirm the link, then hold while
-            // the operator fits the V-bit, jogs to a stock corner and sets work zero. Nothing moves until OK.
+            // Runs against the WORK ORIGIN THAT IS ALREADY SET - after Setup that is the stock corner with Z0
+            // on its top, so there is nothing to do but press Run. The prompt that used to live here asked the
+            // operator to jog to a corner and Zero All mid-run; it was the slowest part of the tool and it
+            // carried a trap, because it fired BEFORE the "G54" line below it. Zero All zeroes whichever WCS
+            // is ACTIVE, so an operator working in G55 zeroed G55 and then watched the program switch to G54
+            // and run against whatever that held. The G54 line is gone with it: this program now inherits the
+            // active WCS and never changes it. What replaced the promise is a real check - the editor shows
+            // the live origin and refuses to generate unless the whole pattern fits the machine envelope.
             lines.Add("(PREREQ, connected, noalarm)");
-            lines.Add("(MBOX, OKCANCEL, Fit the V-bit, jog to a stock corner, then set work zero here - on the DRO click Zero All [Z0 = stock top]. Click OK to start, Cancel to abort.)");
+            // Factual, not a task: the operator has already set the origin, so this only confirms what is
+            // about to be cut and from where. Nothing moves until OK.
+            lines.Add(string.Format("(MBOX, OKCANCEL, Fit the V-bit. About to scratch {0} pairs of lines over {1}mm, starting {2}mm from the CURRENT work origin - {3}mm deep. Click OK to start, Cancel to abort.)",
+                Results.Count, F(span), F(m), F(ScratchDepth)));
             lines.Add("(WAITIDLE)");
 
-            // Work-coordinate prolog (the operator zeroed at the corner) - no machine-coord G53 moves, so homing is
-            // not required. Lift to safe Z first (off the stock top), then change tool / start the spindle.
+            // Work-coordinate prolog - no machine-coord G53 moves, so homing is not required by the program
+            // itself (the editor's envelope check does want it, and says so when it is missing).
+            //
+            // G49 cancels any tool length offset. Without it a TLO left live by an earlier probe or tool
+            // change shifts every Z here by its own length - and the whole cut is a 0.3mm scratch, so any
+            // offset at all either buries the V-bit or leaves it marking air. The probe wizard has always
+            // emitted this; this one did not.
             lines.Add("G90 G94 G17 G21");
-            lines.Add("G54");
+            lines.Add("G49");
             lines.Add("G0 Z" + F(SafeZ));
             if (tool > 0)
                 lines.Add("M6 T" + tool.ToString(CultureInfo.InvariantCulture));
@@ -450,6 +509,102 @@ namespace CNC.Controls
             }
         }
 
+        /// <summary>
+        /// The pattern's extent in WORK coordinates from the origin: how far it reaches along the axis being
+        /// calibrated, and across it. Deliberately the LARGEST candidate's commanded distance, not the
+        /// nominal span - a candidate above the current steps/mm is commanded FURTHER than the span asked
+        /// for, and that longest pair is the one that runs off the end of the stock (or the table).
+        /// </summary>
+        private void PatternExtent(out double along, out double across)
+        {
+            int n = Math.Max(1, (int)Math.Round(Points));
+            double maxCommanded = Span;
+            foreach (var r in Results)
+                if (r.Commanded > maxCommanded)
+                    maxCommanded = r.Commanded;
+
+            along = EdgeMargin + maxCommanded;
+            across = EdgeMargin + (n - 1) * RowSpacing + LineLength;
+        }
+
+        /// <summary>
+        /// What this run will do to the machine, from the origin that is set RIGHT NOW - and whether it
+        /// fits. Sets <see cref="OriginText"/>/<see cref="FitText"/> for the editor and returns the reason
+        /// it cannot run, or null when it can.
+        /// </summary>
+        /// <remarks>
+        /// This replaced a prompt that asked the operator to promise they had set a zero. A promise is not a
+        /// signal; the work offset is. Note what is deliberately NOT tested: "is G54 defined". There is no
+        /// such state - an unset WCS simply holds 0,0,0, which is also a perfectly legitimate origin for
+        /// someone who zeroed at machine origin on purpose, so treating zero as "unset" would refuse a valid
+        /// setup and still not catch a wrong one. The consequences are testable and the intent is not, so
+        /// this checks the consequences: does the whole pattern stay inside the machine envelope, and is the
+        /// work Z0 somewhere a stock top could actually be.
+        /// </remarks>
+        private string CheckOrigin()
+        {
+            OriginText = FitText = string.Empty;
+
+            if (model == null)
+                return "Not connected.";
+
+            var wco = model.WorkPositionOffset;
+            int axisIndex = Axis;
+            int perpIndex = axisIndex == 0 ? 1 : 0;
+
+            OriginText = string.Format(CultureInfo.InvariantCulture, "{0}  X{1:0.000}  Y{2:0.000}  Z{3:0.000}",
+                string.IsNullOrEmpty(model.WorkCoordinateSystem) ? "current" : model.WorkCoordinateSystem,
+                wco.X, wco.Y, wco.Z);
+
+            double along, across;
+            PatternExtent(out along, out across);
+
+            // Z0 at the machine's Z home means the "stock top" is the top of Z travel - nothing can be
+            // sitting there, so the V-bit would trace 0.3mm below the machine's ceiling and cut air. This is
+            // the one case where a zero offset IS conclusive, because the geometry rules it out.
+            if (wco.Z == 0d)
+                return "Work Z0 is at the machine's Z home, so there is no stock top to scratch. Touch off on the stock first.";
+
+            if (model.HomedState != HomedState.Homed)
+            {
+                FitText = "not homed - cannot check the pattern against the machine envelope";
+                return null;   // the program uses no G53, so this is a warning, not a refusal
+            }
+
+            // MPos = WPos + WCO, so the machine coordinate each end of the pattern reaches is the work
+            // extent plus the offset. Checked per axis against the SHARED envelope (GrblInfo.ReachableLimit -
+            // travel minus the homing pull-off, the formula a hand-rolled copy got wrong on 2026-09-14).
+            string bad = EnvelopeFault(axisIndex, wco.Values[axisIndex], along)
+                      ?? EnvelopeFault(perpIndex, wco.Values[perpIndex], across)
+                      ?? EnvelopeFault(2, wco.Z, SafeZ, -ScratchDepth);
+            if (bad != null)
+                return bad;
+
+            FitText = string.Format(CultureInfo.InvariantCulture, "pattern {0:0} x {1:0} mm from the origin - fits", along, across);
+            return null;
+        }
+
+        private string EnvelopeFault(int axis, double offset, params double[] workReaches)
+        {
+            double lo = GrblInfo.ReachableLimit(axis, true), hi = GrblInfo.ReachableLimit(axis, false);
+            if (double.IsNaN(lo) || double.IsNaN(hi))
+            {
+                FitText = "machine travel or pull-off unknown - cannot check the envelope";
+                return null;
+            }
+            double min = Math.Min(lo, hi), max = Math.Max(lo, hi);
+
+            foreach (double reach in workReaches)
+            {
+                double target = offset + reach;
+                if (target < min || target > max)
+                    return string.Format(CultureInfo.InvariantCulture,
+                        "The pattern runs off the table: it reaches {0}{1:0.0} in machine coordinates, outside {2:0.0}..{3:0.0}. Move the origin, or reduce the span.",
+                        GrblInfo.AxisIndexToLetter(axis), target, min, max);
+            }
+            return null;
+        }
+
         // Minimum stock the pattern needs: span + 2 x margin along the axis; (points-1) x row spacing +
         // line length + 2 x margin across it.
         private void UpdateMinStock()
@@ -501,6 +656,13 @@ namespace CNC.Controls
             if (CurrentResolution <= 0d)
             {
                 AppDialogs.Show(LibStrings.FindResource("ScNoAxisResolution"), "Stepper calibration", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            string originWhy = CheckOrigin();
+            if (originWhy != null)
+            {
+                AppDialogs.Show(originWhy, "Stepper calibration", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 
