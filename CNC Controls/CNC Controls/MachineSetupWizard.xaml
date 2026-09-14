@@ -472,6 +472,10 @@
                         <TabItem.Header><TextBlock x:Uid="step_calStepper" Text="Stepper calibration"/></TabItem.Header>
                         <local:StepperCalibrationProbeWizard x:Name="calStepperWizard"/>
                     </TabItem>
+                    <TabItem x:Uid="tabstep_calScratch" x:Name="tabCalScratch" ToolTip="Correct steps/mm by scratching test lines with a V-bit and measuring them with calipers. Needs no probe and no fixture.">
+                        <TabItem.Header><TextBlock x:Uid="step_calScratch" Text="Stepper calibration (scratch)"/></TabItem.Header>
+                        <local:StepperCalibrationScratchWizard x:Name="calScratchWizard"/>
+                    </TabItem>
                     <TabItem x:Uid="tabstep_calSquareness" x:Name="tabCalSquareness" ToolTip="Check and correct gantry squareness.">
                         <TabItem.Header><TextBlock x:Uid="step_calSquareness" Text="Squareness"/></TabItem.Header>
                         <local:AutoSquareWizard x:Name="calSquarenessWizard"/>

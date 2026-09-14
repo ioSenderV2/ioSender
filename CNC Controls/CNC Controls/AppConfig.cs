@@ -726,6 +726,14 @@ namespace CNC.Controls
             // always a no-op and the section just starts with StepperCalProbeParams' own defaults.
             RegisterFolded<StepperCalProbeParams>("StepperCalProbe",
                 () => StepperCalibrationProbeWizard.SectionConfig, v => StepperCalibrationProbeWizard.SectionConfig = v, "StepperCalProbe.xml");
+            // Restored 2026-09-13 with the scratch wizard itself (retired 2026-08-02 in d93286ca, when the
+            // probe method was briefly the only one kept). The probe method needs a 3D probe AND a located
+            // Corner Fence AND a reference block of known size; this one needs a V-bit and calipers, which is
+            // the whole reason it is back - a machine with no 3D probe defined had no way to calibrate at all.
+            // "StepperCalScratch.xml" is the pre-folding standalone file, so ImportLegacy is a real path here
+            // (unlike StepperCalProbe's) for a profile that predates section folding.
+            RegisterFolded<ScratchParams>("StepperCalScratch",
+                () => StepperCalibrationScratchWizard.SectionConfig, v => StepperCalibrationScratchWizard.SectionConfig = v, "StepperCalScratch.xml");
             // Shared by both StartJobView instances now - the real Start Job tab and Odd Jobs' "Setup" sub-tab
             // (job-flow unification, 2026-07-31 - see StartJobConfig's own comment). Used to be two
             // independent sections; the second ("OddJobsSetup") is retired outright, no migration - Setup was

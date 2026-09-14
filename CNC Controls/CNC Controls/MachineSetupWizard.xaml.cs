@@ -314,8 +314,12 @@ namespace CNC.Controls
             if (tab == tabStepMacros) return "Tab.MachineSetup.Macros";
             if (tab == tabStepSimulator) return "Tab.MachineSetup.Simulator";
             if (tab == tabStepCalibration)
-                return tabCalibration?.SelectedItem == tabCalSquareness
-                     ? "Tab.MachineSetup.CalSquareness" : "Tab.MachineSetup.CalStepper";
+            {
+                if (tabCalibration?.SelectedItem == tabCalSquareness)
+                    return "Tab.MachineSetup.CalSquareness";
+                return tabCalibration?.SelectedItem == tabCalScratch
+                     ? "Tab.MachineSetup.CalScratch" : "Tab.MachineSetup.CalStepper";
+            }
             return null;
         }
 
@@ -360,8 +364,13 @@ namespace CNC.Controls
                 new SettingsSubPage("Tab.MachineSetup.Fixtures", HeaderText(tabStepFixtures), this) { IndexRoot = tabStepFixtures.Content as FrameworkElement, Status = () => hdrFixtures.Foreground },
                 new SettingsSubPage("Tab.MachineSetup.Macros", HeaderText(tabStepMacros), this) { IndexRoot = tabStepMacros.Content as FrameworkElement, Status = () => hdrMacros.Foreground },
                 new SettingsSubPage("Tab.MachineSetup.Calibration", HeaderText(tabStepCalibration), null) { Status = () => hdrCalibration.Foreground },
-                new SettingsSubPage("Tab.MachineSetup.CalStepper", Localized("SettingsPageCalStepper", "Stepper"), this)
+                new SettingsSubPage("Tab.MachineSetup.CalStepper", Localized("SettingsPageCalStepper", "Stepper (probe)"), this)
                     { IndexRoot = tabCalStepper.Content as FrameworkElement, Parent = CalibrationCategoryKey, IsAvailable = () => tabCalStepper.IsEnabled },
+                // No IsAvailable: the scratch method needs only a V-bit and calipers, so unlike the probe
+                // page above it is ALWAYS offered - that is the whole point of having it back. A machine
+                // with no 3D probe defined now still has a way to calibrate steps/mm.
+                new SettingsSubPage("Tab.MachineSetup.CalScratch", Localized("SettingsPageCalScratch", "Stepper (scratch)"), this)
+                    { IndexRoot = tabCalScratch.Content as FrameworkElement, Parent = CalibrationCategoryKey },
                 new SettingsSubPage("Tab.MachineSetup.CalSquareness", HeaderText(tabCalSquareness), this)
                     { IndexRoot = tabCalSquareness.Content as FrameworkElement, Parent = CalibrationCategoryKey },
                 new SettingsSubPage("Tab.MachineSetup.Simulator", HeaderText(tabStepSimulator), this)
@@ -375,9 +384,11 @@ namespace CNC.Controls
             // Calibration's children select the Calibration step AND the matching sub-tab. Order matters:
             // set the sub-tab first, so entering the step activates the right wizard rather than the
             // previously selected one and then immediately switching.
-            if (key == "Tab.MachineSetup.CalStepper" || key == "Tab.MachineSetup.CalSquareness")
+            if (key == "Tab.MachineSetup.CalStepper" || key == "Tab.MachineSetup.CalScratch" || key == "Tab.MachineSetup.CalSquareness")
             {
-                tabCalibration.SelectedItem = key == "Tab.MachineSetup.CalStepper" ? tabCalStepper : tabCalSquareness;
+                tabCalibration.SelectedItem = key == "Tab.MachineSetup.CalStepper" ? tabCalStepper
+                                            : key == "Tab.MachineSetup.CalScratch" ? tabCalScratch
+                                            : tabCalSquareness;
                 tabSteps.SelectedItem = tabStepCalibration;
                 return;
             }
@@ -1355,8 +1366,13 @@ namespace CNC.Controls
                 ProbeDefinitions.Renumber(ProbeDefinitions.Items);   // names derive from type + count
                 ProbeDefinitions.Save();
                 grdProbes.SelectedItem = def;
-                RefreshStepColors();
+                // Availability FIRST: RefreshStepColors raises StepStatusChanged, which is what makes the
+                // navigation tree re-evaluate each page's IsAvailable - and CalStepper's reads
+                // tabCalStepper.IsEnabled. Called the other way round (as it was until 2026-09-13) the tree
+                // sampled the OLD value, so adding your first 3D probe left the Stepper (probe) page hidden
+                // until the tab was left and re-entered.
                 UpdateCalibrationStepAvailability();
+                RefreshStepColors();
             }
         }
 
@@ -1381,6 +1397,9 @@ namespace CNC.Controls
                 ProbeDefinitions.Save();
                 grdProbes.Items.Refresh();
                 UpdateCalibrationStepAvailability();
+                // Changing an existing probe's TYPE changes CalStepper's availability just as adding one
+                // does, but this path never raised StepStatusChanged, so the navigation tree was never told.
+                RefreshStepColors();
             }
         }
 
@@ -1393,8 +1412,8 @@ namespace CNC.Controls
                 ProbeDefinitions.Items.Remove(sel);
                 ProbeDefinitions.Renumber(ProbeDefinitions.Items);
                 ProbeDefinitions.Save();
+                UpdateCalibrationStepAvailability();   // before RefreshStepColors - see ProbeNew_Click
                 RefreshStepColors();
-                UpdateCalibrationStepAvailability();
             }
         }
 
@@ -1512,11 +1531,13 @@ namespace CNC.Controls
             var tab = tabCalibration?.SelectedItem as TabItem;
             if (tab == tabCalStepper)
                 calStepperWizard.Activate(activate);
+            else if (tab == tabCalScratch)
+                calScratchWizard.Activate(activate);
             else if (tab == tabCalSquareness)
                 calSquarenessWizard.Activate(activate);
         }
 
-        // Switching between Stepper calibration / Squareness within the Calibration step - deactivate the
+        // Switching between Stepper calibration (probe) / (scratch) / Squareness within the Calibration step - deactivate the
         // outgoing sub-tab, activate the incoming one. Ignored while the Calibration step itself isn't the
         // active outer step (this event also bubbles up to Steps_SelectionChanged, which filters it out there
         // via e.OriginalSource, same pattern as the macros/simulator checks above).
@@ -1530,6 +1551,8 @@ namespace CNC.Controls
                 var removed = e.RemovedItems[0] as TabItem;
                 if (removed == tabCalStepper)
                     calStepperWizard.Activate(false);
+                else if (removed == tabCalScratch)
+                    calScratchWizard.Activate(false);
                 else if (removed == tabCalSquareness)
                     calSquarenessWizard.Activate(false);
             }
