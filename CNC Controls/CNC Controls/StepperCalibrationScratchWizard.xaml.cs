@@ -399,27 +399,44 @@ namespace CNC.Controls
             // and run against whatever that held. The G54 line is gone with it: this program now inherits the
             // active WCS and never changes it. What replaced the promise is a real check - the editor shows
             // the live origin and refuses to generate unless the whole pattern fits the machine envelope.
-            lines.Add("(PREREQ, connected, noalarm)");
-            // Factual, not a task: the operator has already set the origin, so this only confirms what is
-            // about to be cut and from where. Nothing moves until OK.
-            lines.Add(string.Format("(MBOX, OKCANCEL, Fit the V-bit. About to scratch {0} pairs of lines over {1}mm, starting {2}mm from the CURRENT work origin - {3}mm deep. Click OK to start, Cancel to abort.)",
-                Results.Count, F(span), F(m), F(ScratchDepth)));
+            // "homed" is here because of the G30 park below, and ONLY because of it. Nothing else in this
+            // program uses machine coordinates - the pattern itself is pure work-coordinate motion, which is
+            // why this tool used to run on an unhomed machine. EmitGotoG30 is three G53 moves, and G53 on an
+            // unhomed machine addresses coordinates that mean nothing.
+            lines.Add("(PREREQ, connected, homed, noalarm)");
+
+            // Park at G30 before asking for the bit, same as the probe wizard. Without it the prompt appears
+            // with the spindle wherever the last operation left it - possibly down in the work - and the
+            // operator is invited to reach in and change a tool there.
+            lines.Add("(park at G30 - fit the V-bit)");
+            MacroProcessor.EmitGotoG30(line => lines.Add(line));
             lines.Add("(WAITIDLE)");
 
-            // Work-coordinate prolog - no machine-coord G53 moves, so homing is not required by the program
-            // itself (the editor's envelope check does want it, and says so when it is missing).
-            //
+            // Factual, not a task: the operator has already set the origin, so this only confirms what is
+            // about to be cut and from where. The "fit the V-bit" lead-in is dropped when a tool change is
+            // being emitted below - M6 prompts for the tool itself, and two prompts for one bit is one too
+            // many. Nothing moves until OK.
+            lines.Add(string.Format("(MBOX, OKCANCEL, {0}About to scratch {1} pairs of lines over {2}mm, starting {3}mm from the CURRENT work origin - {4}mm deep. Click OK to start, Cancel to abort.)",
+                tool > 0 ? string.Empty : "Fit the V-bit. ", Results.Count, F(span), F(m), F(ScratchDepth)));
+            lines.Add("(WAITIDLE)");
+
             // G49 cancels any tool length offset. Without it a TLO left live by an earlier probe or tool
-            // change shifts every Z here by its own length - and the whole cut is a 0.3mm scratch, so any
-            // offset at all either buries the V-bit or leaves it marking air. The probe wizard has always
-            // emitted this; this one did not.
+            // change shifts every Z here by its own length - and the whole cut is a sub-millimetre scratch,
+            // so any offset at all either buries the V-bit or leaves it marking air. The probe wizard has
+            // always emitted this; this one did not.
             lines.Add("G90 G94 G17 G21");
             lines.Add("G49");
-            lines.Add("G0 Z" + F(SafeZ));
             if (tool > 0)
                 lines.Add("M6 T" + tool.ToString(CultureInfo.InvariantCulture));
             if (SpindleRPM > 0d)
                 lines.Add("S" + ((int)Math.Round(SpindleRPM)).ToString(CultureInfo.InvariantCulture) + " M3");
+
+            // AFTER the tool change, not before it. This used to sit above the M6, where it was pure noise -
+            // the tool change retracts and parks on its own, discarding whatever height this had just set.
+            // It is not redundant here though: the loop below opens with an absolute "G1 Z-depth" at PLUNGE
+            // feed, so without first coming down to the safe height that plunge starts from wherever the tool
+            // change left the spindle - machine top - and crawls the entire way down at 100 mm/min.
+            lines.Add("G0 Z" + F(SafeZ));
 
             for (int i = 0; i < Results.Count; i++)
             {
@@ -565,11 +582,12 @@ namespace CNC.Controls
             if (wco.Z == 0d)
                 return "Work Z0 is at the machine's Z home, so there is no stock top to scratch. Touch off on the stock first.";
 
+            // A refusal now, not a warning. It used to be the latter because the program was pure
+            // work-coordinate motion; it parks at G30 first as of 2026-09-14, which is G53, so its own
+            // (PREREQ) demands homed too. Better to say so here than to generate a program that refuses
+            // itself at the moment the operator presses Run.
             if (model.HomedState != HomedState.Homed)
-            {
-                FitText = "not homed - cannot check the pattern against the machine envelope";
-                return null;   // the program uses no G53, so this is a warning, not a refusal
-            }
+                return "The machine is not homed. This program parks at G30 before asking for the V-bit, and the pattern cannot be checked against the machine envelope until the machine knows where it is.";
 
             // MPos = WPos + WCO, so the machine coordinate each end of the pattern reaches is the work
             // extent plus the offset. Checked per axis against the SHARED envelope (GrblInfo.ReachableLimit -
