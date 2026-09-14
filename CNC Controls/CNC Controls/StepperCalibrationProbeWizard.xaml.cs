@@ -631,6 +631,12 @@ namespace CNC.Controls
                 return;
             }
 
+            if (double.IsNaN(SeekFloorZ()))
+            {
+                txtWarnings.Text = "The machine's Z travel or homing pull-off is not known yet, so a safe probe depth cannot be worked out. Connect and let the settings load, then try again.";
+                return;
+            }
+
             txtWarnings.Text = string.Empty;
             measuredWidth = measuredHeight = null;
             newStepsX = newStepsY = null;
@@ -764,6 +770,27 @@ namespace CNC.Controls
         // both tight/"exact" references derived from the ENTERED true size - the whole premise of this
         // tool is that size is already precisely known, so there's no need for a loose locate pass. Same
         // "5mm inset" anchor formula as StartJobView.BuildProgram's own exact-size corners 2/3.
+        /// <summary>
+        /// The deepest machine Z this tool may legally aim a seek at: the REACHABLE floor, not the raw
+        /// travel. Backed off a further 1mm so pcorner's own "#<_bottom> + 1" seek target still lands
+        /// inside the envelope rather than exactly on its edge.
+        /// </summary>
+        /// <remarks>
+        /// This was -(GrblInfo.MaxTravel.Z) + 1, which ignores the homing pull-off. On 2026-09-14 that
+        /// put the corner-1 top seek at Z-133 against a real envelope of -129..0 ($132=135, $27=6):
+        /// grblHAL refused it at PLANNING with Alarm:2 and the machine never moved, which looks like a
+        /// dead probe rather than an out-of-range target. GrblInfo.ReachableLimit is the shared formula.
+        /// </remarks>
+        /// <returns>NaN when the envelope is not known - the caller must REFUSE, not substitute.</returns>
+        private static double SeekFloorZ()
+        {
+            double floor = GrblInfo.ReachableLimit(2, false);
+            // Was "-9999" when travel was unknown. That is an invented number standing in for an unknown
+            // one, and it is the deepest possible seek target - the worst thing to guess. Not knowing the
+            // envelope is a reason to stop, not a reason to pick a value.
+            return double.IsNaN(floor) ? double.NaN : floor + 1.0d;
+        }
+
         private static string BuildProgram(Fixture fx, ProbeDefinition p, double trueWidthMm, double trueHeightMm,
                                           double cornerTravelMarginMm, bool touchPlate)
         {
@@ -800,7 +827,7 @@ namespace CNC.Controls
             b.AppendLine("#<_ls_edgemargin> = 10");   // see pcorner.macro's own comment - slop against an unconfirmed edge
             b.AppendLine(string.Format("#<_ls_searchf> = {0}", searchF));
             b.AppendLine(string.Format("#<_ls_latchf> = {0}", latchF));
-            b.AppendLine(string.Format("#<_ls_zfloor> = {0}", (GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 1.0d : -9999d).ToInvariantString("0.0##")));
+            b.AppendLine(string.Format("#<_ls_zfloor> = {0}", SeekFloorZ().ToInvariantString("0.0##")));
 
             // Park at G30 and confirm the probe before touching anything - same pattern StartJobView.BuildProgram
             // uses (EmitGotoG30 + MBOX). Use the SHARED emitter rather than hand-rolling the three lines: this
@@ -820,8 +847,7 @@ namespace CNC.Controls
             // tool length that captured it, unsound the moment a different bit is in the spindle). It is a
             // SEEK-DEPTH CAP and nothing more - see the crash note on #<_ls_maxz> just below before assuming
             // it means anything about where the material is.
-            b.AppendLine(string.Format("#<_bottom> = {0}",
-                (GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 1.0d : -9999d).ToInvariantString("0.0##")));
+            b.AppendLine(string.Format("#<_bottom> = {0}", SeekFloorZ().ToInvariantString("0.0##")));
             b.AppendLine("#<_ls_corner> = 1");
             b.AppendLine(string.Format("#<_ls_refx> = {0}", refX));
             b.AppendLine(string.Format("#<_ls_refy> = {0}", refY));

@@ -992,6 +992,44 @@ namespace CNC.Core
             return (AxisFlags)(1 << index);
         }
 
+        /// <summary>
+        /// The furthest machine coordinate an axis can actually be commanded to, at the end given by
+        /// <paramref name="towardsHome"/> - i.e. the soft-limit envelope, INCLUDING the homing pull-off.
+        /// </summary>
+        /// <remarks>
+        /// Mirrors grblHAL's limits_set_work_envelope(). Exists because this arithmetic keeps getting
+        /// re-derived and keeps getting the pull-off wrong: a generated G38.2 seek aimed at
+        /// -(MaxTravel.Z) + 1 was refused at PLANNING with Alarm:2 on 2026-09-14 ($132=135, $27=6 =>
+        /// the real floor is -129, not -134), and nothing moved, which reads like a dead probe rather
+        /// than an out-of-range target. Raw $130-$132 is the travel, NOT the reachable range.
+        ///
+        /// JogBaseControl.ClampMachine holds an equivalent private copy (it clamps a position rather
+        /// than reporting a bound, and takes a caller-supplied clearance). It is deliberately left
+        /// alone for now - it governs live jogging - but it is the same formula and the two should be
+        /// folded together rather than a third being written.
+        /// </remarks>
+        public static double ReachableLimit(int axis, bool towardsHome)
+        {
+            double maxTravel = MaxTravel.Values[axis];
+            if (maxTravel <= 0d)
+                return towardsHome ? 0d : double.NaN;   // travel unknown - caller must not invent a bound
+
+            // NaN, not 0, when the pull-off cannot be read: treating an unknown clearance as zero reports a
+            // LARGER envelope than the machine really has, which is the wrong direction to be wrong in. The
+            // caller decides what to do about not knowing - it must not be handed a confident wrong number.
+            double clearance = GrblSettings.GetDouble(GrblSetting.HomingPulloff);
+            if (double.IsNaN(clearance))
+                return double.NaN;
+
+            // Homes to the POSITIVE end (that axis' $23 bit set, with $22 bit3): 0 .. +travel.
+            bool positive = ForceSetOrigin && HomingDirection.HasFlag(AxisIndexToFlag(axis));
+            if (positive)
+                return towardsHome ? clearance : maxTravel - clearance;
+
+            // Everything else runs from 0 at the home end down to -travel.
+            return towardsHome ? -clearance : -(maxTravel - clearance);
+        }
+
         public static AxisFlags AxisLetterToFlag(string letter)
         {
             return (AxisFlags)(1 << AxisLetters.IndexOf(letter));
