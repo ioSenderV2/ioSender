@@ -767,6 +767,15 @@ namespace CNC.Controls
 
         protected override AutoSquareParams Config { get { return SectionConfig; } set { SectionConfig = value; } }
 
+        // Same omission the scratch wizard had (fixed 2026-09-14): without this, editing any of the inputs
+        // below left the previously generated program held and the Run bar still reading "Run", so pressing
+        // it drilled the OLD pattern - blade/tongue lengths, depths and feeds all silently ignored.
+        protected override void OnPersistedPropertyChanged()
+        {
+            Persist();
+            DiscardProgram();
+        }
+
         protected override DependencyProperty[] PersistedProperties => new[] {
             BladeLengthProperty, TongueLengthProperty, CornerOffsetProperty, BitDiameterProperty,
             DrillDepthProperty, PeckDepthProperty, PlungeFeedProperty, SpindleRPMProperty,

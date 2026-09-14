@@ -153,7 +153,14 @@ namespace CNC.Controls
         }
         private static void OnAxisChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            ((StepperCalibrationScratchWizard)d).getAxisDetails((int)e.NewValue);
+            var w = (StepperCalibrationScratchWizard)d;
+            w.getAxisDetails((int)e.NewValue);
+            // Axis is NOT one of the PersistedProperties, so it does not reach OnPersistedPropertyChanged and
+            // needs its own discard. It is also the worst one to get stale: the axis letter is baked into
+            // every line of the program, so a program generated for X and run after switching to Y would cut
+            // the X pattern while the panel said Y.
+            w.DiscardProgram();
+            w.RefreshGenerateReady();
         }
 
         public static readonly DependencyProperty CurrentResolutionProperty = DependencyProperty.Register(nameof(CurrentResolution), typeof(double), typeof(StepperCalibrationScratchWizard), new PropertyMetadata(0d));
@@ -633,12 +640,21 @@ namespace CNC.Controls
             MinStockText = string.Format(CultureInfo.InvariantCulture, "{0:0} x {1:0} mm", along, across);
         }
 
-        // A watched parameter changed: persist it, then refresh the prefilled results grid and minimum-stock figure.
+        // A watched parameter changed: persist it, refresh the prefilled results grid and minimum-stock
+        // figure - and THROW AWAY the generated program.
+        //
+        // That last part was missing, and it is the dangerous half. The program is built once and held; the
+        // Run bar reads "Run" while a program is held. So changing the span, the depth, the feeds or the tool
+        // left the bar saying Run with the PREVIOUS program still loaded, and pressing it cut the old
+        // pattern while the panel described the new one. The sibling probe wizard has always done this from
+        // its own OnCalInputChanged; this one and AutoSquareWizard never did.
         protected override void OnPersistedPropertyChanged()
         {
             Persist();
             RebuildResults();
             UpdateMinStock();
+            DiscardProgram();
+            RefreshGenerateReady();   // extents changed, so the envelope check has to be re-run
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)
