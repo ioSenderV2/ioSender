@@ -45,15 +45,27 @@
                  width to the right of the first instead of beside it. Unit="mm" here is the PARSE/display
                  unit (mm vs in), not a visible suffix - only NumericField renders one - so the row carries
                  its own "mm" at the end, once, for both boxes. -->
-            <StackPanel Orientation="Horizontal" Margin="0,2,0,0"
-                        ToolTip="How deep each of the two marks in a pair is cut - the first at the edge margin, the second a full span away. They are separate because the reference surface is not flat: a spoilboard that dips more than the cut depth across the span marks one end and misses the other, and a pair with one mark missing cannot be measured at all. Depth does not affect the RESULT - the measurement is the spacing between the two line centres, and a V-bit's centre sits under the spindle axis whatever the depth - so set each one as deep as it needs to be to come out crisp.">
-                <Label x:Uid="lbl_scdepths" Content="Scratch depths:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
-                <local:NumericTextBox x:Uid="num_scdepth1" x:Name="numDepth1" MinWidth="64" VerticalAlignment="Center" Margin="0,0,8,0" Format="##0.0##" Unit="mm"
-                    Value="{Binding ScratchDepth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
-                <local:NumericTextBox x:Uid="num_scdepth2" x:Name="numDepth2" MinWidth="64" VerticalAlignment="Center" Format="##0.0##" Unit="mm"
-                    Value="{Binding ScratchDepth2, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
-                <TextBlock x:Uid="txt_scdepthsunit" Text="mm" VerticalAlignment="Center" Margin="6,0,0,0" Opacity="0.75"/>
-            </StackPanel>
+            <Grid Margin="0,2,0,0"
+                  ToolTip="How deep each of the two marks in a pair is cut - the first at the edge margin, the second a full span away. They are separate because the reference surface is not flat: a spoilboard that dips more than the cut depth across the span marks one end and misses the other, and a pair with one mark missing cannot be measured at all. Depth does not affect the RESULT - the measurement is the spacing between the two line centres, and a V-bit's centre sits under the spindle axis whatever the depth - so set each one as deep as it needs to be to come out crisp.">
+                <Grid.ColumnDefinitions>
+                    <!-- The SAME shared column every NumericField on this panel uses, so the label sits in
+                         the common label column and the boxes start where every other field's box starts.
+                         A hand-set Width="120" did neither: ColonAt is only a MINIMUM (the column is Auto
+                         and grows to the longest label in the scope), so 120 both clipped "Scratch depths:"
+                         and started the boxes left of everything else. MinWidth matches the ColonAt="120"
+                         the fields above and below pass. -->
+                    <ColumnDefinition Width="Auto" MinWidth="120" SharedSizeGroup="NumericFieldLabel"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Label x:Uid="lbl_scdepths" Grid.Column="0" Content="Scratch depths:" Padding="0,0,4,0" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <local:NumericTextBox x:Uid="num_scdepth1" x:Name="numDepth1" MinWidth="64" VerticalAlignment="Center" Margin="0,0,8,0" Format="##0.0##" Unit="mm"
+                        Value="{Binding ScratchDepth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                    <local:NumericTextBox x:Uid="num_scdepth2" x:Name="numDepth2" MinWidth="64" VerticalAlignment="Center" Format="##0.0##" Unit="mm"
+                        Value="{Binding ScratchDepth2, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                    <TextBlock x:Uid="txt_scdepthsunit" Text="mm" VerticalAlignment="Center" Margin="6,0,0,0" Opacity="0.75"/>
+                </StackPanel>
+            </Grid>
             <local:NumericField x:Uid="fld_scplunge" Label="Plunge feed:" ColonAt="120" Format="#####0"
                 Value="{Binding PlungeFeed, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm/min"
                 ToolTip="How fast the V-bit descends into the surface at the start of each line. Straight down into material, so keep it well below the scratch feed."/>

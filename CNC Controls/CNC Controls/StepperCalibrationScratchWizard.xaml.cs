@@ -533,8 +533,21 @@ namespace CNC.Controls
             if (SpindleRPM > 0d)
                 lines.Add("M5");
             lines.Add("G0 Z" + F(SafeZ));
+            // Bookkeeping BEFORE the park, so the park is the last thing that moves - see below.
             if (referenceTlo)
                 MacroProcessor.EmitTloRestore(lines.Add);
+
+            // Park at G30 rather than finishing at safe Z over the last scratch, where the spindle sits in
+            // the middle of the work with nothing to tell the operator it is done.
+            //
+            // It also fixes the Run bar staying on "Run" after a clean finish. MacroProcessor's run watcher
+            // ends at StreamingState Idle, but the JobFinished it needs to DISCARD the program comes from
+            // OnProgramEnd, which the controller's own "[MSG:Pgm End]" drives. This program's last lines
+            // were non-motion (G43.1, a PRINT, a parameter assignment, M30), so the machine was already
+            // Idle and the watcher unsubscribed 49ms BEFORE Pgm End arrived - measured, 2026-09-14
+            // 11:15:43.251 vs .300 - and nothing was listening when JobFinished finally came. Ending in
+            // motion restores the ordering every other Generate-first tool already relies on.
+            MacroProcessor.EmitGotoG30(lines.Add);
             lines.Add("M30");
 
             return lines;
