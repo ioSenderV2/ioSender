@@ -1,4 +1,4 @@
-/*
+﻿/*
  * MacroProcessor.cs - part of CNC Controls library
  *
  * The desktop face of macro / generated-program running. The engine - the directive loop, prerequisite
@@ -64,7 +64,16 @@ namespace CNC.Controls
         public static bool SupportsGenerateMode
         {
             get { return _supportsGenerateMode; }
-            set { _supportsGenerateMode = value; ActiveProgramChanged?.Invoke(); }
+            set
+            {
+                _supportsGenerateMode = value;
+                // Tab teardown clears the blocked reason with everything else. These statics are SHARED by
+                // every Generate-first tab, so a reason left behind by the tab you just left would otherwise
+                // sit on the next tab's disabled button describing the wrong thing entirely.
+                if (!value)
+                    GenerateBlockedReason = string.Empty;
+                ActiveProgramChanged?.Invoke();
+            }
         }
 
         // Opt-in for a Generate-first tab whose generated program IS a real cutting program worth Dry
@@ -90,7 +99,17 @@ namespace CNC.Controls
         public static bool IsGenerateReady
         {
             get { return _isGenerateReady; }
-            set { _isGenerateReady = value; ActiveProgramChanged?.Invoke(); }
+            set
+            {
+                _isGenerateReady = value;
+                // "Ready" can never carry a reason it is not ready - clearing it HERE rather than asking
+                // every caller to remember means a gate that flips back to ready cannot leave its old
+                // explanation on the button. Callers therefore only ever need to set the reason on the
+                // blocking branch, and must set it AFTER IsGenerateReady, not before.
+                if (value)
+                    GenerateBlockedReason = string.Empty;
+                ActiveProgramChanged?.Invoke();
+            }
         }
 
         /// <summary>

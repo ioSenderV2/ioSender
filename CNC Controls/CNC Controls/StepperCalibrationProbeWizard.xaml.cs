@@ -221,7 +221,13 @@ namespace CNC.Controls
         {
             if (!isActiveTab)
                 return;
-            MacroProcessor.IsGenerateReady = rbAxisZ.IsChecked == true ? ActiveProbe() != null : SelectedFixture != null;
+            bool isZ = rbAxisZ.IsChecked == true;
+            MacroProcessor.IsGenerateReady = isZ ? ActiveProbe() != null : SelectedFixture != null;
+            // After the gate, never before: setting it ready clears the reason (see MacroProcessor).
+            if (!MacroProcessor.IsGenerateReady)
+                MacroProcessor.GenerateBlockedReason = isZ
+                    ? "Z calibration needs a 3D probe - define one in Machine Setup > Probe definitions."
+                    : "Select a validated Corner Fence fixture first (Machine Setup > Fixture definitions).";
         }
 
         // Drop the generated program; also registered as MacroProcessor.DiscardGenerated (see Activate) -

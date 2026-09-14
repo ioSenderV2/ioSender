@@ -1,4 +1,4 @@
-/*
+﻿/*
  * AutoSquareWizard.xaml.cs - part of CNC Controls library
  *
  * Facilitates Phil Barrett's auto-square OFFSET method for a ganged, auto-squared gantry (typically Y).
@@ -114,7 +114,13 @@ namespace CNC.Controls
         private void RefreshGenerateReady(bool travelSet)
         {
             if (isActiveTab)
+            {
                 MacroProcessor.IsGenerateReady = travelSet;
+                // After the gate, never before: setting it ready clears the reason (see MacroProcessor).
+                if (!travelSet)
+                    MacroProcessor.GenerateBlockedReason =
+                        "The axis travel legs are not known yet - enter them above before generating.";
+            }
         }
 
         // Drop the generated program; also registered as MacroProcessor.DiscardGenerated (see Activate) -

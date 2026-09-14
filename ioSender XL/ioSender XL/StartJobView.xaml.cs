@@ -514,7 +514,15 @@ namespace GCode_Sender
 
             bool ok = ActiveProbe() != null;
             if (isActiveTab)
+            {
                 MacroProcessor.IsGenerateReady = ok;
+                // After the gate, never before: setting it ready clears the reason (see MacroProcessor).
+                // Same text txtNoProbe carries, so the button and the panel cannot say different things.
+                if (!ok)
+                    MacroProcessor.GenerateBlockedReason = IsTouchPlate
+                        ? "No touch plate is defined - add one in Machine Setup > Probe definitions."
+                        : "No 3D probe is defined - add one in Machine Setup > Probe definitions.";
+            }
             txtNoProbe.Visibility = ok ? Visibility.Collapsed : Visibility.Visible;
 
             UpdateMeasureAvailability();
@@ -587,7 +595,18 @@ namespace GCode_Sender
             txtNoFixture.Visibility = noFixtures ? Visibility.Visible : Visibility.Collapsed;
             txtFixtureWarning.Visibility = (fx != null && !implemented) ? Visibility.Visible : Visibility.Collapsed;
             if (isActiveTab)
+            {
                 MacroProcessor.IsGenerateReady = ok && ActiveProbe() != null;
+                // After the gate, never before: setting it ready clears the reason (see MacroProcessor).
+                // Ordered by what the operator has to go and do first, most specific complaint winning.
+                if (!MacroProcessor.IsGenerateReady)
+                    MacroProcessor.GenerateBlockedReason =
+                          noFixtures ? "No fixtures are defined - add one in Machine Setup > Fixture definitions."
+                        : fx == null ? "Select a fixture to hold the stock."
+                        : !implemented ? "This fixture kind is not supported for probing yet - choose another."
+                        : !notAlarmed ? "The controller is in alarm - unlock or home it before generating."
+                        : "No probe is defined - add one in Machine Setup > Probe definitions.";
+            }
 
             bool showMeasure = fx == null || FixtureKinds.CanMeasure(fx.Kind);
             chkMeasure.Visibility = showMeasure ? Visibility.Visible : Visibility.Collapsed;

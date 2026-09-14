@@ -799,7 +799,16 @@ namespace CNC.Controls
                 btnStart.Content = FindResource("GenerateLabel");
                 IsRunActionEnabled = IsRunEnabled && MacroProcessor.IsGenerateReady;
                 IsGenerateActionReady = IsRunActionEnabled;
-                btnStart.ToolTip = IsRunActionEnabled ? FindResource("GenerateTipReady") : FindResource("GenerateTipDisabled");
+                // Say WHY it is refusing, same as the normal-Run path below. This branch used to return here
+                // with the generic text, and since every Generate-first tab reaches the bar through exactly
+                // this branch, MacroProcessor.GenerateBlockedReason was never once displayed - including for
+                // the work order whose unreadable validation failure is the reason it exists. Fall back to
+                // the generic text only when no tab published a reason, or when the bar is disabled for a
+                // reason that has nothing to do with the gate (disconnected, mid-job: IsRunEnabled false).
+                string genBlocked = MacroProcessor.GenerateBlockedReason;
+                btnStart.ToolTip = IsRunActionEnabled ? FindResource("GenerateTipReady")
+                                 : IsRunEnabled && !string.IsNullOrEmpty(genBlocked) ? (object)genBlocked
+                                 : FindResource("GenerateTipDisabled");
                 UpdateGenerateAndRunVisibility();
                 return;
             }

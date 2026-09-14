@@ -303,6 +303,9 @@ namespace CNC.Controls
         {
             if (isActiveTab)
                 MacroProcessor.IsGenerateReady = CurrentResolution > 0d;
+                // After the gate, never before: setting it ready clears the reason (see MacroProcessor).
+                if (CurrentResolution <= 0d)
+                    MacroProcessor.GenerateBlockedReason = LibStrings.FindResource("ScNoAxisResolution");
         }
 
         // Drop the generated program; also registered as MacroProcessor.DiscardGenerated (see Activate) -
