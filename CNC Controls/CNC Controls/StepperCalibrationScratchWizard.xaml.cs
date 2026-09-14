@@ -472,7 +472,7 @@ namespace CNC.Controls
             // program uses machine coordinates - the pattern itself is pure work-coordinate motion, which is
             // why this tool used to run on an unhomed machine. EmitGotoG30 is three G53 moves, and G53 on an
             // unhomed machine addresses coordinates that mean nothing.
-            lines.Add("(PREREQ, connected, homed, noalarm)");
+            MacroProcessor.EmitProgramHeader(lines.Add, "connected, homed, noalarm");
 
             // Park at G30 before asking for the bit, same as the probe wizard. Without it the prompt appears
             // with the spindle wherever the last operation left it - possibly down in the work - and the
@@ -490,7 +490,7 @@ namespace CNC.Controls
                 F(ScratchDepth) + "/" + F(ScratchDepth2)));
             lines.Add("(WAITIDLE)");
 
-            lines.Add("G90 G94 G17 G21");
+            MacroProcessor.EmitModalDefaults(lines.Add);
 
             // NO G49 HERE. It was added on 2026-09-14 reasoning that a stale tool length offset would wreck
             // a sub-millimetre scratch - which is backwards on this machine. The offset is not incidental,
@@ -571,8 +571,7 @@ namespace CNC.Controls
             // Idle and the watcher unsubscribed 49ms BEFORE Pgm End arrived - measured, 2026-09-14
             // 11:15:43.251 vs .300 - and nothing was listening when JobFinished finally came. Ending in
             // motion restores the ordering every other Generate-first tool already relies on.
-            MacroProcessor.EmitGotoG30(lines.Add);
-            lines.Add("M30");
+            MacroProcessor.EmitProgramFooter(lines.Add, stopSpindle: false, parkAtG30: true, endWord: "M30");
 
             return lines;
         }

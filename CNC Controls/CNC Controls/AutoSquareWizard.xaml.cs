@@ -603,8 +603,8 @@ namespace CNC.Controls
             lines.Add(string.Format("(ioSender auto-square reference holes - centred L: +{0} mm X, +{1} mm Y, {2} mm bit, {3} mm deep{4})",
                 F(xleg), F(yleg), F(BitDiameter), F(DrillDepth), preview ? ", DRY RUN" : ""));
 
-            lines.Add("(PREREQ, connected, homed, noalarm)");
-            lines.Add("G90 G94 G17 G21");
+            MacroProcessor.EmitProgramHeader(lines.Add, "connected, homed, noalarm");
+            MacroProcessor.EmitModalDefaults(lines.Add);
             if (!ReuseZ0)
             {
                 // Park at the first hole and touch off Z there (sets work Z0).
@@ -653,7 +653,13 @@ namespace CNC.Controls
             }
 
             lines.Add("G0 Z" + F(SafeZ));
-            lines.Add("M30");
+            // parkAtG30: FALSE, and that is this tool's outstanding gap, not an oversight of the shared
+            // footer. Every other generated program hands the machine back at G30; this one finishes at
+            // safe Z over the last hole it drilled, which is exactly the post-condition class that wrecked
+            // a toolsetter on 2026-09-14. Adding the park is a SAFETY CHANGE, not a tidy-up - it puts a
+            // rapid into a program that has never had one, and this tool's (PREREQ) does not demand G30 be
+            // set - so it is left for a deliberate decision rather than slipped in with a refactor.
+            MacroProcessor.EmitProgramFooter(lines.Add, stopSpindle: false, parkAtG30: false, endWord: "M30");
 
             return lines;
         }

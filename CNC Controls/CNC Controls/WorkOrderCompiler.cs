@@ -1996,7 +1996,8 @@ namespace CNC.Controls
             // The WCS condition names whichever slot THIS work order actually uses (WorkOrderWcs, set from
             // wo.Wcs above) - used to hardcode G59, which failed the "is it set" check for anyone whose Setup
             // established the origin on a different WCS.
-            lines.Add(string.Format("(PREREQ, connected, homed, noalarm, tlo, EXPR, {0})", WorkOrderWcs()));
+            MacroProcessor.EmitProgramHeader(lines.Add,
+                string.Format("connected, homed, noalarm, tlo, EXPR, {0}", WorkOrderWcs()));
 
             // Declare the stock, so anything reading the program knows what the material is rather than
             // inferring it. The 3D view in particular was drawing the toolpath's own bounding box plus a
@@ -2023,7 +2024,7 @@ namespace CNC.Controls
                 lines.Add(string.Format("(FIRST TOOL CHANGE SKIPPED - T{0} assumed already loaded, with a valid tool length offset)", firstTool));
 
             lines.AddRange(ToolDeclarations(wo));
-            lines.Add("G90 G94 G17 G21");
+            MacroProcessor.EmitModalDefaults(lines.Add);
             lines.Add(WorkOrderWcs());
             // The program's OPENING retract has to be machine-referenced, not "G0 Z{SafeZ}" in the work
             // coordinate system. SafeZ is a work-Z height, meaningful only once the tool is already near the
@@ -2251,8 +2252,12 @@ namespace CNC.Controls
             // StartJobView.BuildProgram uses. Only covers a CLEAN finish; an aborted/alarmed run never
             // reaches this line, so #<_tlo_ref> is left at the baseline this run loaded rather than the true
             // prior value - safe (the baseline is itself a trusted reference), just not a perfect restore.
+            //
+            // This one restore sits BETWEEN the park and the end word, so the shared footer below takes
+            // neither the park (already emitted, just above the restore) nor the spindle stop (each
+            // operation stops its own).
             lines.Add("#<_tlo_ref> = #<_tlo_saved>");
-            lines.Add("M30");
+            MacroProcessor.EmitProgramFooter(lines.Add, stopSpindle: false, parkAtG30: false, endWord: "M30");
             return lines;
         }
     }

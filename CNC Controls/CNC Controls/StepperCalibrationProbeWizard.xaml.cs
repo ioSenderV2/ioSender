@@ -835,10 +835,9 @@ namespace CNC.Controls
             string latchF = p.LatchFeedRate.ToInvariantString("0.0##");
 
             var b = new StringBuilder();
-            b.AppendLine("(Stepper calibration - probe a reference block of known true size)");
-            b.AppendLine("(PREREQ, connected, homed, EXPR, noalarm)");
-            b.AppendLine("G21 G90 G94 G17");
-            b.AppendLine("G49");
+            MacroProcessor.EmitProgramHeader(l => b.AppendLine(l), "connected, homed, EXPR, noalarm",
+                                             "(Stepper calibration - probe a reference block of known true size)");
+            MacroProcessor.EmitModalDefaults(l => b.AppendLine(l), cancelToolOffset: true);
             b.AppendLine("G10 L2 P1 X0 Y0 Z0");
             if (GrblInfo.HasToolSetter)
                 b.AppendLine(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
@@ -956,8 +955,7 @@ namespace CNC.Controls
             b.AppendLine("(PRINT, CAL_Y=#<size_y>)");
 
             b.AppendLine("(--- park at G30 - no origin/WCS is set by this tool, it only measures ---)");
-            MacroProcessor.EmitGotoG30(l => b.AppendLine(l));
-            b.AppendLine("M2");
+            MacroProcessor.EmitProgramFooter(l => b.AppendLine(l), stopSpindle: false, parkAtG30: true, endWord: "M2");
 
             return b.ToString();
         }
@@ -994,10 +992,9 @@ namespace CNC.Controls
             double[] g = { g1Mm, g2Mm, g3Mm };
 
             var b = new StringBuilder();
-            b.AppendLine("(Stepper calibration - Z axis via a 1-2-3 gauge block)");
-            b.AppendLine("(PREREQ, connected, homed, EXPR, noalarm)");
-            b.AppendLine("G21 G90 G94 G17");
-            b.AppendLine("G49");
+            MacroProcessor.EmitProgramHeader(l => b.AppendLine(l), "connected, homed, EXPR, noalarm",
+                                             "(Stepper calibration - Z axis via a 1-2-3 gauge block)");
+            MacroProcessor.EmitModalDefaults(l => b.AppendLine(l), cancelToolOffset: true);
             b.AppendLine("G10 L2 P1 X0 Y0 Z0");
             if (GrblInfo.HasToolSetter)
                 b.AppendLine(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
@@ -1087,8 +1084,7 @@ namespace CNC.Controls
             }
 
             b.AppendLine("(--- park at G30 - no origin/WCS is set by this tool, it only measures ---)");
-            MacroProcessor.EmitGotoG30(l => b.AppendLine(l));
-            b.AppendLine("M2");
+            MacroProcessor.EmitProgramFooter(l => b.AppendLine(l), stopSpindle: false, parkAtG30: true, endWord: "M2");
 
             return b.ToString();
         }

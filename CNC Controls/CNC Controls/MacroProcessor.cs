@@ -947,6 +947,85 @@ namespace CNC.Controls
             return true;
         }
 
+        // --- The frame every generated program is built inside -----------------------------------------
+        //
+        // Nine builders across five tabs (Work Order, Setup x4, both stepper-calibration wizards, Auto
+        // Square) each open and close a program the same way, and each had written it out longhand. The
+        // duplication was not harmless: the modal line was spelled in two different orders for no reason,
+        // Work Order hand-rolled the Z lift that EmitGotoG30 exists to own, and Auto Square simply forgot
+        // to park at all - it finished over the last hole it drilled, which is the post-condition class
+        // that destroyed a toolsetter on 2026-09-14.
+        //
+        // Three methods rather than one "emit the whole prologue", because the ORDER is not shared. Setup
+        // and the probe wizard put the modal line straight after the gate and park much later, after a
+        // pile of parameter assignments; Work Order puts its tool declarations in between; the scratch
+        // wizard parked BEFORE establishing units at all. Folding those into one call would silently
+        // reorder machine-moving g-code, which a refactor does not get to do. Each piece goes in at the
+        // position its caller already uses.
+
+        /// <summary>
+        /// A program's opening: its identifying comment(s), then the prerequisite gate.
+        /// </summary>
+        /// <param name="prereq">
+        /// The condition list INSIDE <c>(PREREQ, ...)</c>. Deliberately passed whole rather than assembled
+        /// from flags: "connected, homed" is the only condition all nine share, and the rest genuinely
+        /// differ per program (EXPR, noalarm, tlo, G30, G59.3, ATC=1, a named WCS). A builder that needs a
+        /// condition states it; nothing is added behind its back.
+        /// </param>
+        public static void EmitProgramHeader(System.Action<string> L, string prereq, params string[] comments)
+        {
+            foreach (var c in comments)
+                if (!string.IsNullOrEmpty(c))
+                    L(c.StartsWith("(") ? c : "(" + c + ")");
+            L("(PREREQ, " + prereq + ")");
+        }
+
+        /// <summary>
+        /// The modal state every generated program establishes before it moves: millimetres, absolute
+        /// distance, feed per minute, XY plane.
+        /// </summary>
+        /// <param name="cancelToolOffset">
+        /// Emit <c>G49</c> as well. NOT the default, and not a tidy-up: on this machine a tool length
+        /// offset is what makes one work Z0 mean the same thing for every tool (tc.macro applies a G43.1 on
+        /// every M6, against the machine-wide baseline), so cancelling it leaves Z0 referenced to whatever
+        /// tool last had an offset. See the scratch wizard, which says at length why it does NOT pass this.
+        /// </param>
+        public static void EmitModalDefaults(System.Action<string> L, bool cancelToolOffset = false)
+        {
+            // One spelling. The two that existed - "G21 G90 G94 G17" and "G90 G94 G17 G21" - are the same
+            // four modal groups in a different order, so this settles a cosmetic split, not a behavioural one.
+            L("G21 G90 G94 G17");
+            if (cancelToolOffset)
+                L("G49");
+        }
+
+        /// <summary>
+        /// A program's close: stop the spindle, park, end.
+        /// </summary>
+        /// <param name="parkAtG30">
+        /// Park at G30 rather than finishing wherever the last cut left the tool. Effectively always true -
+        /// a program must hand the machine back somewhere the NEXT one expects to find it, and every
+        /// hardware failure in the 2026-09-13/14 run was a program that did not. It stays a parameter only
+        /// because a caller must be able to say so deliberately.
+        /// </param>
+        /// <param name="endWord">
+        /// <c>M30</c> or <c>M2</c>. NOT unified - M30 rewinds and resets modal state where M2 does not, so
+        /// which one a program ends with is the program's business, not the frame's.
+        /// </param>
+        public static void EmitProgramFooter(System.Action<string> L, bool stopSpindle, bool parkAtG30, string endWord)
+        {
+            if (stopSpindle)
+                L("M5");
+            // The park has to be the last thing that MOVES, and it has to move at all. A program whose
+            // final lines are non-motion (a parameter assignment, a PRINT, M30) reaches Idle before the
+            // controller's own "[MSG:Pgm End]" arrives, and the run watcher has unsubscribed 49 ms before
+            // JobFinished turns up - measured 2026-09-14 11:15:43.251 vs .300. The program then never gets
+            // discarded and the Run bar stays stuck on "Run".
+            if (parkAtG30)
+                EmitGotoG30(L);
+            L(endWord);
+        }
+
         public static void SaveGeneratedCopy(string name, string code)
         {
             MacroRunner.SaveGeneratedCopy(name, code);

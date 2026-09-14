@@ -2164,8 +2164,8 @@ namespace GCode_Sender
             L("(Front-left/right define the frame (ideal == measured).)");
             L("(Back-left/right are touched twice: the ideal rectangle point, then the actual probed corner - the gap between the two is the out-of-square amount.)");
             L("(Discipline matches Measure: no G53 move runs while the rotation is active.)");
-            L("(PREREQ, connected, homed, noalarm, EXPR, G30)");
-            L("G21 G90 G94 G17");
+            MacroProcessor.EmitProgramHeader(L, "connected, homed, noalarm, EXPR, G30");
+            MacroProcessor.EmitModalDefaults(L);
             if (GrblInfo.HasToolSetter)
                 L(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
 
@@ -2322,9 +2322,8 @@ namespace GCode_Sender
             // own G28 stored position at run-time. NOT required here via a plain PREREQ condition - Generate_Click
             // handles an unset G28 explicitly (jog-and-confirm dialog, sets it itself), so by the time this
             // program ever streams, G28 is guaranteed set.
-            L("(PREREQ, connected, homed, EXPR, ATC=1, G30, G59.3)");
-            L("G21 G90 G94 G17");
-            L("G49");
+            MacroProcessor.EmitProgramHeader(L, "connected, homed, EXPR, ATC=1, G30, G59.3");
+            MacroProcessor.EmitModalDefaults(L, cancelToolOffset: true);
             // Save whatever #<_tlo_ref> held before this program touched it (restored near the end, on a clean
             // finish - see that comment), then load the machine-wide TLO baseline (Machine Setup's own
             // "Reference TLO" - AppConfig.Settings.Base.TloRefBaseline) as an INPUT, not a reset to 0. Every
@@ -2726,9 +2725,8 @@ namespace GCode_Sender
             L("(Start Job (Dynamic) - one-shot probe via pcorner/pcenter.macro.)");
             L(string.Format("(Probe \"{0}\": tip {1}mm body {2}mm.)", p.Name, N(p.ProbeDiameter), N(p.BodyDiameter)));
             L("(Jog target: the green dot picked on the Stock drawing. VALIDATE before trusting.)");
-            L("(PREREQ, connected, homed, EXPR, G30)");
-            L("G21 G90 G94 G17");
-            L("G49");
+            MacroProcessor.EmitProgramHeader(L, "connected, homed, EXPR, G30");
+            MacroProcessor.EmitModalDefaults(L, cancelToolOffset: true);
             if (GrblInfo.HasToolSetter)
                 L(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
             L(string.Format("#<_ls_rad> = {0}", N(r)));
@@ -2988,10 +2986,9 @@ namespace GCode_Sender
             string prereq = "connected, homed, EXPR, G30";
             if (setTloRef)
                 prereq += ", ATC=1, G59.3";
-            L(string.Format("(PREREQ, {0})", prereq));
+            MacroProcessor.EmitProgramHeader(L, prereq);
 
-            L("G21 G90 G94 G17");
-            L("G49");
+            MacroProcessor.EmitModalDefaults(L, cancelToolOffset: true);
             // Save/load the TLO baseline - same mechanism and reasoning as BuildProgram's own top-of-program
             // comment.
             if (setTloRef)
