@@ -212,11 +212,10 @@ namespace GCode_Sender
         // the operator comes back or the program is dropped). It is what tells Activate(false) that this
         // particular deactivation is OUR handoff and not a real tab-leave.
         private bool handedToJobTab;
-        // programBorrowed/loadedProgramName: we pushed the previous job aside and loaded ours under this
-        // name. Paired the same way WorkOrderView pairs runEndWatcherArmed with a FileName test - the flag
-        // alone is never trusted, since MacroProcessor.Run's watcher may have popped already.
-        private bool programBorrowed;
-        private string loadedProgramName;
+        // The pushed-aside-previous-job bookkeeping that used to live here (programBorrowed /
+        // loadedProgramName) is MacroProcessor's shared handoff record now - see IsHandedOff. It was one of
+        // three private copies of the same pair; one record is what makes "exactly one push outstanding"
+        // checkable rather than a property each copy has to maintain.
         // The run bar is ours while the tab is focused OR while we've handed off to the Job tab. Every
         // write to the shared MacroProcessor statics is gated on this rather than isActiveTab alone -
         // otherwise a discard after the handoff (the run finishing, an input edit) would leave the bar
@@ -781,55 +780,31 @@ namespace GCode_Sender
             if (model == null || string.IsNullOrWhiteSpace(program) || MacroProcessor.SwitchToTab == null)
                 return;
 
-            // Capture BEFORE the switch. handedToJobTab now stops Activate(false) from clearing `program`,
-            // but reading a field back across that synchronous switch is precisely the trap that shipped a
-            // blank Job tab on 2026-08-11 (0c457451): read it once, here, and hand the local along.
-            string toLoad = program;
-            // Program_FileChanged clears IsDryRunMode by design on every load - re-arm it around LoadText
-            // (Work Order's Generate idiom, and what MacroProcessor.Run does for the same reason).
-            bool dryRunArmed = model.IsDryRunMode;
+            // Set FIRST, before the shared helper's tab switch: Activate(false) fires synchronously inside
+            // it and reads this to know the deactivation is OUR handoff and not a real tab-leave.
+            handedToJobTab = true;
 
-            handedToJobTab = true;   // set FIRST: Activate(false) reads it to know this is our own handoff
-            MacroProcessor.SwitchToTab(ViewType.GRBL);   // the Job tab
-
-            // Don't push a SECOND slot over our own still-loaded program - a previous Generate the operator
-            // looked at and never ran. LoadText replaces it in place. This is WorkOrderView.Generate's
-            // guard, carried over with the incident behind it: pushing again stacked snapshots and doubled
-            // watchers ("Push: depth now 2", observed live 2026-08-08).
-            if (!(programBorrowed && model.FileName == loadedProgramName))
-                CNC.Controls.GCode.File.Push();
-            CNC.Controls.GCode.File.LoadText(name, toLoad);
-            programBorrowed = true;
-            loadedProgramName = name;
-            model.IsDryRunMode = dryRunArmed;
-
-            DebugLog.Write("run", string.Format("StartJobView: Generate handed '{0}' ({1} chars) to the Job tab - waiting for Run",
-                name, toLoad.Length));
+            // The capture-before-the-switch, the guarded push, the load, the dry-run re-arm and the terminal
+            // watcher are all MacroProcessor.HandOffToJobTab now, shared with the other four Generate-first
+            // tabs. The one thing that stays here is the sentence above: this tab is the only one that keeps
+            // owning the run bar across its own deactivation.
+            MacroProcessor.HandOffToJobTab(model, name, program, ViewType.StartJob);
         }
 
         // Hand the previous job back. Everything that DROPS the generated program without running it - an
         // input edit, leaving this tab for somewhere other than the Job tab - has to do this, or the pushed
         // snapshot is stranded and the Job tab keeps showing a program nothing will ever run.
         //
-        // The LOADED JOB is the test, never the flag on its own: after a real run MacroProcessor.Run's own
-        // watcher has already popped by the time it calls DiscardGenerated, so this correctly does nothing.
-        // (One case is not covered, the same one Work Order accepts: generate, then wander off to a third
-        // tab from the Job tab. This view's Activate(false) already ran, so nothing here fires and the slot
-        // is left unconsumed. The alternative - popping a program out from under a run someone may be
-        // about to start - is worse.)
+        // The body is MacroProcessor.ReleaseHandoff now - this method is its call site, kept because the
+        // name says what dropping the program MEANS here. Its guards came from this copy: the loaded job is
+        // the test rather than the flag (the run watcher may have popped already), and a run in flight owns
+        // the pop outright. (One case is still not covered, the same one Work Order accepts: generate, then
+        // wander off to a third tab from the Job tab. This view's Activate(false) already ran, so nothing
+        // here fires and the slot is left unconsumed. The alternative - popping a program out from under a
+        // run someone may be about to start - is worse.)
         private void ReleaseBorrowedProgram()
         {
-            if (!programBorrowed)
-                return;
-            if (model != null && model.IsJobRunning)
-                return;   // a run owns the pop while it is in flight - leave the bookkeeping to its watcher
-            programBorrowed = false;
-            if (model != null && model.FileName == loadedProgramName)
-            {
-                DebugLog.Write("run", string.Format("StartJobView: dropping '{0}' without running it - popping the previous job back", loadedProgramName));
-                CNC.Controls.GCode.File.Pop();
-            }
-            loadedProgramName = null;
+            MacroProcessor.ReleaseHandoff(model);
         }
 
         // The handoff is over (the run reached its terminal, finished or stopped): stop owning the run bar
@@ -2038,8 +2013,9 @@ namespace GCode_Sender
 
             // Read AFTER any switch above (which can release the borrow): whether OUR program is still the
             // loaded job is what decides if Run pushes another slot. MacroProcessor.Run re-checks the same
-            // thing rather than taking this on trust.
-            bool alreadyLoaded = programBorrowed && model.FileName == runName;
+            // thing rather than taking this on trust - IsHandedOff IS that check, so this is now the same
+            // question asked of the same record rather than of a private flag that had to be kept in step.
+            bool alreadyLoaded = MacroProcessor.IsHandedOff(model, runName);
 
             // The return value was discarded here, so a refused run - a gate, a cancelled confirmation,
             // prerequisites unmet - left the operator on the Job tab watching nothing happen with no

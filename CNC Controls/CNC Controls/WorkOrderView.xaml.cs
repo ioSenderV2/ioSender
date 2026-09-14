@@ -3209,86 +3209,16 @@ namespace CNC.Controls
         // loaded program - GCode.File itself - through the unified engine, live per-line status landing
         // directly in the docked list. Step 7 then moved every OTHER macro caller onto the same path.)
 
-        // Pop the loaded job back to whatever was there before, once this run reaches its TRUE terminal state
-        // (Idle/NoFile - a clean finish or a Stop) - mirrors MainWindow.RestoreSourceOnEnd's own arm-on-
-        // running/fire-on-terminal pattern (see its comment for why Idle/NoFile, not JobFinished). Left in
-        // place through an Error/Halted (alarm) on purpose, same as every other Generate-first tool, so the
-        // operator can still see what failed rather than having it silently vanish back to the previous file
-        // mid-inspection.
-        private void WatchForRunEnd()
-        {
-            WatchForRunEnd(model);
-        }
-
-        // One watcher, ever. Without this, Generate over a still-loaded Work Order program (the
-        // boot-restored one, or a previous Generate that never ran) pushed AND armed a second time -
-        // observed live 2026-08-08 15:04: "Push: depth now 2" + every watcher trace doubled. The
-        // stacked pops happened to cancel out, but duplicate handlers and a growing snapshot stack
-        // are exactly the state-drift class this tab has been burned by before.
-        private static bool runEndWatcherArmed;
-
-        // Static since the compile cache's boot-time auto-restore (2026-08-08): that path arms this
-        // watcher before any WorkOrderView instance exists, and the body only ever needed the view
-        // model + statics anyway. Behavior unchanged for the Generate path, which forwards above.
-        private static void WatchForRunEnd(GrblViewModel model)
-        {
-            if (runEndWatcherArmed)
-            {
-                DebugLog.Write("workorder", "WatchForRunEnd: already armed - not arming a second watcher");
-                return;
-            }
-            runEndWatcherArmed = true;
-            bool started = false;
-            System.ComponentModel.PropertyChangedEventHandler handler = null;
-            handler = (s, e) =>
-            {
-                if (e.PropertyName != nameof(GrblViewModel.StreamingState))
-                    return;
-                var st = model.StreamingState;
-                // Send ONLY - not SendMDI. Step 6 arms this watcher at GENERATE time, and Cycle Start
-                // may be minutes away: a single jog in between reaches SendMDI then Idle, which under
-                // the old SendMDI-arming would have popped the program before it ever ran.
-                // AND only OUR program's Send: any other run in between - a Setup/macro run pushes the
-                // work order aside and streams under its own name - must be ignored outright, not
-                // latched. Without this gate, Setup-then-carve (2026-08-08, first boot-restored session)
-                // latched started on SETUP's Send, hit Setup's terminal with the macro loaded, took the
-                // not-ours disarm exit below, and the carve then finished with no watcher: no pop, no
-                // switch back. The macro run's own watcher (MacroProcessor.Run) restores the work order
-                // around it, so staying armed across a foreign run is exactly right.
-                if (st == StreamingState.Send && model.FileName == "Work Order")
-                    started = true;
-                DebugLog.Write("workorder", string.Format("WatchForRunEnd: saw StreamingState={0}, started={1}{2}",
-                    st, started, !started ? " - NOT ARMED, a terminal state here will be ignored" : string.Empty));
-                if (!started || (st != StreamingState.Idle && st != StreamingState.NoFile))
-                    return;
-                model.PropertyChanged -= handler;
-                runEndWatcherArmed = false;   // the one unsubscribe point - both exits below run through it
-                // Self-disarm without popping when the loaded job is no longer OURS - the operator
-                // generated, then loaded a different file instead of running: popping now would yank
-                // THEIR file out from under THEIR run. (The pushed stack entry is left unconsumed in
-                // that path - accepted, the alternative is worse.)
-                if (model.FileName != "Work Order")
-                {
-                    DebugLog.Write("workorder", string.Format("WatchForRunEnd: terminal but loaded job is '{0}', not ours - disarming without pop", model.FileName));
-                    return;
-                }
-                DebugLog.Write("workorder", "WatchForRunEnd: terminal - popping the borrowed program and switching back");
-                GCode.File.Pop();
-                MacroProcessor.SwitchToTab?.Invoke(ViewType.WorkOrder);
-            };
-            model.PropertyChanged += handler;
-
-            // The state AT ARM TIME is the number that matters, and it is the one thing the handler above can
-            // never tell us: this watcher only arms (started=true) by OBSERVING a Send/SendMDI transition, so
-            // if the run already passed that point before we subscribed, no terminal state will ever pop the
-            // program and it just sits there as "the job" forever. Reported 2026-08-06 - a work order finished,
-            // parked at G30, and the program stayed loaded. That run had the UI roughly 2.5 minutes behind the
-            // wire (the console reached the final Ln:36623 at 17:29:51; the machine got there at 17:27:17),
-            // which is exactly the condition that makes arriving late plausible.
-            // So record where we came in. "armed while already Send" or "armed while already Idle" identifies
-            // the fault immediately; without it the two are indistinguishable after the fact.
-            DebugLog.Write("workorder", string.Format("WatchForRunEnd: armed with StreamingState={0}", model.StreamingState));
-        }
+        // The terminal watcher that used to live here - pop the borrowed program back at the run's true
+        // terminal (Idle/NoFile after a genuine Send of ours) and switch back to this tab - is now
+        // MacroProcessor.WatchHandoffEnd, armed by HandOffToJobTab. It is this method, moved, so that the
+        // other four Generate-first tabs get the same contract rather than three more copies of it; the
+        // "one watcher, ever" guard and the not-ours self-disarm went with it.
+        //
+        // ONE change of behaviour came with the move: the switch back to this tab now happens only on a
+        // CLEAN finish. A run that alarmed or was stopped leaves the operator on the Job tab, where the
+        // failed program is still loaded and the stopped line is still marked - the old unconditional
+        // switch-back moved them off the evidence. (User decision 2026-09-14.)
 
         // ---- Compiled-program cache (user request 2026-08-08: a script-font engraving compiles for
         // ~4 MINUTES, and since Step 6/7 the program pops off the Job tab after every run, so repeat
@@ -3449,14 +3379,12 @@ namespace CNC.Controls
                 // feature: the restored run finished and did NOT pop/switch back to the Work Order tab):
                 // push the (empty, at boot) slot and arm the same terminal watcher, so a finished or
                 // stopped run evaporates the program and lands the operator on the Work Order tab,
-                // exactly like a Generate-initiated run.
-                GCode.File.Push();
-                GCode.File.LoadText("Work Order", text);
+                // exactly like a Generate-initiated run. Which is now literally the same call Generate
+                // makes - the tab switch inside it is a no-op at boot (the Job tab is already the one
+                // showing, and MacroProcessor.SwitchToTab is not wired yet this early regardless).
+                MacroProcessor.HandOffToJobTab(model, ProgramName, text, ViewType.WorkOrder, stats);
                 if (model != null)
-                {
                     model.Message = string.Format("Restored the last Work Order program from cache ({0}) - press Cycle Start when ready.", stats);
-                    WatchForRunEnd(model);
-                }
                 DebugLog.Write("workorder", string.Format("auto-restored cached program at boot (fp {0}, {1})", fp.Substring(0, 8), stats));
                 return true;
             }
@@ -3609,28 +3537,23 @@ namespace CNC.Controls
             if (currentFilePath != null)
                 SaveToDisk();
 
-            bool dryRunArmed = model != null && model.IsDryRunMode;
             string toLoad = program;
             string stats = MacroProcessor.ActiveProgramStats;
 
-            MacroProcessor.SwitchToTab?.Invoke(ViewType.GRBL);   // the Job tab
+            // The tab switch, the guarded push, the load and the terminal watcher are all
+            // MacroProcessor.HandOffToJobTab now - this tab's own copy of them is where that method came
+            // from, so nothing about the sequence changed except that the other four Generate-first tabs
+            // run the same one. Dry-run re-arming moved in there with it.
+            MacroProcessor.HandOffToJobTab(model, ProgramName, toLoad, ViewType.WorkOrder, stats);
 
-            // Don't push a SECOND slot when the loaded job is already our own watched Work Order
-            // program (boot-restored, or a previous Generate that never ran) - LoadText below replaces
-            // it in place and the already-armed watcher keeps serving. Pushing again stacked snapshots
-            // and doubled the watcher (observed live 2026-08-08). A foreign loaded file still gets
-            // pushed (and thus restored at the end) exactly as before.
-            if (!(runEndWatcherArmed && model?.FileName == "Work Order"))
-                GCode.File.Push();
-            GCode.File.LoadText("Work Order", toLoad);
             if (model != null)
-            {
-                model.IsDryRunMode = dryRunArmed;
                 model.Message = string.Format("Work order loaded ({0}) - press Cycle Start when ready.", stats);
-            }
-
-            WatchForRunEnd();
         }
+
+        // The name this tab's generated program is loaded under. It is an IDENTITY, not a label: the
+        // handoff record and its watcher both test the loaded job against it to decide whether a terminal
+        // is ours to pop, so it must be one constant and not a string literal repeated at each site.
+        public const string ProgramName = "Work Order";
 
         public static WorkOrder SectionConfig;
 

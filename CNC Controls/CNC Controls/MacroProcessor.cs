@@ -197,6 +197,229 @@ namespace CNC.Controls
             view.Connect();
         }
 
+        // --- The generated-program handoff: ONE mechanism for every Generate-first tab ------------------
+        //
+        // Every Generate-first tab (Work Order, Setup, and the three Calibration wizards) now ends its
+        // Generate the same way: the program it just built becomes THE LOADED JOB on the Job tab, the
+        // operator is taken there to look at it before anything moves, and the run bar keeps pointing back
+        // at the tab that built it. At the run's true terminal the borrowed program is popped, whatever was
+        // loaded before comes back, and the operator is returned to the tab they started from.
+        //
+        // This was three separate implementations - WorkOrderView.Generate/WatchForRunEnd, StartJobView's
+        // HandOffToJobTab/ReleaseBorrowedProgram/EndHandoff, and for the three wizards no handoff at all,
+        // just a floating preview that left the Job tab showing someone else's program. Two of the three
+        // had to learn the same two guards the hard way, and the third never did:
+        //
+        //   - never push a SECOND snapshot over a program that is already ours (observed live 2026-08-08:
+        //     "Push: depth now 2" with every watcher trace doubled);
+        //   - never pop when the loaded job is no longer ours - the operator generated, then loaded their
+        //     own file instead of running, and popping yanks it out from under them.
+        //
+        // Keeping the bookkeeping in ONE record is the point: "exactly one push is outstanding" becomes a
+        // thing that can be checked in one place rather than a property three copies each maintain.
+
+        // What a Generate-first tab has currently handed to the Job tab. Null name = nothing borrowed.
+        private static string _borrowedName;
+        private static ViewType _borrowedOrigin;
+        private static bool _borrowedWatcherArmed;
+        private static System.ComponentModel.PropertyChangedEventHandler _borrowedHandler;
+        // Filled in by Run() when the tab finally starts the borrowed program - the handoff watcher owns
+        // the terminal, so it is the one that has to make the caller's completion callback.
+        private static System.Action<bool> _borrowedOnDone;
+
+        /// <summary>The name a Generate-first tab's program is currently loaded under, or null when
+        /// nothing is borrowed.</summary>
+        public static string BorrowedProgramName { get { return _borrowedName; } }
+
+        /// <summary>
+        /// True when <paramref name="name"/> is a program a Generate-first tab handed to the Job tab AND it
+        /// is still the loaded job - i.e. reloading it in place is safe and pushing again is not. The LOADED
+        /// JOB is half the test on purpose: the record alone would still say "ours" after the operator
+        /// loaded a file of their own over it.
+        /// </summary>
+        public static bool IsHandedOff(GrblViewModel model, string name)
+        {
+            return _borrowedName != null && _borrowedName == name && model != null && model.FileName == name;
+        }
+
+        /// <summary>
+        /// Generate's tail for every Generate-first tab: make <paramref name="program"/> the loaded job,
+        /// take the operator to the Job tab to look at it, and arm the watcher that gives the previous job
+        /// back and returns them to <paramref name="originTab"/> once the run is over.
+        /// </summary>
+        public static void HandOffToJobTab(GrblViewModel model, string name, string program, ViewType originTab, string stats = null)
+        {
+            if (model == null || string.IsNullOrWhiteSpace(program))
+            {
+                // Handing off nothing used to be indistinguishable from a successful handoff, which is
+                // exactly how a blank Job tab shipped once already (2026-08-11, 0c457451).
+                DebugLog.Write("run", string.Format("HandOffToJobTab: REFUSED - nothing to hand off (model={0}, program={1} chars)",
+                    model == null ? "null" : "ok", program == null ? 0 : program.Length));
+                return;
+            }
+
+            ActiveProgramStats = stats;
+            ActiveProgramVersion++;
+            SaveGeneratedCopy(name, program);
+
+            // Capture BEFORE the switch. Selecting another tab runs the originating tab's Activate(false)
+            // SYNCHRONOUSLY (WPF tab selection is not deferred), and that is where a tab clears its own
+            // `program` field - reading it back across the switch is the trap that shipped the blank Job
+            // tab above. One read, here, and the local is what gets loaded.
+            string toLoad = program;
+            // Program_FileChanged clears IsDryRunMode by design on every load - re-arm it around LoadText.
+            bool dryRunArmed = model.IsDryRunMode;
+
+            // Decide this BEFORE overwriting the record, and set the record BEFORE the switch: the
+            // originating tab's own Activate(false), fired synchronously below, reads it to tell this
+            // handoff apart from a genuine tab-leave.
+            bool replacingOurOwn = IsHandedOff(model, name);
+            _borrowedName = name;
+            _borrowedOrigin = originTab;
+
+            SwitchToTab?.Invoke(ViewType.GRBL);   // the Job tab
+
+            // Don't push a SECOND slot over our own still-loaded program - a previous Generate the operator
+            // looked at and never ran. LoadText replaces it in place.
+            if (!replacingOurOwn)
+                GCode.File.Push();
+            GCode.File.LoadText(name, toLoad);
+            model.IsDryRunMode = dryRunArmed;
+
+            WatchHandoffEnd(model);
+
+            DebugLog.Write("run", string.Format("HandOffToJobTab: '{0}' ({1} chars) is the loaded job; origin={2}, pushed={3}",
+                name, toLoad.Length, originTab, !replacingOurOwn));
+        }
+
+        /// <summary>
+        /// Hand the previous job back WITHOUT having run the borrowed program - an input changed, the tab
+        /// was left for good, or the run was refused up front. Everything that drops a generated program
+        /// has to come through here, or the pushed snapshot is stranded and the Job tab keeps showing a
+        /// program nothing will ever run.
+        /// </summary>
+        /// <remarks>
+        /// The LOADED JOB is the test, never the record on its own: after a real run the handoff watcher
+        /// has already popped by the time a tab's DiscardGenerated reaches here, so this correctly does
+        /// nothing. A run still in flight owns the pop outright - leave it to the watcher.
+        /// </remarks>
+        public static void ReleaseHandoff(GrblViewModel model)
+        {
+            if (_borrowedName == null)
+                return;
+            if (model != null && model.IsJobRunning)
+                return;
+
+            string name = _borrowedName;
+            _borrowedName = null;
+            _borrowedOnDone = null;
+            if (_borrowedHandler != null && model != null)
+            {
+                model.PropertyChanged -= _borrowedHandler;
+                _borrowedHandler = null;
+                _borrowedWatcherArmed = false;
+            }
+
+            if (model != null && model.FileName == name)
+            {
+                DebugLog.Write("run", string.Format("ReleaseHandoff: dropping '{0}' without running it - popping the previous job back", name));
+                GCode.File.Pop();
+            }
+        }
+
+        /// <summary>
+        /// Pop the borrowed program back and return the operator to the tab that generated it, once the run
+        /// reaches its TRUE terminal (Idle/NoFile after a genuine Send of OUR program).
+        /// </summary>
+        /// <remarks>
+        /// Armed at GENERATE time, not at Run time. Cycle Start may be minutes away, and arming late is how
+        /// a work order once finished, parked at G30, and simply stayed loaded forever (2026-08-06): this
+        /// watcher only arms by OBSERVING a Send transition, so arriving after one has already gone past
+        /// means no terminal will ever fire it.
+        /// </remarks>
+        private static void WatchHandoffEnd(GrblViewModel model)
+        {
+            if (_borrowedWatcherArmed)
+            {
+                DebugLog.Write("run", "WatchHandoffEnd: already armed - not arming a second watcher");
+                return;
+            }
+            _borrowedWatcherArmed = true;
+            bool started = false, jobFinished = false, sawError = false;
+            _borrowedHandler = (s, e) =>
+            {
+                if (e.PropertyName != nameof(GrblViewModel.StreamingState))
+                    return;
+                var st = model.StreamingState;
+                // Send ONLY (never SendMDI), and only OUR OWN program's Send. A single jog between Generate
+                // and Cycle Start reaches SendMDI then Idle; an unrelated macro run streams under its own
+                // name having pushed ours aside. Either one, latched, pops the program before it ever runs -
+                // both were live incidents, 2026-08-08.
+                if (st == StreamingState.Send && model.FileName == _borrowedName)
+                    started = true;
+                if (st == StreamingState.JobFinished)
+                    jobFinished = true;
+                // Latch a failed run: the terminal only arrives at the Idle that follows the operator's
+                // reset/unlock, by which time StreamingState no longer says anything went wrong.
+                if (st == StreamingState.Error || st == StreamingState.Halted)
+                    sawError = true;
+                if (!started || (st != StreamingState.Idle && st != StreamingState.NoFile))
+                    return;
+
+                model.PropertyChanged -= _borrowedHandler;
+                _borrowedHandler = null;
+                _borrowedWatcherArmed = false;
+                string name = _borrowedName;
+                var origin = _borrowedOrigin;
+                var onDone = _borrowedOnDone;
+                _borrowedName = null;
+                _borrowedOnDone = null;
+
+                // Self-disarm without popping when the loaded job is no longer ours - the operator
+                // generated, then loaded a different file instead of running. Popping now would yank THEIR
+                // file out from under THEIR run. (The pushed slot is left unconsumed in that path -
+                // accepted; the alternative is worse.)
+                if (model.FileName != name)
+                    DebugLog.Write("run", string.Format("WatchHandoffEnd: terminal but loaded job is '{0}', not '{1}' - disarming without pop",
+                        model.FileName, name));
+                else
+                {
+                    // st is in the line because its absence once cost two passes over the same symptom:
+                    // "jobFinished=False" says the discard did not happen, never which terminal got there
+                    // first. JobFinished comes from OnProgramEnd (the controller's own "[MSG:Pgm End]"), so
+                    // a program whose final acks land before the motion finishes terminates on Idle instead.
+                    DebugLog.Write("run", string.Format("WatchHandoffEnd: '{0}' terminal={1} (jobFinished={2} sawError={3}) - popping the borrowed program",
+                        name, st, jobFinished, sawError));
+                    GCode.File.Pop();
+                }
+
+                // A CLEAN finish has nothing actionable left to look at: drop the preview, drop the
+                // program, and put the operator back on the tab that built it.
+                //
+                // A FAILED run keeps all three - the program stays loaded, the view stays up, and the
+                // operator stays HERE on the Job tab where the alarm and the stopped line are, rather than
+                // being moved away from the evidence. That polarity is MacroProcessor.Run's own and was
+                // re-confirmed by the user 2026-09-14; the switch-back is gated on it for the same reason
+                // the other two are, which is a deliberate change from Work Order's old unconditional
+                // switch-back (that one moved you off the failure).
+                if (!sawError)
+                {
+                    ProgramView.Active?.Disconnect();
+                    if (jobFinished && SupportsGenerateMode)
+                        DiscardGenerated?.Invoke();
+                    SwitchToTab?.Invoke(origin);
+                }
+
+                onDone?.Invoke(jobFinished);
+            };
+            model.PropertyChanged += _borrowedHandler;
+
+            // The state AT ARM TIME is the one thing the handler above can never report afterwards - see
+            // the remark on arming early. "armed while already Send" identifies that fault immediately.
+            DebugLog.Write("run", string.Format("WatchHandoffEnd: armed for '{0}' (origin {1}) with StreamingState={2}",
+                _borrowedName, _borrowedOrigin, model.StreamingState));
+        }
+
         // NOTE: ConfirmRun and ShowMessage used to live here. Every message the engine raises now goes
         // through CNC.Core.UserPrompt, which AppDialogs.RegisterCorePrompts routes back to this assembly -
         // and since a10ce1e that path picks the same dialog owner ShowMessage used to, so nothing about
@@ -532,8 +755,14 @@ namespace CNC.Controls
             // snapshot is the one the watcher pops. Gated on the loaded job actually still being ours, not
             // on the caller's word alone: if something else was loaded in between, skipping the push would
             // load over THAT file with nothing left to restore it. Pushing is the safe direction.
-            if (alreadyPushed && model.FileName == name)
-                DebugLog.Write("run", string.Format("Run: '{0}' is already the loaded job - reloading in place, not pushing a second slot", name));
+            // A Generate-first tab whose Generate already handed this program to the Job tab is the same
+            // case, established from the shared record rather than the caller's word - see IsHandedOff.
+            // Its watcher, armed back at Generate time, owns the pop, the discard and the return to the
+            // originating tab, so this run must add neither a push nor a second watcher below.
+            bool handedOff = IsHandedOff(model, name);
+            if (handedOff || (alreadyPushed && model.FileName == name))
+                DebugLog.Write("run", string.Format("Run: '{0}' is already the loaded job{1} - reloading in place, not pushing a second slot",
+                    name, handedOff ? " (handed off from " + _borrowedOrigin + ")" : string.Empty));
             else
             {
                 if (alreadyPushed)
@@ -576,6 +805,15 @@ namespace CNC.Controls
                 if (!started || (st != StreamingState.Idle && st != StreamingState.NoFile))
                     return;
                 model.PropertyChanged -= handler;
+                // A handed-off program's teardown belongs to the handoff watcher, which was armed first and
+                // has therefore already run by the time this fires: it popped, dismissed the view, discarded
+                // the program, switched back, and made our own onDone call (Run passed it along below).
+                // Everything past this point would be a second helping of exactly that.
+                if (handedOff)
+                {
+                    DebugLog.Write("run", string.Format("Run watcher: '{0}' terminal={1} - the handoff watcher owns the teardown", name, st));
+                    return;
+                }
                 // Self-disarm without popping if the loaded job is no longer ours (a different file got
                 // loaded before the terminal was seen) - popping would yank that file out from under the
                 // operator. Same guard as WatchForRunEnd.
@@ -611,6 +849,12 @@ namespace CNC.Controls
                 onDone?.Invoke(jobFinished);
             };
             model.PropertyChanged += handler;
+            // The handoff watcher reaches the terminal first (it subscribed back at Generate time) and is
+            // the one that pops, so it is also the one that has to make this call - handing it over here
+            // rather than letting the handler above do it is what keeps onDone firing exactly once, AFTER
+            // the previous job is back.
+            if (handedOff)
+                _borrowedOnDone = onDone;
 
             // Give the operator a beat before motion when the caller has just moved them to another tab.
             // The program is already loaded and drawn by this point, so the pause is spent looking at the
@@ -641,7 +885,13 @@ namespace CNC.Controls
             if (!started)
             {
                 model.PropertyChanged -= handler;
-                GCode.File.Pop();
+                // A handed-off program's slot belongs to the handoff record - popping it directly would
+                // leave that record claiming a borrow it no longer has, and the still-armed handoff watcher
+                // waiting for a terminal that will never come. ReleaseHandoff is the one undo for both.
+                if (handedOff)
+                    ReleaseHandoff(model);
+                else
+                    GCode.File.Pop();
                 DebugLog.Write("macro", string.Format("Run: '{0}' did not start (gate refused/cancelled) - popped the borrowed program", name));
                 return false;
             }
