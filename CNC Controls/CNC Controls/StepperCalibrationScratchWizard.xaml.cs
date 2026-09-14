@@ -291,6 +291,23 @@ namespace CNC.Controls
         /// Uses Setup's sequence, not a copy of it - MacroProcessor.EmitTloBaseline/Reference/Restore were
         /// lifted out of StartJobView for exactly this.
         /// </remarks>
+        /// <summary>
+        /// Depth of the SECOND mark of each pair - the one a full span away from the first.
+        /// </summary>
+        /// <remarks>
+        /// Two depths rather than one because the reference surface is not flat. A spoilboard that dips
+        /// more than the cut depth across a 500mm span marks one end and misses the other entirely, and a
+        /// pair with one mark missing cannot be measured at all. Depth does not affect the result - the
+        /// measurement is the spacing between the two line CENTRES, and a V-bit's centre sits under the
+        /// spindle axis whatever the depth - so the two may differ freely.
+        /// </remarks>
+        public static readonly DependencyProperty ScratchDepth2Property = DependencyProperty.Register(nameof(ScratchDepth2), typeof(double), typeof(StepperCalibrationScratchWizard), new PropertyMetadata(0.5d));
+        public double ScratchDepth2
+        {
+            get { return (double)GetValue(ScratchDepth2Property); }
+            set { SetValue(ScratchDepth2Property, value); }
+        }
+
         public static readonly DependencyProperty ReferenceTloProperty = DependencyProperty.Register(nameof(ReferenceTlo), typeof(bool), typeof(StepperCalibrationScratchWizard), new PropertyMetadata(true));
         public bool ReferenceTlo
         {
@@ -445,7 +462,8 @@ namespace CNC.Controls
             // being emitted below - M6 prompts for the tool itself, and two prompts for one bit is one too
             // many. Nothing moves until OK.
             lines.Add(string.Format("(MBOX, OKCANCEL, {0}About to scratch {1} pairs of lines over {2}mm, starting {3}mm from the CURRENT work origin - {4}mm deep. Click OK to start, Cancel to abort.)",
-                tool > 0 ? string.Empty : "Fit the V-bit. ", Results.Count, F(span), F(m), F(ScratchDepth)));
+                tool > 0 ? string.Empty : "Fit the V-bit. ", Results.Count, F(span), F(m),
+                F(ScratchDepth) + "/" + F(ScratchDepth2)));
             lines.Add("(WAITIDLE)");
 
             lines.Add("G90 G94 G17 G21");
@@ -504,9 +522,10 @@ namespace CNC.Controls
                 lines.Add(string.Format("G1 Z-{0} F{1}", F(ScratchDepth), F(PlungeFeed)));
                 lines.Add(string.Format("G1 {0}{1} F{2}", perp, F(rowEnd), F(ScratchFeed)));
                 lines.Add("G0 Z" + F(SafeZ));
-                // mark 2 - one commanded span away
+                // mark 2 - one commanded span away, at its OWN depth: a span's worth of spoilboard is
+                // rarely flat enough for one number to mark both ends crisply.
                 lines.Add(string.Format("G0 {0}{1} {2}{3}", axis, F(a1), perp, F(rowStart)));
-                lines.Add(string.Format("G1 Z-{0} F{1}", F(ScratchDepth), F(PlungeFeed)));
+                lines.Add(string.Format("G1 Z-{0} F{1}", F(ScratchDepth2), F(PlungeFeed)));
                 lines.Add(string.Format("G1 {0}{1} F{2}", perp, F(rowEnd), F(ScratchFeed)));
                 lines.Add("G0 Z" + F(SafeZ));
             }
@@ -786,11 +805,14 @@ namespace CNC.Controls
         protected override DependencyProperty[] PersistedProperties => new[] {
             SpanProperty, DeltaProperty, PointsProperty, ScratchDepthProperty, PlungeFeedProperty,
             ScratchFeedProperty, SafeZProperty, LineLengthProperty, RowSpacingProperty,
-            EdgeMarginProperty, SpindleRPMProperty, ToolNumberProperty, ReferenceTloProperty };
+            EdgeMarginProperty, SpindleRPMProperty, ToolNumberProperty, ReferenceTloProperty,
+            ScratchDepth2Property };
 
         protected override void ApplyConfig(ScratchParams p)
         {
             Span = p.Span; Delta = p.Delta; Points = p.Points; ScratchDepth = p.ScratchDepth;
+            // Fall back to the single depth this profile already had - see ScratchParams.ScratchDepth2.
+            ScratchDepth2 = p.ScratchDepth2 > 0d ? p.ScratchDepth2 : p.ScratchDepth;
             PlungeFeed = p.PlungeFeed; ScratchFeed = p.ScratchFeed; SafeZ = p.SafeZ;
             LineLength = p.LineLength; RowSpacing = p.RowSpacing; EdgeMargin = p.EdgeMargin;
             SpindleRPM = p.SpindleRPM; ToolNumber = p.ToolNumber; ReferenceTlo = p.ReferenceTlo;
@@ -799,7 +821,7 @@ namespace CNC.Controls
         protected override ScratchParams CaptureConfig()
         {
             return new ScratchParams {
-                Span = Span, Delta = Delta, Points = Points, ScratchDepth = ScratchDepth,
+                Span = Span, Delta = Delta, Points = Points, ScratchDepth = ScratchDepth, ScratchDepth2 = ScratchDepth2,
                 PlungeFeed = PlungeFeed, ScratchFeed = ScratchFeed, SafeZ = SafeZ, LineLength = LineLength,
                 RowSpacing = RowSpacing, EdgeMargin = EdgeMargin, SpindleRPM = SpindleRPM, ToolNumber = ToolNumber,
                 ReferenceTlo = ReferenceTlo
@@ -835,6 +857,11 @@ namespace CNC.Controls
         // profiles; an existing one keeps whatever it has saved.
         // Reference the LOADED bit at the puck before cutting - see the wizard's ReferenceTlo property.
         public bool ReferenceTlo = true;
+        // Depth of the SECOND mark of each pair. 0 = never set by this profile, in which case ApplyConfig
+        // falls back to ScratchDepth so an existing setup keeps cutting both marks at the depth it had.
+        // 0 is safe as the "unset" sentinel here in a way it usually is not: a zero-depth mark is not a
+        // mark, so nobody sets it deliberately.
+        public double ScratchDepth2 = 0d;
         public double Span = 400d, Delta = 0.010d, Points = 3d, ScratchDepth = 0.5d, PlungeFeed = 100d,
                       ScratchFeed = 500d, SafeZ = 5d, LineLength = 5d, RowSpacing = 15d, EdgeMargin = 10d,
                       SpindleRPM = 18000d, ToolNumber = 1d;
