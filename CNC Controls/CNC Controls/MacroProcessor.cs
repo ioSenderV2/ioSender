@@ -583,7 +583,12 @@ namespace CNC.Controls
                     DebugLog.Write("macro", string.Format("Run watcher: terminal but loaded job is '{0}', not '{1}' - disarming without pop", model.FileName, name));
                 else
                 {
-                    DebugLog.Write("macro", string.Format("Run watcher: '{0}' terminal (jobFinished={1}) - popping the borrowed program", name, jobFinished));
+                    // st is in here because it was not, and its absence cost two passes over the same
+                    // symptom: "jobFinished=False" says the discard did not happen, never which terminal
+                    // got there first. JobFinished comes from OnProgramEnd (the controller's own
+                    // "[MSG:Pgm End]"), so a program whose final acks land before the motion finishes
+                    // terminates on Idle instead and the discard is silently skipped.
+                    DebugLog.Write("macro", string.Format("Run watcher: '{0}' terminal={1} (jobFinished={2}) - popping the borrowed program", name, st, jobFinished));
                     GCode.File.Pop();
                 }
                 // The run is over and there is nothing actionable left to look at: dismiss the expanded

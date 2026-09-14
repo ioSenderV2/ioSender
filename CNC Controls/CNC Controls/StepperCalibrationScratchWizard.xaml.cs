@@ -757,7 +757,20 @@ namespace CNC.Controls
             if (string.IsNullOrWhiteSpace(program))
                 return;
 
-            MacroProcessor.Run(model, "Stepper calibration " + GrblInfo.AxisIndexToLetter(Axis), program, true);
+            // onDone rather than relying on MacroProcessor's DiscardGenerated, which only fires when its run
+            // watcher saw StreamingState.JobFinished - and for this program it never does. The watcher's
+            // terminal is the SENDER's state, reached when the last line is acked, and the "ok" for a
+            // buffered G0 comes back immediately: measured 2026-09-14, the watcher finished at 11:47:52.368
+            // while the closing G30 park was still queued, with the machine reporting Run at 4570 mm/min
+            // 220ms later. Putting the park last did not help and could not have - no ordering of lines
+            // changes which comes first, because the acks always do.
+            //
+            // So this tool ends its own program instead of asking a race to do it. Unconditionally, without
+            // consulting jobFinished: the program is a fixed pattern that regenerates instantly, and
+            // re-running a stale one is the exact hazard this whole tool has been tripping over. There is no
+            // resume to protect either - ActiveRun always streams from the first line.
+            MacroProcessor.Run(model, "Stepper calibration " + GrblInfo.AxisIndexToLetter(Axis), program, true,
+                               onDone: _ => DiscardProgram());
         }
 
         private void Generate()
