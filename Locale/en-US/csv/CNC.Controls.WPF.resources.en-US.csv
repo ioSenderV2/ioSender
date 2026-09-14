@@ -1667,3 +1667,10 @@ CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_womarkgap:CNC.Controls
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_womarkgap:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Length of the gap between dashes, measured along the line."
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,tabstep_calScratch:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Correct steps/mm by scratching test lines with a V-bit and measuring them with calipers. Needs no probe and no fixture.
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_calScratch:System.Windows.Controls.TextBlock.Text,Text,True,True,,Stepper calibration (scratch)
+CNC.Controls.WPF.g.en-US.resources:calibrationview.baml,tabcal_stepper:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Correct steps/mm by probing a reference block of known size against a validated Corner Fence.
+CNC.Controls.WPF.g.en-US.resources:calibrationview.baml,cal_stepper:System.Windows.Controls.TextBlock.Text,Text,True,True,,Stepper calibration (probe)
+CNC.Controls.WPF.g.en-US.resources:calibrationview.baml,tabcal_scratch:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Correct steps/mm by scratching test lines with a V-bit and measuring them with calipers. Needs no probe and no fixture.
+CNC.Controls.WPF.g.en-US.resources:calibrationview.baml,cal_scratch:System.Windows.Controls.TextBlock.Text,Text,True,True,,Stepper calibration (scratch)
+CNC.Controls.WPF.g.en-US.resources:calibrationview.baml,tabcal_squareness:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Check and correct gantry squareness.
+CNC.Controls.WPF.g.en-US.resources:calibrationview.baml,cal_squareness:System.Windows.Controls.TextBlock.Text,Text,True,True,,Squareness
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabCalibration:System.String.$Content,None,True,True,,Calibration
