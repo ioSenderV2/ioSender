@@ -3259,12 +3259,16 @@ namespace GCode_Sender
                         continue;
                     }
                     (compCtl as ICNCView)?.Setup(UIViewModel, AppConfig.Settings);
-                    tabMode.Items.Add(new TabItem {
+                    var compTab = new TabItem {
                         Content = compCtl,
-                        Header = comp.Label,
                         Tag = node.Component,
                         Uid = "tab_" + node.Component
-                    });
+                    };
+                    // Same closability rule as a registered view. These carry no ViewType, so no shortcut
+                    // badge - TabHeaderControl takes a null id and simply never shows one.
+                    compTab.Header = new CNC.Controls.TabHeaderControl(comp.Label, null,
+                        isClosableComponent(node.Component) ? (System.Action)(() => closeTab(compTab)) : null);
+                    tabMode.Items.Add(compTab);
                     continue;
                 }
                 // No Presentation check here on purpose: the TREE is the placement authority. A view
@@ -3369,15 +3373,80 @@ namespace GCode_Sender
             string tabId = ctl is ICNCView icv
                 ? tabViewIds.FirstOrDefault(kv => kv.Value == icv.ViewType).Key
                 : null;
+
+            // Closable only when there is a menu entry to open it again - see isClosableTab. Evaluated per
+            // header rather than once, because the same method builds the startup tabs (where a view placed
+            // on the bar must NOT get an X) and the on-demand ones (where it must).
+            System.Action onClose = isClosableComponent(componentKey) ? (System.Action)(() => closeTab(tabItem)) : null;
+
+            tabItem.Header = new CNC.Controls.TabHeaderControl(d.Label, tabId, onClose);
             if (tabId != null)
-            {
-                tabItem.Header = new CNC.Controls.TabHeaderControl(d.Label, tabId);
                 TabKeyBinder.AttachBindMenu(tabItem, tabId);
-            }
-            else
-                tabItem.Header = d.Label;
 
             return tabItem;
+        }
+
+        /// <summary>
+        /// True when this component has a MENU entry that would open it again, which is exactly the
+        /// condition under which its tab may be closed.
+        /// </summary>
+        /// <remarks>
+        /// The rule is "can I get it back", not "was this tab created on demand". A tab the operator placed
+        /// on the bar has no menu entry - closing it would remove the view from the session with no way to
+        /// reopen it short of the layout editor - so it gets no close button and ESC will not touch it. The
+        /// layout tree is the placement authority for menus exactly as it is for tabs (BuildMenuSlot reads
+        /// the same two slots), so asking the tree is asking the same question the File/Tools menus answered.
+        /// </remarks>
+        private static bool isClosableComponent(string componentKey)
+        {
+            if (string.IsNullOrEmpty(componentKey))
+                return false;
+
+            var root = AppConfig.Settings.Layout;
+            return (root?.Slot(LayoutKeys.SlotMenuFile)?.Items.Any(n => n?.Component == componentKey) ?? false)
+                || (root?.Slot(LayoutKeys.SlotMenuTools)?.Items.Any(n => n?.Component == componentKey) ?? false);
+        }
+
+        /// <summary>True when this tab may be closed - see <see cref="isClosableComponent"/>.</summary>
+        private static bool isClosableTab(TabItem tab)
+        {
+            return tab != null && isClosableComponent(tab.Tag as string);
+        }
+
+        /// <summary>
+        /// Close a tab, leaving the view reachable from the menu it came from.
+        /// </summary>
+        /// <remarks>
+        /// Selecting a neighbour FIRST is not cosmetic: TabMode_SelectionChanged is what calls
+        /// Activate(false) on the outgoing view, and that is what releases MacroProcessor's shared
+        /// Generate-mode statics (ActiveRun/ActiveGenerate/SupportsGenerateMode). Removing the tab without
+        /// that would leave the Run bar still pointing its Generate button at a view that is no longer on
+        /// screen. Removing the SELECTED item also makes WPF pick the replacement itself, which is a second
+        /// way to end up never running the deactivation for the tab actually going away.
+        /// </remarks>
+        private void closeTab(TabItem tab)
+        {
+            if (!isClosableTab(tab))
+                return;
+
+            if (tabMode.SelectedItem == tab)
+            {
+                int i = tabMode.Items.IndexOf(tab);
+                TabItem next = null;
+                for (int step = 1; step < tabMode.Items.Count && next == null; step++)
+                {
+                    var before = i - step >= 0 ? tabMode.Items[i - step] as TabItem : null;
+                    var after = i + step < tabMode.Items.Count ? tabMode.Items[i + step] as TabItem : null;
+                    // Prefer the tab to the LEFT (where the permanent tabs live), then the right.
+                    next = (before != null && before.IsEnabled) ? before
+                         : (after != null && after.IsEnabled) ? after : null;
+                }
+                if (next == null)
+                    return;   // nothing else selectable - leave it open rather than show an empty window
+                tabMode.SelectedItem = next;
+            }
+
+            tabMode.Items.Remove(tab);
         }
 
         /// <summary>
@@ -3943,6 +4012,27 @@ namespace GCode_Sender
             {
                 ManualHelp.Open(UIViewModel?.CurrentView?.ViewType ?? ViewType.Startup);
                 return true;
+            }
+
+            // ESC closes the current tab, opt-in (Settings > UI) and only when that tab is closable.
+            //
+            // Three guards, and each one is load-bearing. This dispatcher runs for EVERY window in the
+            // application (GlobalKeys), so without the IsActive test an ESC dismissing a dialog would close
+            // a tab behind it at the same time. ESC is also the universal "cancel my edit" key, so a focused
+            // text box keeps it. And unmodified only - Shift+ESC and friends belong to whoever binds them.
+            if (e.Key == Key.Escape && Keyboard.Modifiers == ModifierKeys.None
+                && AppConfig.Settings.Base.EscClosesTab
+                && IsActive
+                && !(Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase))
+            {
+                var cur = tabMode.SelectedItem as TabItem;
+                if (isClosableTab(cur))
+                {
+                    closeTab(cur);
+                    return true;
+                }
+                // Not closable: fall through rather than swallow. ESC has other jobs (the console overlay,
+                // a flyout) and a setting that is ON must not make the key dead everywhere else.
             }
 
             return dispatchTabShortcut(e) || ActionKeyBinder.Dispatch(e);

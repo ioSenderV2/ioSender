@@ -416,6 +416,11 @@ namespace CNC.Controls
         // is set alongside it, same condition. Check Run/Dry Run/Simulate keep their own names either way -
         // those are modes worth understanding on their own terms, not a rename target.
         public bool UseFriendlyRunLabels { get; set; } = false;
+        // ESC closes the current tab, when that tab is closable. Closable means the view has a MENU entry to
+        // launch it again (MainWindow.isClosableTab) - a tab the operator placed on the bar is never closed
+        // by this, because nothing would bring it back. Default OFF: ESC is a plain "never mind" key
+        // elsewhere in the app, and a key that silently removes what you are looking at has to be asked for.
+        public bool EscClosesTab { get; set; } = false;
         // Jog pad's five "go to a place" buttons - the four corner targets and the centre bullseye
         // (JogBaseControl). Default OFF (user, 2026-08-03): they drive the machine across the table at
         // rapid, so the pad ships as a plain arrow pad and the operator opts in once they know what the
