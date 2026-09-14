@@ -817,9 +817,9 @@ namespace CNC.Controls
             // Corner 1 (origin, FrontLeft) - REUSE mode, corner offset only (no locate pass). #<_bottom> falls
             // back to the machine's own Z floor rather than a cached spoilboard reading (see the TLO-baseline
             // design conversation this replaced - a raw machine-Z spoilboard cache is only valid for the exact
-            // tool length that captured it, unsound the moment a different bit is in the spindle) - a wider
-            // seek-depth cap than a tight cached estimate, but still a real, probe-guarded search, not a bare
-            // rapid, so a dead/mis-wired probe still alarms instead of ploughing into the reference block.
+            // tool length that captured it, unsound the moment a different bit is in the spindle). It is a
+            // SEEK-DEPTH CAP and nothing more - see the crash note on #<_ls_maxz> just below before assuming
+            // it means anything about where the material is.
             b.AppendLine(string.Format("#<_bottom> = {0}",
                 (GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 1.0d : -9999d).ToInvariantString("0.0##")));
             b.AppendLine("#<_ls_corner> = 1");
@@ -828,7 +828,28 @@ namespace CNC.Controls
             b.AppendLine(string.Format("#<_ls_topx> = {0}", (fx.CornerOffsetX + insetMm).ToInvariantString("0.0##")));
             b.AppendLine(string.Format("#<_ls_topy> = {0}", (fx.CornerOffsetY + insetMm).ToInvariantString("0.0##")));
             b.AppendLine("#<_ls_startz> = 0");
-            b.AppendLine("#<_ls_maxz> = 0");
+            // ---------------------------------------------------------------------------------------------
+            // CRASHED THE MACHINE 2026-09-14. This was "#<_ls_maxz> = 0", which pcorner.macro reads as "the
+            // caller has no trusted safe height" - so its o43 branch rapids to
+            //     #<_approach_z> = #<_bottom> + #<_ls_thickness> + #<_ls_plateoffset> + 10
+            // That formula treats #<_bottom> as THE SURFACE THE STOCK SITS ON. We pass the machine's Z travel
+            // limit. With bottom=-134, thickness=25.4, plate=12 that aimed a G53 G0 - a bare rapid, NOT a
+            // probe - at Z-86.6, roughly the whole Z envelope below where the reference block actually was.
+            // It drove the tool into the touch plate at 4570 mm/min; the machine ended up parked at exactly
+            // -86.600 and the probe-released gate then reported the latched probe, which looked like a probe
+            // fault and was really the wreck. The slow G38.2 top seek only ever starts AFTER this rapid.
+            //
+            // Start Job avoids the same branch by handing corner 1 a freshly probed height from the TLO
+            // reference puck. This tool has no such reference - but machine top IS trustworthy here: the
+            // operator has just confirmed the probe at G30 and nothing is above Z0. It cannot be spelled "0",
+            // because that is pcorner's own sentinel for "unset" (its #<_ls_appz> sibling had to pick 9999 for
+            // exactly this reason - see that file's comment), hence the hair below.
+            //
+            // The point is not the number. With a trusted height the macro travels at the top and leaves the
+            // ENTIRE descent to its probe-guarded G38.2 at #<_ls_searchf> - so an unexpected obstruction stops
+            // the machine instead of being discovered by hitting it. That costs time and nothing else, which
+            // is the right trade for a tool that by definition knows nothing about the stock's height.
+            b.AppendLine("#<_ls_maxz> = -0.01");
             b.AppendLine("#<_ls_appz> = 9999");
             b.AppendLine("O<pcorner> CALL [#<_ls_rad>]");
             b.AppendLine("#<c1x> = #<_corner_x>");
