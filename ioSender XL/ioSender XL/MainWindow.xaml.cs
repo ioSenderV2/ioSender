@@ -4014,6 +4014,21 @@ namespace GCode_Sender
                 return true;
             }
 
+            // ESC discards a generated program that a Generate-first tab handed to the Job tab and that
+            // has not been started - gives the previous program back and returns to the tab that built it.
+            //
+            // FIRST, ahead of the close-tab branch below, because it is the more specific claim on the key:
+            // it fires only while there is a handoff outstanding, where "cancel what I just did" can mean
+            // nothing else. It shares that branch's guards for the same reasons (see them), and adds
+            // nothing of its own - CancelHandoff itself refuses while a job is running, since Esc is not a
+            // Stop. Returning false when there is nothing to cancel is what keeps the key falling through
+            // to everyone else who wants it.
+            if (e.Key == Key.Escape && Keyboard.Modifiers == ModifierKeys.None
+                && IsActive
+                && !(Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase)
+                && CNC.Controls.MacroProcessor.CancelHandoff(DataContext as GrblViewModel))
+                return true;
+
             // ESC closes the current tab, opt-in (Settings > UI) and only when that tab is closable.
             //
             // Three guards, and each one is load-bearing. This dispatcher runs for EVERY window in the

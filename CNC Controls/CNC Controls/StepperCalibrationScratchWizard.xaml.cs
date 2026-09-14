@@ -116,7 +116,7 @@ namespace CNC.Controls
             // with no way to start it AS a scratch run - no confirmation, and no discard when it finishes.
             // The teardown is deferred to the run's terminal, where the shared watcher switches back here
             // and Activate(true) above re-registers everything.
-            else if (!MacroProcessor.IsHandoffPending(ViewType.Calibration))
+            else if (!MacroProcessor.IsHandingOffFrom(ViewType.Calibration))
             {
                 MacroProcessor.ActiveRun = null;
                 MacroProcessor.SupportsGenerateMode = false;
@@ -367,7 +367,7 @@ namespace CNC.Controls
         // Job tab - across that handoff the bar keeps pointing here, so every write to the shared
         // MacroProcessor statics has to be gated on this rather than isActiveTab alone. StartJobView's own
         // OwnsRunBar, same reasoning; it just reads the shared handoff record instead of a private flag.
-        private bool OwnsRunBar { get { return isActiveTab || MacroProcessor.IsHandoffPending(ViewType.Calibration); } }
+        private bool OwnsRunBar { get { return isActiveTab || MacroProcessor.HoldsHandoffFrom(ViewType.Calibration); } }
 
         // The name this tool's program is loaded under. It is an IDENTITY, not a label: the handoff record
         // and its watcher both test the loaded job against it to decide whether a terminal is ours to pop,

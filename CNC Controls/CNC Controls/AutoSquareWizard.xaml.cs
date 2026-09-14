@@ -80,7 +80,7 @@ namespace CNC.Controls
             // program with no way to start it AS an Auto Square run - no confirmation, and no ReuseZ0
             // arming when it finishes. The teardown is deferred to the run's terminal, where the shared
             // watcher switches back here and Activate(true) above re-registers everything.
-            else if (!MacroProcessor.IsHandoffPending(ViewType.Calibration))
+            else if (!MacroProcessor.IsHandingOffFrom(ViewType.Calibration))
             {
                 MacroProcessor.ActiveRun = null;
                 MacroProcessor.SupportsGenerateMode = false;
@@ -108,7 +108,7 @@ namespace CNC.Controls
         // Job tab - across that handoff the bar keeps pointing here, so every write to the shared
         // MacroProcessor statics has to be gated on this rather than isActiveTab alone. StartJobView's own
         // OwnsRunBar, same reasoning; it just reads the shared handoff record instead of a private flag.
-        private bool OwnsRunBar { get { return isActiveTab || MacroProcessor.IsHandoffPending(ViewType.Calibration); } }
+        private bool OwnsRunBar { get { return isActiveTab || MacroProcessor.HoldsHandoffFrom(ViewType.Calibration); } }
 
 
         // The handoff is over - the run reached its terminal. On a CLEAN finish the shared watcher has

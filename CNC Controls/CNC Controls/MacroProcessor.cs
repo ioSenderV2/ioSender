@@ -222,6 +222,8 @@ namespace CNC.Controls
         private static string _borrowedName;
         private static ViewType _borrowedOrigin;
         private static bool _borrowedWatcherArmed;
+        // True ONLY for the duration of HandOffToJobTab's own SwitchToTab call - see IsHandingOffFrom.
+        private static bool _handoffSwitching;
         private static System.ComponentModel.PropertyChangedEventHandler _borrowedHandler;
         // Filled in by Run() when the tab finally starts the borrowed program - the handoff watcher owns
         // the terminal, so it is the one that has to make the caller's completion callback.
@@ -245,21 +247,66 @@ namespace CNC.Controls
             return _borrowedName != null && _borrowedName == name && model != null && model.FileName == name;
         }
 
+        // These two look alike and are NOT interchangeable. They were ONE method for a day, and that bug is
+        // worth keeping written down: a tab used it to mean "this Activate(false) is my own handoff" while
+        // it actually answered "is a borrow outstanding". Those coincide only until the operator walks BACK
+        // to the tab - after which leaving it again for somewhere unrelated still looked like a handoff, so
+        // the tab skipped its teardown and went on owning the run bar from off-screen, borrowed program and
+        // all.
+
         /// <summary>
-        /// True when the tab identified by <paramref name="originTab"/> is the one whose program is
-        /// currently handed to the Job tab - so an Activate(false) arriving now is OUR OWN handoff
-        /// switching away, not the operator leaving the tab for good.
+        /// TRANSIENT: true only while <see cref="HandOffToJobTab"/> is performing its own tab switch - so an
+        /// Activate(false) arriving right now is OUR OWN handoff switching away, not the operator leaving
+        /// the tab for good. False at every other moment, including the whole time the borrow is held.
         /// </summary>
         /// <remarks>
-        /// A Generate-first tab must NOT tear down its run-bar registration or clear its own `program`
-        /// field on that deactivation. The bar keeps pointing back at it across the handoff, and that is
-        /// the whole point: pressing Run on the Job tab still runs the program AS that tab's run, with its
-        /// confirmation, its completion hook and its result parsing. Clearing the field and reading it back
-        /// across the switch is what shipped a blank Job tab on 2026-08-11 (0c457451).
+        /// The window is exact because WPF tab selection is not deferred: the outgoing tab's Activate(false)
+        /// runs synchronously inside the SwitchToTab call this brackets. A Generate-first tab must not tear
+        /// down its run-bar registration or clear its own `program` field on that one deactivation - the bar
+        /// keeps pointing back at it across the handoff, which is the whole point: pressing Run on the Job
+        /// tab still runs the program AS that tab's run, with its confirmation, its completion hook and its
+        /// result parsing. (Clearing the field and reading it back across the switch is separately what
+        /// shipped a blank Job tab on 2026-08-11, 0c457451.)
         /// </remarks>
-        public static bool IsHandoffPending(ViewType originTab)
+        public static bool IsHandingOffFrom(ViewType originTab)
+        {
+            return _handoffSwitching && _borrowedName != null && _borrowedOrigin == originTab;
+        }
+
+        /// <summary>
+        /// DURABLE: true for as long as <paramref name="originTab"/>'s generated program is the borrowed
+        /// loaded job - from its Generate until the run's terminal, a discard, or Esc. This is the one that
+        /// answers "is the run bar still mine", which stays true while the operator is over on the Job tab.
+        /// </summary>
+        public static bool HoldsHandoffFrom(ViewType originTab)
         {
             return _borrowedName != null && _borrowedOrigin == originTab;
+        }
+
+        /// <summary>
+        /// Operator cancel: discard a generated program that was handed to the Job tab and never started,
+        /// give the previous program back and return to the tab that built it. Bound to Esc.
+        /// </summary>
+        /// <returns>
+        /// True when there was a handoff to cancel - the caller consumes the key. False otherwise, so Esc
+        /// falls through to whatever else wants it; a gesture that silently does nothing must not also
+        /// silently swallow the key.
+        /// </returns>
+        public static bool CancelHandoff(GrblViewModel model)
+        {
+            // A run in flight owns the program outright - its watcher is what pops, and Esc is not a Stop.
+            if (_borrowedName == null || model == null || model.IsJobRunning)
+                return false;
+
+            string name = _borrowedName;
+            var origin = _borrowedOrigin;
+            DebugLog.Write("run", string.Format("CancelHandoff: Esc - discarding '{0}' and returning to {1}", name, origin));
+
+            ReleaseHandoff(model);          // pop the previous job back, disarm the watcher, clear the record
+            DiscardGenerated?.Invoke();     // the tab drops its own program text, so the bar reads "Generate"
+            SwitchToTab?.Invoke(origin);    // ...back where it was built
+            model.Message = string.Format("{0} discarded - the previous program is back.", name);
+            return true;
         }
 
         /// <summary>
@@ -307,7 +354,11 @@ namespace CNC.Controls
             _borrowedOrigin = originTab;
             _borrowedOnEnd = onHandoffEnd;
 
-            SwitchToTab?.Invoke(ViewType.GRBL);   // the Job tab
+            // Bracketed, not just called: the originating tab's Activate(false) runs synchronously inside
+            // this, and IsHandingOffFrom is how that tab tells this deactivation from a real tab-leave.
+            _handoffSwitching = true;
+            try { SwitchToTab?.Invoke(ViewType.GRBL); }   // the Job tab
+            finally { _handoffSwitching = false; }
 
             // Don't push a SECOND slot over our own still-loaded program - a previous Generate the operator
             // looked at and never ran. LoadText replaces it in place.
@@ -317,6 +368,11 @@ namespace CNC.Controls
             model.IsDryRunMode = dryRunArmed;
 
             WatchHandoffEnd(model);
+
+            // The Esc half of this is not discoverable on its own - there is no button for it - so the one
+            // status line the operator is already reading is where it has to be said.
+            model.Message = string.Format("{0} loaded{1} - press Cycle Start when ready, or Esc to discard it.",
+                name, string.IsNullOrEmpty(stats) ? string.Empty : " (" + stats + ")");
 
             DebugLog.Write("run", string.Format("HandOffToJobTab: '{0}' ({1} chars) is the loaded job; origin={2}, pushed={3}",
                 name, toLoad.Length, originTab, !replacingOurOwn));
@@ -429,12 +485,14 @@ namespace CNC.Controls
                 // A CLEAN finish has nothing actionable left to look at: drop the preview, drop the
                 // program, and put the operator back on the tab that built it.
                 //
-                // A FAILED run keeps all three - the program stays loaded, the view stays up, and the
-                // operator stays HERE on the Job tab where the alarm and the stopped line are, rather than
-                // being moved away from the evidence. That polarity is MacroProcessor.Run's own and was
-                // re-confirmed by the user 2026-09-14; the switch-back is gated on it for the same reason
-                // the other two are, which is a deliberate change from Work Order's old unconditional
-                // switch-back (that one moved you off the failure).
+                // A FAILED run keeps the operator HERE on the Job tab, and keeps the originating tab's own
+                // program text so Run can re-run it without rebuilding. Note what it does NOT keep: the pop
+                // above is unconditional, so the previous program is back either way. That is not a
+                // contradiction - this terminal only arrives at the Idle FOLLOWING the operator's reset or
+                // unlock, so the failed program sits on screen with its stopped line marked for as long as
+                // the machine is alarmed, and gives way once they clear it. The switch-back is gated here
+                // for the same reason the discard is, and that is a deliberate change from Work Order's old
+                // unconditional switch-back, which moved you off the failure. (User decision 2026-09-14.)
                 if (!sawError)
                 {
                     // NOT the loaded job's own view. GCode.File.Pop() above ends in RaiseFileChanged, which

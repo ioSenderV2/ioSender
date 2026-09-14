@@ -3544,10 +3544,10 @@ namespace CNC.Controls
             // MacroProcessor.HandOffToJobTab now - this tab's own copy of them is where that method came
             // from, so nothing about the sequence changed except that the other four Generate-first tabs
             // run the same one. Dry-run re-arming moved in there with it.
+            // The "loaded (stats) - press Cycle Start when ready, or Esc to discard it" status line is the
+            // handoff's own now. This tab used to write its own copy of it one line after the call, which
+            // simply overwrote the shared one - and would now silently drop the Esc half of it.
             MacroProcessor.HandOffToJobTab(model, ProgramName, toLoad, ViewType.WorkOrder, stats);
-
-            if (model != null)
-                model.Message = string.Format("Work order loaded ({0}) - press Cycle Start when ready.", stats);
         }
 
         // The name this tab's generated program is loaded under. It is an IDENTITY, not a label: the
