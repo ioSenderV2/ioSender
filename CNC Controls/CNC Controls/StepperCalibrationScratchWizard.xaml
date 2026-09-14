@@ -41,11 +41,14 @@
             <local:NumericField x:Uid="fld_scpoints" Label="Test points:" ColonAt="120" Format="##0"
                 Value="{Binding Points, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit=""/>
             <local:NumericField x:Uid="fld_scdepth" Label="Scratch depth:" ColonAt="120"
-                Value="{Binding ScratchDepth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+                Value="{Binding ScratchDepth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"
+                ToolTip="How deep each line is cut. It only has to be deep enough to SEE - the measurement is the spacing between a pair of lines, and a V-bit's line centre sits under the spindle axis whatever the depth, so cutting deeper changes the groove's width but not where its centre is. Go deeper on a surface that is not flat: an unsurfaced spoilboard easily varies more than the default, and a pair with one mark missing cannot be measured at all."/>
             <local:NumericField x:Uid="fld_scplunge" Label="Plunge feed:" ColonAt="120" Format="#####0"
-                Value="{Binding PlungeFeed, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm/min"/>
+                Value="{Binding PlungeFeed, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm/min"
+                ToolTip="How fast the V-bit descends into the surface at the start of each line. Straight down into material, so keep it well below the scratch feed."/>
             <local:NumericField x:Uid="fld_scfeed" Label="Scratch feed:" ColonAt="120" Format="#####0"
-                Value="{Binding ScratchFeed, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm/min"/>
+                Value="{Binding ScratchFeed, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm/min"
+                ToolTip="How fast the V-bit draws each line, once it is down at depth. Nothing is probed or searched for in this program - it is all plain moves - so this is simply a cutting feed; slower gives a cleaner edge to measure against."/>
             <local:NumericField x:Uid="fld_scsafez" Label="Safe Z:" ColonAt="120"
                 Value="{Binding SafeZ, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
             <local:NumericField x:Uid="fld_sclinelen" Label="Line length:" ColonAt="120"
@@ -118,7 +121,13 @@
                     <DataGridTextColumn x:Uid="col_scPair" Header="Pair" Binding="{Binding Label}" IsReadOnly="True" MinWidth="70"/>
                     <DataGridTextColumn x:Uid="col_scCandidate" Header="Candidate steps/mm" Binding="{Binding Steps, StringFormat=0.000###}" IsReadOnly="True" Width="*"/>
                     <DataGridTextColumn x:Uid="col_scCommanded" Header="Commanded (mm)" Binding="{Binding Commanded, StringFormat=0.000}" IsReadOnly="True" Width="*"/>
-                    <DataGridTextColumn x:Uid="col_scMeasured" Header="Measured (mm)" Binding="{Binding Measured, StringFormat=0.000, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                    <!-- No UpdateSourceTrigger=PropertyChanged here, deliberately. With it, every keystroke
+                         pushed the half-typed number to the source, which raised PropertyChanged, which wrote
+                         the StringFormat'd text ("500.000") back into the box you were still typing in - so
+                         typing 500 then .2 left you looking at "500.2.000" and deleting the wreckage. The
+                         default (commit on Enter/Tab/leaving the cell) lets the text alone while it is being
+                         typed and formats it once, when it is a number. -->
+                    <DataGridTextColumn x:Uid="col_scMeasured" Header="Measured (mm)" Binding="{Binding Measured, StringFormat=0.000}" Width="*"/>
                     <DataGridTextColumn x:Uid="col_scImplied" Header="Implied steps/mm" Binding="{Binding Estimate, StringFormat=0.000###}" IsReadOnly="True" Width="*"/>
                 </DataGrid.Columns>
             </DataGrid>

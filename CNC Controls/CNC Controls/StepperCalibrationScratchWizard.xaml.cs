@@ -748,7 +748,11 @@ namespace CNC.Controls
     // Persisted stepper-calibration (scratch) parameters. Public for XmlSerializer.
     public class ScratchParams
     {
-        public double Span = 400d, Delta = 0.010d, Points = 3d, ScratchDepth = 0.3d, PlungeFeed = 100d,
+        // 0.5, not the original 0.3 (2026-09-14): 0.3 assumes a reference surface flatter than an unsurfaced
+        // spoilboard actually is, and a pair with one mark missing cannot be measured at all. Depth does not
+        // affect the result - see the field's own tooltip - so erring deep costs nothing. Only affects NEW
+        // profiles; an existing one keeps whatever it has saved.
+        public double Span = 400d, Delta = 0.010d, Points = 3d, ScratchDepth = 0.5d, PlungeFeed = 100d,
                       ScratchFeed = 500d, SafeZ = 5d, LineLength = 5d, RowSpacing = 15d, EdgeMargin = 10d,
                       SpindleRPM = 18000d, ToolNumber = 1d;
     }
