@@ -264,6 +264,19 @@ namespace CNC.Controls
         // same treatment as changing the fixture.
         private void cbxProbeType_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            // This fires DURING InitializeComponent, not just on a user pick: the ComboBox carries
+            // SelectedIndex="0" in the XAML, and WPF raises SelectionChanged from ItemsControl.EndInit as the
+            // BAML loads - at which point every OTHER x:Name field in this class is still null, so the line
+            // below threw and took the whole constructor with it. Opening Tools > Calibration then crashed the
+            // app, because the view could not be built at all.
+            //
+            // Nothing is lost by skipping the pre-init call: Activate(true) calls RefreshProbeChoices itself,
+            // which is what establishes the picker's real state once the probe definitions are readable.
+            // (CalAxis_Checked next door has the same exposure and gets away with it only because the panels
+            // it touches happen to be assigned by the time the radio default is applied - see its comment.)
+            if (!IsInitialized)
+                return;
+
             btnSave.IsEnabled = false;
             newStepsX = newStepsY = newStepsZ = null;
             RefreshProbeChoices();
