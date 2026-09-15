@@ -1,4 +1,4 @@
-/*
+﻿/*
  * OddJobsFeedsSpeedsDialog.xaml.cs - part of CNC Controls library
  *
  * Shared "Feeds and Speeds" dialog for the Odd Jobs job wizards - consolidates the bit/RPM/feed/depth-of-
@@ -125,6 +125,14 @@ namespace CNC.Controls
                 pick = entries.FirstOrDefault(t => t.Kind == CustomToolKind.OFlute);
             else if (operation == "roughing")
                 pick = entries.FirstOrDefault(t => t.Kind == CustomToolKind.EndMill && t.Flutes >= 3);
+            // "flattening" is NOT "finishing". Both are light final cuts, but this one is defined by the
+            // SHAPE it has to leave: a flat bottom. "finishing" resolves to a BallEnd, whose whole point is
+            // a rounded tip - the one profile that cannot produce a flat floor. Clear floor asked for
+            // "finishing" on that reasoning and defaulted to a 1/4" ball nose (reported 2026-09-14).
+            // After the Aluminum branch deliberately, so an aluminum job still gets its single-flute bit,
+            // which flattens perfectly well.
+            else if (operation == "flattening")
+                pick = entries.FirstOrDefault(t => t.Kind == CustomToolKind.EndMill && t.Flutes == 2);
 
             if (pick == null)
                 pick = entries.FirstOrDefault(t => t.Kind == CustomToolKind.EndMill && t.Flutes == 2)

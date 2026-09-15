@@ -330,8 +330,12 @@ namespace CNC.Controls
                     op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("facing", material);
                     break;
                 case WorkOrderOpKind.ClearFloor:
-                    // A small end mill flattening a carve's floor is a finishing cut in every sense.
-                    op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("finishing", material);
+                    // "flattening", NOT "finishing" - see SuggestTool. This asked for "finishing" on the
+                    // reasoning that flattening a carve's floor is a finishing cut in every sense, which is
+                    // true about the CUT and wrong about the TOOL: that bucket resolves to a ball nose, and
+                    // a rounded tip cannot leave a flat floor. Reported 2026-09-14, a 1/4" ball end mill
+                    // where the operator expected their 1/8" 2-flute.
+                    op.Tool = OddJobsFeedsSpeedsDialog.SuggestTool("flattening", material);
                     break;
                 case WorkOrderOpKind.Mark:
                     // Same tool class as Chamfer and Engrave - the point of a V-bit. 1 mm is the marking

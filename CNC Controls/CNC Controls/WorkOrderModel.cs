@@ -1540,9 +1540,15 @@ namespace CNC.Controls
                     {
                         if (CarveFloorOf(tp) == null)
                             warnings.Add(label + "Clear floor needs an Engrave operation with a V-bit on this toolpath - it flattens that carve's floor.");
+                        // BallEnd belongs in this list and was missing, which is why the wrong default
+                        // above went unreported by the thing whose job is to report it. A ball nose is not
+                        // a pointed bit, so it reads as harmless - and it is the one profile that CANNOT
+                        // leave a flat floor, only a field of scallops.
                         var mill = CustomTools.Find(op.Tool);
                         if (mill != null && (mill.Kind == CustomToolKind.VBitOrChamfer || mill.Kind == CustomToolKind.Countersink || mill.Kind == CustomToolKind.Drill))
                             warnings.Add(label + "Clear floor: pick an end mill - a pointed bit cannot flatten a floor.");
+                        else if (mill != null && mill.Kind == CustomToolKind.BallEnd)
+                            warnings.Add(label + "Clear floor: pick a flat end mill - a ball nose leaves scallops, not a flat floor.");
                     }
 
                     // A groove's depth comes from its width and the bit's angle, so it needs an angle.
