@@ -334,6 +334,12 @@ namespace CNC.Controls
                 return;
             }
 
+            // Sanitize HERE, before anything else sees the text: the diagnostic copy, the Job tab's docked
+            // list and the run then all show the same program. Run sanitizes again on its way to the wire
+            // (harmless - it is idempotent), but by then this text has already been on screen, and a prompt
+            // that reads as gibberish in the list is one the operator distrusts before it is ever shown.
+            program = MacroRunner.SanitizeProgram(program);
+
             ActiveProgramStats = stats;
             ActiveProgramVersion++;
             SaveGeneratedCopy(name, program);
@@ -814,24 +820,11 @@ namespace CNC.Controls
                     }
             }
 
-            // Sanitize comments per line, exactly as the retired streamer did: grblHAL ends a comment at
-            // the FIRST ')' (nested parens corrupt the block - "1 depth pass(es)" -> stray g-code) and
-            // rejects over-long lines outright, and generator-built comments interpolate names of
-            // arbitrary length. Directive rows are skipped - the pump consumes them, they never reach
-            // the wire, and truncating a long (MBOX ...) message would serve nothing.
-            bool sanitized = false;
-            for (int i = 0; i < lines.Length; i++)
-                if (MacroRunner.RecognizeDirective(lines[i]) == null)
-                {
-                    string clean = MacroRunner.SanitizeComment(lines[i]);
-                    if (!ReferenceEquals(clean, lines[i]))
-                    {
-                        lines[i] = clean;
-                        sanitized = true;
-                    }
-                }
-            if (sanitized)
-                code = string.Join("\n", lines);
+            // Sanitize comments per line - see MacroRunner.SanitizeProgram for the rule, and for why a
+            // directive row is exempt from the length limit but NOT from paren flattening. This loop used
+            // to live here and skipped directive rows outright, which is what garbled an (MBOX) prompt.
+            code = MacroRunner.SanitizeProgram(code);
+            lines = code.Replace("\r", string.Empty).Split('\n');
 
             // Confirm-before-run - but an input prompt's OK/Cancel is itself the run confirmation, so
             // when the macro has (PROMPT param, ...) fields the field dialog (shown by JobRunner.Run's

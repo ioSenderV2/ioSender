@@ -1,4 +1,4 @@
-/*
+﻿/*
  * MacroRunner.cs - part of CNC Core library
  *
  * The macro/directive TOOLBOX of the unified streaming engine (Step 7 retired the second engine that
@@ -156,7 +156,21 @@ namespace CNC.Core
         // Replace parens between the outer '(' .. ')' with '[' .. ']' so generated comments are always well-formed.
         // Public since Step 7: MacroProcessor.Run applies it per line at LOAD time (skipping directive rows,
         // which the pump consumes and never sends) - the same protection the retired streaming loop gave.
-        public static string SanitizeComment(string s)
+        /// <summary>
+        /// Replace any '(' / ')' BETWEEN the outer parentheses with '[' / ']'.
+        /// </summary>
+        /// <remarks>
+        /// Split out of <see cref="SanitizeComment"/> 2026-09-14 because it turned out to be needed on
+        /// lines the length limit must NOT touch - see SanitizeProgram. The rule it enforces is the
+        /// controller's: grblHAL ends a comment at the FIRST ')', so an inner one ends the comment early
+        /// and everything after it is parsed as g-code.
+        ///
+        /// It is not only the controller that reads it that way. GCodeParser.TrimBlock tracks the same
+        /// first-')' comment state to decide which spaces to keep, so a nested paren makes it strip every
+        /// space in the REST of the line - which is what an (MBOX) message with "(1/4\")" in it looked
+        /// like to the operator on 2026-09-14: half a sentence, then runtogetherlikethis.
+        /// </remarks>
+        public static string SanitizeParens(string s)
         {
             int open = s.IndexOf('(');
             int close = s.LastIndexOf(')');
@@ -168,14 +182,58 @@ namespace CNC.Core
             for (int i = open + 1; i < close; i++)
                 sb.Append(s[i] == '(' ? '[' : s[i] == ')' ? ']' : s[i]);
             sb.Append(s, close, s.Length - close);
+            return sb.ToString();
+        }
 
-            string result = sb.ToString();
+        public static string SanitizeComment(string s)
+        {
+            int open = s.IndexOf('(');
+            int close = s.LastIndexOf(')');
+            if (open < 0 || close <= open + 1)
+                return s;
+
+            string result = SanitizeParens(s);
             if (result.Length > MaxCommentLineLength && open == 0 && close == result.Length - 1)
             {
                 int keep = MaxCommentLineLength - (open + 1) - 4;   // total = "(" + keep + "...)"
                 result = result.Substring(0, open + 1) + result.Substring(open + 1, keep) + "...)";
             }
             return result;
+        }
+
+        /// <summary>
+        /// Per-line comment sanitising for a whole program, applied before it is loaded as the job.
+        /// </summary>
+        /// <remarks>
+        /// Directive rows ((PREREQ) / (PROMPT) / (MBOX) / (WAITIDLE)) are exempt from the LENGTH limit and
+        /// always were: the pump consumes them, they never reach the wire, and truncating an (MBOX ...)
+        /// message would serve nothing.
+        ///
+        /// They are NOT exempt from paren flattening, and treating "never reaches the wire" as "needs no
+        /// sanitising at all" is what shipped a garbled operator prompt. A directive is still parsed at
+        /// LOAD time like every other line, and GCodeParser.TrimBlock applies the controller's own
+        /// first-')' comment rule - so a message containing "(1/4\")" lost every space after it. The
+        /// exemption is from the limit, not from the syntax.
+        /// </remarks>
+        public static string SanitizeProgram(string code)
+        {
+            if (string.IsNullOrEmpty(code))
+                return code;
+
+            var lines = code.Replace("\r", string.Empty).Split('\n');
+            bool changed = false;
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string clean = RecognizeDirective(lines[i]) == null
+                             ? SanitizeComment(lines[i])
+                             : SanitizeParens(lines[i]);
+                if (!ReferenceEquals(clean, lines[i]))
+                {
+                    lines[i] = clean;
+                    changed = true;
+                }
+            }
+            return changed ? string.Join("\n", lines) : code;
         }
 
         // If 'code' is a single "@<path>" reference, replace it with the referenced file's current
