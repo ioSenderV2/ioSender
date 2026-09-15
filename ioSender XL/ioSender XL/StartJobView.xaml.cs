@@ -2646,7 +2646,14 @@ namespace GCode_Sender
                     // sense to the raw front-edge angle, so the rotation that ALIGNS the work frame to the stock is
                     // -atan2(dy,dx). Without the negation the far edge lands off by ~2*width*sin(angle) (the Verify
                     // skew check showed the right-hand corners a couple of mm short in Y).
-                    L("#<rot> = 0 - ATAN[#<c2y> - #<c1y>]/[#<c2x> - #<c1x>]");
+                    // BRACKETED, and that is not style. The firmware reads an assignment's right-hand side
+                    // with ngc_read_real_value (gcode.c), which accepts a number, a parameter, a unary
+                    // +/- or a BRACKETED expression - and no binary operator at all. Unbracketed, it took
+                    // the leading 0, assigned rot = 0, and left "- ATAN[...]" to the g-code word scanner,
+                    // which answered error:1 "G-code words consist of a letter and a value" against a line
+                    // that looks perfectly reasonable. Reported 2026-09-15, Setup with Measure + Set
+                    // rotation, dying right after the fourth corner probed cleanly.
+                    L("#<rot> = [0 - ATAN[#<c2y> - #<c1y>]/[#<c2x> - #<c1x>]]");
                     L(string.Format("G10 L2 {0} R[#<rot>]", pCode(wcsP)));
                     L("(PRINT, LS_ROT=#<rot>)");
                 }

@@ -188,8 +188,13 @@ O<pcorner> SUB
   ; OUTWARD to each face, instead of from outside the stock inward. Everything below this point is already
   ; written purely in terms of sx/sy, so this single flip is the whole difference.
   o12 IF [#<inside> EQ 1]
-    #<sx> = 0 - #<sx>
-    #<sy> = 0 - #<sy>
+    ; BRACKETED: an assignment's RHS is read by ngc_read_real_value, which takes a number, a parameter,
+    ; a unary sign or a bracketed expression - never a bare binary one. Unbracketed these assigned 0 and
+    ; left "- #<sx>" to the word scanner, which is error:1. Latent until now because this block only runs
+    ; for an INSIDE corner (Dynamic mode); every outside-corner probe skips it. Same fault, same day, as
+    ; Setup's rotation line - see StartJobView's note there.
+    #<sx> = [0 - #<sx>]
+    #<sy> = [0 - #<sy>]
   o12 ENDIF
   (PRINT, PC ENTER corner=#<corner> sx=#<sx> sy=#<sy> rad=#<rad> rx=#<rx> ry=#<ry> startz=#<sz_in> inside=#<inside> faces=#<faces>)
   ; Echo EVERY remaining input, here, before the first motion of the call. Two reasons this is worth the
