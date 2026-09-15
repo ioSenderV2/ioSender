@@ -90,7 +90,12 @@ namespace CNC.Core
             // Suspend() also purges the queue, and Resume() restarts LinkMonitor's clock - which matters
             // because LinkMonitor.Rx() only stamps in Comms.PostTo, so it sees zero RX for the whole
             // transfer BY CONSTRUCTION and would otherwise report the link lost the moment polling resumed.
-            PollGrbl.Suspend();
+            // ClaimLink, not Suspend: Suspend's flag is shared with the short query helpers in Grbl.cs,
+            // which nest inside this transfer (the per-packet ACK wait pumps the UI) and whose own Resume()
+            // would clear it - leaving the poller writing '?' into the middle of our packets for the rest of
+            // the upload. Measured before this change: 56.4 s and 261 injected polls for one ATC install,
+            // one packet per 210 ms poll interval. See PollGrbl.ClaimLink for the full account.
+            PollGrbl.ClaimLink();
 
             Comms.com.EventMode = false;
             Comms.com.PurgeQueue();
@@ -137,7 +142,7 @@ namespace CNC.Core
                 try { fileStream.Dispose(); } catch { }
                 try { Comms.com.PurgeQueue(); } catch { }
                 Comms.com.EventMode = true;
-                PollGrbl.Resume();
+                PollGrbl.ReleaseLink();
             }
 
             return state == TransferState.ACK;

@@ -3871,10 +3871,51 @@ namespace CNC.Core
 
         internal static bool suspend = false;
 
+        // An EXCLUSIVE claim on the link, held for as long as a raw transfer owns it - see ClaimLink.
+        // Deliberately NOT the `suspend` flag above.
+        internal static bool linkBusy = false;
+
         internal static void Suspend()
         {
             suspend = true;
             Comms.com?.PurgeQueue();   // no-op if no connection (queries may run before connect)
+        }
+
+        /// <summary>
+        /// Claim the link exclusively for a raw synchronous transfer (YModem). Nothing else may write to
+        /// the port until <see cref="ReleaseLink"/>.
+        /// </summary>
+        /// <remarks>
+        /// Why this is not just Suspend(). `suspend` is a plain bool shared by ~13 short query helpers in
+        /// this file ($I, $$, $ES, the handshake...), which nest inside one another and none of which
+        /// restores it in a finally. That is survivable for THEM - the next Resume(), or SetState, un-sticks
+        /// it - and fatal for a file transfer, because an inner Resume() clears the outer Suspend() and the
+        /// poller comes straight back. YModem.Upload pumps the UI once per packet while waiting for its ACK,
+        /// so those helpers really do run inside a transfer.
+        ///
+        /// Measured 2026-09-14 over ethernet: an ATC macro install took 56.4 s with 261 status polls
+        /// injected into it and packets pacing at exactly the 210 ms poll interval - the transfer was
+        /// running at one packet per poll. The same '?' -into-a-packet corruption was fixed once already in
+        /// 8d1f8230; this is the flag that made the fix undoable from the outside.
+        ///
+        /// A nesting COUNTER would be the textbook answer and is the wrong trade here: those 13 pairs are
+        /// not exception-safe, so an orphaned Suspend would leave the count above zero and kill polling for
+        /// the session. A separate flag, set and cleared by the one caller that DOES have a finally, cannot
+        /// be orphaned by them and cannot be cleared by them either.
+        /// </remarks>
+        internal static void ClaimLink()
+        {
+            linkBusy = true;
+            Comms.com?.PurgeQueue();
+        }
+
+        /// <summary>Release the exclusive claim - see <see cref="ClaimLink"/>. Call it from a finally.</summary>
+        internal static void ReleaseLink()
+        {
+            linkBusy = false;
+            // Same reason Resume() does it: LinkMonitor.Rx() only stamps in Comms.PostTo, so a raw transfer
+            // shows zero RX by construction and would be reported as a lost link the moment polling resumes.
+            LinkMonitor.Reset();
         }
 
         internal static void Resume()
@@ -3917,7 +3958,9 @@ namespace CNC.Core
             // auto-reconnect), but keep a catch-all here as a last line of defence.
             try
             {
-                if(!suspend)
+                // linkBusy as well as suspend: a raw transfer owns the port outright, and a '?' written
+                // into the middle of one of its packets corrupts that packet. See ClaimLink.
+                if(!suspend && !linkBusy)
                 {
                     // Timed so a late status report can be attributed: a normal interval here with slow
                     // reports downstream clears the poller entirely. See PollDiag's header.
