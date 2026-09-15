@@ -128,6 +128,16 @@ namespace CNC.Controls
                     UpdateMarkOnlySummary();
                     OnWorkOrderChanged();
                 });
+            System.ComponentModel.DependencyPropertyDescriptor
+                .FromProperty(NumericField.ValueProperty, typeof(NumericField))
+                .AddValueChanged(fldMarkOnlyDiameter, (s, e) =>
+                {
+                    if (loadingFields || workOrder == null)
+                        return;
+                    workOrder.MarkDiameter = fldMarkOnlyDiameter.Value;
+                    UpdateMarkOnlySummary();
+                    OnWorkOrderChanged();
+                });
 
             canvasDiagram.MouseLeftButtonDown += (s, e) => { placing = true; PlaceFromMouse(e.GetPosition(canvasDiagram)); canvasDiagram.CaptureMouse(); };
             canvasDiagram.MouseMove += (s, e) => { if (placing) PlaceFromMouse(e.GetPosition(canvasDiagram)); };
@@ -1718,8 +1728,16 @@ namespace CNC.Controls
             // Seed the bit the first time it is switched on, so the summary can name a real tool rather
             // than resolving one silently at generate time. The compiler falls back to the same suggestion
             // if this is ever left unset or points at a deleted tool.
-            if (workOrder.MarkOnly && CustomTools.Find(workOrder.MarkTool) == null)
-                workOrder.MarkTool = OddJobsFeedsSpeedsDialog.SuggestTool("drilling", StartJobConfig.Section?.Material ?? string.Empty);
+            // The first DRILL, not SuggestTool("drilling") - that bucket falls back to an end mill when no
+            // drill exists, which is right for boring a hole and wrong for making a mark. Validate refuses
+            // the run if there is nothing pointed to find, rather than this quietly choosing something flat.
+            var pointed = CustomTools.Find(workOrder.MarkTool);
+            if (workOrder.MarkOnly && (pointed == null || (pointed.Kind != CustomToolKind.Drill &&
+                                                           pointed.Kind != CustomToolKind.VBitOrChamfer &&
+                                                           pointed.Kind != CustomToolKind.Countersink)))
+                workOrder.MarkTool = (CustomTools.SectionConfig?.Entries ?? new List<CustomTool>())
+                    .Where(t => t.Kind == CustomToolKind.Drill)
+                    .Select(t => t.Id).DefaultIfEmpty(-1).First();
             UpdateMarkOnlySummary();
             OnWorkOrderChanged();
         }
@@ -1760,10 +1778,11 @@ namespace CNC.Controls
             int holes = workOrder.Toolpaths.Count(t => workOrder.EnabledOperations(t).Any(o =>
                 o.Kind == WorkOrderOpKind.Drill || o.Kind == WorkOrderOpKind.Bore));
             var bit = CustomTools.Find(workOrder.MarkTool);
-            txtMarkOnlySummary.Text = holes == 0
-                ? "Nothing to mark - this work order has no Drill or Bore operation."
-                : string.Format("{0} hole centre{1} dimpled with {2}. Every other operation is left out.",
-                                holes, holes == 1 ? "" : "s", bit != null ? bit.Name : "a drill");
+            txtMarkOnlySummary.Text =
+                holes == 0 ? "Nothing to mark - this work order has no Drill or Bore operation." :
+                bit == null ? "No drill bit found for the dimple - add a drill-type tool in Tools." :
+                string.Format("{0} hole centre{1} dimpled {2:0.###} mm deep with the {3}. Every other operation is left out.",
+                              holes, holes == 1 ? "" : "s", workOrder.MarkDepth, bit.Name);
         }
 
         // Names the tool the program will start on, so the claim being made ("it's already loaded") is about a
@@ -3847,6 +3866,7 @@ namespace CNC.Controls
             chkSkipFirstToolChange.IsChecked = workOrder.SkipFirstToolChange;
             chkMarkOnly.IsChecked = workOrder.MarkOnly;
             fldMarkOnlyDepth.Value = workOrder.MarkDepth;
+            fldMarkOnlyDiameter.Value = workOrder.MarkDiameter;
             UpdateMarkOnlySummary();
             cbxWcs.SelectedIndex = Math.Min(Math.Max(workOrder.Wcs, 0), 6);
             loadingFields = false;
@@ -4088,6 +4108,7 @@ namespace CNC.Controls
             chkSkipFirstToolChange.IsChecked = workOrder.SkipFirstToolChange;
             chkMarkOnly.IsChecked = workOrder.MarkOnly;
             fldMarkOnlyDepth.Value = workOrder.MarkDepth;
+            fldMarkOnlyDiameter.Value = workOrder.MarkDiameter;
             UpdateMarkOnlySummary();
             cbxWcs.SelectedIndex = Math.Min(Math.Max(workOrder.Wcs, 0), 6);
             loadingFields = false;
@@ -4117,6 +4138,7 @@ namespace CNC.Controls
             chkSkipFirstToolChange.IsChecked = workOrder.SkipFirstToolChange;
             chkMarkOnly.IsChecked = workOrder.MarkOnly;
             fldMarkOnlyDepth.Value = workOrder.MarkDepth;
+            fldMarkOnlyDiameter.Value = workOrder.MarkDiameter;
             UpdateMarkOnlySummary();
             cbxWcs.SelectedIndex = Math.Min(Math.Max(workOrder.Wcs, 0), 6);
             loadingFields = false;

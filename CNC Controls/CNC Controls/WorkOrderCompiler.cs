@@ -429,12 +429,23 @@ namespace CNC.Controls
             if (!wo.MarkOnly)
                 return wo;
 
+            var chosen = CustomTools.Find(wo.MarkTool);
+            // Only a POINTED bit can make a dimple, so an unset or unsuitable choice resolves to the first
+            // drill in the list rather than to SuggestTool, whose "drilling" bucket falls back to an END
+            // MILL when no drill exists - a fallback that is useful for a hole and useless for a mark.
+            // WorkOrderRules.Validate refuses the run outright when there is nothing pointed to find.
+            if (chosen == null || (chosen.Kind != CustomToolKind.Drill &&
+                                   chosen.Kind != CustomToolKind.VBitOrChamfer &&
+                                   chosen.Kind != CustomToolKind.Countersink))
+                chosen = (CustomTools.SectionConfig?.Entries ?? new List<CustomTool>())
+                    .FirstOrDefault(t => t.Kind == CustomToolKind.Drill);
+
             string material = StartJobConfig.Section?.Material ?? string.Empty;
-            int toolId = CustomTools.Find(wo.MarkTool) != null
-                       ? wo.MarkTool
-                       : OddJobsFeedsSpeedsDialog.SuggestTool("drilling", material);
-            var bit = CustomTools.Find(toolId);
-            double dia = bit != null && bit.DiameterMm > 0d ? bit.DiameterMm : 3.175d;
+            int toolId = chosen != null ? chosen.Id : wo.MarkTool;
+            // The DIMPLE's diameter, not the tool's. A drill entry is usually a "size = hole" placeholder
+            // whose nominal diameter means nothing - taking it from there is how the dimple came out
+            // described as 1/4" when a 1/8" bit was in the spindle.
+            double dia = wo.MarkDiameter > 0d ? wo.MarkDiameter : 3.175d;
             double depth = wo.MarkDepth > 0d ? wo.MarkDepth : 1.4d;
 
             var marked = new WorkOrder {
@@ -443,6 +454,7 @@ namespace CNC.Controls
                 Wcs = wo.Wcs,
                 MarkOnly = true,
                 MarkDepth = depth,
+                MarkDiameter = dia,
                 MarkTool = toolId
             };
 
@@ -2095,8 +2107,8 @@ namespace CNC.Controls
             if (wo.MarkOnly)
             {
                 var markBit = CustomTools.Find(wo.MarkTool);
-                lines.Add(string.Format("(*** MARK ONLY - {0} hole centre[s], dimpled {1} mm deep with {2}.)",
-                    wo.Toolpaths.Count, F(wo.MarkDepth), markBit != null ? markBit.Name : "a drill"));
+                lines.Add(string.Format("(*** MARK ONLY - {0} hole centre[s], dimpled {1} mm deep with a {2} mm {3}.)",
+                    wo.Toolpaths.Count, F(wo.MarkDepth), F(wo.MarkDiameter), markBit != null ? markBit.Name : "drill"));
                 lines.Add("(*** The holes are NOT drilled here, and every other operation is left out.)");
             }
             // EXPR added alongside the #<_tlo_ref> save/load/restore below - named-parameter assignments in

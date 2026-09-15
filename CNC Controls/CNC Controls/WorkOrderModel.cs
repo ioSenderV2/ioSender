@@ -686,9 +686,19 @@ namespace CNC.Controls
         // stock- and bit-dependent, not a constant of nature.
         public double MarkDepth = 1.4d;
 
-        // The bit that makes the dimple. 0 = resolve a drilling-class bit at generate time; set explicitly
-        // once the operator picks one. One tool for the whole program, so one tool change.
-        public int MarkTool = 0;
+        // The bit that makes the dimple. -1 = not chosen, resolve one at generate time.
+        //
+        // 🔴 NOT 0. Tool ids start at 0 (CustomTools.NextId), so 0 is a REAL tool - the first one in the
+        // list. Using it as the "unset" sentinel meant the not-chosen check passed on the default, the
+        // resolve never ran, and Mark only cut its dimples with whatever tool 0 happened to be: a 1/4"
+        // two-flute END MILL, which has no point and cannot make a dimple at all. Reported within the hour,
+        // 2026-09-15.
+        public int MarkTool = -1;
+
+        // The dimple's diameter. Separate from the tool because the drill entry in a tool list is typically
+        // a single "size = hole" placeholder whose nominal diameter means nothing - the real size lives on
+        // the operation, which is exactly how an ordinary Drill operation works too. 3.175 = 1/8".
+        public double MarkDiameter = 3.175d;
 
         // The operations a toolpath OWNS and has ticked. Everything downstream of the compiler (the
         // scheduler, the tool declarations, the tool-change count) goes through here, so a held-back
@@ -1499,6 +1509,20 @@ namespace CNC.Controls
             if (wo.MarkOnly && !wo.Toolpaths.Any(t => wo.EnabledOperations(t).Any(o =>
                     o.Kind == WorkOrderOpKind.Drill || o.Kind == WorkOrderOpKind.Bore)))
                 warnings.Add("Mark only is set, but this work order has no enabled Drill or Bore operation - there are no hole centres to dimple.");
+
+            // A dimple is made by a POINT. An end mill plunged 1.4 mm leaves a flat-bottomed counterbore
+            // that a punch slides around in, which is the opposite of a locating mark - so this is a
+            // requirement about the bit's geometry, not a preference. Same lesson as the Clear floor guard
+            // written yesterday: check the property the job actually needs (here: a point; there: a flat),
+            // not the failure someone happened to imagine.
+            if (wo.MarkOnly)
+            {
+                var markBit = CustomTools.Find(wo.MarkTool);
+                if (markBit == null)
+                    warnings.Add("Mark only: no drill bit is set for the dimple, and no drill-type tool was found to fall back on - add one in Tools.");
+                else if (markBit.Kind != CustomToolKind.Drill && markBit.Kind != CustomToolKind.VBitOrChamfer && markBit.Kind != CustomToolKind.Countersink)
+                    warnings.Add("Mark only: " + markBit.Name + " has no point - a dimple needs a twist drill, V-bit or countersink. An end mill leaves a flat bottom a punch cannot find.");
+            }
 
             foreach (var tp in wo.Toolpaths)
             {
