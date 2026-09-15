@@ -24,8 +24,14 @@
 ;                      bear down on the puck, so it probes the MAIN input and triggers on first
 ;                      touch. Anything else = a rigid cutting tool with no electrical sensing, which
 ;                      pushes the puck's own NC switch on the TOOLSETTER input.
-;   #<_tc_touchplate>  1 = no toolsetter hardware exists; every tool probes the main input. Set by
-;                      tc.macro's own header; read here so both callers see one rule.
+;   #<_tc_touchplate>  1 = no toolsetter hardware exists; every tool probes the main input.
+;                      REQUIRED FROM EVERY CALLER, exactly like #<_tlo_toolid> above. This line
+;                      used to read 'set by tc.macro's own header', which described the machine
+;                      rather than the contract - and MacroProcessor.EmitTloReference, the other
+;                      caller, duly did not set it. Named parameters do not survive a reset, so
+;                      the o150 IF below read an UNDEFINED parameter on the first generated-program
+;                      call after any reboot: grblHAL error 2. A tool change earlier in the same
+;                      session leaves it set, which is why only the FIRST one ever failed.
 ;   #<_tlo_ref>        the machine-wide baseline. 0 (or unset) = this tool BECOMES the reference and
 ;                      no G43.1 is applied. Non-zero = apply G43.1 relative to it.
 ;

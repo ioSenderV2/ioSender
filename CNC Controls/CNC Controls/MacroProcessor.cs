@@ -1151,6 +1151,21 @@ namespace CNC.Controls
         {
             L("(--- reference the loaded tool at the puck - see tlo.macro ---)");
             L(string.Format("#<_tlo_toolid> = {0}", toolId));
+            // BOTH of tlo.macro's inputs, every call. #<_tc_touchplate> is the one this used to leave to
+            // chance, and tlo.macro's own header is where the trap was written down: "Set by tc.macro's own
+            // header; read here so both callers see one rule" - true of the READ, and only one of the two
+            // callers was setting it. Named parameters do not survive a controller reset, so a generated
+            // program that called tlo before any tool change this boot hit "o150 IF [#<_tc_touchplate> EQ 1]"
+            // against an UNDEFINED parameter: grblHAL error 2, "Missing the expected G-code word value".
+            //
+            // It hid for as long as it did because a tool change earlier in the same session leaves the
+            // parameter set, so only the FIRST reference after a reboot fails - and on 2026-09-14 that was a
+            // Setup run 90 seconds after a reset, which is exactly the sequence nobody tries twice.
+            //
+            // HasToolSetter, not a copy of tc.macro's literal 0: the variable asks "does toolsetter hardware
+            // exist" and this is the controller's own answer to that question. A second hardcoded constant
+            // beside tc.macro's is what tlo.macro exists to stop - read its header.
+            L(string.Format("#<_tc_touchplate> = {0}", GrblInfo.HasToolSetter ? 0 : 1));
             L("O<tlo> CALL");
             // Immediately after the CALL, before anything else this caller emits. The program streams as ONE
             // job, so without a sync point here a puck probe that alarms does not actually stop it - the
