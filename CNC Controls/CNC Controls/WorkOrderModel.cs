@@ -681,24 +681,43 @@ namespace CNC.Controls
         // so in the first line - the .macro outlives the UI state that produced it.
         public bool MarkOnly = false;
 
-        // How deep a dimple goes. 1.4 mm with a 1/8" twist drill leaves the point plus a little of the
-        // flutes - enough for a punch to find and not so deep that it wanders. Editable because it is
-        // stock- and bit-dependent, not a constant of nature.
-        public double MarkDepth = 1.4d;
-
-        // The bit that makes the dimple. -1 = not chosen, resolve one at generate time.
+        // The dimple, stored as a real operation rather than as a handful of loose Mark* fields.
         //
-        // 🔴 NOT 0. Tool ids start at 0 (CustomTools.NextId), so 0 is a REAL tool - the first one in the
-        // list. Using it as the "unset" sentinel meant the not-chosen check passed on the default, the
-        // resolve never ran, and Mark only cut its dimples with whatever tool 0 happened to be: a 1/4"
-        // two-flute END MILL, which has no point and cannot make a dimple at all. Reported within the hour,
-        // 2026-09-15.
-        public int MarkTool = -1;
-
-        // The dimple's diameter. Separate from the tool because the drill entry in a tool list is typically
-        // a single "size = hole" placeholder whose nominal diameter means nothing - the real size lives on
-        // the operation, which is exactly how an ordinary Drill operation works too. 3.175 = 1/8".
-        public double MarkDiameter = 3.175d;
+        // That shape is what lets the ordinary Feeds and Speeds dialog edit it - tool, diameter, RPM, feed,
+        // plunge and depth, with the advisor's own recommendations and highlighting - instead of this
+        // growing a second, poorer editor of the same six numbers. The tool picker in particular was the
+        // thing Mark only could not otherwise offer, which had already produced one warning naming a bit
+        // the operator was given no way to change.
+        //
+        // It also fixes what the loose fields got wrong by omission: they carried no speeds at all, so the
+        // dimple inherited WorkOrderOperation's own field initializer of 15000 RPM - a general-purpose
+        // number that was never about drilling. A 1/8" drill in aluminium wants about 8000 (the advisor's
+        // 80 m/min over pi x 3.175), and nothing in the old path was ever going to say so.
+        //
+        // -1 for Tool: ids start at 0, so 0 is a REAL tool - using it as "unset" is what made Mark only cut
+        // its dimples with a 1/4" two-flute END MILL, the first tool in the list.
+        public WorkOrderOperation MarkOp = new WorkOrderOperation {
+            Kind = WorkOrderOpKind.Drill,
+            Tool = -1,
+            HoleDiameter = 3.175d,   // 1/8"
+            BitDiameter = 3.175d,
+            TotalDepth = 1.4d,
+            Through = false,
+            // 8000 RPM and 400 mm/min, NOT WorkOrderOperation's own 15000/200 initializers, which are
+            // general-purpose milling numbers that were never about a drill. Both come straight out of
+            // FeedsSpeedsAdvisor's aluminium drill reference, so they agree with what the dialog will
+            // recommend the moment it is opened rather than arguing with it:
+            //
+            //   RPM    = 80 m/min (its ideal surface speed) / (pi x 3.175 mm) = 8020, called 8000
+            //   plunge = 0.05 mm/rev (its feed-per-rev at 3 mm) x 8000        = 400 mm/min
+            //
+            // A 1/8" drill at 15000 in aluminium is roughly twice the reference speed - it rubs and welds
+            // rather than cutting. Reported by the operator, who proposed 8000 before anyone had looked at
+            // the table that already said so.
+            SpindleRPM = 8000d,
+            Feed = 400d,
+            PlungeFeed = 400d
+        };
 
         // The operations a toolpath OWNS and has ticked. Everything downstream of the compiler (the
         // scheduler, the tool declarations, the tool-change count) goes through here, so a held-back
@@ -1379,7 +1398,7 @@ namespace CNC.Controls
         public static CustomTool MarkBitFor(WorkOrder wo)
         {
             var entries = CustomTools.SectionConfig?.Entries ?? new List<CustomTool>();
-            var chosen = wo == null ? null : CustomTools.Find(wo.MarkTool);
+            var chosen = wo == null || wo.MarkOp == null ? null : CustomTools.Find(wo.MarkOp.Tool);
             if (chosen != null && IsPointed(chosen))
                 return chosen;
             return entries.FirstOrDefault(t => t.Kind == CustomToolKind.Drill)

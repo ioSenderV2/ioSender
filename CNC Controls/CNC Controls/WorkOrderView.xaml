@@ -62,10 +62,8 @@
                 <CheckBox x:Uid="chk_womarkonly" x:Name="chkMarkOnly" Content="Mark only - dimple hole centres" Margin="0,4,0,0" Click="chkMarkOnly_Click"
                           ToolTip="Generate a program that puts a shallow dimple at the centre of every Drill and Bore in this work order, and cuts nothing else - for marking out a part that will be drilled somewhere else. The work order keeps its real hole sizes and depths; only the generated program is reduced."/>
                 <StackPanel x:Name="pnlMarkOnlyDepth" Orientation="Horizontal" Margin="18,2,0,0">
-                    <local:NumericField x:Uid="fld_womarkdia" x:Name="fldMarkOnlyDiameter" Label="Drill:" ColonAt="40" Format="##0.0##" Unit="mm"
-                                        ToolTip="The twist drill making the dimple. A drill entry in the tool list is usually a single &quot;size = hole&quot; placeholder, so the real size belongs here - the same way an ordinary Drill operation carries its own hole size."/>
-                    <local:NumericField x:Uid="fld_womarkdepth" x:Name="fldMarkOnlyDepth" Label="deep:" ColonAt="40" Format="##0.0##" Unit="mm" Margin="8,0,0,0"
-                                        ToolTip="How deep each dimple goes. Deep enough for a punch to find and not so deep that the drill wanders."/>
+                    <Button x:Uid="btn_womarkfs" x:Name="btnMarkOnlyFeeds" Content="Feeds and Speeds..." MinWidth="130" MinHeight="22" Click="btnMarkOnlyFeeds_Click"
+                            ToolTip="Pick the drill that makes the dimples and set its depth, spindle speed and plunge feed - the same dialog every other operation uses, with the same recommendations."/>
                 </StackPanel>
                 <TextBlock x:Name="txtMarkOnlySummary" Foreground="#586069" FontSize="11" Margin="18,2,0,0" TextWrapping="Wrap"/>
                 <StackPanel Orientation="Horizontal" Margin="0,10,0,0">

@@ -436,22 +436,20 @@ namespace CNC.Controls
             // Validate refuses the run outright when it comes back null.
             var chosen = WorkOrderRules.MarkBitFor(wo);
 
-            string material = StartJobConfig.Section?.Material ?? string.Empty;
-            int toolId = chosen != null ? chosen.Id : wo.MarkTool;
+            var template = wo.MarkOp ?? new WorkOrderOperation { Kind = WorkOrderOpKind.Drill };
+            int toolId = chosen != null ? chosen.Id : template.Tool;
             // The DIMPLE's diameter, not the tool's. A drill entry is usually a "size = hole" placeholder
             // whose nominal diameter means nothing - taking it from there is how the dimple came out
             // described as 1/4" when a 1/8" bit was in the spindle.
-            double dia = wo.MarkDiameter > 0d ? wo.MarkDiameter : 3.175d;
-            double depth = wo.MarkDepth > 0d ? wo.MarkDepth : 1.4d;
+            double dia = template.HoleDiameter > 0d ? template.HoleDiameter : 3.175d;
+            double depth = template.TotalDepth > 0d ? template.TotalDepth : 1.4d;
 
             var marked = new WorkOrder {
                 GroupByTool = wo.GroupByTool,
                 SkipFirstToolChange = wo.SkipFirstToolChange,
                 Wcs = wo.Wcs,
                 MarkOnly = true,
-                MarkDepth = depth,
-                MarkDiameter = dia,
-                MarkTool = toolId
+                MarkOp = template
             };
 
             foreach (var tp in wo.Toolpaths)
@@ -470,27 +468,18 @@ namespace CNC.Controls
                 shadow.Name = tp.Name;
                 shadow.Enabled = true;
 
-                var dimple = new WorkOrderOperation {
-                    Kind = WorkOrderOpKind.Drill,
-                    Enabled = true,
-                    Tool = toolId,
-                    BitDiameter = dia,
-                    HoleDiameter = dia,
-                    TotalDepth = depth,
-                    Through = false,
-                    // Never peck a dimple. A peck deeper than the hole is one plunge, which is what this is.
-                    PeckDepth = Math.Max(depth, 1d)
-                };
-
-                // The operator's own proven numbers for this bit and material, same recall a new operation
-                // gets - a dimple is still a real plunge into real metal.
-                var remembered = OddJobsToolMemory.Find(toolId, dia, material);
-                if (remembered != null)
-                {
-                    if (remembered.Rpm > 0d) dimple.SpindleRPM = remembered.Rpm;
-                    if (remembered.Feed > 0d) dimple.Feed = remembered.Feed;
-                    if (remembered.PlungeFeed > 0d) dimple.PlungeFeed = remembered.PlungeFeed;
-                }
+                // A copy of the stored template per toolpath, so the speeds the operator set in Feeds and
+                // Speeds are the speeds that run - no second set of defaults anywhere in this path.
+                var dimple = WorkOrderRules.CopyFields(template, new WorkOrderOperation());
+                dimple.Kind = WorkOrderOpKind.Drill;
+                dimple.Enabled = true;
+                dimple.Tool = toolId;
+                dimple.BitDiameter = dia;
+                dimple.HoleDiameter = dia;
+                dimple.TotalDepth = depth;
+                dimple.Through = false;
+                // Never peck a dimple. A peck deeper than the hole is one plunge, which is what this is.
+                dimple.PeckDepth = Math.Max(depth, 1d);
 
                 shadow.Operations = new List<WorkOrderOperation> { dimple };
                 marked.Toolpaths.Add(shadow);
@@ -2120,9 +2109,10 @@ namespace CNC.Controls
             // run, has to be able to tell those apart without the work order in front of them.
             if (wo.MarkOnly)
             {
-                var markBit = CustomTools.Find(wo.MarkTool);
+                var markBit = CustomTools.Find(wo.MarkOp.Tool);
                 lines.Add(string.Format("(*** MARK ONLY - {0} hole centre[s], dimpled {1} mm deep with a {2} mm {3}.)",
-                    wo.Toolpaths.Count, F(wo.MarkDepth), F(wo.MarkDiameter), markBit != null ? markBit.Name : "drill"));
+                    wo.Toolpaths.Count, F(wo.MarkOp.TotalDepth), F(wo.MarkOp.HoleDiameter),
+                    markBit != null ? markBit.Name : "drill"));
                 lines.Add("(*** The holes are NOT drilled here, and every other operation is left out.)");
             }
             // EXPR added alongside the #<_tlo_ref> save/load/restore below - named-parameter assignments in

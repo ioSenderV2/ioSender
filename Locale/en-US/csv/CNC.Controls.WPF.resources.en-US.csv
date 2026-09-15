@@ -1696,3 +1696,5 @@ CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_womarkdepth:System.Win
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_womarkdia:CNC.Controls.NumericField.Label,None,False,True,,Drill:
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_womarkdia:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,fld_womarkdia:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The twist drill making the dimple. A drill entry in the tool list is usually a single &quot;size = hole&quot; placeholder, so the real size belongs here - the same way an ordinary Drill operation carries its own hole size."
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,btn_womarkfs:System.Windows.Controls.ContentControl.Content,Button,True,True,,Feeds and Speeds...
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,btn_womarkfs:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Pick the drill that makes the dimples and set its depth, spindle speed and plunge feed - the same dialog every other operation uses, with the same recommendations."

@@ -114,31 +114,6 @@ namespace CNC.Controls
                     .FromProperty(NumericField.ValueProperty, typeof(NumericField))
                     .AddValueChanged(f, (s, e) => CaptureFields());
 
-            // Wired separately, and deliberately NOT added to AllFields: everything in that list is written
-            // back to the SELECTED OPERATION by CaptureFields, and this one belongs to the work order. Put
-            // it in that array and editing the dimple depth would write 1.4 into whichever operation
-            // happened to be selected.
-            System.ComponentModel.DependencyPropertyDescriptor
-                .FromProperty(NumericField.ValueProperty, typeof(NumericField))
-                .AddValueChanged(fldMarkOnlyDepth, (s, e) =>
-                {
-                    if (loadingFields || workOrder == null)
-                        return;
-                    workOrder.MarkDepth = fldMarkOnlyDepth.Value;
-                    UpdateMarkOnlySummary();
-                    OnWorkOrderChanged();
-                });
-            System.ComponentModel.DependencyPropertyDescriptor
-                .FromProperty(NumericField.ValueProperty, typeof(NumericField))
-                .AddValueChanged(fldMarkOnlyDiameter, (s, e) =>
-                {
-                    if (loadingFields || workOrder == null)
-                        return;
-                    workOrder.MarkDiameter = fldMarkOnlyDiameter.Value;
-                    UpdateMarkOnlySummary();
-                    OnWorkOrderChanged();
-                });
-
             canvasDiagram.MouseLeftButtonDown += (s, e) => { placing = true; PlaceFromMouse(e.GetPosition(canvasDiagram)); canvasDiagram.CaptureMouse(); };
             canvasDiagram.MouseMove += (s, e) => { if (placing) PlaceFromMouse(e.GetPosition(canvasDiagram)); };
             canvasDiagram.MouseLeftButtonUp += (s, e) => { placing = false; canvasDiagram.ReleaseMouseCapture(); };
@@ -1720,6 +1695,47 @@ namespace CNC.Controls
             OnWorkOrderChanged();
         }
 
+        // The dimple's tool and numbers, through the SAME dialog every operation uses - restricted to
+        // drills, with its depth field relabelled. Mark only had no tool picker of its own, which is what
+        // produced a warning naming a bit the operator was never given a way to change; and its loose
+        // fields carried no speeds at all, so the dimple ran at WorkOrderOperation's 15000 RPM initializer.
+        // Reusing the dialog answers both, and brings the advisor's recommendations with it.
+        private void btnMarkOnlyFeeds_Click(object sender, RoutedEventArgs e)
+        {
+            var op = workOrder.MarkOp;
+            var bit = WorkOrderRules.MarkBitFor(workOrder);
+
+            var dlg = new OddJobsFeedsSpeedsDialog(bit != null ? bit.Id : op.Tool,
+                                                   docLabel: "Dimple depth:", showDoc: true, showDirection: false)
+            {
+                Owner = Window.GetWindow(this),
+                BitDiameter = op.HoleDiameter > 0d ? op.HoleDiameter : 3.175d,
+                SpindleRPM = op.SpindleRPM, Feed = op.Feed, PlungeFeed = op.PlungeFeed,
+                DepthOfCut = op.TotalDepth > 0d ? op.TotalDepth : 1.4d,
+                Material = StartJobConfig.Section?.Material ?? string.Empty,
+                IsHssDrill = op.DrillHss
+            };
+            dlg.RestrictToolsFor(WorkOrderOpKind.Drill);
+
+            if (dlg.ShowDialog() != true)
+                return;
+
+            op.Tool = dlg.SelectedToolValue;
+            // Written back, UNLIKE an ordinary drill operation - there the hole size is dictated by the
+            // geometry and the dialog's diameter is not the operator's to change. Here the dimple's
+            // diameter IS the drill they are putting in the spindle, so it is exactly theirs to set.
+            op.HoleDiameter = dlg.BitDiameter;
+            op.BitDiameter = dlg.BitDiameter;
+            op.SpindleRPM = dlg.SpindleRPM;
+            op.Feed = dlg.Feed;
+            op.PlungeFeed = dlg.PlungeFeed;
+            op.TotalDepth = dlg.DepthOfCut;
+            op.DrillHss = dlg.IsHssDrill;
+
+            UpdateMarkOnlySummary();
+            OnWorkOrderChanged();
+        }
+
         private void chkMarkOnly_Click(object sender, RoutedEventArgs e)
         {
             if (loadingFields)
@@ -1732,7 +1748,7 @@ namespace CNC.Controls
             if (workOrder.MarkOnly)
             {
                 var pointed = WorkOrderRules.MarkBitFor(workOrder);
-                workOrder.MarkTool = pointed != null ? pointed.Id : -1;
+                workOrder.MarkOp.Tool = pointed != null ? pointed.Id : -1;
             }
             UpdateMarkOnlySummary();
             OnWorkOrderChanged();
@@ -1777,8 +1793,10 @@ namespace CNC.Controls
             txtMarkOnlySummary.Text =
                 holes == 0 ? "Nothing to mark - this work order has no Drill or Bore operation." :
                 bit == null ? "No drill bit found for the dimple - add a drill-type tool in Tools." :
-                string.Format("{0} hole centre{1} dimpled {2:0.###} mm deep with the {3}. Every other operation is left out.",
-                              holes, holes == 1 ? "" : "s", workOrder.MarkDepth, bit.Name);
+                string.Format("{0} hole centre{1}: {2} at \u00d8{3:0.###} mm x {4:0.###} mm deep, {5:0} RPM, plunge {6:0}. Every other operation is left out.",
+                              holes, holes == 1 ? "" : "s", bit.Name,
+                              workOrder.MarkOp.HoleDiameter, workOrder.MarkOp.TotalDepth,
+                              workOrder.MarkOp.SpindleRPM, workOrder.MarkOp.PlungeFeed);
         }
 
         // Names the tool the program will start on, so the claim being made ("it's already loaded") is about a
@@ -3861,8 +3879,6 @@ namespace CNC.Controls
             chkGroupByTool.IsChecked = workOrder.GroupByTool;
             chkSkipFirstToolChange.IsChecked = workOrder.SkipFirstToolChange;
             chkMarkOnly.IsChecked = workOrder.MarkOnly;
-            fldMarkOnlyDepth.Value = workOrder.MarkDepth;
-            fldMarkOnlyDiameter.Value = workOrder.MarkDiameter;
             UpdateMarkOnlySummary();
             cbxWcs.SelectedIndex = Math.Min(Math.Max(workOrder.Wcs, 0), 6);
             loadingFields = false;
@@ -4103,8 +4119,6 @@ namespace CNC.Controls
             chkGroupByTool.IsChecked = workOrder.GroupByTool;
             chkSkipFirstToolChange.IsChecked = workOrder.SkipFirstToolChange;
             chkMarkOnly.IsChecked = workOrder.MarkOnly;
-            fldMarkOnlyDepth.Value = workOrder.MarkDepth;
-            fldMarkOnlyDiameter.Value = workOrder.MarkDiameter;
             UpdateMarkOnlySummary();
             cbxWcs.SelectedIndex = Math.Min(Math.Max(workOrder.Wcs, 0), 6);
             loadingFields = false;
@@ -4133,8 +4147,6 @@ namespace CNC.Controls
             chkGroupByTool.IsChecked = workOrder.GroupByTool;
             chkSkipFirstToolChange.IsChecked = workOrder.SkipFirstToolChange;
             chkMarkOnly.IsChecked = workOrder.MarkOnly;
-            fldMarkOnlyDepth.Value = workOrder.MarkDepth;
-            fldMarkOnlyDiameter.Value = workOrder.MarkDiameter;
             UpdateMarkOnlySummary();
             cbxWcs.SelectedIndex = Math.Min(Math.Max(workOrder.Wcs, 0), 6);
             loadingFields = false;
