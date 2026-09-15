@@ -427,7 +427,10 @@ namespace CNC.Controls
         private static WorkOrder ResolveMarkOnly(WorkOrder wo)
         {
             if (!wo.MarkOnly)
+            {
+                DebugLog.Write("workorder", "ResolveMarkOnly: MarkOnly is false - generating the real program");
                 return wo;
+            }
 
             // The one resolver - see WorkOrderRules.MarkBitFor for why this is not three copies any more.
             // Validate refuses the run outright when it comes back null.
@@ -493,6 +496,10 @@ namespace CNC.Controls
                 marked.Toolpaths.Add(shadow);
             }
 
+            DebugLog.Write("workorder", string.Format(
+                "ResolveMarkOnly: {0} of {1} toolpath(s) have holes -> dimples {2} mm dia x {3} mm deep with T{4} '{5}'",
+                marked.Toolpaths.Count, wo.Toolpaths.Count, F(dia), F(depth),
+                toolId, chosen != null ? chosen.Name : "(none)"));
             return marked;
         }
 
@@ -501,7 +508,21 @@ namespace CNC.Controls
             if (!wo.Toolpaths.Any(t => t.IsIndirect))
                 return wo;
 
-            var resolved = new WorkOrder { GroupByTool = wo.GroupByTool, SkipFirstToolChange = wo.SkipFirstToolChange, Wcs = wo.Wcs };
+            // Everything the work order carries EXCEPT its toolpath list, which this method is rebuilding.
+            //
+            // This used to hand-list three fields - GroupByTool, SkipFirstToolChange, Wcs - and so silently
+            // dropped every work-order-level field added afterwards. Mark only was the first: a work order
+            // with no Indirect toolpaths took the early return above and marked correctly, one WITH them
+            // came through here, lost MarkOnly on the way, and generated the REAL job - a 35 mm bore and
+            // ten 13 mm through-drills where the operator had asked for dimples. Reported 2026-09-15.
+            //
+            // It is the same failure this method already documents ONE LEVEL DOWN, for the toolpath copy:
+            // "Listing its fields by hand instead is how this silently lost SvgFile, SvgWidth, the whole
+            // text block and CornerReliefs." That lesson was learned for the shadow and not applied to its
+            // container. Inverting the default here means a new field on WorkOrder is inherited without
+            // anyone having to remember this line exists.
+            var resolved = WorkOrderRules.CopyFields(wo, new WorkOrder());
+            resolved.Toolpaths = new List<WorkOrderToolpath>();
             foreach (var tp in wo.Toolpaths)
             {
                 if (!tp.IsIndirect)
