@@ -1728,16 +1728,12 @@ namespace CNC.Controls
             // Seed the bit the first time it is switched on, so the summary can name a real tool rather
             // than resolving one silently at generate time. The compiler falls back to the same suggestion
             // if this is ever left unset or points at a deleted tool.
-            // The first DRILL, not SuggestTool("drilling") - that bucket falls back to an end mill when no
-            // drill exists, which is right for boring a hole and wrong for making a mark. Validate refuses
-            // the run if there is nothing pointed to find, rather than this quietly choosing something flat.
-            var pointed = CustomTools.Find(workOrder.MarkTool);
-            if (workOrder.MarkOnly && (pointed == null || (pointed.Kind != CustomToolKind.Drill &&
-                                                           pointed.Kind != CustomToolKind.VBitOrChamfer &&
-                                                           pointed.Kind != CustomToolKind.Countersink)))
-                workOrder.MarkTool = (CustomTools.SectionConfig?.Entries ?? new List<CustomTool>())
-                    .Where(t => t.Kind == CustomToolKind.Drill)
-                    .Select(t => t.Id).DefaultIfEmpty(-1).First();
+            // Same resolver the compiler and the validator use - see WorkOrderRules.MarkBitFor.
+            if (workOrder.MarkOnly)
+            {
+                var pointed = WorkOrderRules.MarkBitFor(workOrder);
+                workOrder.MarkTool = pointed != null ? pointed.Id : -1;
+            }
             UpdateMarkOnlySummary();
             OnWorkOrderChanged();
         }
@@ -1777,7 +1773,7 @@ namespace CNC.Controls
 
             int holes = workOrder.Toolpaths.Count(t => workOrder.EnabledOperations(t).Any(o =>
                 o.Kind == WorkOrderOpKind.Drill || o.Kind == WorkOrderOpKind.Bore));
-            var bit = CustomTools.Find(workOrder.MarkTool);
+            var bit = WorkOrderRules.MarkBitFor(workOrder);
             txtMarkOnlySummary.Text =
                 holes == 0 ? "Nothing to mark - this work order has no Drill or Bore operation." :
                 bit == null ? "No drill bit found for the dimple - add a drill-type tool in Tools." :

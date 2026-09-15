@@ -429,16 +429,9 @@ namespace CNC.Controls
             if (!wo.MarkOnly)
                 return wo;
 
-            var chosen = CustomTools.Find(wo.MarkTool);
-            // Only a POINTED bit can make a dimple, so an unset or unsuitable choice resolves to the first
-            // drill in the list rather than to SuggestTool, whose "drilling" bucket falls back to an END
-            // MILL when no drill exists - a fallback that is useful for a hole and useless for a mark.
-            // WorkOrderRules.Validate refuses the run outright when there is nothing pointed to find.
-            if (chosen == null || (chosen.Kind != CustomToolKind.Drill &&
-                                   chosen.Kind != CustomToolKind.VBitOrChamfer &&
-                                   chosen.Kind != CustomToolKind.Countersink))
-                chosen = (CustomTools.SectionConfig?.Entries ?? new List<CustomTool>())
-                    .FirstOrDefault(t => t.Kind == CustomToolKind.Drill);
+            // The one resolver - see WorkOrderRules.MarkBitFor for why this is not three copies any more.
+            // Validate refuses the run outright when it comes back null.
+            var chosen = WorkOrderRules.MarkBitFor(wo);
 
             string material = StartJobConfig.Section?.Material ?? string.Empty;
             int toolId = chosen != null ? chosen.Id : wo.MarkTool;

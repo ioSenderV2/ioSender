@@ -961,8 +961,17 @@ namespace CNC.Controls
         private static List<KeyValuePair<double, string>> BuildDrillList()
         {
             var list = new List<KeyValuePair<double, string>>();
-            for (double d = 1.0d; d <= 13.0d + 1e-9; d += 0.5d)
-                list.Add(new KeyValuePair<double, string>(d, string.Format(CultureInfo.InvariantCulture, "{0:0.#} mm", d)));
+            // 0.1 mm, not 0.5. Metric jobber drills are SOLD in tenths - 5.2 is exactly as ordinary a bit as
+            // 5.0, and the 0.5 series rejected it as "not a size this build knows", which is a statement
+            // about this list rather than about drills. Reported 2026-09-15 by someone holding the 5.2.
+            //
+            // This is the second report of the same shape: the tapping and clearance sizes below were added
+            // after 4.2 (the M5 tap drill, the commonest hole in a machine build) was refused the same way.
+            // Patching in individual sizes as they are reported treats each one as a special case when the
+            // actual fault is the step - so the step is fixed, and the named entries below stay only for
+            // the NAME they give a match, never for whether it is accepted.
+            for (double d = 1.0d; d <= 13.0d + 1e-9; d += 0.1d)
+                list.Add(new KeyValuePair<double, string>(Math.Round(d, 1), string.Format(CultureInfo.InvariantCulture, "{0:0.#} mm", d)));
 
             list.Add(new KeyValuePair<double, string>(1.588d, "1/16\""));
             list.Add(new KeyValuePair<double, string>(3.175d, "1/8\""));
@@ -1351,6 +1360,40 @@ namespace CNC.Controls
         /// mill's floor and the V-bit's floor are the same number by construction. Null when the
         /// toolpath has no Engrave operation with a V-bit to follow.
         /// </summary>
+        /// <summary>
+        /// The bit that will actually make the dimples, resolved the ONE way - the operator's explicit
+        /// choice when it is pointed, otherwise the first drill, otherwise anything else with a point.
+        /// Null only when the tool list holds nothing pointed at all.
+        /// </summary>
+        /// <remarks>
+        /// Shared because it was written three times - compiler, validator, and the editor's summary - and
+        /// they disagreed. The validator read WorkOrder.MarkTool RAW and named whatever it found there; the
+        /// compiler resolved past it. So a work order saved with the old MarkTool = 0 default (0 being a
+        /// real tool id, the first in the list) produced "1/4" 2-flute endmill has no point" against a
+        /// program that was going to use the drill anyway - a warning about a tool the operator was never
+        /// shown and cannot change, since Mark only exposes a diameter and no picker.
+        ///
+        /// A check the reader cannot act on is worse than no check: it trains them to scroll past the panel
+        /// that also carries the real ones.
+        /// </remarks>
+        public static CustomTool MarkBitFor(WorkOrder wo)
+        {
+            var entries = CustomTools.SectionConfig?.Entries ?? new List<CustomTool>();
+            var chosen = wo == null ? null : CustomTools.Find(wo.MarkTool);
+            if (chosen != null && IsPointed(chosen))
+                return chosen;
+            return entries.FirstOrDefault(t => t.Kind == CustomToolKind.Drill)
+                ?? entries.FirstOrDefault(IsPointed);
+        }
+
+        /// <summary>Can this bit make a dimple - i.e. does it come to a point?</summary>
+        public static bool IsPointed(CustomTool t)
+        {
+            return t != null && (t.Kind == CustomToolKind.Drill ||
+                                 t.Kind == CustomToolKind.VBitOrChamfer ||
+                                 t.Kind == CustomToolKind.Countersink);
+        }
+
         public static CarveFloor CarveFloorOf(WorkOrderToolpath tp)
         {
             if (tp == null || !tp.CarvesOutlines)
@@ -1515,14 +1558,11 @@ namespace CNC.Controls
             // requirement about the bit's geometry, not a preference. Same lesson as the Clear floor guard
             // written yesterday: check the property the job actually needs (here: a point; there: a flat),
             // not the failure someone happened to imagine.
-            if (wo.MarkOnly)
-            {
-                var markBit = CustomTools.Find(wo.MarkTool);
-                if (markBit == null)
-                    warnings.Add("Mark only: no drill bit is set for the dimple, and no drill-type tool was found to fall back on - add one in Tools.");
-                else if (markBit.Kind != CustomToolKind.Drill && markBit.Kind != CustomToolKind.VBitOrChamfer && markBit.Kind != CustomToolKind.Countersink)
-                    warnings.Add("Mark only: " + markBit.Name + " has no point - a dimple needs a twist drill, V-bit or countersink. An end mill leaves a flat bottom a punch cannot find.");
-            }
+            // ONE case, and it is the only one the operator can act on: the tool list holds nothing that
+            // comes to a point. Anything else resolves silently (see MarkBitFor) rather than complaining
+            // about a tool this screen never offered to let them change.
+            if (wo.MarkOnly && MarkBitFor(wo) == null)
+                warnings.Add("Mark only: no bit in your tool list comes to a point - add a twist drill under Tools. An end mill leaves a flat bottom a punch cannot find.");
 
             foreach (var tp in wo.Toolpaths)
             {
