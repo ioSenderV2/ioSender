@@ -1,4 +1,5 @@
 ; tlo.macro - reference the tool ALREADY IN THE SPINDLE against the toolsetter puck.
+; Upload-rate fix verified against this file: 2026-09-14 (see PollGrbl.ClaimLink).
 ;
 ; Extracted from tc.macro on 2026-09-14, unchanged in behaviour, because a SECOND copy of this
 ; sequence had grown in the sender (StartJobView.EmitTloReference, emitted inline into generated
