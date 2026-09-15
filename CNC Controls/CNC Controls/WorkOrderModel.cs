@@ -662,6 +662,34 @@ namespace CNC.Controls
         // whatever TLO is currently in force. Hence off by default and stated in the program header.
         public bool SkipFirstToolChange = false;
 
+        // MARK ONLY - generate a program that dimples the CENTRES of every hole this work order defines
+        // and cuts nothing else.
+        //
+        // The machine this runs on is too flexible to drill aluminium properly, so the job splits in two:
+        // the router marks where the holes go, the marks get deepened with a punch, and the holes are
+        // drilled on a mag drill. The work order still has to carry the REAL sizes and depths, because it
+        // is the thing that says what gets drilled at each dimple - stripping it down to 1.4 mm dimples by
+        // hand would destroy exactly the information the second half of the job needs.
+        //
+        // So this is a property of the RUN, not of the work order's content: the authored work order is
+        // untouched and every drill keeps its real size, and WorkOrderCompiler.ResolveMarkOnly substitutes
+        // dimples on the way to the program. See it for what survives and what does not.
+        //
+        // Persisted with everything else, which is deliberate but not free: an operator who marks a part in
+        // the morning and presses Generate in the afternoon would get dimples again. That is why the Run
+        // bar's button says "Generate (mark only)" while this is set and why the program's own header says
+        // so in the first line - the .macro outlives the UI state that produced it.
+        public bool MarkOnly = false;
+
+        // How deep a dimple goes. 1.4 mm with a 1/8" twist drill leaves the point plus a little of the
+        // flutes - enough for a punch to find and not so deep that it wanders. Editable because it is
+        // stock- and bit-dependent, not a constant of nature.
+        public double MarkDepth = 1.4d;
+
+        // The bit that makes the dimple. 0 = resolve a drilling-class bit at generate time; set explicitly
+        // once the operator picks one. One tool for the whole program, so one tool change.
+        public int MarkTool = 0;
+
         // The operations a toolpath OWNS and has ticked. Everything downstream of the compiler (the
         // scheduler, the tool declarations, the tool-change count) goes through here, so a held-back
         // operation can't leak into one of them and not the others.
@@ -1462,6 +1490,15 @@ namespace CNC.Controls
                 warnings.Add(string.Format(CultureInfo.InvariantCulture,
                     "{0} has a {1:0.###} deg rotation set - Work Order toolpaths don't account for WCS rotation and would cut skewed. Clear the rotation (or switch to an unrotated WCS) before generating.",
                     wcs, wcsData.Rotation));
+
+            // Mark only resolves to dimples at hole centres and NOTHING else, so a work order with no
+            // enabled Drill or Bore anywhere resolves to an empty program. Refuse here rather than letting
+            // Generate produce a file that parks at G30 and does nothing - which reads exactly like a
+            // machine that failed to start, and sends the operator looking at the controller.
+            // Checked once for the whole work order, like the rotation rule above.
+            if (wo.MarkOnly && !wo.Toolpaths.Any(t => wo.EnabledOperations(t).Any(o =>
+                    o.Kind == WorkOrderOpKind.Drill || o.Kind == WorkOrderOpKind.Bore)))
+                warnings.Add("Mark only is set, but this work order has no enabled Drill or Bore operation - there are no hole centres to dimple.");
 
             foreach (var tp in wo.Toolpaths)
             {

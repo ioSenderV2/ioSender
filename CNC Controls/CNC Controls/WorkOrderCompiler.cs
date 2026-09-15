@@ -393,6 +393,104 @@ namespace CNC.Controls
         // source, self-reference, chained Indirect) is dropped entirely rather than resolved - same as any
         // toolpath with no enabled operations always is; WorkOrderRules.Validate is what surfaces that to the
         // operator, not this method.
+        /// <summary>
+        /// Everything between the work order the operator AUTHORED and the one this file compiles:
+        /// Indirect toolpaths become shadows, and Mark only becomes dimples. One entry point on purpose -
+        /// there are three call sites, and a resolve step that some of them skip is a bug waiting to be
+        /// filed against whichever one was forgotten.
+        /// </summary>
+        private static WorkOrder Resolve(WorkOrder wo)
+        {
+            return ResolveMarkOnly(ResolveIndirect(wo));
+        }
+
+        /// <summary>
+        /// Mark only: replace every hole with a DIMPLE at its centre, and drop everything else.
+        /// </summary>
+        /// <remarks>
+        /// Runs AFTER ResolveIndirect, so an Indirect toolpath's borrowed holes get marked too - the
+        /// shadows are ordinary toolpaths by this point and need no special handling here.
+        ///
+        /// ONE dimple per toolpath, not one per operation. A Circle has a single centre, so a toolpath
+        /// carrying both a Drill and a Bore (or two drills) describes one hole and must not be punched
+        /// twice in the same spot. Any pattern on the toolpath comes across with CopyFields, so a 3x2 grid
+        /// of holes still yields six dimples.
+        ///
+        /// Bore counts as a hole (user's call, 2026-09-15): it is milled rather than drilled, but its
+        /// centre is exactly as much a place you are about to put a mag drill.
+        ///
+        /// Everything else is dropped outright - that is the point, not a side effect. A toolpath left
+        /// with nothing disappears, and a work order with no holes at all resolves to an EMPTY program,
+        /// which WorkOrderRules.Validate refuses up front rather than letting Generate emit a file that
+        /// parks and does nothing.
+        /// </remarks>
+        private static WorkOrder ResolveMarkOnly(WorkOrder wo)
+        {
+            if (!wo.MarkOnly)
+                return wo;
+
+            string material = StartJobConfig.Section?.Material ?? string.Empty;
+            int toolId = CustomTools.Find(wo.MarkTool) != null
+                       ? wo.MarkTool
+                       : OddJobsFeedsSpeedsDialog.SuggestTool("drilling", material);
+            var bit = CustomTools.Find(toolId);
+            double dia = bit != null && bit.DiameterMm > 0d ? bit.DiameterMm : 3.175d;
+            double depth = wo.MarkDepth > 0d ? wo.MarkDepth : 1.4d;
+
+            var marked = new WorkOrder {
+                GroupByTool = wo.GroupByTool,
+                SkipFirstToolChange = wo.SkipFirstToolChange,
+                Wcs = wo.Wcs,
+                MarkOnly = true,
+                MarkDepth = depth,
+                MarkTool = toolId
+            };
+
+            foreach (var tp in wo.Toolpaths)
+            {
+                if (!tp.Enabled)
+                    continue;
+                bool hasHole = tp.Operations.Any(o => o.Enabled &&
+                    (o.Kind == WorkOrderOpKind.Drill || o.Kind == WorkOrderOpKind.Bore));
+                if (!hasHole)
+                    continue;
+
+                // CopyFields for the same reason ResolveIndirect uses it: the shadow exists to BE this
+                // toolpath, in the same place, with the same pattern. Listing fields by hand is how that
+                // path silently lost SvgFile and the whole text block once already.
+                var shadow = WorkOrderRules.CopyFields(tp, new WorkOrderToolpath());
+                shadow.Name = tp.Name;
+                shadow.Enabled = true;
+
+                var dimple = new WorkOrderOperation {
+                    Kind = WorkOrderOpKind.Drill,
+                    Enabled = true,
+                    Tool = toolId,
+                    BitDiameter = dia,
+                    HoleDiameter = dia,
+                    TotalDepth = depth,
+                    Through = false,
+                    // Never peck a dimple. A peck deeper than the hole is one plunge, which is what this is.
+                    PeckDepth = Math.Max(depth, 1d)
+                };
+
+                // The operator's own proven numbers for this bit and material, same recall a new operation
+                // gets - a dimple is still a real plunge into real metal.
+                var remembered = OddJobsToolMemory.Find(toolId, dia, material);
+                if (remembered != null)
+                {
+                    if (remembered.Rpm > 0d) dimple.SpindleRPM = remembered.Rpm;
+                    if (remembered.Feed > 0d) dimple.Feed = remembered.Feed;
+                    if (remembered.PlungeFeed > 0d) dimple.PlungeFeed = remembered.PlungeFeed;
+                }
+
+                shadow.Operations = new List<WorkOrderOperation> { dimple };
+                marked.Toolpaths.Add(shadow);
+            }
+
+            return marked;
+        }
+
         private static WorkOrder ResolveIndirect(WorkOrder wo)
         {
             if (!wo.Toolpaths.Any(t => t.IsIndirect))
@@ -1948,7 +2046,7 @@ namespace CNC.Controls
         // setting is actually worth on this particular work order rather than promising a saving in the abstract.
         public static int ToolChangeCount(WorkOrder wo, bool grouped)
         {
-            wo = ResolveIndirect(wo);
+            wo = Resolve(wo);
             bool wasGrouped = wo.GroupByTool;
             wo.GroupByTool = grouped;
             try
@@ -1972,14 +2070,14 @@ namespace CNC.Controls
         // it follows grouping rather than tree order.
         public static int FirstToolNumber(WorkOrder wo)
         {
-            var first = Schedule(ResolveIndirect(wo)).FirstOrDefault();
+            var first = Schedule(Resolve(wo)).FirstOrDefault();
             return first.Value != null ? ToolNumberFor(first.Value) : int.MinValue;
         }
 
         public static List<string> BuildProgram(WorkOrder wo)
         {
             _wcs = ResolveWcs(wo);
-            wo = ResolveIndirect(wo);
+            wo = Resolve(wo);
             var lines = new List<string>();
             int opCount = wo.EnabledOperationCount;
             int tpCount = wo.Toolpaths.Count(t => wo.EnabledOperations(t).Any());
@@ -1991,6 +2089,16 @@ namespace CNC.Controls
             if (wo.AnyHeldBack)
                 lines.Add(string.Format("(PARTIAL RUN - {0} of {1} operations enabled, {2} held back)",
                     opCount, wo.TotalOperationCount, wo.TotalOperationCount - opCount));
+            // Said early and said plainly. This program looks like the job and is not the job: it dimples
+            // each hole centre and cuts nothing else. Anyone reading the saved .macro later, or watching it
+            // run, has to be able to tell those apart without the work order in front of them.
+            if (wo.MarkOnly)
+            {
+                var markBit = CustomTools.Find(wo.MarkTool);
+                lines.Add(string.Format("(*** MARK ONLY - {0} hole centre[s], dimpled {1} mm deep with {2}.)",
+                    wo.Toolpaths.Count, F(wo.MarkDepth), markBit != null ? markBit.Name : "a drill"));
+                lines.Add("(*** The holes are NOT drilled here, and every other operation is left out.)");
+            }
             // EXPR added alongside the #<_tlo_ref> save/load/restore below - named-parameter assignments in
             // the main streamed program (not just inside a called macro) need grblHAL's NGC expression support.
             // The WCS condition names whichever slot THIS work order actually uses (WorkOrderWcs, set from
