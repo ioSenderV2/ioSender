@@ -527,6 +527,34 @@ namespace CNC.Controls
 
                 if (opOwner.Operations.Count == 0)
                     rows.Add(new Row { IsOperation = true, Name = "no operations - cuts nothing", Dimmed = true });
+
+                // Every instance, listed with its own X/Y - not just a count in the Qty column.
+                //
+                // The sheet's job is to be carried to the second machine. "Qty 6" says a pattern exists and
+                // says nothing about where to put the drill; the operator then has to reconstruct six
+                // positions from a grid pitch and a corner, by hand, next to a running spindle. The numbers
+                // are already here - Qty is literally the COUNT of this same sequence - so printing them
+                // costs a row each and removes the arithmetic.
+                //
+                // Only when there is more than one: a single feature's position is already on its own row
+                // directly above, and repeating it would be noise on every sheet that has no patterns.
+                if (qty > 1)
+                {
+                    int n = 0;
+                    foreach (var pl in placements)
+                        foreach (var pos in pl.Geometry.PatternPositions(pl.X, pl.Y))
+                        {
+                            n++;
+                            rows.Add(new Row
+                            {
+                                IsOperation = true,
+                                Name = string.Format(CultureInfo.InvariantCulture, "{0} #{1}", WorkOrderPalette.Id(index), n),
+                                X = pos[0].ToString("0.0#", CultureInfo.InvariantCulture),
+                                Y = pos[1].ToString("0.0#", CultureInfo.InvariantCulture),
+                                Dimmed = !live
+                            });
+                        }
+                }
             }
 
             return rows;
@@ -640,6 +668,14 @@ namespace CNC.Controls
                     p.Text(OpIndent, baseline, FontOp, p.Ellipsize(r.Name, OpDetailEnd - OpIndent, FontOp));
                     if (!string.IsNullOrEmpty(r.Tool))
                         p.Text(ColTool, baseline, FontOp, p.Ellipsize(r.Tool, ColEnd - ColTool, FontOp));
+                    // An indented row carries EITHER a tool (an operation) or a position (one instance of a
+                    // patterned feature), never both - so these share the line with the tool column above
+                    // without needing to reserve space against it. Same right-aligned X/Y columns the
+                    // feature rows use, so a pattern's positions read straight down under its own centre.
+                    if (!string.IsNullOrEmpty(r.X))
+                        p.TextRight(ColXr, baseline, FontOp, r.X);
+                    if (!string.IsNullOrEmpty(r.Y))
+                        p.TextRight(ColYr, baseline, FontOp, r.Y);
                 }
                 else
                 {
