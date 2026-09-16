@@ -303,10 +303,20 @@ namespace CNC.Core
                     if (!present.Contains(n) || sizeBad || hashBad)
                         needs.Add(n);
                 }
-                // The sidecar itself is out of date whenever it is not already exactly what we would write -
-                // including the legacy single-hash case, where every macro is current and only its FORMAT is
-                // not. That path rewrites 400 bytes and sends no macros at all.
-                bool sumStale = sidecarRead != embeddedSum.Trim();
+                // Compare the PARSED manifests, never the raw text. ReadControllerFile joins the dumped
+                // lines with AppendLine - Environment.NewLine, so CRLF on Windows - while EmbeddedManifest
+                // writes LF. A string comparison therefore never matched, sumStale was permanently true,
+                // and a freshly written sidecar re-prompted for an update on every single connect.
+                //
+                // Comparing the maps is what the question actually means anyway: does the controller hold
+                // exactly these files at exactly these hashes. Line endings, row order and stray whitespace
+                // are all beside the point, and not one of them can break it now.
+                bool sumStale = onFsHashes.Count != Required.Length ||
+                                Required.Any(n =>
+                                {
+                                    string h;
+                                    return !onFsHashes.TryGetValue(n, out h) || h != EmbeddedChecksum(n);
+                                });
                 bool checksumStale = needs.Count > 0 || sumStale;
                 ConsoleLog.Write(string.Format("[AtcMacros] EnsureProvisioned: needs=[{0}], legacyCurrent={1}, sumStale={2}",
                     string.Join(",", needs), legacyCurrent, sumStale));
