@@ -45,7 +45,7 @@ namespace CNC.Controls
         public string MeasuredResult = string.Empty;
         // Fly-over only: the V-bit (CustomTool.Id) Verify skew changes to before visiting the corners.
         // -1 = none, use whatever is in the spindle. See StartJobView's picker for why V-bits only.
-        public int VerifyFlyoverToolId = -1;
+        public int VerifyFlyoverToolId = int.MinValue;   // int.MinValue = never chosen (pick the sharpest V-bit); -1 = explicitly none
         public string Corner = "FrontLeft";
         public int Wcs = 1;            // 1 = G54
         public bool Measure = true;

@@ -469,7 +469,7 @@
                          construction instead of assumed. "(none)" leaves the spindle alone. -->
                     <TextBlock x:Uid="lbl_verifytool" Text="V-bit:" VerticalAlignment="Center" Margin="12,0,4,0"/>
                     <ComboBox x:Uid="cbx_verifytool" x:Name="cbxVerifyTool" MinWidth="150" VerticalAlignment="Center"
-                              DisplayMemberPath="Name" SelectedValuePath="Id" ToolTipService.ShowOnDisabled="True"
+                              DisplayMemberPath="Label" SelectedValuePath="Id" ToolTipService.ShowOnDisabled="True"
                               SelectionChanged="VerifyTool_SelectionChanged"
                               ToolTip="Fly-over only: change to this V-bit before visiting the corners. Its point sights each corner exactly, and the tool change re-references the tool length so the 2mm sight gap is real rather than assumed. Leave at (none) to use whatever is already in the spindle. Only V-bit / chamfer tools are listed."/>
                 </StackPanel>

@@ -1061,6 +1061,21 @@ namespace GCode_Sender
             ShowResult();
         }
 
+        // -1 is a real answer ("use whatever is in the spindle"), so "never chosen" needs a value of its own -
+        // otherwise the sharpest-V-bit default would fight the operator every time they picked (none).
+        private const int VerifyToolNone = -1;
+        private const int VerifyToolUnset = int.MinValue;
+
+        // ComboBox items. CustomTool's Id/Name are FIELDS and WPF binds PROPERTIES, so the list has to be
+        // projected onto something with real properties or every row renders blank - see the note where it is
+        // built. Label carries the angle because the tool names do not reliably match the angle recorded.
+        private class VerifyToolItem
+        {
+            public int Id { get; set; }
+            public string Label { get; set; }
+            public double AngleDeg { get; set; }
+        }
+
         // Set by LoadInputs, consumed by the first RefreshVerifyTouchAvailability that builds the combo.
         private int? pendingVerifyToolId;
 
@@ -1075,7 +1090,7 @@ namespace GCode_Sender
         // so a tool edited while the panel was open cannot emit an M6 for something that no longer exists.
         private CustomTool VerifyFlyoverTool()
         {
-            int id = (cbxVerifyTool?.SelectedValue as int?) ?? -1;
+            int id = (cbxVerifyTool?.SelectedValue as int?) ?? VerifyToolNone;
             return id < 0 ? null : CustomTools.Find(id);
         }
 
@@ -1243,21 +1258,41 @@ namespace GCode_Sender
             // A saved id from LoadInputs wins once, then the live selection does: the list does not exist yet
             // when the settings are read, so the value has to wait here for it. An id whose tool has since been
             // deleted falls back to "(none)" rather than selecting nothing and silently meaning it.
-            int keepTool = pendingVerifyToolId ?? (cbxVerifyTool.SelectedValue as int?) ?? -1;
+            int keepTool = pendingVerifyToolId ?? (cbxVerifyTool.SelectedValue as int?) ?? VerifyToolNone;
             pendingVerifyToolId = null;
 
-            var vbits = new List<CustomTool> { new CustomTool { Id = -1, Name = "(none)" } };
+            // Projected onto VerifyToolItem, NOT bound to CustomTool directly. CustomTool exposes Id, Name and
+            // Kind as public FIELDS, and WPF's DisplayMemberPath/SelectedValuePath resolve PROPERTIES only - a
+            // field silently resolves to nothing, so the list rendered a row per tool with no text in any of
+            // them and SelectedValue never matched. It looked like an empty dropdown; it was a full one, blank.
+            //
+            // Sharpest first, angle in the label: the names in the table do not reliably agree with the angle
+            // recorded against them (one called "45 deg V-bit (chamfer)" carries IncludedAngleDeg 90), so the
+            // number shown here is the one the sort and the default actually use.
+            var vbits = new List<VerifyToolItem> { new VerifyToolItem { Id = VerifyToolNone, Label = "(none)", AngleDeg = double.MaxValue } };
             if (CustomTools.SectionConfig?.Entries != null)
                 vbits.AddRange(CustomTools.SectionConfig.Entries
                                           .Where(t => t.Kind == CustomToolKind.VBitOrChamfer)
-                                          .OrderBy(t => t.Name));
+                                          .OrderBy(t => t.IncludedAngleDeg)
+                                          .Select(t => new VerifyToolItem
+                                          {
+                                              Id = t.Id,
+                                              AngleDeg = t.IncludedAngleDeg,
+                                              Label = string.Format(CultureInfo.CurrentCulture, "{0}° - {1}", t.IncludedAngleDeg, t.Name)
+                                          }));
+
+            // Never chosen -> the SHARPEST, which is what this check wants: the finer the point, the less there
+            // is between it and the corner. An explicit "(none)" is a choice and survives, which is why unset
+            // needs its own sentinel rather than reusing -1.
+            if (keepTool == VerifyToolUnset)
+                keepTool = vbits.FirstOrDefault(t => t.Id != VerifyToolNone)?.Id ?? VerifyToolNone;
 
             bool wasLoading = loadingInputs;
             loadingInputs = true;          // rebuilding the list fires SelectionChanged; that is not an edit
             try
             {
                 cbxVerifyTool.ItemsSource = vbits;
-                cbxVerifyTool.SelectedValue = vbits.Any(t => t.Id == keepTool) ? keepTool : -1;
+                cbxVerifyTool.SelectedValue = vbits.Any(t => t.Id == keepTool) ? keepTool : VerifyToolNone;
             }
             finally { loadingInputs = wasLoading; }
 
@@ -2156,7 +2191,7 @@ namespace GCode_Sender
                     HeightMapGridY = fldHeightMapGridY.Value,
                     Material = cbxMaterial.SelectedItem as string ?? string.Empty,
                     MeasuredResult = SerializeMeasured(),
-                    VerifyFlyoverToolId = (cbxVerifyTool?.SelectedValue as int?) ?? -1,
+                    VerifyFlyoverToolId = (cbxVerifyTool?.SelectedValue as int?) ?? VerifyToolNone,
                     SafeZ = 20d
                 };
                 AppConfig.Settings.Save();
