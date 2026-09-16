@@ -1061,12 +1061,25 @@ namespace GCode_Sender
         // the "from <date>" line on the readout - see BuildResultText.
         private DateTime? measuredRestoredUtc;
 
+        // Whatever MeasuredResult held when this session loaded, kept verbatim - INCLUDING a string that failed
+        // to parse. It is what SerializeMeasured hands back when this session has no complete measurement of its
+        // own, and without it a save is destructive:
+        //
+        //   a restore that fails -> no corners in this session -> SaveInputs serialises "nothing" -> the stored
+        //   measurement is overwritten with empty, and the data the restore failed to read is now GONE.
+        //
+        // Which is exactly what happened on 2026-09-16: an off-by-one in the parser cost the measurement itself,
+        // so the fixed build had nothing left to load and looked like it had failed too. A reader must never be
+        // able to destroy what it could not read. The same applies with no bug at all - any session that simply
+        // has not measured yet would otherwise wipe the last one on exit.
+        private string savedMeasuredResult = string.Empty;
+
         // Machine coordinates, invariant culture, round-tripped as-is. See StartJobSettings.MeasuredResult for
-        // the format. Empty when there is nothing worth saving - a partial measure is not a frame.
+        // the format. A partial measure is not a frame, so it is not saved - but neither does it erase one.
         private string SerializeMeasured()
         {
             if (!(Has(1) && Has(2) && Has(3) && Has(4)))
-                return string.Empty;
+                return savedMeasuredResult;
 
             Func<double?, string> f = v => v.HasValue
                 ? v.Value.ToString("0.#####", CultureInfo.InvariantCulture) : string.Empty;
@@ -1078,7 +1091,8 @@ namespace GCode_Sender
               .Append(f(measuredX)).Append('|').Append(f(measuredY)).Append('|').Append(f(spoilZ));
             for (int c = 1; c <= 4; c++)
                 sb.Append('|').Append(f(cornerX[c])).Append(',').Append(f(cornerY[c])).Append(',').Append(f(cornerZ[c]));
-            return sb.ToString();
+            savedMeasuredResult = sb.ToString();   // this IS the stored measurement now - keep the two in step
+            return savedMeasuredResult;
         }
 
         // Restore a saved measurement. Anything unexpected restores NOTHING rather than a partial frame: these
@@ -1086,6 +1100,7 @@ namespace GCode_Sender
         private void RestoreMeasured(string saved)
         {
             measuredRestoredUtc = null;
+            savedMeasuredResult = saved ?? string.Empty;   // keep it whatever happens below - see the field's note
             if (string.IsNullOrEmpty(saved))
                 return;
 
@@ -1099,7 +1114,15 @@ namespace GCode_Sender
                 const int headerFields = 6, cornerCount = 4;
                 var parts = saved.Split('|');
                 if (parts.Length != headerFields + cornerCount || parts[0] != "v1")
+                {
+                    // Say WHY. This returned silently through two builds while the readout just showed "X = -",
+                    // which is indistinguishable from "never measured" - so the bug looked like a missing
+                    // feature rather than a broken parse, twice.
+                    DebugLog.Write("startjob", string.Format(CultureInfo.InvariantCulture,
+                        "RestoreMeasured: REJECTED - {0} fields (want {1}), tag '{2}' - [{3}]",
+                        parts.Length, headerFields + cornerCount, parts.Length > 0 ? parts[0] : "", saved));
                     return;
+                }
 
                 Func<string, double?> p = t => string.IsNullOrEmpty(t) ? (double?)null
                     : double.TryParse(t, NumberStyles.Float, CultureInfo.InvariantCulture, out double v) ? v : (double?)null;
@@ -1125,15 +1148,25 @@ namespace GCode_Sender
                                       DateTimeStyles.RoundtripKind | DateTimeStyles.AdjustToUniversal, out DateTime when))
                     measuredRestoredUtc = when;
 
+                DebugLog.Write("startjob", string.Format(CultureInfo.InvariantCulture,
+                    "RestoreMeasured: OK - X={0:0.###} Y={1:0.###} corners c1 {2:0.###},{3:0.###} c4 {4:0.###},{5:0.###} measured {6}",
+                    measuredX ?? double.NaN, measuredY ?? double.NaN,
+                    cornerX[1] ?? double.NaN, cornerY[1] ?? double.NaN,
+                    cornerX[4] ?? double.NaN, cornerY[4] ?? double.NaN,
+                    measuredRestoredUtc.HasValue ? measuredRestoredUtc.Value.ToString("o") : "unknown"));
+
                 // The saved WCS is deliberately NOT applied over cbxWcs - the operator may have changed it on
                 // purpose since. It is carried so a later version can warn when the two disagree, which is the
                 // case where Verify skew would write an origin into a coordinate system nobody measured.
             }
-            catch
+            catch (Exception ex)
             {
                 for (int c = 1; c <= 4; c++) { cornerX[c] = cornerY[c] = cornerZ[c] = null; }
                 measuredX = measuredY = spoilZ = null;
                 measuredRestoredUtc = null;
+                // savedMeasuredResult is deliberately left alone - a parse we could not finish must not be
+                // grounds for deleting the operator's measurement on the next save.
+                DebugLog.Write("startjob", "RestoreMeasured: THREW - " + ex.Message + " - [" + saved + "]");
             }
         }
 
