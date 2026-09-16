@@ -2429,10 +2429,31 @@ namespace GCode_Sender
         // known. The probe runs off the UI thread; the actual switch is marshalled back and deferred so it runs
         // after the serial handshake has fully settled. Guarded against re-entry while a migration is in flight.
         private bool migratingToNetwork = false;
+
+        // ONE attempt per ioSender run, win or lose.
+        //
+        // migratingToNetwork below is only a re-entry guard - it is cleared in the finally, so it stops two
+        // migrations overlapping and does nothing about the NEXT one. And this method is called from JobView
+        // every time the controller info loads, which includes every reconnect. That closes a loop:
+        //
+        //   serial connects -> info loads -> migrate -> the telnet link answers the TCP handshake but not
+        //   g-code -> $I goes unanswered -> the capabilities prompt -> back to serial -> info loads ->
+        //   migrate again...
+        //
+        // Observed 2026-09-15 during a network outage, and it ended with the controller in CHECK MODE: the
+        // capabilities prompt's "stay connected" option sends $C, so a connection loop eventually answers
+        // that prompt in a way that latches check mode. The user's own words: "Prefer network should be a
+        // one shot per ioSender startup".
+        //
+        // Latched where the attempt is COMMITTED, not where it succeeds, so an unreachable controller
+        // spends the shot too - otherwise a network that is down for the whole session re-probes on every
+        // reconnect, which is the same loop with a 1.5 s delay in it.
+        private bool networkMigrationTried = false;
+
         public void TryMigrateToNetwork()
         {
             var cfg = AppConfig.Settings;
-            if (migratingToNetwork || cfg.Base == null || !cfg.Base.PreferNetwork)
+            if (networkMigrationTried || migratingToNetwork || cfg.Base == null || !cfg.Base.PreferNetwork)
                 return;
             if (Comms.com == null || !Comms.com.IsOpen || !cfg.Base.PortParams.ToLower().StartsWith("com"))
                 return;   // only migrate away from a serial/USB link
@@ -2441,12 +2462,13 @@ namespace GCode_Sender
                 return;
 
             migratingToNetwork = true;
+            networkMigrationTried = true;   // the one shot is spent HERE - see the field's own comment
             string serialTarget = cfg.Base.PortParams;
             var model = (GrblViewModel)DataContext;
 
             new Thread(() =>
             {
-                bool reachable = ProbeTcp(ip, 23, 1500);
+                bool reachable = ProbeGrblTelnet(ip, 23, 1500);
                 Dispatcher.BeginInvoke(new System.Action(() =>
                 {
                     try
@@ -2466,9 +2488,14 @@ namespace GCode_Sender
                             }
                             model.Message = migrated
                                 ? "Connection migrated to network (" + ip + ":23)"
-                                : "Network migration failed; staying on " + serialTarget;
+                                : "Network migration failed; staying on " + serialTarget + " - not retried until ioSender restarts.";
                             UpdateSimulatorTint();
                         }
+                        else if (!reachable)
+                            // Previously silent. An option that declines without a word reads as broken, and
+                            // now that the attempt is one-shot the operator needs to know it has been used.
+                            model.Message = "Prefer network: " + ip + ":23 did not answer - staying on " +
+                                            serialTarget + ", not retried until ioSender restarts.";
                     }
                     finally
                     {
@@ -2478,8 +2505,27 @@ namespace GCode_Sender
             }) { IsBackground = true }.Start();
         }
 
-        // Quick TCP reachability check: can we open a connection to host:port within timeoutMs?
-        private static bool ProbeTcp(string host, int port, int timeoutMs)
+        /// <summary>
+        /// Is there a grblHAL on host:port that actually TALKS - not merely something that accepts a socket?
+        /// </summary>
+        /// <remarks>
+        /// This used to be a TCP reachability check: connect, and if the handshake completed call it good.
+        /// That is not the question being asked. The caller is about to THROW AWAY A WORKING SERIAL LINK on
+        /// the strength of this answer, so the bar has to be "the controller responds", not "a port is open".
+        ///
+        /// 2026-09-15: during a network fault the controller had an IP and something completed the TCP
+        /// handshake on 23, but nothing answered g-code. The migration duly dropped serial, connected to a
+        /// mute socket, and the connect handshake's $I went unanswered five times - which raises the
+        /// "could not read capabilities" prompt, whose "stay connected" option sends $C. That is how the
+        /// machine ended up in CHECK MODE after a network outage.
+        ///
+        /// So: send '?' and require a status report back. '?' is a realtime command answered from the
+        /// controller's own input handler rather than the g-code queue, so it replies even on a machine
+        /// that is running, held or alarmed - there is no state in which a live grblHAL stays silent to it.
+        /// A report is anything between '&lt;' and '&gt;', which is cheap to recognise and impossible to
+        /// fake by a port merely being open.
+        /// </remarks>
+        private static bool ProbeGrblTelnet(string host, int port, int timeoutMs)
         {
             try
             {
@@ -2489,7 +2535,33 @@ namespace GCode_Sender
                     if (!ar.AsyncWaitHandle.WaitOne(timeoutMs))
                         return false;
                     client.EndConnect(ar);
-                    return client.Connected;
+                    if (!client.Connected)
+                        return false;
+
+                    var stream = client.GetStream();
+                    stream.WriteByte(0x3F);   // '?' - realtime status request
+                    stream.Flush();
+
+                    var buf = new byte[256];
+                    var sb = new System.Text.StringBuilder();
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    while (sw.ElapsedMilliseconds < timeoutMs)
+                    {
+                        if (!stream.DataAvailable)
+                        {
+                            System.Threading.Thread.Sleep(20);
+                            continue;
+                        }
+                        int n = stream.Read(buf, 0, buf.Length);
+                        if (n <= 0)
+                            break;
+                        sb.Append(System.Text.Encoding.ASCII.GetString(buf, 0, n));
+                        string seen = sb.ToString();
+                        int lt = seen.IndexOf('<');
+                        if (lt >= 0 && seen.IndexOf('>', lt) > lt)
+                            return true;   // a real status report - this is a grblHAL and it is listening
+                    }
+                    return false;   // accepted the socket and said nothing: NOT worth losing serial for
                 }
             }
             catch
