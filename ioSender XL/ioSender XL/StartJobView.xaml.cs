@@ -1310,7 +1310,7 @@ namespace GCode_Sender
 
                     var angLbl = new TextBlock
                     {
-                        Text = string.Format(CultureInfo.InvariantCulture, "{0:0.0}Â°", ang),
+                        Text = string.Format(CultureInfo.InvariantCulture, "{0:0.0}°", ang),
                         FontSize = 22d,
                         TextAlignment = TextAlignment.Center,
                         Background = Brushes.White,
@@ -1473,7 +1473,7 @@ namespace GCode_Sender
 
             double? skew = SkewDegrees(), diag = DiagonalDelta();
             if (skew.HasValue && diag.HasValue)
-                sb.AppendFormat("\nSquareness: skew {0}Â°   (diagonal Î” {1})",
+                sb.AppendFormat("\nSquareness: skew {0}°   (diagonal Δ {1})",
                     skew.Value.ToString("0.###", CultureInfo.InvariantCulture),
                     FormatLen(diag.Value));
 
@@ -1481,7 +1481,7 @@ namespace GCode_Sender
             // (corners 1/3 are Y-face-blocked - see BuildViseProgram). This is its own left-edge-vs-jaw-Y-face
             // check, from corners 1/3's probed X alone (see rxViseSkew/LS_VISE_SKEW).
             if (viseLeftEdgeSkewDeg.HasValue)
-                sb.AppendFormat("\nVise left-edge skew: {0}Â°", viseLeftEdgeSkewDeg.Value.ToString("0.###", CultureInfo.InvariantCulture));
+                sb.AppendFormat("\nVise left-edge skew: {0}°", viseLeftEdgeSkewDeg.Value.ToString("0.###", CultureInfo.InvariantCulture));
 
             if (measureRun && probed < 4)
                 sb.AppendFormat("\n(probing... {0}/4 corners)", probed);

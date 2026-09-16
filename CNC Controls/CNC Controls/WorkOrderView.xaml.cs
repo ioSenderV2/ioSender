@@ -1186,8 +1186,8 @@ namespace CNC.Controls
                     : "Not a standard drill size - use a Bore operation instead.";
             else if (op.Kind == WorkOrderOpKind.Bore)
                 txtDrillMatch.Text = WorkOrderRules.NeedsSteppedBore(op.HoleDiameter, op.BitDiameter)
-                    ? string.Format("Bored with the Ã˜{0:0.##} mm bit in stepped helical passes (the bit alone can't reach the middle of a Ã˜{1:0.##} mm hole).", op.BitDiameter, op.HoleDiameter)
-                    : string.Format("Bored in one continuous helix with the Ã˜{0:0.##} mm bit.", op.BitDiameter);
+                    ? string.Format("Bored with the Ø{0:0.##} mm bit in stepped helical passes (the bit alone can't reach the middle of a Ø{1:0.##} mm hole).", op.BitDiameter, op.HoleDiameter)
+                    : string.Format("Bored in one continuous helix with the Ø{0:0.##} mm bit.", op.BitDiameter);
             // Stepover only matters where an enclosed area gets cleared - a pocket, a floor lap, or a bore
             // wide enough to need more than one helix.
             Show(fldStepover, op.Kind == WorkOrderOpKind.Pocket || op.Kind == WorkOrderOpKind.BottomFinish || op.Kind == WorkOrderOpKind.Surface
