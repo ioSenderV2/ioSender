@@ -2314,7 +2314,24 @@ namespace GCode_Sender
         {
             // Inset so the probe tip's EDGE sits on the corner. A fly-over wants the tip ON the corner - there is
             // nothing being felt for - and it must also work with no probe defined at all, hence the 0.
-            double r = touch ? p.ProbeDiameter / 2d : 0d;
+            // Inset so the tool's EDGE sits on the corner, in BOTH modes.
+            //
+            // Probing has to: the tip must be over the stock or the G38.3 finds nothing. The fly-over used to
+            // inset by nothing, putting the tool CENTRE on the corner - which sounds like the honest choice and
+            // is the wrong one, because a 1/4" tool centred on a corner COVERS the corner. The operator is then
+            // sighting at the one thing the tool is hiding. Reported by the user after running it.
+            //
+            // Inset by the radius and the tool sits fully on the stock with its circumference passing through
+            // the corner point: both edges stay visible running away from where the tool's edge meets them, and
+            // the judgement becomes "does it just kiss the corner" instead of "what is under there".
+            //
+            // The fly-over's diameter is whatever is actually in the collet, not a probe's tip - there may be no
+            // 3D probe defined at all on this setup. ActiveOrFallbackProbeDiameter prefers a loaded program's
+            // (TOOL T=n D=..) comment and falls back to the probe definition's own fallback-diameter field,
+            // which documents itself as exactly this. No probe definition at all -> no inset, rather than throw.
+            var flyProbe = touch ? p : ActiveProbe();
+            double r = flyProbe == null ? 0d
+                     : (touch ? flyProbe.ProbeDiameter : ActiveOrFallbackProbeDiameter(flyProbe)) / 2d;
             double search = touch && p.ProbeFeedRate > 0d ? p.ProbeFeedRate : 200d;
             const double probeDepth = 3d;                            // work Z: probe to 3 below the corner's own top
 
@@ -2411,7 +2428,7 @@ namespace GCode_Sender
 
             L(touch
                 ? "(Verify skew - touch each corner in the rotated work frame. Each should touch the surface right at the corner.)"
-                : string.Format("(Verify skew, FLY-OVER - visit each corner in the rotated work frame, crossing at machine top and dropping to {0}mm above each corner's measured top. Nothing is probed; sight the tip against each corner.)", N(flySightGap)));
+                : string.Format("(Verify skew, FLY-OVER - visit each corner in the rotated work frame, crossing at machine top and dropping to {0}mm above each corner's measured top. Nothing is probed. Each point is inset by the tool RADIUS, so the tool's edge should sit on the corner - not its centre.)", N(flySightGap)));
             L("(Front-left/right define the frame (ideal == measured).)");
             L("(Back-left/right are visited twice: the ideal rectangle point, then the actual probed corner - the gap between the two is the out-of-square amount.)");
             // G53 is NonModal_AbsoluteOverride, which gcode.c's rotation block explicitly exempts, so a G53 move
@@ -2433,7 +2450,7 @@ namespace GCode_Sender
             L("(WAITIDLE)");
             L(touch
                 ? "(MBOX, OKCANCEL, Install the 3D probe. This touches each corner to check the skew. Click OK to start.)"
-                : string.Format("(MBOX, OKCANCEL, Fly-over check - the machine visits each corner of the measured frame, crossing at machine top and dropping to {0}mm above the measured stock top at each one. Nothing is probed. Watch whether the tool tip lines up with each corner.{1} Take off the touch plate if one is still on the stock - {0}mm above the stock top is inside it. That gap is measured from the tops this measure probed, so it is only {0}mm if the SAME tool and tool-length offset are still in the spindle. Click OK to start.)",
+                : string.Format("(MBOX, OKCANCEL, Fly-over check - the machine visits each corner of the measured frame, crossing at machine top and dropping to {0}mm above the measured stock top at each one. Nothing is probed. Each point is inset by the tool radius, so look for the EDGE of the tool sitting on the corner, not its centre.{1} Take off the touch plate if one is still on the stock - {0}mm above the stock top is inside it. That gap is measured from the tops this measure probed, so it is only {0}mm if the SAME tool and tool-length offset are still in the spindle. Click OK to start.)",
                     N(flySightGap),
                     measuredRestoredUtc.HasValue
                         ? " NOTE: these corners were RESTORED from the measure of " + measuredRestoredUtc.Value.ToLocalTime().ToString("ddd d MMM HH:mm") + ", not measured this session - check the tool is the one that measured them."
