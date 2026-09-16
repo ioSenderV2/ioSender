@@ -1556,11 +1556,26 @@ namespace CNC.Controls
             // order's own effective WCS (WorkOrderCompiler.ResolveWcs - follows Setup live if wo.Wcs is 0,
             // otherwise the pinned slot) rather than whatever happens to be active on the DRO right now -
             // see WorkOrder.Wcs's own comment on why those can differ.
+            // A rotated WCS no longer REFUSES the run, and the old claim behind that refusal was wrong.
+            //
+            // It said "Work Order toolpaths don't account for WCS rotation and would cut skewed". They do
+            // not need to: every cutting move this compiler emits is a WORK-coordinate move, and the
+            // firmware rotates those itself - which is the entire point of measuring a skewed stock. The
+            // G53 retract and G30 park are machine moves and the firmware exempts G53 from rotation
+            // (NonModal_AbsoluteOverride, gcode.c), so they are unaffected too.
+            //
+            // The one operation that genuinely could not tolerate it was Entire spoilboard, which mixes
+            // frames - and that is fixed at its source now, by clearing the rotation on the scratch slot it
+            // claims (see WorkOrderCompiler.BuildSurfaceEntireSpoilboard) rather than by forbidding the
+            // whole feature.
+            //
+            // What remains is worth SAYING and not worth blocking: the stock canvas and the 3D preview draw
+            // unrotated, so with a rotation set the picture no longer matches what the machine will cut.
             string wcs = WorkOrderCompiler.WcsCode(wo);
             var wcsData = GrblWorkParameters.GetCoordinateSystem(wcs);
             if (wcsData != null && Math.Abs(wcsData.Rotation) > 1e-6)
-                warnings.Add(string.Format(CultureInfo.InvariantCulture,
-                    "{0} has a {1:0.###} deg rotation set - Work Order toolpaths don't account for WCS rotation and would cut skewed. Clear the rotation (or switch to an unrotated WCS) before generating.",
+                advisories.Add(string.Format(CultureInfo.InvariantCulture,
+                    "{0} has a {1:0.###} deg rotation set. The cut follows it - that is what it is for - but the preview and stock drawing are shown unrotated, so they will not match the finished part.",
                     wcs, wcsData.Rotation));
 
             // Mark only resolves to dimples at hole centres and NOTHING else, so a work order with no

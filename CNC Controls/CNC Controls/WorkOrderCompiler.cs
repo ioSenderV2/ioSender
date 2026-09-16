@@ -1836,7 +1836,22 @@ namespace CNC.Controls
             lines.Add("(WAITIDLE)");
             lines.Add("(MBOX, OKCANCEL, Z0 is set and Z is raised to the top. Fit the dust boot / do any final prep, then click OK to start. Click Cancel to abort.)");
             lines.Add("(WAITIDLE)");
-            lines.Add(string.Format("G10 L2 P{0} X{1} Y{2}", scratchP, F(ox), F(oy)));
+            // R0 - clear any rotation on the scratch slot as we claim it.
+            //
+            // This operation is the ONE place in the compiler that mixes frames: ox/oy are MACHINE
+            // coordinates of the travel-envelope corner, used both as the G53 target above and as this
+            // WCS origin, after which the whole raster is cut in WORK coordinates. A rotation on this slot
+            // would turn that raster while the machine-referenced setup and the envelope arithmetic assume
+            // it is square - and this is the one toolpath sized to the FULL envelope, so there is no margin
+            // to absorb it. G10 L2 with X/Y does NOT clear an existing rotation, so without the R word the
+            // slot keeps whatever it was last left holding.
+            //
+            // Gated on the controller reporting WCSROT: on firmware without ROTATION_ENABLE the R word is
+            // error:20, and there can be no rotation to clear on such a controller anyway. Same gate, same
+            // reasoning, as StartJobView's own rotation handling.
+            lines.Add(GrblInfo.RotationSupported
+                ? string.Format("G10 L2 P{0} X{1} Y{2} R0", scratchP, F(ox), F(oy))
+                : string.Format("G10 L2 P{0} X{1} Y{2}", scratchP, F(ox), F(oy)));
             lines.Add(ScratchWcs());
             lines.Add("G0 Z" + F(SafeZ()));
 
