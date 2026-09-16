@@ -472,6 +472,14 @@
                               DisplayMemberPath="Label" SelectedValuePath="Id" ToolTipService.ShowOnDisabled="True"
                               SelectionChanged="VerifyTool_SelectionChanged"
                               ToolTip="Fly-over only: change to this V-bit before visiting the corners. Its point sights each corner exactly, and the tool change re-references the tool length so the 2mm sight gap is real rather than assumed. Leave at (none) to use whatever is already in the spindle. Only V-bit / chamfer tools are listed."/>
+                    <!-- Its OWN button, deliberately not a third mode on Verify skew: this one CUTS. It runs the
+                         spindle and leaves a permanent mark, and that must not sit one checkbox away from a
+                         check that touches nothing. What it buys is the only measurable test in the set - a
+                         scribed line turns an angular error into a taper you read with calipers, where every
+                         other check here is an eyeball judgement at a point. -->
+                    <Button x:Uid="ls_scribesquare" x:Name="btnScribe" Content="Scribe square" MinWidth="90" MinHeight="26" Margin="10,0,0,0" Click="ScribeSquare_Click" IsEnabled="False"
+                            ToolTipService.ShowOnDisabled="True"
+                            ToolTip="CUTS a shallow square into the stock with the selected V-bit, inset 10mm from every edge of the measured frame, following the probed surface. Measure the scribed line against each stock edge afterwards: if the rotation is right the gap to the front edge is a constant 10mm end to end. Needs four probed corners and a V-bit selected."/>
                 </StackPanel>
             </StackPanel>
         </Grid>

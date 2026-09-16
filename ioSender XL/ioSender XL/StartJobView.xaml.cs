@@ -1298,6 +1298,12 @@ namespace GCode_Sender
 
             // Only the fly-over uses it - the touching form goes down on the 3D probe, not on a V-bit.
             cbxVerifyTool.IsEnabled = chkVerifyTouch.IsChecked != true;
+
+            // Scribing needs the same four corners Verify skew does, plus an actual V-bit to cut with - there
+            // is no "use whatever is in the spindle" here, because the program has to know the tool to pick a
+            // speed and feed for it and to re-reference its length.
+            if (btnScribe != null)
+                btnScribe.IsEnabled = btnVerify.IsEnabled && VerifyFlyoverTool() != null;
         }
 
         private void ShowResult()
@@ -2401,6 +2407,158 @@ namespace GCode_Sender
         // You sight the tip against each corner instead of feeling for it. Worth having because the touching
         // form's resolution is set by the probe tip radius anyway (3+ mm on a touch-plate-sized tip), so a
         // frame that is rotated or displaced wrong shows up to the eye about as well as it does to the probe.
+        // Scribe square: cut a shallow rectangle inset 10 mm from the measured frame, with the selected V-bit.
+        //
+        // Every other check in this panel judges a POINT, and a point can only be judged by eye. A scribed line
+        // turns an angular error into a TAPER measured with calipers, over the full length of the stock: if the
+        // rotation is right the gap from the scribed line to the front edge is a constant 10 mm end to end, and
+        // a sign error would show as that gap tapering by 2 * length * sin(angle) - 2.6 mm on this stock, which
+        // no eyeball check at a corner could ever have resolved. That is how the original sign error survived.
+        private void ScribeSquare_Click(object sender, RoutedEventArgs e)
+        {
+            if (model == null)
+                return;
+            var vbit = VerifyFlyoverTool();
+            if (vbit == null)
+            {
+                AppDialogs.Show("Select a V-bit first - the scribe needs to know which tool it is cutting with, both to re-reference its length and to pick a speed and feed for it.",
+                    "Scribe square", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+            if (!(Has(1) && Has(2) && Has(3) && Has(4)))
+            {
+                AppDialogs.Show("Measure the stock first - all four corners must be probed before a square can be scribed against them.",
+                    "Scribe square", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            string scribe = BuildScribeProgram(vbit, cbxWcs.SelectedIndex + 1);
+            EnsureProgramView();
+            programView.SetProgramText(scribe);
+            programView.Connect();
+            MacroProcessor.Run(model, "Scribe square", scribe, true);
+        }
+
+        private string BuildScribeProgram(CustomTool vbit, int wcsP)
+        {
+            const double inset = 10d;        // from every edge of the measured frame
+            const double depth = 0.25d;      // below the probed surface - a line to read, not a cut
+            const double clearZ = 5d;        // above the surface between the plunge and the retract
+
+            // Same frame Verify skew builds: FL is the origin, the front edge is work +X.
+            double rot = Math.Atan2(cornerY[2].Value - cornerY[1].Value, cornerX[2].Value - cornerX[1].Value);
+            double rotDeg = rot * 180d / Math.PI;
+            double cos = Math.Cos(rot), sin = Math.Sin(rot);
+            double WXc(int c) { double dx = cornerX[c].Value - cornerX[1].Value, dy = cornerY[c].Value - cornerY[1].Value; return dx * cos + dy * sin; }
+            double WYc(int c) { double dx = cornerX[c].Value - cornerX[1].Value, dy = cornerY[c].Value - cornerY[1].Value; return -dx * sin + dy * cos; }
+
+            // The PROBED frame, not the measured means. measuredX/Y average the two opposite spans, so a
+            // rectangle built from them sits at 10 mm from nothing in particular; built from the frame being
+            // verified, "the gap to the front edge is exactly 10 mm" becomes an exact prediction to check.
+            double fx = WXc(2), ly = WYc(3);
+
+            // Inset TOWARD the interior, and the interior's Y direction depends on the machine's handedness -
+            // WY(3) is signed for exactly that reason, and assuming +Y is what once drove a probe off the table
+            // into Alarm:2. With a negative ly the whole rectangle lives in negative work Y, so both insets flip
+            // with it. fx is a length and always positive.
+            double yDir = ly < 0d ? -1d : 1d;
+            double x0 = inset, x1 = fx - inset;
+            double y0 = inset * yDir, y1 = ly - inset * yDir;
+
+            // Work Z at a point, from a BILINEAR interpolation of the four probed corner tops. The stock is not
+            // flat - this one spans 0.3 mm - so a single datum would scribe deep at one corner and miss at
+            // another. Work Z0 is corner 1's top, hence the subtraction.
+            //
+            // Along each side of the rectangle one parameter is constant, so bilinear collapses to LINEAR: a
+            // single G1 carrying X, Y and Z is exact over that side and no segmentation is needed.
+            double z1 = cornerZ[1] ?? 0d, z2 = cornerZ[2] ?? z1, z3 = cornerZ[3] ?? z1, z4 = cornerZ[4] ?? z1;
+            double SurfZ(double x, double y)
+            {
+                double u = fx > 1e-6 ? x / fx : 0d, v = Math.Abs(ly) > 1e-6 ? y / ly : 0d;
+                double z = (1d - u) * (1d - v) * z1 + u * (1d - v) * z2 + (1d - u) * v * z3 + u * v * z4;
+                return z - z1;                                  // machine -> work Z
+            }
+            double CutZ(double x, double y) { return SurfZ(x, y) - depth; }
+
+            // Speeds and feeds from the same advisor the Odd Jobs dialog uses, for THIS tool in THIS material -
+            // a V-bit and a chamfer bit share the advisor's conical path ("chamfer"). Recommended values can be
+            // absent (an unknown material), so each falls back to something conservative rather than to zero,
+            // which would be a feed of nothing and a spindle that never starts.
+            var rec = FeedsSpeedsAdvisor.Evaluate(new FeedsSpeedsOperation
+            {
+                Id = "scribe",
+                Strategy = "adaptive",
+                Tool = new FeedsSpeedsTool { Name = vbit.Name, Type = "chamfer", DiameterMm = vbit.DiameterMm, Flutes = vbit.Flutes },
+                Current = new FeedsSpeedsCurrent { AxialStep = depth }
+            }, cbxMaterial.SelectedItem as string ?? string.Empty);
+            FeedsSpeedsAdvisor.ApplyMachineLimits(rec);
+            double rpm = rec.Rpm.Recommended ?? (vbit.DefaultRpm > 0d ? vbit.DefaultRpm : 16000d);
+            double feed = rec.CuttingFeed.Recommended ?? 1000d;
+            double plunge = rec.PlungeFeed.Recommended ?? 300d;
+
+            var b = new StringBuilder();
+            void L(string s) { b.Append(SanitizeParens(s)).Append('\n'); }
+
+            L(string.Format(CultureInfo.InvariantCulture,
+                "(Scribe square - a {0}mm-deep rectangle inset {1}mm from the measured frame, cut with the {2}.)", N(depth), N(inset), vbit.Name));
+            L("(Measure the scribed line against each stock edge afterwards. The gap to the FRONT edge is the rotation check - it should be constant end to end.)");
+            L("(The other three gaps taper by however far out of square the stock is; that is the stock, not the frame.)");
+            MacroProcessor.EmitProgramHeader(L, "connected, homed, noalarm, EXPR, G30");
+            MacroProcessor.EmitModalDefaults(L);
+
+            L(WcsCode(wcsP) + "  (activate the WCS the measure set - origin)");
+            if (GrblInfo.RotationSupported)
+                EmitRotationWrite(L, string.Format("G10 L2 {0} R0", pCode(wcsP)));
+            L("G53 G0 Z0");
+            L("(WAITIDLE)");
+            L(string.Format(CultureInfo.InvariantCulture,
+                "(MBOX, OKCANCEL, THIS CUTS. It scribes a {0}mm-deep rectangle {1}mm inside every edge of the measured frame, {2} x {3}mm, with the {4} at {5} RPM. The mark is PERMANENT and lands on the part unless your part is inset further than {1}mm. It follows the probed surface, so the depth holds across the stock's {6}mm of flatness. Click OK to cut.)",
+                N(depth), N(inset), N(x1 - x0), N(Math.Abs(y1 - y0)), vbit.Name, N(Math.Round(rpm)), N(Flatness() ?? 0d)));
+            L("(WAITIDLE)");
+            L("G53 G0 Z0");
+
+            // Tool change BEFORE the rotation goes on: tc.macro does G53 moves and probes the toolsetter, and
+            // the G43.1 it applies is what puts this tool's length in the frame the corners were measured in.
+            L(string.Format("(--- change to {0} ---)", vbit.Name));
+            L(string.Format("M6 T{0}", vbit.Id.ToString(CultureInfo.InvariantCulture)));
+            L("(WAITIDLE)");
+            L("G53 G0 Z0");
+
+            if (GrblInfo.RotationSupported)
+                EmitRotationWrite(L, string.Format("G10 L2 {0} X{1} Y{2} R{3}", pCode(wcsP),
+                    N(cornerX[1].Value * cos + cornerY[1].Value * sin),
+                    N(-cornerX[1].Value * sin + cornerY[1].Value * cos),
+                    N(rotDeg)));
+
+            L(string.Format("M3 S{0}", N(Math.Round(rpm))));
+            L("(WAITIDLE)");
+            L(string.Format("(--- scribe {0} x {1}mm, {2}mm inside the frame ---)", N(x1 - x0), N(Math.Abs(y1 - y0)), N(inset)));
+            L(string.Format("G0 X{0} Y{1}", N(x0), N(y0)));
+            L(string.Format("G0 Z{0}", N(SurfZ(x0, y0) + clearZ)));
+            L(string.Format("G1 Z{0} F{1}", N(CutZ(x0, y0)), N(plunge)));
+            // Round trip, closing on the start corner. Z on every move: bilinear is linear along a side, so the
+            // controller's own interpolation follows the surface exactly between these endpoints.
+            L(string.Format("G1 X{0} Y{1} Z{2} F{3}", N(x1), N(y0), N(CutZ(x1, y0)), N(feed)));
+            L(string.Format("G1 X{0} Y{1} Z{2}", N(x1), N(y1), N(CutZ(x1, y1))));
+            L(string.Format("G1 X{0} Y{1} Z{2}", N(x0), N(y1), N(CutZ(x0, y1))));
+            L(string.Format("G1 X{0} Y{1} Z{2}", N(x0), N(y0), N(CutZ(x0, y0))));
+            L(string.Format("G0 Z{0}", N(SurfZ(x0, y0) + clearZ)));
+            L("M5");
+            L("(WAITIDLE)");
+
+            // Park at G30 exactly as Verify skew does - rotation cleared for the G53 moves, restored after.
+            L("(--- park at G30 ---)");
+            if (GrblInfo.RotationSupported)
+                EmitRotationWrite(L, string.Format("G10 L2 {0} R0", pCode(wcsP)));
+            L("G53 G0 Z0");
+            L("G53 G0 X[#5181] Y[#5182]");
+            L("G53 G0 Z[#5183]");
+            if (GrblInfo.RotationSupported)
+                EmitRotationWrite(L, string.Format("G10 L2 {0} R{1}", pCode(wcsP), N(rotDeg)));
+            L("M2");
+            return b.ToString();
+        }
+
         private string BuildVerifyProgram(ProbeDefinition p, int wcsP, bool touch)
         {
             // Inset so the probe tip's EDGE sits on the corner. A fly-over wants the tip ON the corner - there is
