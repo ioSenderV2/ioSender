@@ -161,8 +161,10 @@
         <!-- Content set in code-behind (UpdateRunButtonLabel) - "Feed Hold" by default, "Pause" when
              AppConfig.Base.UseFriendlyRunLabels is on, same condition as the Run button's own swap. Left as
              a literal here purely as the design-time/fallback value. -->
-        <Button x:Uid="btn_feedHold" x:Name="btnHold" Content="Feed Hold" ToolTip="Space" Style="{StaticResource JobButtonStyle}" IsEnabled="{Binding Path=IsFeedHoldEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="5,0,0,0" Click="btnHold_Click"/>
-        <Button x:Uid="btn_stop" x:Name="btnStop" Content="Stop" ToolTip="Alt+S" Style="{StaticResource JobButtonStyle}" IsEnabled="{Binding Path=IsStopEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="5,0,0,0" Click="btnStop_Click"/>
+        <Button x:Uid="btn_feedHold" x:Name="btnHold" Content="Feed Hold" ToolTip="Space" Style="{StaticResource JobButtonStyle}" IsEnabled="{Binding Path=IsFeedHoldEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                Visibility="{Binding Path=FeedHoldVisibility, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="5,0,0,0" Click="btnHold_Click"/>
+        <Button x:Uid="btn_stop" x:Name="btnStop" Content="Stop" ToolTip="Alt+S" Style="{StaticResource JobButtonStyle}" IsEnabled="{Binding Path=IsStopEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                Visibility="{Binding Path=StopVisibility, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="5,0,0,0" Click="btnStop_Click"/>
         <!-- There was a Rewind button here. Removed 2026-08-06: it was unreachable in practice. Stopping a
              running job hands off to StreamingAwaitIdle, whose Idle case calls RewindFile() as soon as the
              machine reports Idle, so job.CurrBlock is already 0 by the time JobRunner.CanRewind is evaluated

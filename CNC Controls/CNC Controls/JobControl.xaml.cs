@@ -175,6 +175,7 @@ namespace CNC.Controls
 
                 case nameof(JobRunner.CanStop):
                     IsStopEnabled = runner.CanStop;
+                    UpdateRunBarVisibility();   // Stop shows exactly when it would do something
                     break;
 
                 // JobRunner.CanRewind is deliberately NOT mirrored - the Rewind button was removed (see
@@ -339,6 +340,55 @@ namespace CNC.Controls
             set { SetValue(IsStopEnabledEnabledProperty, value); }
         }
 
+        // Feed Hold and Stop are HIDDEN when they mean nothing, rather than sitting there greyed out.
+        //
+        // They follow DIFFERENT rules, because they answer different questions (user's call 2026-09-15):
+        //
+        //   Feed Hold is about MOTION. It is the one control that stops a moving machine, so it appears
+        //   whenever the machine can move - Run, Hold, Jog, Tool, Door. Jog matters and is easy to miss:
+        //   grblHAL reports it as its own state, not as Run, and a feed hold during a jog decelerates and
+        //   cancels it. Hiding it there would take the brake away in exactly the case JobRunner's own
+        //   comment singles out - "a jog into a fixture is when you reach for it".
+        //
+        //   Stop is about a JOB. With nothing streaming there is nothing to stop, so it simply follows
+        //   IsStopEnabled - visible exactly when pressing it would do something.
+        //
+        // Collapsed, not Hidden: both are the LAST two controls in the run strip's StackPanel, so
+        // reclaiming their space shifts nothing else. (Were anything to their right, this would have to be
+        // Hidden - a control bar whose buttons move under the cursor is how a mis-click happens.)
+        public static readonly DependencyProperty FeedHoldVisibilityProperty =
+            DependencyProperty.Register(nameof(FeedHoldVisibility), typeof(Visibility), typeof(JobControl),
+                                        new PropertyMetadata(Visibility.Collapsed));
+        public Visibility FeedHoldVisibility
+        {
+            get { return (Visibility)GetValue(FeedHoldVisibilityProperty); }
+            set { SetValue(FeedHoldVisibilityProperty, value); }
+        }
+
+        public static readonly DependencyProperty StopVisibilityProperty =
+            DependencyProperty.Register(nameof(StopVisibility), typeof(Visibility), typeof(JobControl),
+                                        new PropertyMetadata(Visibility.Collapsed));
+        public Visibility StopVisibility
+        {
+            get { return (Visibility)GetValue(StopVisibilityProperty); }
+            set { SetValue(StopVisibilityProperty, value); }
+        }
+
+        /// <summary>
+        /// Re-evaluate which of Feed Hold / Stop are worth showing. Called on every GrblState change and
+        /// whenever the runner's own Stop gate moves.
+        /// </summary>
+        private void UpdateRunBarVisibility()
+        {
+            var state = model == null ? GrblStates.Unknown : model.GrblState.State;
+
+            bool canMove = state == GrblStates.Run || state == GrblStates.Hold || state == GrblStates.Jog ||
+                           state == GrblStates.Tool || state == GrblStates.Door;
+
+            FeedHoldVisibility = canMove ? Visibility.Visible : Visibility.Collapsed;
+            StopVisibility = IsStopEnabled ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         private void JobControl_Loaded(object sender, RoutedEventArgs e)
         {
             if (!System.ComponentModel.DesignerProperties.GetIsInDesignMode(this))
@@ -450,6 +500,7 @@ namespace CNC.Controls
                 case nameof(GrblViewModel.GrblState):
                     runner.GrblStateChanged((sender as GrblViewModel).GrblState);
                     UpdateRunButtonLabel();   // IsCheckMode is derived from GrblState - no PropertyChanged of its own
+                    UpdateRunBarVisibility();
                     break;
 
                 case nameof(GrblViewModel.IsDryRunMode):
