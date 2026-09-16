@@ -1056,6 +1056,32 @@ namespace GCode_Sender
             ShowResult();
         }
 
+        // "Touch corners" can only mean anything when there is a 3D probe to touch WITH - the six G38.3 moves
+        // probe the stock's top face, which a touch plate cannot do (it needs the plate physically under the
+        // tool at each point) and a tool setter certainly cannot. So the checkbox follows the probe library
+        // rather than sitting at a hopeful default: with no 3D probe defined it is cleared and disabled, and
+        // Verify skew does the fly-over, which needs no probe at all.
+        //
+        // Shipped default-ticked, which on a library of tool-setter + touch-plate only - a perfectly normal
+        // setup, and the one this was first run on - meant the button's ONLY reachable behaviour was a dialog
+        // saying "select a probe definition first". The no-probe mode existed and could not be got at without
+        // knowing to untick a box whose label says nothing about probes. Reported 2026-09-16.
+        //
+        // Only forced when unavailable: once a 3D probe exists the operator's own choice is left alone.
+        private void RefreshVerifyTouchAvailability()
+        {
+            if (chkVerifyTouch == null)
+                return;
+
+            // The tooltip stays in XAML (one localised string, covering both states) with
+            // ToolTipService.ShowOnDisabled - a disabled control shows no tooltip by default in WPF, which
+            // would have hidden the explanation exactly when it is needed.
+            bool has3D = ThreeDProbe() != null;
+            chkVerifyTouch.IsEnabled = has3D;
+            if (!has3D)
+                chkVerifyTouch.IsChecked = false;
+        }
+
         private void ShowResult()
         {
             int probed = 0;
@@ -1066,6 +1092,7 @@ namespace GCode_Sender
             btnCopySize.IsEnabled = measuredX.HasValue && measuredY.HasValue;
             // Verify skew needs all four corners (a full measure run) and a controller that applies WCS rotation.
             btnVerify.IsEnabled = GrblInfo.RotationSupported && Has(1) && Has(2) && Has(3) && Has(4);
+            RefreshVerifyTouchAvailability();
 
             CheckSizeAgainstEntered(probed);
         }
@@ -1571,6 +1598,9 @@ namespace GCode_Sender
             UpdateProbeWarning();
             UpdateFixtureWarning();   // also drives chkRotate visibility (gated on RotationSupported AND the fixture type probing edges)
             UpdateExpressionWarning();
+            // Also here, not just in ShowResult: the probe library can be edited while the app runs, and the tab
+            // is entered long before any measure has produced a result to show.
+            RefreshVerifyTouchAvailability();
             chkSetTloRef.Visibility = GrblInfo.HasATC ? Visibility.Visible : Visibility.Collapsed;
         }
 
@@ -2109,7 +2139,13 @@ namespace GCode_Sender
             var p = ThreeDProbe();
             if (p == null && touch)
             {
-                AppDialogs.Show(CNC.Controls.LibStrings.FindResource("HmSelectProbe"),
+                // NOT the shared HmSelectProbe string. That says "select a probe definition first" - which names
+                // no particular probe, and on a library that already HAS two (tool setter, touch plate) reads as
+                // nonsense. Say which kind is missing, and say that the check can run without one, because it
+                // can: untick "Touch corners" and it flies over the same six points at machine top.
+                AppDialogs.Show("Touching the corners needs a 3D probe, and none is defined - a touch plate or tool setter cannot probe the stock's top face at each corner.\n\n" +
+                                "Untick \"Touch corners\" to run the check as a fly-over instead: the machine visits the same six points at machine top so you can sight the tool tip against each corner. Nothing descends and no probe is needed.\n\n" +
+                                "To probe instead, add a 3D probe under Machine Setup > Probe definitions.",
                     "Verify skew", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }

@@ -453,9 +453,13 @@
                          top with no Z descent at all, so it needs no probe, cannot reach the stock, and does not
                          care what tool-length offset is active. Ticked adds the G38.3 touch at each point (needs
                          a 3D probe defined and fitted). Default ticked - the touch is the more informative check. -->
+                    <!-- ToolTipService.ShowOnDisabled because this control's DISABLED state is the one that needs
+                         explaining: WPF shows no tooltip on a disabled control by default, which would hide the
+                         reason exactly when the operator is looking for it. Cleared and disabled when no 3D probe
+                         is defined - see RefreshVerifyTouchAvailability. -->
                     <CheckBox x:Uid="ls_verifytouch" x:Name="chkVerifyTouch" Content="Touch corners" IsChecked="True"
-                              VerticalAlignment="Center" Margin="10,0,0,0"
-                              ToolTip="Ticked: probe down at each corner (needs a 3D probe fitted). Unticked: just fly over the six points at machine top so you can sight the tip - no probe needed."/>
+                              VerticalAlignment="Center" Margin="10,0,0,0" ToolTipService.ShowOnDisabled="True"
+                              ToolTip="Ticked: probe down at each corner - needs a 3D probe defined and fitted. Unticked: fly over the six points at machine top so you can sight the tool tip against each corner - no probe needed. Disabled when no 3D probe is defined."/>
                 </StackPanel>
             </StackPanel>
         </Grid>
