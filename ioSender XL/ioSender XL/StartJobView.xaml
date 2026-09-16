@@ -460,6 +460,18 @@
                     <CheckBox x:Uid="ls_verifytouch" x:Name="chkVerifyTouch" Content="Touch corners" IsChecked="True"
                               VerticalAlignment="Center" Margin="10,0,0,0" ToolTipService.ShowOnDisabled="True"
                               ToolTip="Ticked: probe down at each corner - needs a 3D probe defined and fitted. Unticked: fly over the six points at machine top so you can sight the tool tip against each corner - no probe needed. Disabled when no 3D probe is defined."/>
+                    <!-- Fly-over only, and V-BITS ONLY (CustomToolKind.VBitOrChamfer). Two reasons, and neither
+                         is convenience. A V-bit's tip IS a point, so it sights a corner exactly - which is why
+                         the program centres it on the corner rather than insetting by a radius as it must for a
+                         round tool that would otherwise hide what you are looking at. And the M6 runs tc.macro,
+                         which applies a G43.1 against the machine-wide baseline, so the tool-length offset then
+                         matches the frame the corners were measured in and the 2mm sight gap is correct by
+                         construction instead of assumed. "(none)" leaves the spindle alone. -->
+                    <TextBlock x:Uid="lbl_verifytool" Text="V-bit:" VerticalAlignment="Center" Margin="12,0,4,0"/>
+                    <ComboBox x:Uid="cbx_verifytool" x:Name="cbxVerifyTool" MinWidth="150" VerticalAlignment="Center"
+                              DisplayMemberPath="Name" SelectedValuePath="Id" ToolTipService.ShowOnDisabled="True"
+                              SelectionChanged="VerifyTool_SelectionChanged"
+                              ToolTip="Fly-over only: change to this V-bit before visiting the corners. Its point sights each corner exactly, and the tool change re-references the tool length so the 2mm sight gap is real rather than assumed. Leave at (none) to use whatever is already in the spindle. Only V-bit / chamfer tools are listed."/>
                 </StackPanel>
             </StackPanel>
         </Grid>

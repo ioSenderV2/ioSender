@@ -1,4 +1,4 @@
-/*
+﻿/*
  * StartJobConfig.cs - part of CNC Controls library
  *
  * Persisted Load Stock inputs, folded into App.config as the "StartJob" section (was the standalone
@@ -43,6 +43,9 @@ namespace CNC.Controls
         // The timestamp is not decoration: restored corners describe stock that may since have been moved,
         // and the readout says so with this date - see RestoreMeasured.
         public string MeasuredResult = string.Empty;
+        // Fly-over only: the V-bit (CustomTool.Id) Verify skew changes to before visiting the corners.
+        // -1 = none, use whatever is in the spindle. See StartJobView's picker for why V-bits only.
+        public int VerifyFlyoverToolId = -1;
         public string Corner = "FrontLeft";
         public int Wcs = 1;            // 1 = G54
         public bool Measure = true;

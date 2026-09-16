@@ -275,6 +275,10 @@ namespace GCode_Sender
             chkExactSize.Unchecked += (s, e) => { UpdateSizeHint(); InputChanged(); };
             chkRotate.Checked += (s, e) => InputChanged();
             chkRotate.Unchecked += (s, e) => InputChanged();
+            // The V-bit picker is fly-over only, so its enabled state follows this box - without these it would
+            // stay greyed out (or live) until something else happened to refresh the panel.
+            chkVerifyTouch.Checked += (s, e) => RefreshVerifyTouchAvailability();
+            chkVerifyTouch.Unchecked += (s, e) => RefreshVerifyTouchAvailability();
             chkSetTloRef.Checked += (s, e) => InputChanged();
             chkSetTloRef.Unchecked += (s, e) => InputChanged();
             // Switching probe type changes which ProbeDefinition Generate needs (and whether it's defined) -
@@ -1057,6 +1061,24 @@ namespace GCode_Sender
             ShowResult();
         }
 
+        // Set by LoadInputs, consumed by the first RefreshVerifyTouchAvailability that builds the combo.
+        private int? pendingVerifyToolId;
+
+        private void VerifyTool_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!loadingInputs)
+                SaveInputs();
+        }
+
+        // The V-bit the fly-over should change to, or null for "(none)" / a stale id whose tool has since been
+        // deleted from the table. Resolved through CustomTools.Find rather than trusting the combo's own item,
+        // so a tool edited while the panel was open cannot emit an M6 for something that no longer exists.
+        private CustomTool VerifyFlyoverTool()
+        {
+            int id = (cbxVerifyTool?.SelectedValue as int?) ?? -1;
+            return id < 0 ? null : CustomTools.Find(id);
+        }
+
         // When the restored measurement was taken, or null if this session measured it (or never has). Drives
         // the "from <date>" line on the readout - see BuildResultText.
         private DateTime? measuredRestoredUtc;
@@ -1209,6 +1231,38 @@ namespace GCode_Sender
             chkVerifyTouch.IsEnabled = has3D;
             if (!has3D)
                 chkVerifyTouch.IsChecked = false;
+
+            if (cbxVerifyTool == null)
+                return;
+
+            // Fly-over V-bit list. Rebuilt here rather than bound once, because the tool table is editable while
+            // the app runs. V-bits only: a round tool has to be inset by its radius or it covers the corner (see
+            // the inset note in BuildVerifyProgram), and a point needs no inset at all - restricting the list is
+            // what lets the program centre the tool on the corner without asking which kind it got.
+            //
+            // A saved id from LoadInputs wins once, then the live selection does: the list does not exist yet
+            // when the settings are read, so the value has to wait here for it. An id whose tool has since been
+            // deleted falls back to "(none)" rather than selecting nothing and silently meaning it.
+            int keepTool = pendingVerifyToolId ?? (cbxVerifyTool.SelectedValue as int?) ?? -1;
+            pendingVerifyToolId = null;
+
+            var vbits = new List<CustomTool> { new CustomTool { Id = -1, Name = "(none)" } };
+            if (CustomTools.SectionConfig?.Entries != null)
+                vbits.AddRange(CustomTools.SectionConfig.Entries
+                                          .Where(t => t.Kind == CustomToolKind.VBitOrChamfer)
+                                          .OrderBy(t => t.Name));
+
+            bool wasLoading = loadingInputs;
+            loadingInputs = true;          // rebuilding the list fires SelectionChanged; that is not an edit
+            try
+            {
+                cbxVerifyTool.ItemsSource = vbits;
+                cbxVerifyTool.SelectedValue = vbits.Any(t => t.Id == keepTool) ? keepTool : -1;
+            }
+            finally { loadingInputs = wasLoading; }
+
+            // Only the fly-over uses it - the touching form goes down on the 3D probe, not on a V-bit.
+            cbxVerifyTool.IsEnabled = chkVerifyTouch.IsChecked != true;
         }
 
         private void ShowResult()
@@ -2040,6 +2094,7 @@ namespace GCode_Sender
                 chkSetTloRef.IsChecked = s.SetTloRef;
                 cbxMaterial.SelectedItem = cbxMaterial.Items.Cast<string>().FirstOrDefault(m => m == s.Material);
                 RestoreMeasured(s.MeasuredResult);
+                pendingVerifyToolId = s.VerifyFlyoverToolId;   // applied by RefreshVerifyTouchAvailability, which builds the list
                 IsTouchPlate = s.Probe == "TouchPlate";
                 UpdateProbeWarning();   // may fall back to 3D Probe if the touch-plate definition no longer exists
                 // Corner is always front-left now; the probe comes from the selected probe definition - both dropped.
@@ -2101,6 +2156,7 @@ namespace GCode_Sender
                     HeightMapGridY = fldHeightMapGridY.Value,
                     Material = cbxMaterial.SelectedItem as string ?? string.Empty,
                     MeasuredResult = SerializeMeasured(),
+                    VerifyFlyoverToolId = (cbxVerifyTool?.SelectedValue as int?) ?? -1,
                     SafeZ = 20d
                 };
                 AppConfig.Settings.Save();
@@ -2329,8 +2385,13 @@ namespace GCode_Sender
             // 3D probe defined at all on this setup. ActiveOrFallbackProbeDiameter prefers a loaded program's
             // (TOOL T=n D=..) comment and falls back to the probe definition's own fallback-diameter field,
             // which documents itself as exactly this. No probe definition at all -> no inset, rather than throw.
+            // A V-BIT NEEDS NO INSET AT ALL - its tip is a point, so the point goes on the corner. That is the
+            // whole reason the picker is restricted to V-bits: there is no "which kind did I get" question left
+            // to answer at this line. Without one, the tool in the collet is round and must be inset.
+            var flyTool = touch ? null : VerifyFlyoverTool();
             var flyProbe = touch ? p : ActiveProbe();
-            double r = flyProbe == null ? 0d
+            double r = flyTool != null ? 0d
+                     : flyProbe == null ? 0d
                      : (touch ? flyProbe.ProbeDiameter : ActiveOrFallbackProbeDiameter(flyProbe)) / 2d;
             double search = touch && p.ProbeFeedRate > 0d ? p.ProbeFeedRate : 200d;
             const double probeDepth = 3d;                            // work Z: probe to 3 below the corner's own top
@@ -2450,13 +2511,29 @@ namespace GCode_Sender
             L("(WAITIDLE)");
             L(touch
                 ? "(MBOX, OKCANCEL, Install the 3D probe. This touches each corner to check the skew. Click OK to start.)"
-                : string.Format("(MBOX, OKCANCEL, Fly-over check - the machine visits each corner of the measured frame, crossing at machine top and dropping to {0}mm above the measured stock top at each one. Nothing is probed. Each point is inset by the tool radius, so look for the EDGE of the tool sitting on the corner, not its centre.{1} Take off the touch plate if one is still on the stock - {0}mm above the stock top is inside it. That gap is measured from the tops this measure probed, so it is only {0}mm if the SAME tool and tool-length offset are still in the spindle. Click OK to start.)",
+                : string.Format("(MBOX, OKCANCEL, Fly-over check - the machine visits each corner of the measured frame, crossing at machine top and dropping to {0}mm above the measured stock top at each one. Nothing is probed. {2}{1} Take off the touch plate if one is still on the stock - {0}mm above the stock top is inside it. That gap is measured from the tops this measure probed, so it is only {0}mm if the SAME tool and tool-length offset are still in the spindle. Click OK to start.)",
                     N(flySightGap),
                     measuredRestoredUtc.HasValue
-                        ? " NOTE: these corners were RESTORED from the measure of " + measuredRestoredUtc.Value.ToLocalTime().ToString("ddd d MMM HH:mm") + ", not measured this session - check the tool is the one that measured them."
-                        : string.Empty));
+                        ? " NOTE: these corners were RESTORED from the measure of " + measuredRestoredUtc.Value.ToLocalTime().ToString("ddd d MMM HH:mm") + ", not measured this session."
+                        : string.Empty,
+                    flyTool != null
+                        ? "It first changes to the " + flyTool.Name + ", which also re-references the tool length - look for its POINT sitting on each corner."
+                        : "Each point is inset by the tool radius, so look for the EDGE of the tool on the corner, not its centre."));
             L("(WAITIDLE)");
             L("G53 G0 Z0");                                         // re-lift after the prompt (still R0)
+
+            // Tool change BEFORE the rotation goes on and before any corner is visited. Two things ride on
+            // this happening here: tc.macro does G53 moves and probes the toolsetter, which is cleanest with
+            // the rotation still at R0; and the G43.1 it applies against the machine-wide baseline is what puts
+            // the V-bit's tool length in the SAME frame the corners were measured in - which is what makes the
+            // 2mm sight gap a real 2mm instead of an assumption about what is in the spindle.
+            if (flyTool != null)
+            {
+                L(string.Format("(--- change to {0} - its point sights each corner, and the M6 re-references the tool length ---)", flyTool.Name));
+                L(string.Format("M6 T{0}", flyTool.Id.ToString(CultureInfo.InvariantCulture)));
+                L("(WAITIDLE)");
+                L("G53 G0 Z0");                                     // back to machine top after the change
+            }
 
             // Apply the measured skew rotation. From here on ONLY work-coord moves are issued (no G53), so a
             // machine-move/rotation interaction can't arise.
