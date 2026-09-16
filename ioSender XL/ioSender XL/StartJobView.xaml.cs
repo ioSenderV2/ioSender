@@ -1144,9 +1144,24 @@ namespace GCode_Sender
                 }
                 measuredX = p(parts[3]); measuredY = p(parts[4]); spoilZ = p(parts[5]);
 
-                if (DateTime.TryParse(parts[1], CultureInfo.InvariantCulture,
-                                      DateTimeStyles.RoundtripKind | DateTimeStyles.AdjustToUniversal, out DateTime when))
-                    measuredRestoredUtc = when;
+                // RoundtripKind ALONE. Combined with AdjustToUniversal (as it was) TryParse does not return
+                // false, it THROWS ArgumentException - "RoundtripKind cannot be used with AssumeLocal,
+                // AssumeUniversal or AdjustToUniversal" - and it threw here after the corners had already been
+                // assigned, so the catch below wiped a measurement that had parsed perfectly well. The "o"
+                // format ends in Z, so RoundtripKind already yields Kind=Utc and ToUniversalTime is a no-op;
+                // it is kept so a value stored by some other writer cannot come back as local time.
+                //
+                // In its OWN try: this is a caption. A date we cannot read is worth losing; the four corners
+                // the WCS origin and rotation come from are not, and must not ride on it.
+                try
+                {
+                    if (DateTime.TryParse(parts[1], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out DateTime when))
+                        measuredRestoredUtc = when.ToUniversalTime();
+                }
+                catch (Exception dex)
+                {
+                    DebugLog.Write("startjob", "RestoreMeasured: timestamp unreadable (corners kept) - " + dex.Message);
+                }
 
                 DebugLog.Write("startjob", string.Format(CultureInfo.InvariantCulture,
                     "RestoreMeasured: OK - X={0:0.###} Y={1:0.###} corners c1 {2:0.###},{3:0.###} c4 {4:0.###},{5:0.###} measured {6}",
