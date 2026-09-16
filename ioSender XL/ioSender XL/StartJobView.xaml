@@ -1,4 +1,4 @@
-<UserControl x:Class="GCode_Sender.StartJobView"
+﻿<UserControl x:Class="GCode_Sender.StartJobView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -444,7 +444,11 @@
                 <TextBlock x:Name="txtExprWarn" Foreground="#C0392B" TextWrapping="Wrap" Visibility="Collapsed"
                            Text="This controller does not report NGC expression support ($I). The generated program needs grblHAL with expressions enabled."/>
                 <TextBlock x:Name="txtResult" FontWeight="SemiBold" TextWrapping="Wrap" Text="Measured stock:  X = -   Y = -"/>
-                <StackPanel x:Name="pnlCopyVerifyButtons" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,8,0,0">
+                <!-- WrapPanel, not a horizontal StackPanel: this row has grown to two buttons, a checkbox, a
+                     label, a 150px combo and a third button, which is wider than the left column at its
+                     minimum. A StackPanel does not wrap - it just runs past the edge and silently takes the
+                     last control with it, which is how the Scribe square button shipped invisible. -->
+                <WrapPanel x:Name="pnlCopyVerifyButtons" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,8,0,0">
                     <Button x:Uid="ls_copysize" x:Name="btnCopySize" Content="Copy size" MinWidth="90" MinHeight="26" Margin="8,0,0,0" Click="CopySize_Click" IsEnabled="False"
                             ToolTip="Copy the measured stock size (X Y [Z] in mm) to the clipboard for Fusion's ioSenderBatchPost 'measured stock' field."/>
                     <Button x:Uid="ls_verifyskew" x:Name="btnVerify" Content="Verify skew" MinWidth="90" MinHeight="26" Margin="8,0,0,0" Click="VerifySkew_Click" IsEnabled="False"
@@ -480,7 +484,7 @@
                     <Button x:Uid="ls_scribesquare" x:Name="btnScribe" Content="Scribe square" MinWidth="90" MinHeight="26" Margin="10,0,0,0" Click="ScribeSquare_Click" IsEnabled="False"
                             ToolTipService.ShowOnDisabled="True"
                             ToolTip="CUTS a shallow square into the stock with the selected V-bit, inset 10mm from every edge of the measured frame, following the probed surface. Measure the scribed line against each stock edge afterwards: if the rotation is right the gap to the front edge is a constant 10mm end to end. Needs four probed corners and a V-bit selected."/>
-                </StackPanel>
+                </WrapPanel>
             </StackPanel>
         </Grid>
 
