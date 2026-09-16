@@ -1091,17 +1091,23 @@ namespace GCode_Sender
 
             try
             {
+                // v1 | utc | wcs | measuredX | measuredY | spoilZ | c1 | c2 | c3 | c4  ->  6 header + 4 corners.
+                // Derived from the two constants rather than written out, because the literal 11 that used to
+                // be here was one too many AND the corner index below was one too high - a saved measurement
+                // never restored, and the length check made sure nobody saw the IndexOutOfRange that would
+                // have said so.
+                const int headerFields = 6, cornerCount = 4;
                 var parts = saved.Split('|');
-                if (parts.Length != 11 || parts[0] != "v1")
+                if (parts.Length != headerFields + cornerCount || parts[0] != "v1")
                     return;
 
                 Func<string, double?> p = t => string.IsNullOrEmpty(t) ? (double?)null
                     : double.TryParse(t, NumberStyles.Float, CultureInfo.InvariantCulture, out double v) ? v : (double?)null;
 
                 var cx = new double?[5]; var cy = new double?[5]; var cz = new double?[5];
-                for (int c = 1; c <= 4; c++)
+                for (int c = 1; c <= cornerCount; c++)
                 {
-                    var xyz = parts[6 + c].Split(',');
+                    var xyz = parts[headerFields + c - 1].Split(',');
                     if (xyz.Length != 3)
                         return;
                     cx[c] = p(xyz[0]); cy[c] = p(xyz[1]); cz[c] = p(xyz[2]);
