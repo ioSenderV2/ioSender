@@ -146,11 +146,13 @@ namespace CNC.Core
 
                     // Only flag Outdated when we actually read a DIFFERENT checksum. An empty/failed read (a
                     // raced FS query right after connect) must NOT flip every present macro to Outdated.
-                    string embeddedSumNow = EmbeddedChecksum();
                     string onFs = ReadControllerFile(model, JoinPath(destPath, ChecksumFile)).Trim();
-                    bool stale = onFs.Length > 0 && onFs != embeddedSumNow;
-                    ConsoleLog.Write(string.Format("[AtcMacros] GetStatus: checksum sidecar '{0}' -> onFs='{1}' (len={2}), embedded='{3}', stale={4}, GrblState={5}/{6}",
-                        JoinPath(destPath, ChecksumFile), onFs, onFs.Length, embeddedSumNow, stale, model.GrblState.State, model.GrblState.Substate));
+                    var onFsHashes = ParseManifest(onFs);
+                    // An old single-hash sidecar that still matches means every macro IS current - report them
+                    // that way rather than as five Outdated rows for a format change.
+                    bool legacyCurrent = LegacySumMatches(onFs);
+                    ConsoleLog.Write(string.Format("[AtcMacros] GetStatus: checksum sidecar '{0}' -> {1} manifest row(s), legacyCurrent={2}, len={3}, GrblState={4}/{5}",
+                        JoinPath(destPath, ChecksumFile), onFsHashes.Count, legacyCurrent, onFs.Length, model.GrblState.State, model.GrblState.Substate));
 
                     foreach (string name in Required)
                     {
@@ -174,6 +176,13 @@ namespace CNC.Core
                         // stale independently (ExpectedSize is derived fresh from this install's embedded macro
                         // every call). Flagged Outdated rather than Missing - the file IS there, just wrong.
                         bool sizeMismatch = sizeKnown && sz > 0 && sz != expected;
+
+                        // Per FILE now, not one verdict for the set: only the macro that actually changed
+                        // reads as Outdated. An empty/failed sidecar read still must not flip everything -
+                        // hence the onFs.Length gate, exactly as before.
+                        string wantHash;
+                        bool stale = onFs.Length > 0 && !legacyCurrent &&
+                                     (!onFsHashes.TryGetValue(name, out wantHash) || wantHash != EmbeddedChecksum(name));
 
                         ConsoleLog.Write(string.Format(
                             "[AtcMacros] GetStatus: {0} - present={1}, rawSize='{2}', sizeKnown={3}, sz={4}, expected={5}, empty={6}, sizeMismatch={7}, checksumStale={8}, FS={9}",
@@ -273,9 +282,34 @@ namespace CNC.Core
                 string destPath = target != null ? target.Path : "/littlefs";
 
                 bool missing = !Required.All(present.Contains);
-                string embeddedSum = EmbeddedChecksum();
+                string embeddedSum = EmbeddedManifest();
                 string sidecarRead = ReadControllerFile(model, JoinPath(destPath, ChecksumFile)).Trim();
-                bool checksumStale = sidecarRead != embeddedSum;
+                var onFsHashes = ParseManifest(sidecarRead);
+                bool legacyCurrent = LegacySumMatches(sidecarRead);
+
+                // WHICH files need sending, not merely WHETHER any do. One edit used to re-upload the whole
+                // set: ~500 YModem packets at ~50 ms of littlefs commit each, 23 seconds, of which 10 were
+                // for the four files that had not changed (measured 2026-09-15).
+                //
+                // A file is sent when it is absent, the wrong size (truncation - see anySizeMismatch), or
+                // its hash differs from the manifest. A sidecar that could not be read at all leaves the
+                // hash unknown for every file, which correctly means "send everything".
+                var needs = new List<string>();
+                foreach (string n in Required)
+                {
+                    string want = EmbeddedChecksum(n), got;
+                    bool hashBad = !legacyCurrent && (!onFsHashes.TryGetValue(n, out got) || got != want);
+                    bool sizeBad = sizeByName.TryGetValue(n, out int sn) && sn != ExpectedSize(n);
+                    if (!present.Contains(n) || sizeBad || hashBad)
+                        needs.Add(n);
+                }
+                // The sidecar itself is out of date whenever it is not already exactly what we would write -
+                // including the legacy single-hash case, where every macro is current and only its FORMAT is
+                // not. That path rewrites 400 bytes and sends no macros at all.
+                bool sumStale = sidecarRead != embeddedSum.Trim();
+                bool checksumStale = needs.Count > 0 || sumStale;
+                ConsoleLog.Write(string.Format("[AtcMacros] EnsureProvisioned: needs=[{0}], legacyCurrent={1}, sumStale={2}",
+                    string.Join(",", needs), legacyCurrent, sumStale));
                 bool stale = anySizeMismatch || checksumStale;
                 ConsoleLog.Write(string.Format(
                     "[AtcMacros] EnsureProvisioned: missing={0}, anySizeMismatch={1}, sidecarRead='{2}', embeddedSum='{3}', checksumStale={4}, stale={5}, GrblState={6}/{7}",
@@ -336,9 +370,10 @@ namespace CNC.Core
                         UnlinkWithTimeout(full);
                 }
 
-                // (Re)write the full set - macros are small and this is rare - then refresh the checksum sidecar.
+                // Only what actually changed - see the needs list above. The sidecar is refreshed either
+                // way, since it is also what carries the per-file hashes forward.
                 bool wrote = false, allWritten = true;
-                foreach (string name in Required)
+                foreach (string name in needs)
                 {
                     string content = ReadEmbedded(name);
                     if (content == null)
@@ -356,12 +391,14 @@ namespace CNC.Core
                         allWritten = false;                         // a write failed - reported as Failed so the user can retry
                 }
 
-                if (wrote && allWritten)
+                if ((wrote || sumStale) && allWritten)
                 {
                     // Trailing newline is required: when the controller dumps a file with no final newline via
                     // $F<=, the content runs straight into the "ok" with no line break, so the read-back would
                     // return "<hash>ok" and never match - making it re-prompt on every connect.
-                    string sumContent = embeddedSum + "\n";
+                    // EmbeddedManifest already ends every row with a newline, so the trailing one the
+                    // comment above requires is there by construction - a second would only add a blank line.
+                    string sumContent = embeddedSum;
                     bool sumOk = GrblInfo.HasYModem
                                     ? YModemWrite(model, ChecksumFile, sumContent, destPath, present.Contains(ChecksumFile))
                                     : WriteFile(ChecksumFile, sumContent, destPath, upload);
@@ -388,6 +425,73 @@ namespace CNC.Core
 
         // SHA-256 over the embedded macro set (name + content, in fixed Required order), as lower-case hex.
         // Changes whenever any shipped macro changes, so it doubles as the "version" of this install's macros.
+        /// <summary>SHA-256 of ONE embedded macro's bytes.</summary>
+        static string EmbeddedChecksum(string name)
+        {
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            {
+                byte[] body = System.Text.Encoding.UTF8.GetBytes(ReadEmbedded(name) ?? string.Empty);
+                return BitConverter.ToString(sha.ComputeHash(body)).Replace("-", string.Empty).ToLowerInvariant();
+            }
+        }
+
+        /// <summary>
+        /// The sidecar's contents: one "&lt;sha256&gt;  &lt;name&gt;" line per macro.
+        /// </summary>
+        /// <remarks>
+        /// It used to be a single hash over the whole set, which meant editing ONE macro re-uploaded ALL
+        /// FIVE. That is not free here: the files go up in 128-byte YModem blocks and the controller takes
+        /// ~50 ms to commit each one to littlefs, so a full set is ~500 packets and 23 seconds. Measured
+        /// 2026-09-15 after a one-line edit to pcorner.macro - 13 s for the file that changed and 10 s for
+        /// the four that had not. Editing tc.macro or tlo.macro, which is the common case, now costs about
+        /// three seconds instead of twenty-three.
+        ///
+        /// Per-file hashes rather than per-file SIZES because size already had this job and cannot do it:
+        /// ExpectedSize catches truncation, and misses any edit that happens to preserve the byte count.
+        /// </remarks>
+        static string EmbeddedManifest()
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (string name in Required)
+                sb.Append(EmbeddedChecksum(name)).Append("  ").Append(name).Append('\n');
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Parse a sidecar into name -> hash. Unparseable lines are skipped, so the OLD single-hash format
+        /// yields an empty map - which reads as "every file stale". See LegacySumMatches for why that does
+        /// not cost a pointless full upload the first time this ships.
+        /// </summary>
+        static Dictionary<string, string> ParseManifest(string text)
+        {
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string raw in (text ?? string.Empty).Replace("\r", string.Empty).Split('\n'))
+            {
+                string line = raw.Trim();
+                int sp = line.IndexOf(' ');
+                if (sp != 64)                       // "<64 hex>  <name>" - anything else is not a manifest row
+                    continue;
+                string nm = line.Substring(sp).Trim();
+                if (nm.Length > 0)
+                    map[nm] = line.Substring(0, sp);
+            }
+            return map;
+        }
+
+        /// <summary>
+        /// True when the sidecar is the OLD single-aggregate format AND it still matches - i.e. every macro
+        /// on the controller is current, and all that is out of date is the shape of the sidecar itself.
+        /// </summary>
+        /// <remarks>
+        /// Without this, the very upgrade that exists to stop needless uploads would begin with one, on
+        /// every machine, for nothing. Rewriting 400 bytes of sidecar is the whole cost instead.
+        /// </remarks>
+        static bool LegacySumMatches(string sidecar)
+        {
+            string t = (sidecar ?? string.Empty).Trim();
+            return t.Length == 64 && t.IndexOf(' ') < 0 && t == EmbeddedChecksum();
+        }
+
         static string EmbeddedChecksum()
         {
             using (var sha = System.Security.Cryptography.SHA256.Create())
