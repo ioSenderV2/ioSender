@@ -2486,14 +2486,24 @@ namespace GCode_Sender
             // Each corner targets ITS OWN measured top (cornerZ, machine, relative to corner 1 which is work Z0),
             // so the stock's own flatness is followed rather than assumed away - this stock spans 0.3 mm.
             double cx = fx / 2d, cy = ly / 2d;
-            void Touch(double px, double py, int zc, string label)
+            // stayLow: this point and the previous one are a PAIR - the ideal rectangle corner and the corner
+            // actually probed - and the whole value of the pair is seeing the gap BETWEEN them, which is often
+            // well under a millimetre. Retracting 100 mm to machine top and coming back down somewhere new
+            // destroys exactly that: you are comparing two positions from memory, several seconds apart, with
+            // a full-height move in between, and nothing tells you which way it shifted. Crossing the gap at
+            // the sight height instead makes the difference something you watch happen. Reported by the user
+            // after running it, and they are right - the pair is the one place the retract costs more than it
+            // buys. Fly-over only: in probing mode the tool is standing ON the surface after a G38.3, and
+            // moving XY at that height would drag it across the stock.
+            void Touch(double px, double py, int zc, string label, bool stayLow = false, bool holdLow = false)
             {
                 double dx = cx - px, dy = cy - py, len = Math.Sqrt(dx * dx + dy * dy);
                 double ix = len < 1e-6 ? px : px + r * dx / len;
                 double iy = len < 1e-6 ? py : py + r * dy / len;
                 L(string.Format("(--- {0} ---)", label));
-                L("G53 G0 Z0");                                     // machine top - clear of the stock for ANY tool
-                L(string.Format("G0 X{0} Y{1}", N(ix), N(iy)));     // work XY (rotation applied), at machine top
+                if (!stayLow)
+                    L("G53 G0 Z0");                                 // machine top - clear of the stock for ANY tool
+                L(string.Format("G0 X{0} Y{1}", N(ix), N(iy)));     // work XY (rotation applied)
                 L("(WAITIDLE)");
                 if (touch)
                 {
@@ -2513,9 +2523,12 @@ namespace GCode_Sender
                     // write intervenes (that is the combination EmitRotationWrite exists for).
                     if (cornerZ[zc].HasValue)
                     {
-                        L(string.Format("G53 G0 Z{0}", N(cornerZ[zc].Value + flySightGap)));
+                        // Already at the sight height when stayLow - the XY move above crossed the gap at it.
+                        if (!stayLow)
+                            L(string.Format("G53 G0 Z{0}", N(cornerZ[zc].Value + flySightGap)));
                         L("G4 P2");                                 // hold still long enough to sight the tip
-                        L("G53 G0 Z0");                             // back to machine top before moving on
+                        if (!holdLow)
+                            L("G53 G0 Z0");                         // back to machine top before moving on
                     }
                     else
                         L("G4 P2");                                 // no measured top for this corner - stay high
@@ -2589,12 +2602,17 @@ namespace GCode_Sender
             // Order matches the Measure / Start-Job numbering: 1=FL, 2=FR, 3=BL, 4=BR.
             // The Z argument is which corner's measured top this point sits on - the two "ideal rectangle"
             // points belong to the same physical corner as the measured one they are paired with.
+            // The back corners come in PAIRS: ideal rectangle point, then the corner actually probed. In the
+            // fly-over the first of each pair holds the sight height (holdLow) and the second crosses to it at
+            // that height (stayLow), so the gap between them is watched rather than reconstructed from memory
+            // either side of a full-height retract. Probing keeps retracting between every point - see Touch.
+            bool pair = !touch;
             Touch(0d, 0d, 1, "front-left (origin)");
             Touch(fx, 0d, 2, "front-right");
-            Touch(0d, ly, 3, "back-left - ideal rectangle");
-            Touch(WX(3), WY(3), 3, "back-left - measured corner");
-            Touch(fx, ly, 4, "back-right - ideal rectangle");
-            Touch(WX(4), WY(4), 4, "back-right - measured corner");
+            Touch(0d, ly, 3, "back-left - ideal rectangle", holdLow: pair);
+            Touch(WX(3), WY(3), 3, "back-left - measured corner", stayLow: pair);
+            Touch(fx, ly, 4, "back-right - ideal rectangle", holdLow: pair);
+            Touch(WX(4), WY(4), 4, "back-right - measured corner", stayLow: pair);
 
             // Park back at G30 (where the job started). Clear the rotation for the G53 park moves, park, then
             // restore the skew rotation so the WCS is left as the measure produced it (no move follows - safe).
