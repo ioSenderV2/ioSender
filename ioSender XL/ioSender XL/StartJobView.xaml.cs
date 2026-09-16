@@ -2176,6 +2176,27 @@ namespace GCode_Sender
             double search = touch && p.ProbeFeedRate > 0d ? p.ProbeFeedRate : 200d;
             const double probeDepth = 3d;                            // work Z: probe to 3 below the corner's own top
 
+            // Fly-over sight height: Safe Z delta ABOVE each corner's own measured top, in MACHINE coordinates -
+            // the same field, and the same meaning, the measure uses for its corner-to-corner crossing height.
+            // Machine top would need no assumption at all, but it sits ~104 mm over the work on this machine and
+            // you cannot judge a corner down a sight line that long, which is the whole point of the mode.
+            //
+            // It IS tool-length dependent, unavoidably: machine Z tracks the controlled point, which is the tool
+            // tip only while the active offset matches what is fitted. Fly over with a much longer tool that was
+            // never referenced and the margin is not the margin. Floored at 10 mm so a small Safe Z delta - which
+            // is legitimate for corner crossing, where the measure knows the tool - cannot bring the tip down
+            // near the surface here, where it does not.
+            const double minFlyoverClearance = 10d;
+            // The touch plate has to be added back, for the same reason the measure's #<c1_maxz> adds it: the
+            // corner Z pcorner reports is #<_corner_z>, ALREADY plate-thickness-corrected, so it is the true
+            // stock top and NOT the plate's own top surface. Clearing the stock top by Safe Z delta clears a
+            // plate still sitting on it by Safe Z delta MINUS the plate, and a margin under the plate's own
+            // thickness would fly straight into it. Only counted when the touch plate is the selected probe -
+            // that is the setup where one is on the stock at all.
+            var tp = IsTouchPlate ? TouchPlateProbe() : null;
+            double flyPlateOffset = tp != null ? tp.PlateThickness : 0d;
+            double flyClear = Math.Max(fldCornerMargin.Value, minFlyoverClearance) + flyPlateOffset;
+
             // Corner work coords in the measure's rotated frame: transform each probed corner (machine) about the
             // FL origin by the applied rotation. FR defines +X (front edge); BL gives the Y direction whose SIGN
             // depends on the machine's handedness - never assume +Y (that sent the probe off the table -> Alarm:2).
@@ -2225,12 +2246,25 @@ namespace GCode_Sender
                     L("G53 G0 Z0");                                 // retract to machine top
                 }
                 else
-                    L("G4 P2");                                     // hold still long enough to sight the tip
+                {
+                    // Descend ONLY once the tool is already over the point, and retract before the next crossing -
+                    // so the low height is never held while travelling. G53 names Z alone, which holds X/Y at the
+                    // parser's position; correct here because the work-XY move above just set it, and no G10 L2 R
+                    // write intervenes (that is the combination EmitRotationWrite exists for).
+                    if (cornerZ[zc].HasValue)
+                    {
+                        L(string.Format("G53 G0 Z{0}", N(cornerZ[zc].Value + flyClear)));
+                        L("G4 P2");                                 // hold still long enough to sight the tip
+                        L("G53 G0 Z0");                             // back to machine top before moving on
+                    }
+                    else
+                        L("G4 P2");                                 // no measured top for this corner - stay high
+                }
             }
 
             L(touch
                 ? "(Verify skew - touch each corner in the rotated work frame. Each should touch the surface right at the corner.)"
-                : "(Verify skew, FLY-OVER - visit each corner in the rotated work frame at machine top. Nothing descends; sight the tip against each corner.)");
+                : string.Format("(Verify skew, FLY-OVER - visit each corner in the rotated work frame, crossing at machine top and dropping to {0}mm above each corner's measured top. Nothing is probed; sight the tip against each corner.)", N(flyClear)));
             L("(Front-left/right define the frame (ideal == measured).)");
             L("(Back-left/right are visited twice: the ideal rectangle point, then the actual probed corner - the gap between the two is the out-of-square amount.)");
             // G53 is NonModal_AbsoluteOverride, which gcode.c's rotation block explicitly exempts, so a G53 move
@@ -2252,7 +2286,7 @@ namespace GCode_Sender
             L("(WAITIDLE)");
             L(touch
                 ? "(MBOX, OKCANCEL, Install the 3D probe. This touches each corner to check the skew. Click OK to start.)"
-                : "(MBOX, OKCANCEL, Fly-over check - the machine visits each corner of the measured frame at machine top and pauses. Nothing descends and nothing is probed. Watch whether the tool tip lines up with each corner. Click OK to start.)");
+                : string.Format("(MBOX, OKCANCEL, Fly-over check - the machine visits each corner of the measured frame, crossing at machine top and dropping to {0}mm above the measured stock top at each one. Nothing is probed and nothing touches the stock. Watch whether the tool tip lines up with each corner. That clearance assumes the tool-length offset matches what is in the spindle. Click OK to start.)", N(flyClear)));
             L("(WAITIDLE)");
             L("G53 G0 Z0");                                         // re-lift after the prompt (still R0)
 
