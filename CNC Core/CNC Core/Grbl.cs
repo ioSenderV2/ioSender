@@ -635,9 +635,29 @@ namespace CNC.Core
 
                 Id = (int)Math.Floor(id) + (int)Math.Round((id - Math.Floor(id)) * 10.0d, 0);
 
-                if (data.Contains(':'))
-                    Rotation = dbl.Parse(data.Split(':')[1]);
+                ParseRotation(data);
             }
+        }
+
+        /// <summary>
+        /// Read the rotation out of a <c>[G5x:x,y,z:rot]</c> payload.
+        /// </summary>
+        /// <remarks>
+        /// Split out of the constructor 2026-09-15 because that is the only place it used to live, and
+        /// AddOrUpdateCS updates an EXISTING entry with Position.Parse - which splits on ':' and keeps only
+        /// the coordinates, by design. So the rotation was read once, when the entry was first created at
+        /// connect, and never again: every later $# left it frozen at its connect-time value.
+        ///
+        /// That is not cosmetic. WorkOrderRules.Validate refuses to generate a Work Order against a rotated
+        /// WCS - it is the only thing standing between a rotation set by ordinary Setup use and a program
+        /// that cuts skewed - and it reads this property. On 2026-09-15 Setup put -0.10 deg on G54, the
+        /// gate read 0.00, and the work order generated and ran. Re-reading $# before validating did NOT
+        /// fix it, because the refresh could not update the one field being asked about.
+        /// </remarks>
+        public void ParseRotation(string data)
+        {
+            if (data != null && data.Contains(':'))
+                Rotation = dbl.Parse(data.Split(':')[1]);
         }
 
         public int Id { get; private set; }
@@ -2080,7 +2100,10 @@ namespace CNC.Core
             if (cs == null)
                 CoordinateSystems.Add(cs = new CoordinateSystem(gCode, data));
             else
+            {
                 cs.Parse(data);
+                cs.ParseRotation(data);   // Parse keeps only the coordinates - see ParseRotation
+            }
 
             return cs;
         }
