@@ -1852,6 +1852,18 @@ namespace CNC.Controls
             lines.Add(GrblInfo.RotationSupported
                 ? string.Format("G10 L2 P{0} X{1} Y{2} R0", scratchP, F(ox), F(oy))
                 : string.Format("G10 L2 P{0} X{1} Y{2}", scratchP, F(ox), F(oy)));
+            if (GrblInfo.RotationSupported)
+            {
+                // Resync the parser after writing R. If this scratch slot happens to be the ACTIVE coordinate
+                // system - nothing deactivates it at the end of a run, so the next run starts with it active -
+                // then clearing a non-zero rotation on it leaves grblHAL's gc_state.position holding WORK
+                // coordinates it believes are machine coordinates, and the next move that leaves an axis
+                // unnamed flies to them. See StartJobView.EmitRotationWrite for the full mechanism and the
+                // two measured reproductions; this is the same repair, inline because the compiler builds a
+                // plain line list rather than going through that emitter.
+                lines.Add("G4 P0");                              // drain: #<_abs_*> are read at PARSE time
+                lines.Add("G53 G0 X[#<_abs_x>] Y[#<_abs_y>]");   // no-op move; resyncs from the steppers
+            }
             lines.Add(ScratchWcs());
             lines.Add("G0 Z" + F(SafeZ()));
 

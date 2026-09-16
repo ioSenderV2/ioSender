@@ -2173,7 +2173,7 @@ namespace GCode_Sender
             // machine move (a G53 move with an active WCS rotation needs a separate firmware exemption).
             L(WcsCode(wcsP) + "  (activate the WCS the measure set - origin)");
             if (GrblInfo.RotationSupported)
-                L(string.Format("G10 L2 {0} R0", pCode(wcsP)));     // clear rotation for the G53 lift
+                EmitRotationWrite(L, string.Format("G10 L2 {0} R0", pCode(wcsP)));   // clear rotation for the G53 lift
 
             L("G53 G0 Z0");                                         // lift to machine top (rotation cleared - clean)
             L("(WAITIDLE)");
@@ -2192,7 +2192,7 @@ namespace GCode_Sender
             // this program itself just switched on. Writing both from the retained corners makes the check
             // self-contained and identical whichever way the measure ran.
             if (GrblInfo.RotationSupported)
-                L(string.Format("G10 L2 {0} X{1} Y{2} R{3}", pCode(wcsP),
+                EmitRotationWrite(L, string.Format("G10 L2 {0} X{1} Y{2} R{3}", pCode(wcsP),
                     N(cornerX[1].Value * cos + cornerY[1].Value * sin),
                     N(-cornerX[1].Value * sin + cornerY[1].Value * cos),
                     N(rotDeg)));
@@ -2209,14 +2209,53 @@ namespace GCode_Sender
             // restore the skew rotation so the WCS is left as the measure produced it (no move follows - safe).
             L("(--- park at G30 ---)");
             if (GrblInfo.RotationSupported)
-                L(string.Format("G10 L2 {0} R0", pCode(wcsP)));
+                EmitRotationWrite(L, string.Format("G10 L2 {0} R0", pCode(wcsP)));
             L("G53 G0 Z0");                                         // lift to machine top
             L("G53 G0 X[#5181] Y[#5182]");                          // traverse to G30 X/Y
             L("G53 G0 Z[#5183]");                                   // descend to G30 Z
             if (GrblInfo.RotationSupported)
-                L(string.Format("G10 L2 {0} R{1}", pCode(wcsP), N(rotDeg)));   // restore the skew rotation
+                EmitRotationWrite(L, string.Format("G10 L2 {0} R{1}", pCode(wcsP), N(rotDeg)));   // restore the skew rotation
             L("M2");
             return b.ToString();
+        }
+
+        // EVERY "G10 L2 ... R..." goes through here. grblHAL corrupts the PARSER's held position whenever a
+        // G10 L2 touches the rotation of the coordinate system that is CURRENTLY ACTIVE, and the very next move
+        // that leaves an axis unnamed then flies to wherever the corrupted position says.
+        //
+        // gcode.c (NonModal_Settings, ~4259-4280) converts gc_state.position machine -> work, applies the new
+        // coordinate data, then converts work -> machine. The two halves are guarded INDEPENDENTLY when they
+        // have to be paired:
+        //
+        //     to-work   runs if OLD rotation != 0 AND old != new
+        //     to-machine runs if NEW rotation != 0
+        //
+        // so clearing a rotation (old != 0, new == 0) converts to work and NEVER CONVERTS BACK - the parser is
+        // left holding work coordinates it believes are machine coordinates. Setting one from zero has the
+        // mirror-image fault, and rewriting the same non-zero rotation runs the second half alone.
+        //
+        // Observed 2026-09-16 and reproduced arithmetically to the millimetre, twice. Clearing a 5 deg rotation
+        // on an active G55 whose origin was 129.409,-661.865, with the machine standing at 186.605,-648.070,
+        // left the parser holding 0.003,-0.003 - and the next "G53 G0 Z0", a Z-ONLY line, traversed the whole
+        // table to machine 0,0 at rapid before carrying on. An earlier run cleared a -0.10 deg rotation and the
+        // same Z-only lift dragged X by 1.140 and Y by 0.224; the formula above predicts 1.156 and 0.226.
+        //
+        // The fix belongs in the firmware (pair the guards) and is tracked separately. Here we repair the damage
+        // at the only place it can be caused: after the write, command an absolute move that NAMES X and Y, so
+        // the parser's position is overwritten with a target rather than carried forward. Naming them from
+        // #<_abs_x>/#<_abs_y> is what makes this self-correcting - those read the STEPPER position (ngc_params.c
+        // _absolute_pos), not the parser's, so they are true no matter how corrupt gc_state.position is.
+        //
+        // The G4 P0 is load-bearing, not politeness. Those parameters are read at PARSE time, which runs ahead
+        // of motion, so mid-stream they would answer with a position the machine has not reached yet and the
+        // "no-op" move would drive BACKWARDS to it. mc_dwell calls protocol_buffer_synchronize unconditionally,
+        // so after G4 P0 the queue is drained and parse time == real position. Z is deliberately NOT named: only
+        // the plane axes are corrupted, and naming Z here would turn a repair into a plunge.
+        private static void EmitRotationWrite(Action<string> L, string g10Line)
+        {
+            L(g10Line);
+            L("G4 P0");                                    // drain the queue - #<_abs_*> are read at parse time
+            L("G53 G0 X[#<_abs_x>] Y[#<_abs_y>]");         // no-op move; resyncs the parser from the steppers
         }
 
         private static string WcsCode(int wcsP)
@@ -2371,7 +2410,7 @@ namespace GCode_Sender
             // clean; the true measured skew is applied at the end. Only on firmware that reports WCSROT ($I) - the
             // R word errors:20 on plain builds.
             if (GrblInfo.RotationSupported)
-                L(string.Format("G10 L2 {0} R0", pCode(wcsP)));
+                EmitRotationWrite(L, string.Format("G10 L2 {0} R0", pCode(wcsP)));
             L(string.Format("#<_ls_rad> = {0}", N(r)));   // probe tip radius (global, read by pcorner)
             // Sacrificial spacer/backer thickness under the stock (0 = none). pcorner's effective floor becomes
             // spoilboard + spacer, so a thin sheet on a backer is probed on the metal, not down in the backer.
@@ -2692,7 +2731,7 @@ namespace GCode_Sender
                     L("#<rotc> = [COS[#<rot>]]");
                     L("#<rots> = [SIN[#<rot>]]");
                     // R(-rot) * (c1x, c1y): the offset that puts work zero back on the probed corner.
-                    L(string.Format("G10 L2 {0} X[[#<c1x> * #<rotc>] + [#<c1y> * #<rots>]] Y[[#<c1y> * #<rotc>] - [#<c1x> * #<rots>]] R[#<rot>]", pCode(wcsP)));
+                    EmitRotationWrite(L, string.Format("G10 L2 {0} X[[#<c1x> * #<rotc>] + [#<c1y> * #<rots>]] Y[[#<c1y> * #<rotc>] - [#<c1x> * #<rots>]] R[#<rot>]", pCode(wcsP)));
                     L("(PRINT, LS_ROT=#<rot>)");
                 }
             }
@@ -3046,7 +3085,7 @@ namespace GCode_Sender
             if (GrblInfo.HasToolSetter)
                 L(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
             if (GrblInfo.RotationSupported)
-                L(string.Format("G10 L2 {0} R0", pCode(wcsP)));   // clear any stale rotation - vise never measures skew
+                EmitRotationWrite(L, string.Format("G10 L2 {0} R0", pCode(wcsP)));   // clear any stale rotation - vise never measures skew
 
             L("(park at G30 - install / confirm the probe)");
             EmitGotoG30(L);
