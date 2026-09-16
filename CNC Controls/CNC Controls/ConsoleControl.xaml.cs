@@ -119,11 +119,24 @@ namespace CNC.Controls
         private void ResponseLog_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
             logDirty = true;
+
+            // Lines removed off the TOP shift every remaining line up by one, so a pixel offset held across the
+            // flush points at different text afterwards. Count them and subtract the difference below. Both
+            // sources land here: the 2000-line cap's RemoveAt(0) (GrblViewModel), and "Clear up to here".
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Remove)
+                trimmedSinceFlush += e.OldItems == null ? 1 : e.OldItems.Count;
+            else if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+                trimmedSinceFlush = 0;   // Clear all - the old offset means nothing against an empty log
         }
 
         // Set by an MDI Enter: the next flush must land at the END whatever the scroll position was. Typing a
         // command means "show me what happens", even if the user had scrolled up to read something first.
         private bool jumpToEnd;
+
+        // Lines dropped off the top since the last flush, and the line count that produced the current extent -
+        // together they convert "the log scrolled under you" into the pixel correction the restore below needs.
+        private int trimmedSinceFlush;
+        private int lastLineCount;
 
         private void FlushLog(bool force)
         {
@@ -131,28 +144,37 @@ namespace CNC.Controls
                 return;
             logDirty = false;
 
-            // Decide "were we at the bottom?" BEFORE the text is replaced, from the TextBox's own scroll state.
-            // Assigning Text snaps the internal ScrollViewer to offset 0, and the AlwaysScrollToEnd behaviour
-            // infers manual scrolling from ScrollChanged events whose extent did not change - which is exactly
-            // what that snap looks like once the 2000-line scrollback is full (a line trimmed off the top for
-            // every line added, so the extent holds still). It then recorded the snap as the user scrolling to
-            // the top and stopped following: every MDI command reset the console to line 0 (reported
-            // 2026-09-06). The behaviour cannot tell the two apart from inside a ScrollChanged handler; this
-            // can, because it knows a replacement is about to happen.
-            bool atBottom = jumpToEnd
-                || txtOutput.VerticalOffset >= txtOutput.ExtentHeight - txtOutput.ViewportHeight - 1.0;
+            // Assigning Text snaps the internal ScrollViewer to offset 0, so this method has to put the view back
+            // afterwards - in BOTH cases, which is the bug fixed here. It used to restore only the at-bottom case
+            // and leave the scrolled-up case holding the snap, so every flush threw a reader to line 0 while the
+            // log kept streaming (reported 2026-09-16, the typed command 1000+ lines below the top). The earlier
+            // 2026-09-06 fix hit the same symptom from the follow side and never covered this half.
+            //
+            // Read the scroll state BEFORE the replacement - afterwards it describes the snap, not the user.
+            double prevOffset = txtOutput.VerticalOffset, prevH = txtOutput.HorizontalOffset;
+            bool atBottom = jumpToEnd || prevOffset >= txtOutput.ExtentHeight - txtOutput.ViewportHeight - 1.0;
+            double lineH = txtOutput.ExtentHeight / Math.Max(1, lastLineCount);
+            int trimmed = trimmedSinceFlush;
             jumpToEnd = false;
+            trimmedSinceFlush = 0;
 
             var log = logModel.ResponseLog;
             var sb = new System.Text.StringBuilder(log.Count * 16);
             foreach (var line in log)
                 sb.AppendLine(line);   // same join the old converter produced, so line-index math holds
             txtOutput.Text = sb.ToString();
+            lastLineCount = log.Count;
 
-            // Restore the follow. The ScrollToEnd raises its own ScrollChanged at the bottom with no extent
-            // change, which re-arms the behaviour's AtBottom flag, so the two mechanisms agree again afterwards.
             if (atBottom)
                 txtOutput.ScrollToEnd();
+            else
+            {
+                // Hold the same TEXT still, not the same pixel offset: once the scrollback is at its cap every
+                // line added drops one off the top, and an uncorrected offset would creep down the log at the
+                // stream's rate. Horizontal offset is preserved verbatim - nothing shifts sideways.
+                txtOutput.ScrollToVerticalOffset(Math.Max(0d, prevOffset - trimmed * lineH));
+                txtOutput.ScrollToHorizontalOffset(prevH);
+            }
 
             // Assigning Text invalidates every match offset we hold: new lines were appended, and once the
             // scrollback hits its cap the trim drops lines off the TOP, which shifts every offset left. Stale

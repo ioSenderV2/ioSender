@@ -80,9 +80,18 @@
              2000-line scrollback and re-set the entire TextBox text on EVERY collection change - twice per
              line once the trim kicked in - which at a dense job's response rate saturated the UI thread:
              status stopped painting, input starved, and a multi-minute backlog of received-but-unprocessed
-             lines drained long after the machine went quiet. See FlushLog in code-behind. -->
+             lines drained long after the machine went quiet. See FlushLog in code-behind.
+
+             Deliberately NO TextBoxUtilities.AlwaysScrollToEnd here (About.xaml still uses it, and should -
+             it genuinely appends). That behaviour decides whether to follow from inside a ScrollChanged
+             handler, where a wholesale Text replacement and a user dragging the thumb are indistinguishable:
+             both arrive as an offset change with no extent change once the scrollback sits at its 2000-line
+             cap. It read the replacement's snap to offset 0 as "the user scrolled to the top" and stopped
+             following. FlushLog knows a replacement is about to happen, so it is the single authority on
+             where the view sits afterwards - two mechanisms guessing at one scroll position is what produced
+             the 2026-09-06 and 2026-09-16 reports of the console jumping to line 0. -->
         <TextBox x:Name="txtOutput" x:Uid="txt_consoleOutput" IsReadOnly="True" IsUndoEnabled="False" TextWrapping="NoWrap" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
-                 local:TextBoxUtilities.AlwaysScrollToEnd="True" IsInactiveSelectionHighlightEnabled="True"
+                 IsInactiveSelectionHighlightEnabled="True"
                  FontSize="{Binding Source={x:Static local:AppConfig.Settings}, Path=Base.ConsoleFontSize}" FontFamily="Verdana"
                  ScrollViewer.VerticalScrollBarVisibility="Auto"
                  ScrollViewer.HorizontalScrollBarVisibility="Visible"
