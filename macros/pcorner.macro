@@ -1,4 +1,6 @@
 ; pcorner.macro - generalized corner XYZ probe for grblHAL (any of the 4 stock corners).
+; Per-file ATC upload verified against this file: 2026-09-15. Editing ONE macro now sends ONE
+; macro - see AtcMacros.EmbeddedManifest for why that used to cost 23 seconds instead of 13.
 ;
 ; Safe probing philosophy: probe Z down to DISCOVER the
 ; spoilboard and stock-top heights, never rapid to an assumed Z; decompose every reposition
