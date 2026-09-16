@@ -2323,21 +2323,26 @@ namespace GCode_Sender
             // Machine top would need no assumption at all, but it sits ~104 mm over the work on this machine and
             // you cannot judge a corner down a sight line that long, which is the whole point of the mode.
             //
-            // It IS tool-length dependent, unavoidably: machine Z tracks the controlled point, which is the tool
-            // tip only while the active offset matches what is fitted. Fly over with a much longer tool that was
-            // never referenced and the margin is not the margin. Floored at 10 mm so a small Safe Z delta - which
-            // is legitimate for corner crossing, where the measure knows the tool - cannot bring the tip down
-            // near the surface here, where it does not.
-            const double minFlyoverClearance = 10d;
-            // The touch plate has to be added back, for the same reason the measure's #<c1_maxz> adds it: the
-            // corner Z pcorner reports is #<_corner_z>, ALREADY plate-thickness-corrected, so it is the true
-            // stock top and NOT the plate's own top surface. Clearing the stock top by Safe Z delta clears a
-            // plate still sitting on it by Safe Z delta MINUS the plate, and a margin under the plate's own
-            // thickness would fly straight into it. Only counted when the touch plate is the selected probe -
-            // that is the setup where one is on the stock at all.
-            var tp = IsTouchPlate ? TouchPlateProbe() : null;
-            double flyPlateOffset = tp != null ? tp.PlateThickness : 0d;
-            double flyClear = Math.Max(fldCornerMargin.Value, minFlyoverClearance) + flyPlateOffset;
+            // 2 mm, not Safe Z delta. Safe Z delta plus the plate came to 37 mm on this setup, and at 37 mm you
+            // cannot see whether the tip is on the corner or 3 mm off it - which is the entire question the
+            // fly-over exists to answer. A sight gap has to be small enough to read.
+            //
+            // 2 mm is honest here in a way it would not be anywhere else, because the height is measured from
+            // cornerZ - the stock top AS THE MEASURE PROBED IT, in the tool-length frame that was active at the
+            // time. Same tool still fitted, same offset, and machine Z of cornerZ + 2 puts the tip exactly 2 mm
+            // over the surface. The frame is self-consistent; nothing is being estimated.
+            //
+            // What breaks that is a TOOL CHANGE between the measure and the check, and the restore feature makes
+            // it likelier rather than less - a measurement reloaded from a previous session may have been taken
+            // with something else entirely. At 2 mm there is no margin left to absorb the difference, so the
+            // operator is told before the machine moves: the prompt states the gap, states the assumption, and
+            // names the measure's date when the corners came out of storage rather than out of this session.
+            //
+            // The plate term is gone with it. 2 mm above the STOCK top is inside a touch plate still sitting on
+            // the stock (cornerZ is #<_corner_z>, already plate-corrected), so the prompt says to take it off -
+            // a height cannot be chosen that is both a usable sight gap and clear of an object nobody knows is
+            // there. Crossing between corners is still at machine top, so only the descent is ever this low.
+            const double flySightGap = 2d;
 
             // Corner work coords in the measure's rotated frame: transform each probed corner (machine) about the
             // FL origin by the applied rotation. FR defines +X (front edge); BL gives the Y direction whose SIGN
@@ -2395,7 +2400,7 @@ namespace GCode_Sender
                     // write intervenes (that is the combination EmitRotationWrite exists for).
                     if (cornerZ[zc].HasValue)
                     {
-                        L(string.Format("G53 G0 Z{0}", N(cornerZ[zc].Value + flyClear)));
+                        L(string.Format("G53 G0 Z{0}", N(cornerZ[zc].Value + flySightGap)));
                         L("G4 P2");                                 // hold still long enough to sight the tip
                         L("G53 G0 Z0");                             // back to machine top before moving on
                     }
@@ -2406,7 +2411,7 @@ namespace GCode_Sender
 
             L(touch
                 ? "(Verify skew - touch each corner in the rotated work frame. Each should touch the surface right at the corner.)"
-                : string.Format("(Verify skew, FLY-OVER - visit each corner in the rotated work frame, crossing at machine top and dropping to {0}mm above each corner's measured top. Nothing is probed; sight the tip against each corner.)", N(flyClear)));
+                : string.Format("(Verify skew, FLY-OVER - visit each corner in the rotated work frame, crossing at machine top and dropping to {0}mm above each corner's measured top. Nothing is probed; sight the tip against each corner.)", N(flySightGap)));
             L("(Front-left/right define the frame (ideal == measured).)");
             L("(Back-left/right are visited twice: the ideal rectangle point, then the actual probed corner - the gap between the two is the out-of-square amount.)");
             // G53 is NonModal_AbsoluteOverride, which gcode.c's rotation block explicitly exempts, so a G53 move
@@ -2428,7 +2433,11 @@ namespace GCode_Sender
             L("(WAITIDLE)");
             L(touch
                 ? "(MBOX, OKCANCEL, Install the 3D probe. This touches each corner to check the skew. Click OK to start.)"
-                : string.Format("(MBOX, OKCANCEL, Fly-over check - the machine visits each corner of the measured frame, crossing at machine top and dropping to {0}mm above the measured stock top at each one. Nothing is probed and nothing touches the stock. Watch whether the tool tip lines up with each corner. That clearance assumes the tool-length offset matches what is in the spindle. Click OK to start.)", N(flyClear)));
+                : string.Format("(MBOX, OKCANCEL, Fly-over check - the machine visits each corner of the measured frame, crossing at machine top and dropping to {0}mm above the measured stock top at each one. Nothing is probed. Watch whether the tool tip lines up with each corner.{1} Take off the touch plate if one is still on the stock - {0}mm above the stock top is inside it. That gap is measured from the tops this measure probed, so it is only {0}mm if the SAME tool and tool-length offset are still in the spindle. Click OK to start.)",
+                    N(flySightGap),
+                    measuredRestoredUtc.HasValue
+                        ? " NOTE: these corners were RESTORED from the measure of " + measuredRestoredUtc.Value.ToLocalTime().ToString("ddd d MMM HH:mm") + ", not measured this session - check the tool is the one that measured them."
+                        : string.Empty));
             L("(WAITIDLE)");
             L("G53 G0 Z0");                                         // re-lift after the prompt (still R0)
 
