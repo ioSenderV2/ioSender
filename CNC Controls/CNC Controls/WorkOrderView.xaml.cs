@@ -3498,6 +3498,21 @@ namespace CNC.Controls
                 return false;
             }
 
+            // Re-read $# from the controller BEFORE validating. The WCS-rotation rule in
+            // WorkOrderRules.Validate is the only thing standing between a rotation set by ordinary Setup
+            // use and a Work Order cutting skewed - and it reads GrblWorkParameters.CoordinateSystems,
+            // which is a CACHE that nothing refreshes when a program changes a WCS.
+            //
+            // 2026-09-15: Setup with Set rotation put -0.10 deg on G54 at 17:35. Generate ran at 17:35:12
+            // against coordinate-system data last read at 17:29:32, saw rotation 0.00, and passed. The
+            // controller only reported the real value at 17:35:51, after the run had started - and the run
+            // died on its first G53 with Alarm:2, which is the machine refusing a machine move computed in
+            // a rotated frame. The gate was not wrong; its INPUT was six minutes old.
+            //
+            // One $# round trip (~40 ms) on a deliberate, explicit action. A safety gate cannot read a
+            // cache whose age is unbounded. → the stale-cache family again.
+            GrblWorkParameters.Get(model);
+
             var warnings = WorkOrderRules.Validate(workOrder);
             warnings.AddRange(ParameterWarnings());
             if (warnings.Count > 0)
