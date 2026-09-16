@@ -1052,8 +1052,83 @@ namespace GCode_Sender
             measuredX = measuredY = spoilZ = viseLeftEdgeSkewDeg = viseCenterZ = null;
             for (int i = 0; i < cornerX.Length; i++)
                 cornerX[i] = cornerY[i] = cornerZ[i] = null;
+            measuredRestoredUtc = null;   // whatever lands next is this session's, not a restored one
             sizeWarningShown = false;
             ShowResult();
+        }
+
+        // When the restored measurement was taken, or null if this session measured it (or never has). Drives
+        // the "from <date>" line on the readout - see BuildResultText.
+        private DateTime? measuredRestoredUtc;
+
+        // Machine coordinates, invariant culture, round-tripped as-is. See StartJobSettings.MeasuredResult for
+        // the format. Empty when there is nothing worth saving - a partial measure is not a frame.
+        private string SerializeMeasured()
+        {
+            if (!(Has(1) && Has(2) && Has(3) && Has(4)))
+                return string.Empty;
+
+            Func<double?, string> f = v => v.HasValue
+                ? v.Value.ToString("0.#####", CultureInfo.InvariantCulture) : string.Empty;
+
+            var sb = new StringBuilder();
+            sb.Append("v1|")
+              .Append((measuredRestoredUtc ?? DateTime.UtcNow).ToString("o", CultureInfo.InvariantCulture)).Append('|')
+              .Append((cbxWcs.SelectedIndex + 1).ToString(CultureInfo.InvariantCulture)).Append('|')
+              .Append(f(measuredX)).Append('|').Append(f(measuredY)).Append('|').Append(f(spoilZ));
+            for (int c = 1; c <= 4; c++)
+                sb.Append('|').Append(f(cornerX[c])).Append(',').Append(f(cornerY[c])).Append(',').Append(f(cornerZ[c]));
+            return sb.ToString();
+        }
+
+        // Restore a saved measurement. Anything unexpected restores NOTHING rather than a partial frame: these
+        // corners are what Verify skew writes a WCS origin and rotation from, so half of them is worse than none.
+        private void RestoreMeasured(string saved)
+        {
+            measuredRestoredUtc = null;
+            if (string.IsNullOrEmpty(saved))
+                return;
+
+            try
+            {
+                var parts = saved.Split('|');
+                if (parts.Length != 11 || parts[0] != "v1")
+                    return;
+
+                Func<string, double?> p = t => string.IsNullOrEmpty(t) ? (double?)null
+                    : double.TryParse(t, NumberStyles.Float, CultureInfo.InvariantCulture, out double v) ? v : (double?)null;
+
+                var cx = new double?[5]; var cy = new double?[5]; var cz = new double?[5];
+                for (int c = 1; c <= 4; c++)
+                {
+                    var xyz = parts[6 + c].Split(',');
+                    if (xyz.Length != 3)
+                        return;
+                    cx[c] = p(xyz[0]); cy[c] = p(xyz[1]); cz[c] = p(xyz[2]);
+                    if (!cx[c].HasValue || !cy[c].HasValue)     // Z may legitimately be absent; XY may not
+                        return;
+                }
+
+                for (int c = 1; c <= 4; c++)
+                {
+                    cornerX[c] = cx[c]; cornerY[c] = cy[c]; cornerZ[c] = cz[c];
+                }
+                measuredX = p(parts[3]); measuredY = p(parts[4]); spoilZ = p(parts[5]);
+
+                if (DateTime.TryParse(parts[1], CultureInfo.InvariantCulture,
+                                      DateTimeStyles.RoundtripKind | DateTimeStyles.AdjustToUniversal, out DateTime when))
+                    measuredRestoredUtc = when;
+
+                // The saved WCS is deliberately NOT applied over cbxWcs - the operator may have changed it on
+                // purpose since. It is carried so a later version can warn when the two disagree, which is the
+                // case where Verify skew would write an origin into a coordinate system nobody measured.
+            }
+            catch
+            {
+                for (int c = 1; c <= 4; c++) { cornerX[c] = cornerY[c] = cornerZ[c] = null; }
+                measuredX = measuredY = spoilZ = null;
+                measuredRestoredUtc = null;
+            }
         }
 
         // "Touch corners" can only mean anything when there is a 3D probe to touch WITH - the six G38.3 moves
@@ -1513,6 +1588,13 @@ namespace GCode_Sender
             if (measureRun && probed < 4)
                 sb.AppendFormat("\n(probing... {0}/4 corners)", probed);
 
+            // Say so, and say when. These numbers describe stock that may have been moved, re-clamped or
+            // replaced since - and Verify skew writes a WCS origin and rotation from them. Restoring them
+            // silently would make a measurement from days ago look like one taken just now.
+            if (measuredRestoredUtc.HasValue)
+                sb.AppendFormat("\nRestored from the measure of {0} - re-measure if the stock has moved.",
+                    measuredRestoredUtc.Value.ToLocalTime().ToString("ddd d MMM HH:mm"));
+
             return sb.ToString();
         }
 
@@ -1903,6 +1985,7 @@ namespace GCode_Sender
                 chkExactSize.IsChecked = s.ExactSize;
                 chkSetTloRef.IsChecked = s.SetTloRef;
                 cbxMaterial.SelectedItem = cbxMaterial.Items.Cast<string>().FirstOrDefault(m => m == s.Material);
+                RestoreMeasured(s.MeasuredResult);
                 IsTouchPlate = s.Probe == "TouchPlate";
                 UpdateProbeWarning();   // may fall back to 3D Probe if the touch-plate definition no longer exists
                 // Corner is always front-left now; the probe comes from the selected probe definition - both dropped.
@@ -1926,6 +2009,10 @@ namespace GCode_Sender
             {
                 loadingInputs = false;
                 sizeFieldsTouched = false;   // these are last session's leftovers, not yet confirmed for THIS job
+                // Paint the restored measurement and re-enable Copy size / Verify skew. Inside finally so a
+                // partial load still leaves the readout agreeing with whatever actually made it into the fields,
+                // rather than showing "X = -" over a set of corners that are sitting right there.
+                ShowResult();
             }
         }
 
@@ -1959,6 +2046,7 @@ namespace GCode_Sender
                     HeightMapGridX = fldHeightMapGridX.Value,
                     HeightMapGridY = fldHeightMapGridY.Value,
                     Material = cbxMaterial.SelectedItem as string ?? string.Empty,
+                    MeasuredResult = SerializeMeasured(),
                     SafeZ = 20d
                 };
                 AppConfig.Settings.Save();
