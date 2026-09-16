@@ -2181,10 +2181,21 @@ namespace GCode_Sender
             L("(WAITIDLE)");
             L("G53 G0 Z0");                                         // re-lift after install (still R0)
 
-            // Apply the measured skew rotation (negated - grblHAL's G10 L2 R aligns with -atan2(dy,dx)). From here
-            // on ONLY work-coord moves are issued (no G53), so a machine-move/rotation interaction can't arise.
+            // Apply the measured skew rotation. From here on ONLY work-coord moves are issued (no G53), so a
+            // machine-move/rotation interaction can't arise.
+            //
+            // The ORIGIN is restated here alongside R, counter-rotated, rather than inherited from whatever the
+            // measure left in this WCS. grblHAL pivots about MACHINE zero (machine = R(rot)*(work + offset)), so
+            // the offset that puts work zero on the probed corner is R(-rot)*C - and this button is enabled on
+            // four probed corners alone, with no requirement that the measure applied a rotation at all. Reading
+            // the origin from the WCS would therefore test a frame nobody built: a raw origin under a rotation
+            // this program itself just switched on. Writing both from the retained corners makes the check
+            // self-contained and identical whichever way the measure ran.
             if (GrblInfo.RotationSupported)
-                L(string.Format("G10 L2 {0} R{1}", pCode(wcsP), N(-rotDeg)));
+                L(string.Format("G10 L2 {0} X{1} Y{2} R{3}", pCode(wcsP),
+                    N(cornerX[1].Value * cos + cornerY[1].Value * sin),
+                    N(-cornerX[1].Value * sin + cornerY[1].Value * cos),
+                    N(rotDeg)));
 
             // Order matches the Measure / Start-Job numbering: 1=FL, 2=FR, 3=BL, 4=BR.
             Touch(0d, 0d, "front-left (origin)");
@@ -2203,7 +2214,7 @@ namespace GCode_Sender
             L("G53 G0 X[#5181] Y[#5182]");                          // traverse to G30 X/Y
             L("G53 G0 Z[#5183]");                                   // descend to G30 Z
             if (GrblInfo.RotationSupported)
-                L(string.Format("G10 L2 {0} R{1}", pCode(wcsP), N(-rotDeg)));   // restore the skew rotation
+                L(string.Format("G10 L2 {0} R{1}", pCode(wcsP), N(rotDeg)));   // restore the skew rotation
             L("M2");
             return b.ToString();
         }
@@ -2642,19 +2653,46 @@ namespace GCode_Sender
                 // to a controller that would reject it - Load Stock always completes, with rotation when available.
                 if (measure && applyRotation && GrblInfo.RotationSupported)
                 {
-                    // NOTE the leading negation: grblHAL's G10 L2 R rotates the coordinate frame in the opposite
-                    // sense to the raw front-edge angle, so the rotation that ALIGNS the work frame to the stock is
-                    // -atan2(dy,dx). Without the negation the far edge lands off by ~2*width*sin(angle) (the Verify
-                    // skew check showed the right-hand corners a couple of mm short in Y).
-                    // BRACKETED, and that is not style. The firmware reads an assignment's right-hand side
-                    // with ngc_read_real_value (gcode.c), which accepts a number, a parameter, a unary
-                    // +/- or a BRACKETED expression - and no binary operator at all. Unbracketed, it took
-                    // the leading 0, assigned rot = 0, and left "- ATAN[...]" to the g-code word scanner,
-                    // which answered error:1 "G-code words consist of a letter and a value" against a line
-                    // that looks perfectly reasonable. Reported 2026-09-15, Setup with Measure + Set
-                    // rotation, dying right after the fourth corner probed cleanly.
-                    L("#<rot> = [0 - ATAN[#<c2y> - #<c1y>]/[#<c2x> - #<c1x>]]");
-                    L(string.Format("G10 L2 {0} R[#<rot>]", pCode(wcsP)));
+                    // The R word is +atan2(dy,dx), NOT negated, and the origin written with it is COUNTER-rotated.
+                    // Both follow from what grblHAL actually does, measured on the machine 2026-09-16:
+                    //
+                    //     machine = R(rot) * (work + g5x_offset) + g92 + TLO       (gcode.c, ROTATION_ENABLE block)
+                    //
+                    // It rotates the SUM, so the pivot is MACHINE zero, not the WCS origin - G10 L2 stores the
+                    // offset raw and nothing counter-rotates it. Two consequences, both of which used to be wrong:
+                    //
+                    //   SIGN. Work +X maps to machine direction (cos rot, sin rot), so aligning work X to a front
+                    //   edge at +theta needs R = +theta. This emitted -theta, pointing the work frame 2*theta the
+                    //   WRONG WAY - 1.21 mm across a 458 mm stock at theta = 0.075 deg. The old comment here
+                    //   blamed the un-negated form for exactly that symptom; the test stock behind that reading
+                    //   was itself 1.7 mm out of square (a real trapezoid), which is the likelier culprit.
+                    //
+                    //   ORIGIN. Work zero lands at R(rot)*C, not at the probed corner C. The error is |C| * rot -
+                    //   and |C| is measured from MACHINE zero, so it grows with how far out the stock sits: 0.89 mm
+                    //   at 674 mm out, and it does not cancel anywhere. Store R(-rot)*C so the product lands on C.
+                    //
+                    // Verified 2026-09-16 by setting a known origin, R5, and commanding work X0 Y0: predicted
+                    // 186.602,-648.068 from the formula above, machine reported 186.605,-648.070.
+                    //
+                    // This block deliberately REWRITES X and Y alongside R rather than folding the counter-rotation
+                    // into the origin block above. That block must stay bulletproof on firmware without
+                    // ROTATION_ENABLE, where any R word (incl. R0) errors:20 and halts - it emits the raw origin,
+                    // which is exactly right when there is no rotation to counter. Here, where rotation is known
+                    // supported, the same origin is restated in its counter-rotated form.
+                    //
+                    // Every RHS is BRACKETED, and that is not style. The firmware reads an assignment's right-hand
+                    // side with ngc_read_real_value (gcode.c), which accepts a number, a parameter, a unary +/- or
+                    // a BRACKETED expression - and no binary operator at all. Unbracketed, "0 - ATAN[...]" took the
+                    // leading 0, assigned rot = 0, and left "- ATAN[...]" to the g-code word scanner, which
+                    // answered error:1 "G-code words consist of a letter and a value" against a line that looks
+                    // perfectly reasonable. Reported 2026-09-15, dying right after the fourth corner probed cleanly.
+                    //
+                    // SIN/COS take DEGREES and ATAN returns degrees (ngc_expr.c), so no conversion is needed.
+                    L("#<rot> = [ATAN[#<c2y> - #<c1y>]/[#<c2x> - #<c1x>]]");
+                    L("#<rotc> = [COS[#<rot>]]");
+                    L("#<rots> = [SIN[#<rot>]]");
+                    // R(-rot) * (c1x, c1y): the offset that puts work zero back on the probed corner.
+                    L(string.Format("G10 L2 {0} X[[#<c1x> * #<rotc>] + [#<c1y> * #<rots>]] Y[[#<c1y> * #<rotc>] - [#<c1x> * #<rots>]] R[#<rot>]", pCode(wcsP)));
                     L("(PRINT, LS_ROT=#<rot>)");
                 }
             }
