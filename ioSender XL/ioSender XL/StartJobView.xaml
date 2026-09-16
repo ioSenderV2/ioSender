@@ -448,7 +448,14 @@
                     <Button x:Uid="ls_copysize" x:Name="btnCopySize" Content="Copy size" MinWidth="90" MinHeight="26" Margin="8,0,0,0" Click="CopySize_Click" IsEnabled="False"
                             ToolTip="Copy the measured stock size (X Y [Z] in mm) to the clipboard for Fusion's ioSenderBatchPost 'measured stock' field."/>
                     <Button x:Uid="ls_verifyskew" x:Name="btnVerify" Content="Verify skew" MinWidth="90" MinHeight="26" Margin="8,0,0,0" Click="VerifySkew_Click" IsEnabled="False"
-                            ToolTip="After a measure run: re-apply the measured origin + skew rotation, then touch each corner in the rotated work frame. If the skew is right (and the stock square) the probe lands right at every corner."/>
+                            ToolTip="After a measure run: re-apply the measured origin + skew rotation, then visit each corner in the rotated work frame. If the skew is right (and the stock square) every corner lines up."/>
+                    <!-- Unticked turns Verify skew into a FLY-OVER: the six frame points are visited at machine
+                         top with no Z descent at all, so it needs no probe, cannot reach the stock, and does not
+                         care what tool-length offset is active. Ticked adds the G38.3 touch at each point (needs
+                         a 3D probe defined and fitted). Default ticked - the touch is the more informative check. -->
+                    <CheckBox x:Uid="ls_verifytouch" x:Name="chkVerifyTouch" Content="Touch corners" IsChecked="True"
+                              VerticalAlignment="Center" Margin="10,0,0,0"
+                              ToolTip="Ticked: probe down at each corner (needs a 3D probe fitted). Unticked: just fly over the six points at machine top so you can sight the tip - no probe needed."/>
                 </StackPanel>
             </StackPanel>
         </Grid>

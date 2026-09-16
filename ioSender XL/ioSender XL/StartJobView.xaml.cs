@@ -2094,16 +2094,20 @@ namespace GCode_Sender
         }
 
         // Verify skew: after a measure run, re-establish the WCS (origin + measured rotation) from the retained
-        // probed corners and touch each corner of the ideal rectangle in the rotated work frame. If the rotation
-        // is right (and the stock square) every touch lands on the top surface right at the corner; a corner that
-        // misses or touches low reveals a bad rotation or an out-of-square (parallelogram) stock. A separate,
-        // re-runnable check that reuses the last measurement - it does not disturb the measure program/results.
+        // probed corners and visit each corner of the ideal rectangle in the rotated work frame. If the rotation
+        // is right (and the stock square) every point lines up with its corner; one that sits off, or touches
+        // low, reveals a bad rotation or an out-of-square (parallelogram) stock. A separate, re-runnable check
+        // that reuses the last measurement - it does not disturb the measure program/results.
+        //
+        // "Touch corners" unticked makes this a FLY-OVER at machine top, which needs no probe at all - see
+        // BuildVerifyProgram. Only the touching form needs a 3D probe, so only it is gated on one existing.
         private void VerifySkew_Click(object sender, RoutedEventArgs e)
         {
             if (model == null)
                 return;
+            bool touch = chkVerifyTouch.IsChecked == true;
             var p = ThreeDProbe();
-            if (p == null)
+            if (p == null && touch)
             {
                 AppDialogs.Show(CNC.Controls.LibStrings.FindResource("HmSelectProbe"),
                     "Verify skew", MessageBoxButton.OK, MessageBoxImage.Exclamation);
@@ -2116,18 +2120,25 @@ namespace GCode_Sender
                 return;
             }
 
-            string verify = BuildVerifyProgram(p, cbxWcs.SelectedIndex + 1);
+            string verify = BuildVerifyProgram(p, cbxWcs.SelectedIndex + 1, touch);
             EnsureProgramView();
             programView.SetProgramText(verify);
             programView.Connect();
             MacroProcessor.Run(model, "Verify skew", verify, true);
         }
 
-        private string BuildVerifyProgram(ProbeDefinition p, int wcsP)
+        // touch == false turns this into a FLY-OVER: the six frame points are visited at machine top and nothing
+        // descends, so no probe is needed, nothing can reach the stock, and no tool-length offset is involved.
+        // You sight the tip against each corner instead of feeling for it. Worth having because the touching
+        // form's resolution is set by the probe tip radius anyway (3+ mm on a touch-plate-sized tip), so a
+        // frame that is rotated or displaced wrong shows up to the eye about as well as it does to the probe.
+        private string BuildVerifyProgram(ProbeDefinition p, int wcsP, bool touch)
         {
-            double r = p.ProbeDiameter / 2d;                         // inset so the tip edge sits at the corner
-            double latch = p.LatchFeedRate > 0d ? p.LatchFeedRate : 50d;
-            const double safeZ = 10d, probeDepth = 3d;               // work Z: 10 above the top, probe 3 below it
+            // Inset so the probe tip's EDGE sits on the corner. A fly-over wants the tip ON the corner - there is
+            // nothing being felt for - and it must also work with no probe defined at all, hence the 0.
+            double r = touch ? p.ProbeDiameter / 2d : 0d;
+            double search = touch && p.ProbeFeedRate > 0d ? p.ProbeFeedRate : 200d;
+            const double probeDepth = 3d;                            // work Z: probe to 3 below the corner's own top
 
             // Corner work coords in the measure's rotated frame: transform each probed corner (machine) about the
             // FL origin by the applied rotation. FR defines +X (front edge); BL gives the Y direction whose SIGN
@@ -2143,43 +2154,71 @@ namespace GCode_Sender
             var b = new StringBuilder();
             void L(string s) { b.Append(SanitizeParens(s)).Append('\n'); }
 
-            // Inset a work-coord touch point toward the stock centre by the tip radius (so the tip edge sits at
-            // the point), rapid over it above the stock, drop to safe Z, probe down (G38.3 - a miss won't halt),
-            // and retract. Handedness-agnostic: the inset direction comes from the centre, never an assumed sign.
+            // Visit one work-coord point: inset toward the stock centre by the tip radius, cross to it at MACHINE
+            // TOP, then either probe down or just pause to be looked at. Handedness-agnostic: the inset direction
+            // comes from the centre, never an assumed sign.
+            //
+            // THE DESCENT IS ENTIRELY A PROBING MOVE, and that is the safety property, not a detail. This used to
+            // rapid "G0 Z10" - a WORK Z, ten above where work Z0 was set - and then probe the last 13 mm. Work Z0
+            // only means the stock top while the tool-length offset that was active during the measure is still
+            // active, and this program asks you to fit a 3D probe, which is exactly a tool change. Measure with
+            // the touch plate, verify with the probe, and that rapid aims at a height wrong by the difference in
+            // tool length - straight into the stock at G0 if the probe is the longer of the two. A G38.3 stops on
+            // contact, so with the whole descent probing, a stale offset can only make it touch high or miss.
+            //
+            // Each corner targets ITS OWN measured top (cornerZ, machine, relative to corner 1 which is work Z0),
+            // so the stock's own flatness is followed rather than assumed away - this stock spans 0.3 mm.
             double cx = fx / 2d, cy = ly / 2d;
-            void Touch(double px, double py, string label)
+            void Touch(double px, double py, int zc, string label)
             {
                 double dx = cx - px, dy = cy - py, len = Math.Sqrt(dx * dx + dy * dy);
                 double ix = len < 1e-6 ? px : px + r * dx / len;
                 double iy = len < 1e-6 ? py : py + r * dy / len;
                 L(string.Format("(--- {0} ---)", label));
-                L(string.Format("G0 X{0} Y{1}", N(ix), N(iy)));     // work XY (rotation applied); above the stock
+                L("G53 G0 Z0");                                     // machine top - clear of the stock for ANY tool
+                L(string.Format("G0 X{0} Y{1}", N(ix), N(iy)));     // work XY (rotation applied), at machine top
                 L("(WAITIDLE)");
-                L("G0 Z" + N(safeZ));                               // drop to safe Z above the stock top
-                L(string.Format("G38.3 Z{0} F{1}", N(-probeDepth), N(latch)));   // no-error probe
-                L("G0 Z" + N(safeZ));                               // retract above the stock
+                if (touch)
+                {
+                    // Work Z of "probeDepth below this corner's own top". Reached ONLY by probing - see above.
+                    // The per-corner term falls back to 0 (corner 1's top, i.e. work Z0) if that corner's Z
+                    // never arrived: Has() only proves X and Y, and a target built from a null is not a target.
+                    double dz = cornerZ[zc].HasValue && cornerZ[1].HasValue ? cornerZ[zc].Value - cornerZ[1].Value : 0d;
+                    double targetZ = dz - probeDepth;
+                    L(string.Format("G38.3 Z{0} F{1}", N(targetZ), N(search)));   // no-error probe; stops on contact
+                    L("G53 G0 Z0");                                 // retract to machine top
+                }
+                else
+                    L("G4 P2");                                     // hold still long enough to sight the tip
             }
 
-            L("(Verify skew - touch each corner in the rotated work frame. Each should touch the surface right at the corner.)");
+            L(touch
+                ? "(Verify skew - touch each corner in the rotated work frame. Each should touch the surface right at the corner.)"
+                : "(Verify skew, FLY-OVER - visit each corner in the rotated work frame at machine top. Nothing descends; sight the tip against each corner.)");
             L("(Front-left/right define the frame (ideal == measured).)");
-            L("(Back-left/right are touched twice: the ideal rectangle point, then the actual probed corner - the gap between the two is the out-of-square amount.)");
-            L("(Discipline matches Measure: no G53 move runs while the rotation is active.)");
+            L("(Back-left/right are visited twice: the ideal rectangle point, then the actual probed corner - the gap between the two is the out-of-square amount.)");
+            // G53 is NonModal_AbsoluteOverride, which gcode.c's rotation block explicitly exempts, so a G53 move
+            // under an active rotation is fine - confirmed by reading the firmware 2026-09-16, replacing an older
+            // "never mix them" rule of thumb. What is NOT fine is a G53 move right after a G10 L2 R write on the
+            // active WCS; that is what EmitRotationWrite exists to repair.
             MacroProcessor.EmitProgramHeader(L, "connected, homed, noalarm, EXPR, G30");
             MacroProcessor.EmitModalDefaults(L);
-            if (GrblInfo.HasToolSetter)
+            if (touch && GrblInfo.HasToolSetter)
                 L(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
 
-            // Use the WCS the measure set (origin). Clear the rotation FIRST so the G53 safe-Z lift is a clean
-            // machine move (a G53 move with an active WCS rotation needs a separate firmware exemption).
+            // Use the WCS the measure set (origin), rotation cleared for now - the real one goes on below, with
+            // the counter-rotated origin, once the machine is parked.
             L(WcsCode(wcsP) + "  (activate the WCS the measure set - origin)");
             if (GrblInfo.RotationSupported)
-                EmitRotationWrite(L, string.Format("G10 L2 {0} R0", pCode(wcsP)));   // clear rotation for the G53 lift
+                EmitRotationWrite(L, string.Format("G10 L2 {0} R0", pCode(wcsP)));
 
-            L("G53 G0 Z0");                                         // lift to machine top (rotation cleared - clean)
+            L("G53 G0 Z0");                                         // lift to machine top
             L("(WAITIDLE)");
-            L("(MBOX, OKCANCEL, Install the 3D probe. This touches each corner to check the skew. Click OK to start.)");
+            L(touch
+                ? "(MBOX, OKCANCEL, Install the 3D probe. This touches each corner to check the skew. Click OK to start.)"
+                : "(MBOX, OKCANCEL, Fly-over check - the machine visits each corner of the measured frame at machine top and pauses. Nothing descends and nothing is probed. Watch whether the tool tip lines up with each corner. Click OK to start.)");
             L("(WAITIDLE)");
-            L("G53 G0 Z0");                                         // re-lift after install (still R0)
+            L("G53 G0 Z0");                                         // re-lift after the prompt (still R0)
 
             // Apply the measured skew rotation. From here on ONLY work-coord moves are issued (no G53), so a
             // machine-move/rotation interaction can't arise.
@@ -2198,12 +2237,14 @@ namespace GCode_Sender
                     N(rotDeg)));
 
             // Order matches the Measure / Start-Job numbering: 1=FL, 2=FR, 3=BL, 4=BR.
-            Touch(0d, 0d, "front-left (origin)");
-            Touch(fx, 0d, "front-right");
-            Touch(0d, ly, "back-left - ideal rectangle");
-            Touch(WX(3), WY(3), "back-left - measured corner");
-            Touch(fx, ly, "back-right - ideal rectangle");
-            Touch(WX(4), WY(4), "back-right - measured corner");
+            // The Z argument is which corner's measured top this point sits on - the two "ideal rectangle"
+            // points belong to the same physical corner as the measured one they are paired with.
+            Touch(0d, 0d, 1, "front-left (origin)");
+            Touch(fx, 0d, 2, "front-right");
+            Touch(0d, ly, 3, "back-left - ideal rectangle");
+            Touch(WX(3), WY(3), 3, "back-left - measured corner");
+            Touch(fx, ly, 4, "back-right - ideal rectangle");
+            Touch(WX(4), WY(4), 4, "back-right - measured corner");
 
             // Park back at G30 (where the job started). Clear the rotation for the G53 park moves, park, then
             // restore the skew rotation so the WCS is left as the measure produced it (no move follows - safe).

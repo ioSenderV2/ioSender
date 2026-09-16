@@ -109,7 +109,7 @@ ioSender.g.en-US.resources:startjobview.baml,ls_rotate:System.Windows.FrameworkE
 ioSender.g.en-US.resources:startjobview.baml,ls_tloref:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Set tool-length reference
 ioSender.g.en-US.resources:startjobview.baml,ls_tloref:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Reference the tool length at the toolsetter puck (M6 T8, probe already in the spindle) after the origin is set - the core of a one-button job start. Requires ATC and a toolsetter at G59.3."
 ioSender.g.en-US.resources:startjobview.baml,ls_verifyskew:System.Windows.Controls.ContentControl.Content,Button,True,True,,Verify skew
-ioSender.g.en-US.resources:startjobview.baml,ls_verifyskew:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"After a measure run: re-apply the measured origin + skew rotation, then touch each corner in the rotated work frame. If the skew is right (and the stock square) the probe lands right at every corner."
+ioSender.g.en-US.resources:startjobview.baml,ls_verifyskew:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"After a measure run: re-apply the measured origin + skew rotation, then visit each corner in the rotated work frame. If the skew is right (and the stock square) every corner lines up."
 ioSender.g.en-US.resources:mainwindow.baml,mnu_openConfigFolder:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Open the per-user folder where ioSender keeps its settings (App.config), key mappings, grbl backups and restore points."
 ioSender.g.en-US.resources:mainwindow.baml,btn_copyMessage:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Copy the full status message to the clipboard
 ioSender.g.en-US.resources:programpanel.baml,btn_loadFolderHdr:System.Windows.Controls.ContentControl.Content,Button,True,True,,Load Folder...
@@ -255,3 +255,5 @@ ioSender.g.en-US.resources:heightmapview.baml,hm_allowance:CNC.Controls.NumericF
 ioSender.g.en-US.resources:heightmapview.baml,hm_legendTitle:System.Windows.Controls.TextBlock.Text,Text,True,True,,Height
 ioSender.g.en-US.resources:mainwindow.baml,mnu_restartIoSender:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Restart ioSender...
 ioSender.g.en-US.resources:mainwindow.baml,mnu_restartIoSender:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Close and reopen ioSender. Settings are saved first. Clears anything held only in memory for this session - a stuck connection state, for example. Asks first."
+ioSender.g.en-US.resources:startjobview.baml,ls_verifytouch:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Touch corners
+ioSender.g.en-US.resources:startjobview.baml,ls_verifytouch:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Ticked: probe down at each corner (needs a 3D probe fitted). Unticked: just fly over the six points at machine top so you can sight the tip - no probe needed.
