@@ -70,6 +70,16 @@
                        Text="No validated Corner Fence fixture available. Define/position/test one in Machine Setup Wizard &gt; Fixture definitions."/>
 
             <Separator Margin="5,8"/>
+            <TextBlock x:Uid="txt_asporienthdr" Text="Clamped orientation:" TextWrapping="Wrap" Margin="5,0,5,4"/>
+            <StackPanel Orientation="Horizontal" Margin="5,0,5,4">
+                <RadioButton x:Uid="rb_aspnormal" x:Name="rbOrientNormal" Content="Normal (heel in the fence)" GroupName="AspOrient" VerticalAlignment="Center" Checked="Orientation_Checked"
+                             ToolTip="The square face-up, heel registered in the corner fence, blade along X and tongue along Y. This reading is the square's error and the machine's added together."/>
+                <RadioButton x:Uid="rb_aspreversed" x:Name="rbOrientReversed" Content="Reversed (flipped)" GroupName="AspOrient" VerticalAlignment="Center" Margin="14,0,0,0" Checked="Orientation_Checked"
+                             ToolTip="The square FLIPPED OVER, with the far end of the blade registered in the fence and the heel out to the right. Mirroring reverses the sign of the square's own error but not the machine's, so measuring both ways separates them."/>
+            </StackPanel>
+            <TextBlock x:Name="txtReversal" TextWrapping="Wrap" Margin="5,2,5,4" FontSize="11" Foreground="#444444"/>
+
+            <Separator Margin="5,8"/>
             <TextBlock x:Uid="txt_aspsquarehdr" TextWrapping="Wrap" Margin="5,0,5,4"
                        Text="The reference square, clamped heel-to-the-fence with its blade along X and its tongue along Y. The arm lengths only have to be close - they aim the probe's seek; the measurement itself is whatever the probe actually finds."/>
             <local:NumericField x:Uid="fld_aspblade" Label="Blade (X arm):" ColonAt="160" Format="#####0.0" Unit="mm" Margin="0,2"

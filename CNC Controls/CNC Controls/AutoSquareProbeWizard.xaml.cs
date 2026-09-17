@@ -33,10 +33,23 @@
  * of this file restored that inherited offset instead, which is worse than it sounds: it puts back a
  * confident-looking number measured against a tool that is no longer in the spindle.
  *
- * NOT YET BUILT - the reversal test. Measure, flip the square over, measure again: the square's own error
- * changes sign, the machine's does not, so the mean is the machine and half the difference is the square.
- * It is the only way to tell which of the two you are looking at, and it is cheap once probing is the
- * instrument. Deliberately deferred until a single measurement is hardware-verified.
+ * The REVERSAL, built 2026-09-16 once the single measurement was hardware-verified. A lone reading is
+ * (square + machine) and cannot be separated - correcting it to zero squares the gantry TO the square.
+ * Flipping the square mirrors it, which reverses the sign of ITS error and not the machine's, so:
+ *
+ *     normal   = S + eps          reversed = S - eps
+ *     square S = (normal + reversed) / 2     machine eps = (normal - reversed) / 2
+ *
+ * The flip forces the heel to MOVE. A mirrored L cannot lie with both arms in the +X/+Y quadrant - it can
+ * only manage +X/-Y or -X/+Y - and no rotation undoes a mirror, so the reversed orientation registers the
+ * far end of the BLADE in the fence and puts the heel out to the right. Corner ids become 1/2/4 instead
+ * of 1/2/3, with the heel as the vertex rather than the fence corner; storing points by ROLE is what
+ * keeps that out of the arithmetic. Both halves must be measured at the same squaring offset and with no
+ * homing between them, or they describe different machines.
+ *
+ * The square's error is then PERSISTED, and that is the real payoff: it is a property of a physical
+ * object, so every later single reading yields the machine's error by subtraction and the reversal never
+ * has to be repeated.
  */
 
 using System;
@@ -72,8 +85,42 @@ namespace CNC.Controls
         // grblHAL Setting_AxisAutoSquareOffset = AxisSettingsBase(100) + 7*INCREMENT(10): X=170, Y=171, Z=172.
         private const int AutoSquareOffsetBase = 170;
 
-        // The three probed corners, machine coordinates. Null until a run has reported them.
-        private double? c1x, c1y, c2x, c2y, c3x, c3y;
+        // The three probed corners by ROLE, machine coordinates. Null until a run has reported them.
+        //
+        // By role and not by corner id, because the reversal test probes a DIFFERENT set of pcorner corners
+        // (1/2/4 rather than 1/2/3) with a different one of them as the vertex. Storing what each point IS
+        // rather than which id produced it means the skew arithmetic below never learns about orientation at
+        // all - the only code that branches is the program generator that aims the seeks.
+        private double? heelX, heelY, bladeX, bladeY, tongueX, tongueY;
+
+        /// <summary>One completed measurement, and the conditions that make it comparable to another.</summary>
+        private struct Reading
+        {
+            public double Skew;         // degrees, blade-to-tongue interior angle minus 90
+            public double BladeSpan;    // heel -> blade end, mm
+            public double TongueSpan;   // heel -> tongue end, mm
+            public double Offset;       // the squaring offset in force when this was measured
+        }
+
+        // The reversal pair. Both must have been taken at the SAME squaring offset or they are not
+        // comparable - the machine's contribution differs between them and the split is meaningless.
+        private Reading? readNormal, readReversed;
+
+        /// <summary>
+        /// The reference square's OWN out-of-squareness, in degrees, once a reversal pair has established
+        /// it. Persisted: it is a property of a physical object the operator owns, not of a session.
+        /// </summary>
+        /// <remarks>
+        /// This is the real payoff of the reversal, and it outlives the run that measured it. A single
+        /// normal-orientation reading is (square + machine) and cannot be separated. Once the square's own
+        /// error is known, every later single reading gives the MACHINE's error directly by subtraction -
+        /// so the reversal is a one-off calibration of the artifact, not a thing to repeat each time.
+        /// </remarks>
+        private double? squareErrorDeg;
+
+        // Which way the square is currently clamped. Drives the corner ids and seek references in
+        // BuildProgram, the operator prompts, and which half of the reversal pair a result lands in.
+        private bool reversed = false;
 
         // Above this the offset is racking the gantry a lot - on a rigid frame that binds. Same threshold,
         // same reasoning, as the pin tab.
@@ -90,8 +137,10 @@ namespace CNC.Controls
         // reading stood for weeks while every job came out with DOUBLE the error it was correcting.
         private bool invertCorrection = false;
 
-        // (PRINT, SQ_C<n><axis>=..) - the same "(PRINT, TAG=value)" idiom every other generator here uses.
-        private static readonly Regex rxCorner = new Regex(@"SQ_C([123])([XY])\s*=\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
+        // (PRINT, SQ_<role><axis>=..) - the same "(PRINT, TAG=value)" idiom every other generator here uses.
+        // Tagged by role rather than by corner number so the same three tags serve both orientations; see
+        // the role fields above.
+        private static readonly Regex rxCorner = new Regex(@"SQ_(HEEL|BLADE|TONGUE)([XY])\s*=\s*(-?\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
 
         private bool isActiveTab = false;
 
@@ -110,6 +159,8 @@ namespace CNC.Controls
             "4. Generate, then Run. It parks at G30 to confirm the probe, touches the puck to give that probe its own tool length offset, then probes the heel and the far end of each arm - and puts the offset back at the end. Fitting the probe is a tool change, so without that reference the run would work against whatever offset the previous tool left, and hand the machine back the same way.\n\n" +
             "5. Read the measured skew. Apply offset, then Re-home for it to take effect.\n\n" +
             "6. RUN IT AGAIN. This is not optional and it is not a formality - it is how the correction's direction gets established. The skew should collapse toward zero. If it roughly DOUBLED instead, the sign is backwards for your machine: tick 'Invert correction direction', Apply, re-home and re-measure. Leave it ticked from then on.\n\n" +
+            "7. THE REVERSAL - do this once and the square stops being the unknown. A single reading is the square's own error and the machine's added together, so correcting it to zero would square the gantry TO the square. To split them: measure in Normal, then FLIP THE SQUARE OVER and re-clamp with the far end of the BLADE registered in the fence and the heel out to the right at blade length, switch the orientation above to Reversed, and run again. Do NOT change the offset and do NOT re-home between the two - both halves must see the same machine, and skipping the homing keeps its own scatter out of the difference.\n\n" +
+            "Why flipping works: a mirrored square has its own error reversed in sign while the machine's is unchanged. Normal reads square + machine, reversed reads square - machine, so the mean is the square and half the difference is the gantry. The square's error is then remembered, and every later single reading gives the machine alone by subtraction - you never need to reverse again unless you change squares.\n\n" +
             "What the number means: the skew is the angle between the square's two arms as the machine sees them, minus 90 degrees. It is the machine's error and the square's error added together, and nothing here can separate them - so a result at or below about 0.01 degrees is the square's accuracy talking, not the gantry's.\n\n" +
             "If the offset needed is more than a couple of mm, the gantry is mechanically out of square (the two rails out of phase) and racking it that hard can bind a rigid frame. Fix that first; the squaring offset is fine-trim.";
 
@@ -118,6 +169,11 @@ namespace CNC.Controls
             InitializeComponent();
             model = DataContext as GrblViewModel;
             txtHowTo.Text = HowToText;
+            // Set here rather than IsChecked="True" in the XAML: that fires the Checked handler mid-BAML
+            // parse, before later-declared sibling fields exist. Same reason the stepper probe wizard sets
+            // its own radio default in its constructor. ApplyConfig overrides this once the saved state
+            // loads; without it a fresh install would start with NEITHER radio selected.
+            rbOrientNormal.IsChecked = true;
         }
 
         #region Methods required by IGrblConfigTab
@@ -304,26 +360,131 @@ namespace CNC.Controls
 
         private bool HasAllCorners
         {
-            get { return c1x.HasValue && c1y.HasValue && c2x.HasValue && c2y.HasValue && c3x.HasValue && c3y.HasValue; }
+            get { return heelX.HasValue && heelY.HasValue && bladeX.HasValue && bladeY.HasValue && tongueX.HasValue && tongueY.HasValue; }
+        }
+
+        private void ClearCorners()
+        {
+            heelX = heelY = bladeX = bladeY = tongueX = tongueY = null;
         }
 
         /// <summary>
-        /// Deviation from 90 degrees between the blade (corner 1 -> 2) and the tongue (corner 1 -> 3), as the
+        /// File a completed measurement into the half of the reversal pair matching the current orientation,
+        /// and - when that completes a comparable pair - solve for the square's own error.
+        /// </summary>
+        /// <remarks>
+        /// The pair is only comparable at a single squaring offset. Measure one orientation, change $17x,
+        /// then measure the other and the machine's contribution is not the same in both, so the split is
+        /// arithmetic on two different machines. Refused rather than averaged: the stored offset is what
+        /// makes that detectable, and a silently wrong square calibration would bias every correction
+        /// afterwards while looking more authoritative than the raw number it replaced.
+        ///
+        /// There is also no need to re-home between the two, and you should not - the ganged axis
+        /// re-establishes its squareness from two home switches with a spread of its own (about 0.004 deg
+        /// measured on this machine), and that spread cancels out of the difference only if no homing
+        /// happens between the readings.
+        /// </remarks>
+        private void CaptureReading()
+        {
+            double? skew = SkewDegrees();
+            if (!skew.HasValue)
+                return;
+
+            var r = new Reading
+            {
+                Skew = skew.Value,
+                BladeSpan = BladeSpan() ?? 0d,
+                TongueSpan = TongueSpan() ?? 0d,
+                Offset = CurrentOffset
+            };
+
+            if (reversed)
+                readReversed = r;
+            else
+                readNormal = r;
+
+            // Normal reads (square + machine), reversed reads (square - machine) - so the mean is the
+            // square and half the difference is the machine. See the file header for the derivation.
+            if (PairIsComparable)
+            {
+                squareErrorDeg = (readNormal.Value.Skew + readReversed.Value.Skew) / 2d;
+                Persist();
+            }
+        }
+
+        /// <summary>Both halves measured, and at the same squaring offset.</summary>
+        private bool PairIsComparable
+        {
+            get
+            {
+                return readNormal.HasValue && readReversed.HasValue
+                    && Math.Abs(readNormal.Value.Offset - readReversed.Value.Offset) <= 1e-6;
+            }
+        }
+
+        /// <summary>How the machine's own error was arrived at - shown, because it changes what to trust.</summary>
+        private enum SkewBasis
+        {
+            None,
+            Raw,            // one reading, no square calibration: square + machine, inseparable
+            Calibrated,     // one reading minus a previously measured square error
+            Reversal        // both halves of a reversal pair, this session
+        }
+
+        private SkewBasis basis = SkewBasis.None;
+
+        /// <summary>
+        /// The MACHINE's own squareness error - the thing the squaring offset can actually correct - and
+        /// the basis it rests on.
+        /// </summary>
+        private double? MachineSkewDegrees(out SkewBasis how)
+        {
+            if (PairIsComparable)
+            {
+                how = SkewBasis.Reversal;
+                return (readNormal.Value.Skew - readReversed.Value.Skew) / 2d;
+            }
+
+            double? skew = SkewDegrees();
+            if (!skew.HasValue)
+            {
+                how = SkewBasis.None;
+                return null;
+            }
+
+            if (squareErrorDeg.HasValue)
+            {
+                how = SkewBasis.Calibrated;
+                return skew.Value - squareErrorDeg.Value;
+            }
+
+            how = SkewBasis.Raw;
+            return skew.Value;
+        }
+
+        /// <summary>
+        /// Deviation from 90 degrees between the blade and the tongue, measured from the heel, as the
         /// MACHINE sees them. 0 = the machine's right angle and the square's agree.
         /// </summary>
         /// <remarks>
         /// Identical formula to StartJobView.SkewDegrees, which measures the same thing against a rectangle
-        /// of stock and needs only corners 1/2/3 for it - the fourth corner it happens to have is used for
-        /// the diagonal check, not this. Kept as its own copy because this tool lives in CNC.Controls and
-        /// that one in the app assembly.
+        /// of stock and needs only three of its corners for it. Kept as its own copy because this tool lives
+        /// in CNC.Controls and that one in the app assembly.
+        ///
+        /// ORIENTATION-BLIND, and deliberately so. In the reversed orientation the blade runs along -X
+        /// rather than +X, so the vectors point into a different quadrant - but the unsigned angle between
+        /// them is still the interior angle of the L, and that is all this computes. The reversal's sign
+        /// flip comes from the GEOMETRY, not from any branch here: normal reads (square + machine) and
+        /// reversed reads (square - machine) because a mirrored square in a skewed frame genuinely measures
+        /// differently. See the file header.
         /// </remarks>
         private double? SkewDegrees()
         {
             if (!HasAllCorners)
                 return null;
 
-            double ax = c2x.Value - c1x.Value, ay = c2y.Value - c1y.Value;   // along the blade
-            double bx = c3x.Value - c1x.Value, by = c3y.Value - c1y.Value;   // along the tongue
+            double ax = bladeX.Value - heelX.Value, ay = bladeY.Value - heelY.Value;      // along the blade
+            double bx = tongueX.Value - heelX.Value, by = tongueY.Value - heelY.Value;    // along the tongue
             double la = Math.Sqrt(ax * ax + ay * ay), lb = Math.Sqrt(bx * bx + by * by);
             if (la < 1e-6 || lb < 1e-6)
                 return null;
@@ -335,14 +496,14 @@ namespace CNC.Controls
         private double? BladeSpan()
         {
             if (!HasAllCorners) return null;
-            double ax = c2x.Value - c1x.Value, ay = c2y.Value - c1y.Value;
+            double ax = bladeX.Value - heelX.Value, ay = bladeY.Value - heelY.Value;
             return Math.Sqrt(ax * ax + ay * ay);
         }
 
         private double? TongueSpan()
         {
             if (!HasAllCorners) return null;
-            double bx = c3x.Value - c1x.Value, by = c3y.Value - c1y.Value;
+            double bx = tongueX.Value - heelX.Value, by = tongueY.Value - heelY.Value;
             return Math.Sqrt(bx * bx + by * by);
         }
 
@@ -362,7 +523,8 @@ namespace CNC.Controls
         /// </remarks>
         private double CorrectionDelta()
         {
-            double? skew = SkewDegrees();
+            SkewBasis how;
+            double? skew = MachineSkewDegrees(out how);
             if (!skew.HasValue)
                 return 0d;
             double rs = RailSpan();
@@ -393,13 +555,17 @@ namespace CNC.Controls
                 return;
 
             double? skew = SkewDegrees();
+            double? machine = MachineSkewDegrees(out basis);
             bool measureOnly = _offset == null;
             double railSpan = RailSpan();
 
             txtResult.Text = skew.HasValue
-                ? string.Format(CultureInfo.InvariantCulture, "Measured skew:  {0:0.0###}°   (blade {1:0.0##} mm, tongue {2:0.0##} mm)",
-                                skew.Value, BladeSpan() ?? 0d, TongueSpan() ?? 0d)
+                ? string.Format(CultureInfo.InvariantCulture, "Measured skew:  {0:0.0###}°   ({1}, blade {2:0.0##} mm, tongue {3:0.0##} mm)",
+                                skew.Value, reversed ? "reversed" : "normal", BladeSpan() ?? 0d, TongueSpan() ?? 0d)
                 : "Measured skew:  -   (Generate and Run to probe the square)";
+
+            if (txtReversal != null)
+                txtReversal.Text = ReversalStatus(machine);
 
             string warn = string.Empty;
             if (railSpan <= 0d)
@@ -425,12 +591,12 @@ namespace CNC.Controls
                     txtSummary.Text = string.Empty;
                 else if (measureOnly)
                     txtSummary.Text = string.Format(CultureInfo.InvariantCulture,
-                        "skew {0:0.0###}° → the gantry is {1:0.000} mm out of square across the {2:0} mm rail span. Measure-only (no offset setting) - correct it mechanically.",
-                        skew.Value, Math.Abs(CorrectionDelta()), railSpan);
+                        "machine error {0:0.0###}° → the gantry is {1:0.000} mm out of square across the {2:0} mm rail span. Measure-only (no offset setting) - correct it mechanically.",
+                        machine ?? 0d, Math.Abs(CorrectionDelta()), railSpan);
                 else
                     txtSummary.Text = string.Format(CultureInfo.InvariantCulture,
-                        "skew {0:0.0###}° over a {1:0} mm rail span → correction {2:+0.000;-0.000;0} mm, new offset {3:0.000} (from {4:0.000}){5}",
-                        skew.Value, railSpan, CorrectionDelta(), NewOffset, CurrentOffset,
+                        "machine error {0:0.0###}° over a {1:0} mm rail span → correction {2:+0.000;-0.000;0} mm, new offset {3:0.000} (from {4:0.000}){5}",
+                        machine ?? 0d, railSpan, CorrectionDelta(), NewOffset, CurrentOffset,
                         invertCorrection ? "  ·  inverted" : string.Empty);
             }
         }
@@ -438,6 +604,47 @@ namespace CNC.Controls
         private static bool SpanAdrift(double? measured, double entered)
         {
             return measured.HasValue && entered > 0d && Math.Abs(measured.Value - entered) > 20d;
+        }
+
+        /// <summary>
+        /// The reversal line: what is known about the square itself, and therefore how much of the measured
+        /// skew is actually the machine.
+        /// </summary>
+        /// <remarks>
+        /// Stated at every stage rather than only when complete, because the whole point of this panel is
+        /// that a raw reading CANNOT distinguish a crooked gantry from a crooked square, and an operator who
+        /// forgets that will square the machine to the square and read it as success.
+        /// </remarks>
+        private string ReversalStatus(double? machine)
+        {
+            switch (basis)
+            {
+                case SkewBasis.Reversal:
+                    return string.Format(CultureInfo.InvariantCulture,
+                        "Reversal complete (both halves at offset {0:0.000}):  square {1:+0.0###;-0.0###;0}°  ·  machine {2:+0.0###;-0.0###;0}°\nnormal {3:+0.0###;-0.0###;0}° = square + machine,  reversed {4:+0.0###;-0.0###;0}° = square - machine. The square's error is now remembered.",
+                        readNormal.Value.Offset, squareErrorDeg ?? 0d, machine ?? 0d,
+                        readNormal.Value.Skew, readReversed.Value.Skew);
+
+                case SkewBasis.Calibrated:
+                    return string.Format(CultureInfo.InvariantCulture,
+                        "Square error {0:+0.0###;-0.0###;0}° known from an earlier reversal - subtracted, so the machine error above is the gantry alone.",
+                        squareErrorDeg.Value);
+
+                case SkewBasis.Raw:
+                    string half = readNormal.HasValue || readReversed.HasValue
+                        ? (readNormal.HasValue ? "Normal half measured" : "Reversed half measured")
+                          + (readNormal.HasValue && readReversed.HasValue
+                             ? string.Format(CultureInfo.InvariantCulture, " - but the two halves are at DIFFERENT offsets ({0:0.000} and {1:0.000}), so they cannot be split. Re-run one of them at the other's offset.",
+                                             readNormal.Value.Offset, readReversed.Value.Offset)
+                             : " - now flip the square, switch the orientation above, and run the other half WITHOUT re-homing or changing the offset.")
+                        : string.Empty;
+                    return "This reading is the square's error and the machine's added together, and nothing here can separate them - correcting it to zero would square the gantry TO the square. Run the reversal to split them.\n" + half;
+
+                default:
+                    return squareErrorDeg.HasValue
+                        ? string.Format(CultureInfo.InvariantCulture, "Square error {0:+0.0###;-0.0###;0}° remembered from an earlier reversal; it will be subtracted from the next reading.", squareErrorDeg.Value)
+                        : "No reversal done yet - a single reading cannot tell a crooked gantry from a crooked square.";
+            }
         }
 
         #endregion
@@ -535,6 +742,22 @@ namespace CNC.Controls
             UpdateComputed();
         }
 
+        /// <summary>
+        /// Orientation pick. Only the live corners are dropped - the stored reversal halves must survive,
+        /// since switching orientation is precisely the act of going to measure the other one.
+        /// </summary>
+        private void Orientation_Checked(object sender, RoutedEventArgs e)
+        {
+            if (!IsInitialized)
+                return;
+            reversed = rbOrientReversed.IsChecked == true;
+            ClearCorners();     // the reading on screen belongs to the orientation being left
+            Persist();
+            DiscardProgram();   // the sitting program aims its seeks for the OTHER orientation
+            RefreshGenerateReady();
+            UpdateComputed();
+        }
+
         private void ReferenceTlo_Changed(object sender, RoutedEventArgs e)
         {
             if (!IsInitialized)
@@ -569,14 +792,16 @@ namespace CNC.Controls
                 return;
 
             bool isX = m.Groups[2].Value.ToUpperInvariant() == "X";
-            switch (m.Groups[1].Value)
+            switch (m.Groups[1].Value.ToUpperInvariant())
             {
-                case "1": if (isX) c1x = v; else c1y = v; break;
-                case "2": if (isX) c2x = v; else c2y = v; break;
-                case "3": if (isX) c3x = v; else c3y = v; break;
+                case "HEEL": if (isX) heelX = v; else heelY = v; break;
+                case "BLADE": if (isX) bladeX = v; else bladeY = v; break;
+                case "TONGUE": if (isX) tongueX = v; else tongueY = v; break;
             }
 
-            Dispatcher.BeginInvoke(new System.Action(UpdateComputed));
+            // Filing the reading happens on the UI thread with the recompute, not here - CaptureReading
+            // writes squareErrorDeg and calls Persist(), and this runs on a comms thread.
+            Dispatcher.BeginInvoke(new System.Action(() => { CaptureReading(); UpdateComputed(); }));
         }
 
         #endregion
@@ -674,7 +899,9 @@ namespace CNC.Controls
             }
 
             txtWarnings.Text = string.Empty;
-            c1x = c1y = c2x = c2y = c3x = c3y = null;   // a new run measures afresh; never mix two runs' corners
+            // Clear the live corners only. The stored reversal halves must SURVIVE a Generate - running
+            // the second orientation is exactly how the pair gets completed.
+            ClearCorners();
             UpdateComputed();
 
             // The WCS to come back to is whichever one is ACTIVE - tlo.macro ends standing on the puck in
@@ -686,7 +913,7 @@ namespace CNC.Controls
 
             program = BuildProgram(fx, p, BladeLength, TongueLength, FaceDepth(), CornerTravelMarginMm, IsTouchPlate,
                                    WillReferenceTlo, model != null && model.IsTloReferenceSet,
-                                   AppConfig.Settings.Base.TloRefBaseline, returnWcs);
+                                   AppConfig.Settings.Base.TloRefBaseline, returnWcs, reversed);
             MacroProcessor.HandOffToJobTab(model, ProgramNameSquare, program, ViewType.Calibration, onHandoffEnd: EndHandoff);
             // OwnsRunBar, not isActiveTab: the handoff's tab switch has already run Activate(false)
             // synchronously by now, so isActiveTab is false and this write would simply be skipped.
@@ -715,7 +942,7 @@ namespace CNC.Controls
         private static string BuildProgram(Fixture fx, ProbeDefinition p, double bladeMm, double tongueMm,
                                            double faceDepthMm, double cornerTravelMarginMm, bool touchPlate,
                                            bool referenceTlo, bool tloAlreadyReferenced, double tloBaseline,
-                                           string returnWcs)
+                                           string returnWcs, bool reversedOrientation)
         {
             const double insetMm = 5d;
             double r = p.ProbeDiameter / 2d;
@@ -727,7 +954,8 @@ namespace CNC.Controls
 
             var b = new StringBuilder();
             MacroProcessor.EmitProgramHeader(l => b.AppendLine(l), "connected, homed, EXPR, noalarm",
-                                             "(Squareness - probe a reference square's two arms and report the angle between them)");
+                                             string.Format("(Squareness {0} - probe a reference square's two arms and report the angle between them)",
+                                                           reversedOrientation ? "REVERSED - square flipped, heel at the front-right" : "normal - heel in the fence"));
             // NOT cancelToolOffset: true. That was copied in from the stepper probe wizard, and
             // EmitModalDefaults' own parameter documentation warns against it in as many words - on this
             // machine the tool length offset is what makes one work Z0 mean the same thing for every tool.
@@ -764,9 +992,16 @@ namespace CNC.Controls
             b.AppendLine("(park at G30 - install / confirm the probe)");
             MacroProcessor.EmitGotoG30(l => b.AppendLine(l));
             b.AppendLine("(WAITIDLE)");
+            // Says which way round the square goes, in the prompt the operator is actually looking at when
+            // they set it up. Getting this wrong does not fail loudly - it silently measures the same
+            // orientation twice, and two identical halves average to "the machine is perfect".
+            string clamping = reversedOrientation
+                ? "REVERSED RUN: the square must be FLIPPED OVER, with the far end of the BLADE registered in the fence and the heel out to the RIGHT at blade length, tongue running back from the heel."
+                : "NORMAL RUN: the square sits face-up with its HEEL registered in the fence, blade along X and tongue along Y.";
+
             b.AppendLine(touchPlate
-                ? string.Format("(MBOX, OKCANCEL, Using touch plate: {0}. Fit the {1} bit or dowel it is set up for, clip the lead to the SQUARE - steel, so it conducts directly - and place the plate on the heel corner. Click OK. Cancel aborts.)", p.Name, p.TipDescription)
-                : string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. Check the square is clamped flat and its spacer is INSET from the edges - the probe must reach the steel and touch nothing else. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
+                ? string.Format("(MBOX, OKCANCEL, Using touch plate: {0}. Fit the {1} bit or dowel it is set up for, clip the lead to the SQUARE - steel, so it conducts directly - and place the plate on the corner in the fence. {2} Click OK. Cancel aborts.)", p.Name, p.TipDescription, clamping)
+                : string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. {2} Check it is clamped flat and its spacer is INSET from the edges - the probe must reach the steel and touch nothing else. Click OK. Cancel aborts.)", p.Name, p.TipDescription, clamping));
 
             // Give the tool that was just fitted its OWN tool length offset, by touching the puck. Fitting a
             // probe IS a tool change, and a bit fitted by hand has no offset - tc.macro applies one on every
@@ -793,8 +1028,24 @@ namespace CNC.Controls
             else
                 b.AppendLine("(NOTE: no TLO reference taken, so the fitted probe has no tool length offset of its own and this run ends in G49. Re-reference the tool before the next job.)");
 
-            // Corner 1 - the heel. #<_bottom> is a SEEK-DEPTH CAP and nothing more; it is the machine's own Z
-            // floor, not a cached spoilboard reading.
+            // Which physical part of the square each probe lands on. The first two probes are IDENTICAL in
+            // both orientations - same pcorner ids, same references - because reversing the square swaps
+            // which END of the blade sits in the fence, not where the two points are. Only their ROLES swap,
+            // and only the third probe genuinely differs.
+            //
+            //   normal   : fence = heel,           second = blade end,  third = tongue end, id 3 (back-LEFT)
+            //   reversed : fence = blade far end,  second = heel,       third = tongue end, id 4 (back-RIGHT)
+            //
+            // In the reversed orientation the blade runs from the fence rightwards to the heel and the
+            // tongue runs back from the heel, so the tongue's far end is the back-RIGHT corner and its
+            // reference sits outside in +X as well as +Y. See the file header for why the heel has to move
+            // at all: a mirrored L cannot be laid with both arms in the +X/+Y quadrant, and no rotation
+            // undoes a mirror.
+            string roleAtFence = reversedOrientation ? "BLADE" : "HEEL";
+            string roleSecond = reversedOrientation ? "HEEL" : "BLADE";
+
+            // Corner 1 - the corner registered in the fence. #<_bottom> is a SEEK-DEPTH CAP and nothing
+            // more; it is the machine's own Z floor, not a cached spoilboard reading.
             b.AppendLine(string.Format("#<_bottom> = {0}", floorZ));
             b.AppendLine("#<_ls_corner> = 1");
             b.AppendLine(string.Format("#<_ls_refx> = {0}", refX));
@@ -814,8 +1065,8 @@ namespace CNC.Controls
             b.AppendLine("#<c1y> = #<_corner_y>");
             b.AppendLine("#<c1z> = #<_corner_z>");
             b.AppendLine(string.Format("#<c1_maxz> = [#<c1z> + {0}]", cornerTravelMarginMm.ToInvariantString("0.0##")));
-            b.AppendLine("(PRINT, SQ_C1X=#<c1x>)");
-            b.AppendLine("(PRINT, SQ_C1Y=#<c1y>)");
+            b.AppendLine(string.Format("(PRINT, SQ_{0}X=#<c1x>)", roleAtFence));
+            b.AppendLine(string.Format("(PRINT, SQ_{0}Y=#<c1y>)", roleAtFence));
             // Abort the whole run on an alarmed probe rather than letting a stale/undefined value fall
             // through into the skew - same reason StartJobView waits after every corner of its Measure.
             b.AppendLine("(WAITIDLE)");
@@ -826,7 +1077,7 @@ namespace CNC.Controls
             // Corner 2 - the blade's far end (X-neighbour). Its Y face is the blade's front edge, which is
             // the reference the skew is measured from; its X face is the blade's end, which only sets the
             // lever length and needs no accuracy at all.
-            b.AppendLine("(--- corner 2 = blade far end (X-neighbour) ---)");
+            b.AppendLine(string.Format("(--- corner 2 = {0} (X-neighbour) ---)", reversedOrientation ? "the heel" : "blade far end"));
             b.AppendLine("#<_ls_topx> = 15");
             b.AppendLine("#<_ls_topy> = 15");
             b.AppendLine("#<_ls_corner> = 2");
@@ -838,17 +1089,22 @@ namespace CNC.Controls
             b.AppendLine("O<pcorner> CALL [#<_ls_rad>]");
             b.AppendLine("#<c2x> = #<_corner_x>");
             b.AppendLine("#<c2y> = #<_corner_y>");
-            b.AppendLine("(PRINT, SQ_C2X=#<c2x>)");
-            b.AppendLine("(PRINT, SQ_C2Y=#<c2y>)");
+            b.AppendLine(string.Format("(PRINT, SQ_{0}X=#<c2x>)", roleSecond));
+            b.AppendLine(string.Format("(PRINT, SQ_{0}Y=#<c2y>)", roleSecond));
             b.AppendLine("(WAITIDLE)");
 
             if (touchPlate)
                 b.AppendLine("(MBOX, OK, Move the touch plate to the far end of the TONGUE - the short arm, along Y - then click OK.)");
 
-            // Corner 3 - the tongue's far end (Y-neighbour). Mirror of corner 2: its X face is the reference.
-            b.AppendLine("(--- corner 3 = tongue far end (Y-neighbour) ---)");
-            b.AppendLine("#<_ls_corner> = 3");
-            b.AppendLine("#<_ls_refx> = [#<c1x> - 10]");
+            // Corner 3 - the tongue's far end, always. Which pcorner corner that IS depends on the
+            // orientation: with the heel at the front-left the tongue runs back from it and its end is the
+            // back-LEFT corner (id 3, reference outside in -X/+Y); with the heel at the front-right the
+            // tongue runs back from THERE and its end is the back-RIGHT corner (id 4, outside in +X/+Y).
+            b.AppendLine("(--- corner 3 = tongue far end ---)");
+            b.AppendLine(string.Format("#<_ls_corner> = {0}", reversedOrientation ? 4 : 3));
+            b.AppendLine(reversedOrientation
+                ? string.Format("#<_ls_refx> = [#<c1x> + {0}]", (bladeMm + 10d).ToInvariantString("0.0##"))
+                : "#<_ls_refx> = [#<c1x> - 10]");
             b.AppendLine(string.Format("#<_ls_refy> = [#<c1y> + {0}]", (tongueMm + 10d).ToInvariantString("0.0##")));
             b.AppendLine("#<_ls_startz> = 0");
             b.AppendLine("#<_ls_maxz> = #<c1_maxz>");
@@ -856,8 +1112,8 @@ namespace CNC.Controls
             b.AppendLine("O<pcorner> CALL [#<_ls_rad>]");
             b.AppendLine("#<c3x> = #<_corner_x>");
             b.AppendLine("#<c3y> = #<_corner_y>");
-            b.AppendLine("(PRINT, SQ_C3X=#<c3x>)");
-            b.AppendLine("(PRINT, SQ_C3Y=#<c3y>)");
+            b.AppendLine("(PRINT, SQ_TONGUEX=#<c3x>)");
+            b.AppendLine("(PRINT, SQ_TONGUEY=#<c3y>)");
             b.AppendLine("(WAITIDLE)");
 
             // Put back the offset the reference above measured. pcorner.macro cancels it on every call -
@@ -925,7 +1181,12 @@ namespace CNC.Controls
                 // The corners on screen were measured against the OLD offset. Once it is written they
                 // describe a gantry that no longer exists, and leaving them would let UpdateComputed offer
                 // the same correction a second time on top of itself.
-                c1x = c1y = c2x = c2y = c3x = c3y = null;
+                ClearCorners();
+                // Both reversal halves were measured against the OLD offset, so they no longer describe
+                // this gantry and cannot be split against it. The square's own error survives - that is a
+                // property of the steel, not of the machine - so the next single reading still yields a
+                // true machine error by subtraction.
+                readNormal = readReversed = null;
                 DiscardProgram();
                 UpdateComputed();
                 ReHome();
@@ -974,7 +1235,8 @@ namespace CNC.Controls
             if (GrblSettings.Save())
             {
                 DetectOffsetSetting();
-                c1x = c1y = c2x = c2y = c3x = c3y = null;   // as in ApplyOffset - the gantry has changed
+                ClearCorners();
+                readNormal = readReversed = null;   // as in ApplyOffset - the gantry has changed, the square has not
                 DiscardProgram();
                 UpdateComputed();
                 ReHome();
@@ -1025,6 +1287,13 @@ namespace CNC.Controls
             _gangedAxis = Math.Max(0, Math.Min(2, p.GangedAxis));
             invertCorrection = p.InvertCorrection;
             chkInvert.IsChecked = invertCorrection;
+            reversed = p.Reversed;
+            rbOrientReversed.IsChecked = reversed;
+            rbOrientNormal.IsChecked = !reversed;
+            // A property of the steel, not of the session - see squareErrorDeg. HasSquareError rather
+            // than "is it non-zero", because a genuinely square square measures 0 and that reading is
+            // worth keeping.
+            squareErrorDeg = p.HasSquareError ? (double?)p.SquareErrorDeg : null;
             chkReferenceTlo.IsChecked = p.ReferenceTlo;
         }
 
@@ -1040,6 +1309,9 @@ namespace CNC.Controls
                 Probe = IsTouchPlate ? "TouchPlate" : "ThreeDProbe",
                 GangedAxis = _gangedAxis,
                 InvertCorrection = invertCorrection,
+                Reversed = reversed,
+                HasSquareError = squareErrorDeg.HasValue,
+                SquareErrorDeg = squareErrorDeg ?? 0d,
                 ReferenceTlo = chkReferenceTlo != null && chkReferenceTlo.IsChecked == true
             };
         }
@@ -1073,6 +1345,13 @@ namespace CNC.Controls
         public int GangedAxis = 1;               // 0=X, 1=Y, 2=Z
         // Resolved once by the operator against their own machine - see AutoSquareProbeWizard.invertCorrection.
         public bool InvertCorrection = false;
+        // Which way the square was last clamped.
+        public bool Reversed = false;
+        // The reference square's own out-of-squareness, once a reversal pair has measured it. Kept
+        // because it describes a physical object the operator owns: with it known, a single reading
+        // gives the MACHINE's error by subtraction and the reversal never has to be repeated.
+        public bool HasSquareError = false;
+        public double SquareErrorDeg = 0d;
         // Default ON: fitting the probe is a tool change, and the run is wrong-referenced without it.
         public bool ReferenceTlo = true;
     }
