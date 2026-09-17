@@ -288,11 +288,20 @@ assert something false. That is a stopgap, not a fix:
       (#358/#359). Replaced with a warning under `#offsets` saying what actually needs care.
       "Run bar" was also unified to "run strip" throughout, the app's own name for it since #220.
 - [ ] **(3b) The missing topics** — §2 of the audit, **21** of them, not the ~15 this file used to
-      estimate. Suggested order: **M1/M2 (SVG + text carving)** and **M3 (the laser path)** first,
-      since those are the demo-able features and the largest gaps; then **M4 (Height Map)**, a whole
-      topic this file had never listed. Four items are **named-only** rather than absent (M11 scratch
-      calibration, M14 overlays, M20 machine mirror, M21 Restart) — a word count scores them as
-      covered and they are not.
+      estimate. Four are **named-only** rather than absent (M11 scratch calibration, M14 overlays,
+      M20 machine mirror, M21 Restart) — a word count scores them as covered and they are not.
+  - [x] **M1 + M2 — DONE 2026-09-17** (`7ed98713`). One new topic, **`#carving` "Engraving &
+        carving"**, covering Text / single-stroke vs V-carve / Shape text, SVG artwork, Negative and
+        the two panel kinds, the depth model and **Max carve depth**, plus the parts of **M5** that
+        belong with a carve (Clear floor, Mark, Mark dashed). Written from the app's tooltips, every
+        claim checked in source.
+  - [ ] **M3 — the diode-laser path.** The other demo-able feature and the next one up. Remember the
+        gate: it is held back unless launched with `-enableSVGLaserJob`, so the topic has to say so
+        or it documents something the reader cannot find.
+  - [ ] **M5 remainder — Mark only.** A property of the *run*, not of a carve, so it belongs in
+        `#work-order` rather than in `#carving`.
+  - [ ] **M4 (Height Map)** — a whole topic this file had never listed; needs the app driven.
+  - [ ] **M6–M21** — the rest, in §2 of the audit.
 
 ### Process note — why this got to 156
 The rule at the top of this file ("when shipping a UI change, add the impact here") did not run once in

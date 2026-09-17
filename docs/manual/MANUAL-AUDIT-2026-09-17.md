@@ -28,7 +28,7 @@ fixed their neighbours.
 
 | Bucket | Count |
 |---|---|
-| **MISSING** — shipped functionality with no usable manual coverage | **21** (M1–M21) |
+| **MISSING** — shipped functionality with no usable manual coverage | **21** (M1–M21) — ✅ **M1, M2 done 2026-09-17** (new `#carving` topic); 19 left |
 | **OBSOLETE** — manual asserts something that is no longer true | **16** (O1–O16) — ✅ **all applied 2026-09-17**, plus 2 uncatalogued siblings |
 | **NEEDS UPDATING** — still-correct topics now incomplete | **13** (U1–U13) |
 | **Screenshots** — all 19 referenced figures predate #216 | 19 (+ 4 orphans) |
@@ -43,6 +43,24 @@ driven; then §4's thirteen, which can ride along with whichever topic they touc
 ---
 
 ## 2. MISSING — no usable coverage at all
+
+> ✅ **M1 and M2 are DONE 2026-09-17** (`7ed98713`) — written as one new topic, **`#carving`
+> "Engraving & carving"**, placed between Work Order and Machine Setup (intermediate:6,
+> machinist:7), because the two share one engine and splitting them would have split the depth
+> discussion. It also absorbs the parts of **M5** that belong with a carve — **Clear floor** (its
+> depth read from the sibling Engrave, the *Below carve floor* rubbing trap, the ball-nose refusal)
+> and **Mark** including Dashed. What is left of M5 is **Mark only**, which is a property of the
+> *run* rather than of a carve and belongs in `#work-order`.
+>
+> Written from the app's own tooltips rather than the changelog — they are unusually good in this
+> area — with every behavioural claim checked in source. Three things that check turned up, now in
+> the topic and not previously in this table: Text and SVG are offered **no** Contour/Pocket/Chamfer
+> at all; **Clear floor is absent on a single-stroke engrave** (no floor to clear), which is the
+> likeliest "why can't I see it"; and the ball-nose message **blocks** Generate rather than merely
+> advising.
+>
+> Still owed for these two: **screenshots**. A carve in the Work Order tree with the stock preview,
+> and a negative badge, both listed in §6.
 
 "Usable" is doing work in that heading. Several of these are *named* somewhere — in a menu table or
 a one-line parenthetical — without anything that would let an operator use them. Those are marked
@@ -177,9 +195,12 @@ misleads:
 | 7 | `machine-setup-calibration.png` | Depicts Calibration as Machine Setup step 8, which it is not (#332). | Should become a **Calibration view** shot instead. |
 | — | the other 12 | Each depicts an area touched since #216 but not falsified by it. | Ride along with the topic session that needs them. |
 
-**New shots wanted** by the missing topics: an SVG carve in the Work Order tree with the stock
-preview (M1), the SVG laser dialog's three tabs (M3), Height Map's Surface Map with its legend (M4),
-a Save Drawing PDF page (M8), the Calibration view's four sub-tabs (M10/M11).
+**New shots wanted** by the missing topics. **The first two are now owed rather than speculative** —
+the `#carving` topic shipped 2026-09-17 with no figure at all, which is the only topic in the manual
+in that state: an SVG carve in the Work Order tree with the stock preview, and a **negative** badge
+showing the artwork standing proud (M1/M2). Then the SVG laser dialog's three tabs (M3), Height Map's
+Surface Map with its legend (M4), a Save Drawing PDF page (M8), the Calibration view's four sub-tabs
+(M10/M11).
 
 **Four orphans** — referenced by nothing in `index.html`:
 
