@@ -727,6 +727,13 @@ namespace CNC.Controls
             // ignored rather than failing the load.
             RegisterFolded<AutoSquareParams>("AutoSquare",
                 () => AutoSquareWizard.SectionConfig, v => AutoSquareWizard.SectionConfig = v, "AutoSquare.xml");
+            // Squareness measured by probing a reference square instead of drilling/pinning an L - the second
+            // Squareness tab, 2026-09-16. Separate section rather than shared with "AutoSquare": the two tabs
+            // hold genuinely different things (a square's arm lengths and thickness vs a drill pattern's bit,
+            // depth, peck and feeds), and only the ganged-axis pick is common. No legacy standalone file, so
+            // ImportLegacy is always a no-op here and the section starts with its own defaults.
+            RegisterFolded<AutoSquareProbeParams>("AutoSquareProbe",
+                () => AutoSquareProbeWizard.SectionConfig, v => AutoSquareProbeWizard.SectionConfig = v, "AutoSquareProbe.xml");
             // No legacy standalone file (new section) - "StepperCalProbe.xml" never exists, so ImportLegacy is
             // always a no-op and the section just starts with StepperCalProbeParams' own defaults.
             RegisterFolded<StepperCalProbeParams>("StepperCalProbe",

@@ -50,6 +50,7 @@ namespace CNC.Controls
         MachineSetup,
         WorkOrder,
         AutoSquare,
+        AutoSquareProbe,
         Simulator
     }
     interface IGrblConfigTab

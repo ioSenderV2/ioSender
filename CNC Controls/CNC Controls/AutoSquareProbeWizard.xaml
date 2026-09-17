@@ -1,0 +1,112 @@
+<local:ConfigPanel x:TypeArguments="local:AutoSquareProbeParams" x:Class="CNC.Controls.AutoSquareProbeWizard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="520" d:DesignWidth="980">
+    <Grid VerticalAlignment="Stretch" Grid.IsSharedSizeScope="True">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1*" MinWidth="430"/>
+            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="2*"/>
+        </Grid.ColumnDefinitions>
+        <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                      Background="#FFCCCCCC" ResizeBehavior="PreviousAndNext" Cursor="SizeWE"/>
+        <!-- Left: scrolling inputs on top, action buttons pinned at the column bottom (shared tool layout) -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Orientation="Vertical" Margin="5,5,0,0">
+            <TextBlock x:Name="txtAxisInfo" FontWeight="SemiBold" TextWrapping="Wrap" Margin="5,0,5,6"/>
+            <StackPanel Orientation="Horizontal" Margin="5,0,5,4">
+                <TextBlock x:Uid="txt_aspgangedaxis" Text="Ganged axis:" VerticalAlignment="Center" MinWidth="160"/>
+                <ComboBox x:Uid="cbx_aspGangedAxis" x:Name="cbxGangedAxis" MinWidth="60" SelectedIndex="1" SelectionChanged="cbxGangedAxis_SelectionChanged"
+                          ToolTip="The axis that is ganged + auto-squared in firmware (usually Y for a gantry). The squaring offset is only writable for this axis - $170-$172 all show in settings, but only this one accepts a write.">
+                    <ComboBoxItem x:Uid="cbi_aspaxisx" Content="X"/>
+                    <ComboBoxItem x:Uid="cbi_aspaxisy" Content="Y"/>
+                    <ComboBoxItem x:Uid="cbi_aspaxisz" Content="Z"/>
+                </ComboBox>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+                <local:NumericField x:Uid="fld_aspoffset" Label="Current offset:" ColonAt="160" IsReadOnly="True" Format="###0.000###"
+                    Value="{Binding CurrentOffset, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=OneWay}" Unit="mm"/>
+                <Button x:Uid="btn_aspclear" Content="Clear" Tag="clear" Focusable="False" MinWidth="50" MinHeight="22" Margin="8,0,0,0" VerticalAlignment="Center" Click="Button_Click"
+                        ToolTip="Reset the squaring offset ($17x) to 0 and re-home. Worth doing once before the first measurement, so the number you measure is the machine's raw mechanical error."/>
+            </StackPanel>
+
+            <Separator Margin="5,8"/>
+            <!-- Probe picker. Same two options, same meanings, as the stepper-calibration probe wizard - it is
+                 the same pcorner.macro doing the work in both. -->
+            <TextBlock x:Uid="txt_aspprobehdr" Text="Probe:" TextWrapping="Wrap" Margin="5,0,5,4"/>
+            <StackPanel Orientation="Horizontal" Margin="5,0,5,4">
+                <ComboBox x:Uid="cbx_aspProbeType" x:Name="cbxProbeType" MinWidth="140" MinHeight="22" VerticalAlignment="Center" SelectedIndex="0" SelectionChanged="cbxProbeType_SelectionChanged">
+                    <ComboBoxItem x:Uid="cbi_aspProbe3d" x:Name="cbiProbe3d" Content="3D Probe"
+                                  ToolTip="A probe in the spindle that triggers on contact. Probes all three corners in one run with no intervention."/>
+                    <ComboBoxItem x:Uid="cbi_aspProbeTouch" x:Name="cbiProbeTouch" Content="Touch Plate"
+                                  ToolTip="Probes by electrical continuity - and a steel square is about as conductive a reference as exists. The plate is handheld, so the program pauses at safe Z before each corner to let you move it."/>
+                </ComboBox>
+            </StackPanel>
+            <TextBlock x:Name="txtNoProbe" Foreground="#C0392B" TextWrapping="Wrap" Margin="5,0,5,4" FontSize="11" Visibility="Collapsed"
+                       Text="No probe of the selected type is defined. Add one in Machine Setup Wizard &gt; Probe definitions."/>
+
+            <Separator Margin="5,8"/>
+            <TextBlock x:Uid="txt_aspfixture" Text="Fixture (Corner fence, validated position):" TextWrapping="Wrap" Margin="5,0,5,4"/>
+            <StackPanel Orientation="Horizontal" Margin="5,0,5,4">
+                <ComboBox x:Uid="cbx_aspFixture" x:Name="cbxFixture" MinWidth="200" MinHeight="22" VerticalAlignment="Center"
+                          DisplayMemberPath="Name" SelectionChanged="cbxFixture_SelectionChanged"
+                          ToolTip="A validated Corner Fence fixture (Machine Setup &gt; Fixture definitions) to clamp the square against. Only the fixture's approximate position is used - it tells the probe where to start seeking. Nothing about the fence's own squareness enters the measurement."/>
+            </StackPanel>
+            <TextBlock x:Name="txtNoFixture" Foreground="#C0392B" TextWrapping="Wrap" Margin="5,0,5,4" FontSize="11" Visibility="Collapsed"
+                       Text="No validated Corner Fence fixture available. Define/position/test one in Machine Setup Wizard &gt; Fixture definitions."/>
+
+            <Separator Margin="5,8"/>
+            <TextBlock x:Uid="txt_aspsquarehdr" TextWrapping="Wrap" Margin="5,0,5,4"
+                       Text="The reference square, clamped heel-to-the-fence with its blade along X and its tongue along Y. The arm lengths only have to be close - they aim the probe's seek; the measurement itself is whatever the probe actually finds."/>
+            <local:NumericField x:Uid="fld_aspblade" Label="Blade (X arm):" ColonAt="160" Format="#####0.0" Unit="mm" Margin="0,2"
+                ToolTip="Roughly how far the long arm reaches along X from the heel. A longer arm is a longer lever, and the skew resolution improves in direct proportion - use the longest square you have."
+                Value="{Binding BladeLength, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+            <local:NumericField x:Uid="fld_asptongue" Label="Tongue (Y arm):" ColonAt="160" Format="#####0.0" Unit="mm" Margin="0,2"
+                ToolTip="Roughly how far the short arm reaches along Y from the heel."
+                Value="{Binding TongueLength, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+            <local:NumericField x:Uid="fld_aspthickness" Label="Square thickness:" ColonAt="160" Format="##0.0##" Unit="mm" Margin="0,2"
+                ToolTip="The steel's actual thickness - measure it, don't guess. It sets how far below the square's top the side faces are probed (half the thickness). Get this wrong by more than about half and the probe seeks past the edge through open air and fails."
+                Value="{Binding SquareThickness, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+            <local:NumericField x:Uid="fld_aspcornermargin" Label="Safe Z delta:" ColonAt="160" Format="##0.0##" Unit="mm" Margin="0,2"
+                ToolTip="Corners 2/3 travel at corner 1's own measured top plus this delta instead of retracting fully to machine top between corners. Must clear any clamp holding the square down."
+                Value="{Binding CornerTravelMarginMm, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+
+            <Separator Margin="5,8"/>
+            <TextBlock x:Name="txtResult" FontWeight="SemiBold" TextWrapping="Wrap" Margin="5,0,5,4" Text="Measured skew:  -"/>
+            <TextBlock x:Name="txtSummary" TextWrapping="Wrap" Margin="5,4,5,4"/>
+            <local:NumericField x:Uid="fld_aspnewoffset" Label="New offset:" ColonAt="160" Format="###0.000###" Unit="mm" Margin="0,2"
+                ToolTip="The offset that will be written: the current offset plus the correction the measured skew implies. Editable, so you can nudge it or type a value directly."
+                Value="{Binding NewOffset, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+            <CheckBox x:Uid="chk_aspinvert" x:Name="chkInvert" Content="Invert correction direction" Margin="20,6,0,0" VerticalAlignment="Center"
+                      Checked="Invert_Changed" Unchecked="Invert_Changed"
+                      ToolTip="Which way a positive squaring offset racks the gantry depends on which rail your firmware's ganged motor drives, and that is not readable from the controller. If the first Apply makes the measured skew BIGGER rather than smaller, tick this and apply again - then leave it ticked. See the steps on the right."/>
+        </StackPanel>
+        </ScrollViewer>
+        <!-- Warning + action buttons pinned at the bottom of the input column -->
+        <StackPanel Grid.Row="1" Margin="5,0,5,6">
+            <TextBlock x:Name="txtWarnings" Foreground="#C62828" Margin="0,6,0,4" TextWrapping="Wrap"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Uid="btn_aspapply" x:Name="btnApply" Content="Apply offset" Tag="apply" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0" Click="Button_Click" IsEnabled="False"
+                        ToolTip="Write the offset above to the squaring setting."/>
+                <Button x:Uid="btn_asphome" Content="Re-home" Tag="home" Focusable="False" MinWidth="80" MinHeight="24" Margin="3,0" Click="Button_Click"
+                        ToolTip="Re-home the machine so the newly applied offset takes effect."/>
+            </StackPanel>
+        </StackPanel>
+        </Grid>
+        <!-- Right: how-to. The generated program itself previews in the Job tab, not here. -->
+        <Grid Grid.Column="2" Margin="8,5,5,5">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <TextBlock x:Name="txtHowTo" VerticalAlignment="Top" TextWrapping="Wrap" Foreground="#24292F"/>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</local:ConfigPanel>

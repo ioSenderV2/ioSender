@@ -430,6 +430,9 @@
     <Compile Include="AutoSquareWizard.xaml.cs">
       <DependentUpon>AutoSquareWizard.xaml</DependentUpon>
     </Compile>
+    <Compile Include="AutoSquareProbeWizard.xaml.cs">
+      <DependentUpon>AutoSquareProbeWizard.xaml</DependentUpon>
+    </Compile>
     <Compile Include="CalibrationView.xaml.cs">
       <DependentUpon>CalibrationView.xaml</DependentUpon>
     </Compile>
@@ -839,6 +842,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="AutoSquareWizard.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="AutoSquareProbeWizard.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

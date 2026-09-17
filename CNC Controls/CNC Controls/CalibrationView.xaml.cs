@@ -1,8 +1,9 @@
 ﻿/*
  * CalibrationView.xaml.cs - part of CNC Controls library
  *
- * The three machine-calibration wizards as a top-level view: stepper calibration by probing a
- * reference block, stepper calibration by scratching V-bit lines, and gantry squareness.
+ * The machine-calibration wizards as a top-level view: stepper calibration by probing a reference
+ * block, stepper calibration by scratching V-bit lines, and gantry squareness by either probing a
+ * reference square or drilling an L and sighting pins.
  *
  * These were Machine Setup's step 8 until 2026-09-13. The move is not cosmetic. All three are
  * Generate-first tools - since a4baf61f none owns a Generate button, they register
@@ -75,11 +76,18 @@ namespace CNC.Controls
             bool canProbe = ProbeDefinitions.Items.Any(p => p.ProbeType == ProbeType.ThreeDProbe
                                                          || p.ProbeType == ProbeType.TouchPlate);
             tabCalStepper.IsEnabled = canProbe;
+            // Squareness (probe) rides on the same answer for the same reason - it probes a reference square
+            // through the same pcorner.macro. Its pin-and-eye sibling needs no probe, which is why that one
+            // stays, exactly as the scratch wizard stays beside Stepper calibration (probe).
+            tabCalSquarenessProbe.IsEnabled = canProbe;
 
             // Never leave the selection sitting on a tab that has just been disabled - a disabled TabItem
-            // keeps its selection and shows its (dead) content, which reads as the app having hung.
+            // keeps its selection and shows its (dead) content, which reads as the app having hung. Fall
+            // back within the same job each time: steps/mm to the scratch method, squareness to the pins.
             if (!canProbe && tabCalibration.SelectedItem == tabCalStepper)
                 tabCalibration.SelectedItem = tabCalScratch;
+            else if (!canProbe && tabCalibration.SelectedItem == tabCalSquarenessProbe)
+                tabCalibration.SelectedItem = tabCalSquareness;
         }
 
         private void ActivateSelectedChild(bool activate)
@@ -91,6 +99,8 @@ namespace CNC.Controls
                 calScratchWizard.Activate(activate);
             else if (tab == tabCalSquareness)
                 calSquarenessWizard.Activate(activate);
+            else if (tab == tabCalSquarenessProbe)
+                calSquarenessProbeWizard.Activate(activate);
         }
 
         // Switching wizards: deactivate the outgoing one, activate the incoming one. Activating is deferred
@@ -110,6 +120,8 @@ namespace CNC.Controls
                     calScratchWizard.Activate(false);
                 else if (removed == tabCalSquareness)
                     calSquarenessWizard.Activate(false);
+                else if (removed == tabCalSquarenessProbe)
+                    calSquarenessProbeWizard.Activate(false);
             }
 
             Dispatcher.BeginInvoke((System.Action)(() => ActivateSelectedChild(true)),

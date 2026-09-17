@@ -25,8 +25,16 @@
             <TabItem.Header><TextBlock x:Uid="cal_scratch" Text="Stepper calibration (scratch)"/></TabItem.Header>
             <local:StepperCalibrationScratchWizard x:Name="calScratchWizard"/>
         </TabItem>
-        <TabItem x:Uid="tabcal_squareness" x:Name="tabCalSquareness" ToolTip="Check and correct gantry squareness.">
-            <TabItem.Header><TextBlock x:Uid="cal_squareness" Text="Squareness"/></TabItem.Header>
+        <!-- Two squareness tabs, paired the way Stepper calibration already pairs (probe) with (scratch):
+             one instrument needs a probe and a reference square, the other needs a drill bit, pins and an
+             eye. The probe one resolves about an order of magnitude finer and costs nothing per iteration;
+             the pin one is the answer on a machine with no probe defined, so neither replaces the other. -->
+        <TabItem x:Uid="tabcal_squarenessprobe" x:Name="tabCalSquarenessProbe" ToolTip="Check and correct gantry squareness by probing a reference square clamped in the corner fence. Needs a probe; measures far finer than the pin method and can be re-run after every correction without cutting anything.">
+            <TabItem.Header><TextBlock x:Uid="cal_squarenessprobe" Text="Squareness (probe)"/></TabItem.Header>
+            <local:AutoSquareProbeWizard x:Name="calSquarenessProbeWizard"/>
+        </TabItem>
+        <TabItem x:Uid="tabcal_squareness" x:Name="tabCalSquareness" ToolTip="Check and correct gantry squareness by drilling a reference L, pinning it and sighting a framing square against the pins. Needs no probe.">
+            <TabItem.Header><TextBlock x:Uid="cal_squareness" Text="Squareness (pins)"/></TabItem.Header>
             <local:AutoSquareWizard x:Name="calSquarenessWizard"/>
         </TabItem>
     </local:StretchTabControl>
