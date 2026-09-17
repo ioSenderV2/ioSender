@@ -339,7 +339,7 @@ CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,mnu_clearAll:System.Windo
 CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,mnu_clearToHere:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Clear up to here
 CNC.Controls.WPF.g.en-US.resources:consolecontrol.baml,mnu_save:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Save...
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_title:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Machine setup
-CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_intro:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Describe your machine on one page. Nothing is sent to the controller until you press Apply.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_intro:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Work through the steps listed on the left. Nothing is sent to the controller until you press Apply.
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,grp_machine:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,1 · Machine
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_startFrom:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Start from your machine
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_firmwareInfo:System.Windows.Controls.ContentControl.Content,Button,True,True,,Firmware info…
@@ -657,14 +657,14 @@ CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabTools:System.String.$C
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_tabMachineSetup:System.String.$Content,None,True,True,,Machine Setup
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_overview:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Overview
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_head:System.Windows.Controls.TextBlock.Text,Text,True,True,,Setting up your machine
-CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_body:System.Windows.Controls.TextBlock.Text,Text,True,True,,This guided setup describes your machine to ioSender. Work through the tabs left to right - each setup step is its own tab:
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_body:System.Windows.Controls.TextBlock.Text,Text,True,True,,This guided setup describes your machine to ioSender. Work down the steps on the left - each one is a page of its own:
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s1:System.Windows.Controls.TextBlock.Text,Text,True,True,,1 · Machine - pick your make / product / model (or Custom) to pre-fill typical values.
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s2:System.Windows.Controls.TextBlock.Text,Text,True,True,,2 · Home position - the corner your machine homes to.
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s3:System.Windows.Controls.TextBlock.Text,Text,True,True,,"3 · Axis information - travel, max rate and steps/mm for each axis."
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s4:System.Windows.Controls.TextBlock.Text,Text,True,True,,"4 · Homing &amp; limits - limit switches, homing and soft limits."
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s5:System.Windows.Controls.TextBlock.Text,Text,True,True,,5 · Probe definitions - the probes fitted to this machine.
-CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s6:System.Windows.Controls.TextBlock.Text,Text,True,True,,6 · Controller macros - install the controller-side macro set.
-CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_foot:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Nothing is sent to the controller until you press Apply. On a connected machine ioSender pre-fills what the controller already reports ($$), so often you just confirm each tab and Apply."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s6:System.Windows.Controls.TextBlock.Text,Text,True,True,,6 · Fixture definitions - named workholding that Setup can probe against.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_foot:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Nothing is sent to the controller until you press Apply. On a connected machine ioSender pre-fills what the controller already reports ($$), so often you just confirm each step and Apply."
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_machine:System.Windows.Controls.TextBlock.Text,Text,True,True,,1 · Machine
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_homePos:System.Windows.Controls.TextBlock.Text,Text,True,True,,2 · Home position
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_axis:System.Windows.Controls.TextBlock.Text,Text,True,True,,3 · Axis information
@@ -1743,3 +1743,5 @@ CNC.Controls.WPF.g.en-US.resources:autosquareprobewizard.baml,rb_aspreversed:Sys
 CNC.Controls.WPF.g.en-US.resources:autosquareprobewizard.baml,fld_aspsquareerr:CNC.Controls.NumericField.Label,None,False,True,,Square error:
 CNC.Controls.WPF.g.en-US.resources:autosquareprobewizard.baml,fld_aspsquareerr:CNC.Controls.NumericField.Unit,None,False,True,,°
 CNC.Controls.WPF.g.en-US.resources:autosquareprobewizard.baml,fld_aspsquareerr:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The reference square's OWN out-of-squareness, subtracted from every reading so what you see is the gantry alone. A completed reversal fills this in automatically; type it by hand if the reversal that measured it happened in an earlier session. 0 = not known, which simply subtracts nothing."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s7:System.Windows.Controls.TextBlock.Text,Text,True,True,,7 · Controller macros - install the controller-side macro set.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,ov_s8:System.Windows.Controls.TextBlock.Text,Text,True,True,,8 · Build simulator - an offline grblHAL simulator matching this machine's own options. Not shown while the active connection is that simulator.

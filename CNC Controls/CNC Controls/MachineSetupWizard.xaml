@@ -65,19 +65,26 @@
                     <StackPanel Orientation="Vertical" Margin="10" MaxWidth="780" HorizontalAlignment="Left">
                         <TextBlock x:Uid="txt_title" Text="Machine setup" FontSize="18" FontWeight="Bold"/>
                         <TextBlock x:Uid="txt_intro" TextWrapping="Wrap" Foreground="Gray" Margin="0,2,0,0"
-                                   Text="Work through the step tabs below. Nothing is sent to the controller until you press Apply."/>
+                                   Text="Work through the steps listed on the left. Nothing is sent to the controller until you press Apply."/>
                         <Separator Margin="0,8,0,4"/>
                         <TextBlock x:Uid="ov_head" Text="Setting up your machine" Style="{StaticResource SectionHeader}" FontSize="15"/>
                         <TextBlock x:Uid="ov_body" TextWrapping="Wrap" Margin="0,4,0,0"
-                                   Text="This guided setup describes your machine to ioSender. Work through the tabs left to right - each setup step is its own tab:"/>
+                                   Text="This guided setup describes your machine to ioSender. Work down the steps on the left - each one is a page of its own:"/>
+                        <!-- One entry per page returned by GetPages(), in the same order and with the same
+                             numbering as the step headers (hdrMachine ... hdrSimulator). This list stopped at
+                             six for a long time while the wizard had eight steps, and numbered "Controller
+                             macros" as 6 when it is 7 - so the app contradicted its own navigation tree and
+                             the manual. If a step is added, it needs a line here AND a locale row. -->
                         <TextBlock x:Uid="ov_s1" TextWrapping="Wrap" Margin="0,6,0,0" Text="1 · Machine - pick your make / product / model (or Custom) to pre-fill typical values."/>
                         <TextBlock x:Uid="ov_s2" TextWrapping="Wrap" Margin="0,2,0,0" Text="2 · Home position - the corner your machine homes to."/>
                         <TextBlock x:Uid="ov_s3" TextWrapping="Wrap" Margin="0,2,0,0" Text="3 · Axis information - travel, max rate and steps/mm for each axis."/>
                         <TextBlock x:Uid="ov_s4" TextWrapping="Wrap" Margin="0,2,0,0" Text="4 · Homing &amp; limits - limit switches, homing and soft limits."/>
                         <TextBlock x:Uid="ov_s5" TextWrapping="Wrap" Margin="0,2,0,0" Text="5 · Probe definitions - the probes fitted to this machine."/>
-                        <TextBlock x:Uid="ov_s6" TextWrapping="Wrap" Margin="0,2,0,0" Text="6 · Controller macros - install the controller-side macro set."/>
+                        <TextBlock x:Uid="ov_s6" TextWrapping="Wrap" Margin="0,2,0,0" Text="6 · Fixture definitions - named workholding that Setup can probe against."/>
+                        <TextBlock x:Uid="ov_s7" TextWrapping="Wrap" Margin="0,2,0,0" Text="7 · Controller macros - install the controller-side macro set."/>
+                        <TextBlock x:Uid="ov_s8" TextWrapping="Wrap" Margin="0,2,0,0" Text="8 · Build simulator - an offline grblHAL simulator matching this machine's own options. Not shown while the active connection is that simulator."/>
                         <TextBlock x:Uid="ov_foot" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="Gray"
-                                   Text="Nothing is sent to the controller until you press Apply. On a connected machine ioSender pre-fills what the controller already reports ($$), so often you just confirm each tab and Apply."/>
+                                   Text="Nothing is sent to the controller until you press Apply. On a connected machine ioSender pre-fills what the controller already reports ($$), so often you just confirm each step and Apply."/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
