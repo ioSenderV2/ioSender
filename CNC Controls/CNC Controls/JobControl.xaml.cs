@@ -178,6 +178,19 @@ namespace CNC.Controls
                     UpdateRunBarVisibility();   // Stop shows exactly when it would do something
                     break;
 
+                case nameof(JobRunner.CanPeek):
+                    IsPeekEnabled = runner.CanPeek;
+                    UpdateRunBarVisibility();
+                    break;
+
+                // State in, words out - same split as StopShowsPause below. Core owns "am I peeking",
+                // the view owns what that is called.
+                case nameof(JobRunner.IsPeeking):
+                    if (btnPeek != null)
+                        btnPeek.Content = (string)FindResource(runner.IsPeeking ? "JobPeekResume" : "JobPeek");
+                    UpdateRunBarVisibility();
+                    break;
+
                 // JobRunner.CanRewind is deliberately NOT mirrored - the Rewind button was removed (see
                 // JobControl.xaml). The runner still maintains the state for any other host to surface.
 
@@ -374,6 +387,23 @@ namespace CNC.Controls
             set { SetValue(StopVisibilityProperty, value); }
         }
 
+        public static readonly DependencyProperty IsPeekEnabledProperty =
+            DependencyProperty.Register(nameof(IsPeekEnabled), typeof(bool), typeof(JobControl));
+        public bool IsPeekEnabled
+        {
+            get { return (bool)GetValue(IsPeekEnabledProperty); }
+            set { SetValue(IsPeekEnabledProperty, value); }
+        }
+
+        public static readonly DependencyProperty PeekVisibilityProperty =
+            DependencyProperty.Register(nameof(PeekVisibility), typeof(Visibility), typeof(JobControl),
+                                        new PropertyMetadata(Visibility.Collapsed));
+        public Visibility PeekVisibility
+        {
+            get { return (Visibility)GetValue(PeekVisibilityProperty); }
+            set { SetValue(PeekVisibilityProperty, value); }
+        }
+
         /// <summary>
         /// Re-evaluate which of Feed Hold / Stop are worth showing. Called on every GrblState change and
         /// whenever the runner's own Stop gate moves.
@@ -385,8 +415,17 @@ namespace CNC.Controls
             bool canMove = state == GrblStates.Run || state == GrblStates.Hold || state == GrblStates.Jog ||
                            state == GrblStates.Tool || state == GrblStates.Door;
 
-            FeedHoldVisibility = canMove ? Visibility.Visible : Visibility.Collapsed;
+            bool peeking = runner != null && runner.IsPeeking;
+
+            // While PEEKING, Feed Hold goes Hidden rather than Collapsed. A parked machine reports Idle, so
+            // canMove is false and Feed Hold would collapse - which, now that Peek sits to its right, would
+            // slide the Peek/Resume button leftward under the cursor at precisely the moment the operator is
+            // reaching for it. That is the mis-click this control's own layout rule exists to prevent; the
+            // rule said "were anything to their right, this would have to be Hidden", and now there is.
+            FeedHoldVisibility = canMove ? Visibility.Visible
+                                         : (peeking ? Visibility.Hidden : Visibility.Collapsed);
             StopVisibility = IsStopEnabled ? Visibility.Visible : Visibility.Collapsed;
+            PeekVisibility = (IsPeekEnabled || peeking) ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void JobControl_Loaded(object sender, RoutedEventArgs e)
@@ -713,6 +752,24 @@ namespace CNC.Controls
         {
             runner.Abort();
         }
+
+        // One button, two jobs, decided by the runner's own state rather than by a flag kept here - so the
+        // label and the action can never disagree about which half of the peek we are in.
+        void btnPeek_Click(object sender, RoutedEventArgs e)
+        {
+            if (runner.IsPeeking)
+                runner.ResumePeek();
+            else
+                runner.Peek();
+        }
+
+        /// <summary>
+        /// The Peek button itself, for the host to register a keyboard action against (MainWindow's
+        /// registerButtonAction). Exposed rather than wrapped so the key presses the ACTUAL button - one
+        /// implementation, and the key cannot drift from what clicking does. It also inherits the button's
+        /// own IsEnabled, so a key can never do what a click currently cannot.
+        /// </summary>
+        public Button PeekButton { get { return btnPeek; } }
 
         void btnStart_Click(object sender, RoutedEventArgs e)
         {

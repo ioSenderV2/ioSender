@@ -3809,6 +3809,11 @@ namespace GCode_Sender
             // so a key can never do what a click currently cannot.
             registerButtonAction("Program.Mdi", btnMdiConsole, () => MdiConsole_Click(null, null));
             registerButtonAction("Program.Status", btnViewStatus, () => ViewStatus_Click(null, null));
+            // Peek lives inside the JobControl rather than on the window, so the control hands its button
+            // out (PeekButton) instead of this reaching in. Same contract as the two above: the button's own
+            // IsEnabled is the whole gate, and the click handler is the single implementation.
+            registerButtonAction("Program.Peek", runControl?.PeekButton, () => runControl?.PeekButton?.RaiseEvent(
+                new System.Windows.RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent)));
         }
 
         // The button counterpart of registerMenuAction. These live on the run strip rather than in the menu

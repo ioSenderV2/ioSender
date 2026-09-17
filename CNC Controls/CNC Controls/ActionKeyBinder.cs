@@ -66,6 +66,11 @@ namespace CNC.Controls
             // SeedDefaults only seeds an Id that is entirely absent.
             new ActionInfo { Id = "Program.Mdi",    Label = "MDI (open console for input)", DefaultKey = Key.F12, Group = "Program", Description = "Press the run strip's MDI button: open the console with the caret in its input box, ready to type. Never hides it - Esc closes it." },
             new ActionInfo { Id = "Program.Status", Label = "Status (message history)",     Group = "Program", Description = "Press the run strip's Status button: show the status message history since launch." },
+            // Peek belongs in this group for the reason the group exists: like MDI and Status it must stay
+            // live DURING a run, unlike the bindable menu commands, which the menu bar disables wholesale
+            // while a job streams. That is also why Peek is not a menu item at all - it would be unreachable
+            // exactly when it is wanted.
+            new ActionInfo { Id = "Program.Peek",   Label = "Peek / Resume (park and look at the work)", Group = "Program", Description = "Press the run strip's Peek button: pause at the end of the current block, park at G30 with the spindle off, then press again to go back and carry on." },
 
             // Main-menu commands. All unbound by default (DefaultKey = None) - these are conveniences, and
             // grabbing keys for them uninvited would collide with whatever the operator already uses. The
