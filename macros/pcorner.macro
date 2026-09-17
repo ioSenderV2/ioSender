@@ -61,6 +61,21 @@
 ;                       guard at the top of the SUB, NOT from grblHAL. This note used to say "gets 0 from
 ;                       grblHAL", which is simply untrue: an unset named parameter is error:2, exactly as
 ;                       the #<_ls_topmargin> note below says. Do not remove that guard.
+;   #<_ls_facedepth> = OPTIONAL depth (mm) BELOW the probed top at which the X/Y face probes search.
+;                       Default 5 (the value this was hardcoded to from 2026-07-20 until it became a
+;                       parameter), so every existing caller behaves exactly as before - only a caller
+;                       that sets it sees any change. 0/unset = the default.
+;                       It exists because 5 assumes the stock is at least ~5 mm thick, and the squareness
+;                       tool probes a STEEL FRAMING SQUARE - 4.8 mm on the Milwaukee Red this was measured
+;                       against. At the default the face probes land 0.2 mm BELOW the square's underside
+;                       and seek through air: a probe-fail alarm when (as intended) the spacer under it is
+;                       inset, or a confident reading of whatever IS under it if that sits flush to the
+;                       edge. Missing by 0.2 mm fails exactly as thoroughly as missing by 5.
+;                       Raising the square on a spacer does NOT help - this depth is relative to the top
+;                       THIS CALL just probed, so it rises with it.
+;                       Pick roughly half the material thickness. The caller owns that choice because only
+;                       the caller knows what is clamped down; the macro only guarantees the default.
+;                       Still clamped up to #<_ls_zfloor> like any other start_z - see the o32 block.
 ; The retreat clearance above a probed corner top (#<_safe_z> below) is a hardcoded 5 mm. It was 20, which
 ; is far more than any real spoilboard/stock variance - on a T-slot extrusion bed even 5 mm would take some
 ; doing - so 20 just spent Z travel on every retreat. A caller with a genuinely known safe height passes
@@ -136,6 +151,13 @@ O<pcorner> SUB
   o7 ELSE
     #<_ls_edgemargin> = 0
   o7 ENDIF
+  ; Face-probe depth below the probed top. Guarded and defaulted here for the same reason as the three
+  ; above: the default belongs with the macro that defines what the parameter MEANS, so the four existing
+  ; callers - none of which set it - keep the fixed 5 mm they were written against without being touched.
+  o8 IF [EXISTS[#<_ls_facedepth>]]
+  o8 ELSE
+    #<_ls_facedepth> = 0
+  o8 ENDIF
 
   #<rad>    = #1                 ; tip radius = the single CALL arg; rest via globals
   #<corner> = #<_ls_corner>
@@ -148,6 +170,7 @@ O<pcorner> SUB
   #<inside> = #<_ls_inside>      ; 0 = outside corner/edge (default), 1 = inside (see file header)
   #<faces>  = #<_ls_faces>       ; 0 = both faces (default), 1 = X face only, 2 = Y face only (see file header)
   #<edge_margin> = #<_ls_edgemargin>   ; extra face-probe descent clearance, caller-supplied (see file header)
+  #<face_depth>  = #<_ls_facedepth>    ; face-probe depth below the probed top, 0/unset = 5 (see file header)
 
   ; FLOOR the caller's margin. Every caller in the app passes 10, in four separate places - and 10 was
   ; not enough on real hardware 2026-08-16: the Y-face start ended up with ~4 mm of actual air, because
@@ -318,12 +341,21 @@ O<pcorner> SUB
   G90
   (PRINT, PC z_top=#<_z_top>)
 
-  ; ================= start_z for the face probes (fixed 5mm below the measured top) =================
+  ; ================= start_z for the face probes (default 5mm below the measured top) =================
   ; Was top - thickness/2 (material midpoint) - changed to a fixed 5mm inset (2026-07-20, user request):
   ; simpler and independent of the caller's estimated #<_ls_thickness>, which is only ever an estimate
   ; before Measure has actually run. 5mm clears a top chamfer/rounded edge on any stock thick enough to
-  ; probe at all (preconditions require >= 3mm... clamped up to the zfloor safety below regardless).
-  #<_start_z> = [#<_z_top> - 5]
+  ; probe at all (clamped up to the zfloor safety below regardless).
+  ;
+  ; Caller-overridable since 2026-09-16 via #<_ls_facedepth> (see the file header) - 5 is now a DEFAULT,
+  ; not a constant, because it silently assumes the stock is thicker than 5 mm and the squareness tool
+  ; probes a ~2.4 mm framing square. Unset/0 keeps the old fixed 5, so this is a no-op for every caller
+  ; that does not opt in.
+  o9 IF [#<face_depth> GT 0]
+    #<_start_z> = [#<_z_top> - #<face_depth>]
+  o9 ELSE
+    #<_start_z> = [#<_z_top> - 5]
+  o9 ENDIF
   ; SAFETY: never position the probe below the machine's Z soft-limit floor (#<_ls_zfloor>, passed by Load Stock
   ; from $132). When the stock sits low - its top near the Z travel bottom - start_z can fall below
   ; reachable Z, and the G53 G1 descent to it trips Alarm:2 (soft limit). Clamp up to the floor; the side face is
@@ -331,7 +363,7 @@ O<pcorner> SUB
   o32 IF [#<_start_z> LT #<_ls_zfloor>]
     #<_start_z> = #<_ls_zfloor>
   o32 ENDIF
-  (PRINT, PC start_z=#<_start_z>)
+  (PRINT, PC start_z=#<_start_z> facedepth=#<face_depth>)
 
   ; Fallback outputs for a face this call skips (faces=1/2, Dynamic mode edge-midpoint picks) - the
   ; un-probed axis reports the top-probe anchor, NOT a real touch. Overwritten below when that face's
