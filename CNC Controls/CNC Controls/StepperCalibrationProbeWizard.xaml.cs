@@ -562,6 +562,10 @@ namespace CNC.Controls
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
+            // Before reading any field - these buttons are Focusable="False" so a click raises no
+            // LostFocus, and a length-unit field commits only then. See NumericField.CommitPendingEdits.
+            NumericField.CommitPendingEdits(this);
+
             switch ((string)((Button)sender).Tag)
             {
                 case "save":

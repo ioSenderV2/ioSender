@@ -676,6 +676,14 @@ namespace CNC.Controls
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
+            // FIRST, before reading any field. These buttons are Focusable="False" so they cannot steal
+            // the jog keys, and a non-focusable button takes no focus - so a value being typed when the
+            // operator clicks has never raised LostFocus, and a length-unit field commits only then.
+            // Without this the handler reads the PREVIOUS value and acts on it silently: on 2026-09-16
+            // a typed 0.37 was on screen while 0.450 went to the controller. See
+            // NumericField.CommitPendingEdits.
+            NumericField.CommitPendingEdits(this);
+
             switch ((string)((Button)sender).Tag)
             {
                 case "apply": ApplyOffset(); break;

@@ -274,6 +274,29 @@ namespace CNC.Controls
         // mm-displaying field stores/shows 25.4, it does not switch the field to inches). An unparseable
         // entry is discarded - Text reverts to the last good Value, the same fallback the old per-keystroke
         // path used (OnTextChanged's final `else` branch).
+        /// <summary>
+        /// Commit whatever is currently TYPED into <see cref="Value"/>, as tabbing away or pressing Enter
+        /// would. Call this before READING Value in response to a click, or the click may read a stale one.
+        /// </summary>
+        /// <remarks>
+        /// A length-unit field parses only on LostFocus/Enter (see OnTextChanged) - deliberately, because a
+        /// per-keystroke parse cannot handle a trailing unit suffix and would commit "1" on the way to "10".
+        /// The trap is that this app sets Focusable="False" on its action buttons so they cannot steal the
+        /// jog keys, and a non-focusable button does not take focus - so clicking one never raises LostFocus
+        /// on the field being typed into, and the commit never happens.
+        ///
+        /// Observed on hardware 2026-09-16: 0.37 typed into the Squareness tab's New offset, Apply pressed,
+        /// and $171 was written as 0.450 - the value the panel had computed before the operator typed over
+        /// it. No error, no warning; the number on screen and the number sent to the controller simply
+        /// disagreed, on a setting that racks a gantry.
+        /// </remarks>
+        public void CommitEdit()
+        {
+            if (NumericProperties.IsLengthUnit(Unit))
+                CommitLengthText();
+            // Non-length units already commit per keystroke in OnTextChanged - nothing pending to flush.
+        }
+
         private void CommitLengthText()
         {
             if (NumericProperties.TryParseLength(Text, Unit, out double mm))
