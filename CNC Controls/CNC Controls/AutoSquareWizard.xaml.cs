@@ -437,7 +437,13 @@ namespace CNC.Controls
                 txtWarnings.Text = warn;
 
             if (btnApply != null)
-                btnApply.IsEnabled = !measureOnly && travelSet && Math.Abs(NewOffset - CurrentOffset) > 1e-6;
+                // Not gated on the value differing: that deadlocks against the commit-on-click fix in
+                // Button_Click. A typed value does not reach the DependencyProperty until focus leaves the
+                // field, and these buttons are Focusable="False", so the comparison uses the OLD value, sees
+                // no difference and disables the button - which then never receives the click that would
+                // have committed the edit. ApplyOffset decides after the commit instead. travelSet stays:
+                // without max travel there is no rail span, so nothing here can compute an offset at all.
+                btnApply.IsEnabled = !measureOnly && travelSet;
 
             RefreshGenerateReady(travelSet);
 
@@ -750,8 +756,18 @@ namespace CNC.Controls
                 AppDialogs.Show(Loc("AsNoOffset"), "Auto square", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
-            if (XLeg() <= 0d || Math.Abs(NewOffset - CurrentOffset) <= 1e-6)
+            if (XLeg() <= 0d)
                 return;
+            // Reached only after Button_Click has committed any half-typed field, so this is the real value.
+            // Said out loud rather than returning silently - the button is always live now, so a press that
+            // did nothing would look like a fault.
+            if (Math.Abs(NewOffset - CurrentOffset) <= 1e-6)
+            {
+                AppDialogs.Show(string.Format(CultureInfo.InvariantCulture,
+                    "New offset is already {0:0.000###} - the same as the current one, so there is nothing to write.", NewOffset),
+                    "Auto square", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
 
             double newVal = NewOffset;   // clamped to the setting range in UpdateComputed
             string caution = Math.Abs(newVal) > LargeOffsetWarn

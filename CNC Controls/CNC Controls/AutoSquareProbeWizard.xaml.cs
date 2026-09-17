@@ -624,8 +624,23 @@ namespace CNC.Controls
             if (txtWarnings != null)
                 txtWarnings.Text = warn;
 
+            // Enabled whenever there is a setting to write. Gated on NOTHING else, and both of the
+            // conditions that used to be here were wrong:
+            //
+            //   skew.HasValue - made a hand-typed offset impossible after a relaunch, because the live
+            //   corners are empty until a run reports them. Typing a value IS a legitimate way to use this
+            //   panel; it is what the operator was told to do while the square calibration was being worked
+            //   out by hand.
+            //
+            //   NewOffset != CurrentOffset - deadlocks against the commit-on-click fix. A typed value does
+            //   not reach the DependencyProperty until focus leaves the field, so the button compares the
+            //   OLD value, sees no difference, and disables itself - and a disabled button never receives
+            //   the click that would have committed the edit. The gate depended on the very state it
+            //   prevented from being updated.
+            //
+            // The handler decides instead, after CommitPendingEdits has run, where the real value is known.
             if (btnApply != null)
-                btnApply.IsEnabled = !measureOnly && skew.HasValue && railSpan > 0d && Math.Abs(NewOffset - CurrentOffset) > 1e-6;
+                btnApply.IsEnabled = !measureOnly;
 
             if (txtSummary != null)
             {
@@ -1220,8 +1235,16 @@ namespace CNC.Controls
                                 "Squareness", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
+            // Reached only after Button_Click has committed any half-typed field, so this is the real
+            // value. Said out loud rather than returning silently: the button is always live now, so a
+            // press that does nothing would otherwise look like the failure it used to be.
             if (Math.Abs(NewOffset - CurrentOffset) <= 1e-6)
+            {
+                AppDialogs.Show(string.Format(CultureInfo.InvariantCulture,
+                    "New offset is already {0:0.000###} - the same as the current one, so there is nothing to write.", NewOffset),
+                    "Squareness", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
+            }
 
             double newVal = NewOffset;   // already clamped to the setting range in UpdateComputed
             string caution = Math.Abs(newVal) > LargeOffsetWarn
