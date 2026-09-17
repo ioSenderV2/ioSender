@@ -1354,10 +1354,14 @@ namespace CNC.Core
 
         private bool RefusePeek(string why)
         {
-            // Flagged, not a plain status message: a plain one clears the error flag and the only thing that
-            // surfaces an arriving message pops the log window for a FLAGGED message only - which is how the
-            // jog go-to buttons' eight refusals went into a log nobody had open (#250).
-            model.SetError(why);
+            // SetErrorMessage, NOT ViewModelBase.SetError. The latter is the INotifyDataErrorInfo validation
+            // collection - it adds to _validationErrors under an empty key and does not even raise
+            // ErrorsChanged, so nothing displays it. Using it here would have made every refusal silent,
+            // which is precisely the fault this line exists to avoid: the jog go-to buttons' eight refusals
+            // wrote plain status messages, whose setter clears the error flag, and the only thing that
+            // surfaces an arriving message pops the log window for a FLAGGED message - so the reasons went
+            // into a log nobody had open and the buttons just looked broken (#250).
+            model.SetErrorMessage(why);
             DebugLog.Write("run", "Peek: REFUSED - " + why);
             return false;
         }

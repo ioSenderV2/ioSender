@@ -318,8 +318,47 @@ namespace GCode_Sender
 
         private void MarkSizeFieldsTouched()
         {
-            if (!loadingInputs)
-                sizeFieldsTouched = true;
+            if (loadingInputs)
+                return;
+
+            sizeFieldsTouched = true;
+            DiscardRestoredMeasurement();
+        }
+
+        // A measurement describes ONE piece of stock. Saying the stock is a different size is saying the
+        // measurement is of something else - so editing Width/Height/Thickness BY HAND drops a measurement
+        // carried over from a previous session.
+        //
+        // Restored ones only, deliberately. A measurement taken THIS session was taken with the operator
+        // standing at the machine, and a nominal figure corrected afterwards - a typo, a unit toggle, a
+        // second look at the calipers - must not throw away minutes of probing. A carried-over measurement
+        // has no such witness, and it is the one that actually bites: a frame probed days ago, against stock
+        // that has since been unclamped, still arming Verify skew and Scribe square and still able to write
+        // an origin. The date on the readout (#363) was a half-measure against exactly this - it TELLS you
+        // the frame is old, and then lets you use it anyway.
+        //
+        // savedMeasuredResult is cleared WITH it, and that is load-bearing: ResetResults alone would not
+        // stick, because SerializeMeasured hands the loaded string back verbatim whenever this session has
+        // no complete measurement of its own - so the discarded frame would simply be restored again on the
+        // next launch. That verbatim hand-back exists so a READER can never destroy what it could not read;
+        // this is the one path where the erasure is the operator's own instruction rather than a side
+        // effect, which is why it is safe here and nowhere else.
+        private void DiscardRestoredMeasurement()
+        {
+            if (!measuredRestoredUtc.HasValue)
+                return;
+
+            // Captured before ResetResults clears the marker.
+            string was = measuredRestoredUtc.Value.ToLocalTime().ToString("ddd d MMM HH:mm");
+
+            savedMeasuredResult = string.Empty;
+            ResetResults();
+
+            // Said out loud rather than silently: Verify skew and Scribe square are about to grey out, and
+            // an operator who is not told why will reasonably read that as the buttons being broken.
+            model?.SetErrorMessage(string.Format(
+                "Stock size changed - the measurement restored from {0} has been discarded. Re-measure before using Verify skew or Scribe square.", was));
+            DebugLog.Write("startjob", "Stock size edited by hand - discarded the measurement restored from " + was);
         }
 
         // Width/Height/Thickness are the operator's own entered numbers for THIS stock - Start Job must never
