@@ -115,8 +115,17 @@ namespace CNC.Controls
         /// normal-orientation reading is (square + machine) and cannot be separated. Once the square's own
         /// error is known, every later single reading gives the MACHINE's error directly by subtraction -
         /// so the reversal is a one-off calibration of the artifact, not a thing to repeat each time.
+        ///
+        /// A plain double rather than a nullable "known/unknown", because zero and unknown want EXACTLY the
+        /// same behaviour: subtract nothing. Collapsing them removes a state that could only ever disagree
+        /// with itself - and it has the side benefit that a genuinely square square, which measures zero, is
+        /// not a special case. The flag below exists solely so the status text can tell the operator which
+        /// of the two they are looking at; no arithmetic reads it.
+        ///
+        /// Editable, because the reversal that measured it may have happened in a session this install has
+        /// no memory of - as it did on 2026-09-16, when the pair was split by hand across an app restart.
         /// </remarks>
-        private double? squareErrorDeg;
+        private bool squareErrorKnown = false;
 
         // Which way the square is currently clamped. Drives the corner ids and seek references in
         // BuildProgram, the operator prompts, and which half of the reversal pair a result lands in.
@@ -341,6 +350,31 @@ namespace CNC.Controls
         public static readonly DependencyProperty CornerTravelMarginMmProperty = Reg(nameof(CornerTravelMarginMm), 15d);
         public double CornerTravelMarginMm { get { return (double)GetValue(CornerTravelMarginMmProperty); } set { SetValue(CornerTravelMarginMmProperty, value); } }
 
+        /// <summary>
+        /// The reference square's own error, subtracted from every reading to leave the machine's.
+        /// </summary>
+        /// <remarks>
+        /// NOT in PersistedProperties, deliberately. That list routes through OnPersistedPropertyChanged,
+        /// which discards the generated program - correct for anything that changes where the probe goes,
+        /// and wrong for this: it changes only how the result is interpreted, and throwing away a program
+        /// the operator is about to run would be a surprise with no cause. It is persisted by hand from its
+        /// own callback instead.
+        /// </remarks>
+        public static readonly DependencyProperty SquareErrorProperty =
+            DependencyProperty.Register(nameof(SquareError), typeof(double), typeof(AutoSquareProbeWizard),
+                                        new PropertyMetadata(0d, (d, e) => ((AutoSquareProbeWizard)d).OnSquareErrorChanged()));
+        public double SquareError { get { return (double)GetValue(SquareErrorProperty); } set { SetValue(SquareErrorProperty, value); } }
+
+        private void OnSquareErrorChanged()
+        {
+            // An operator typing a value is asserting that they know it, exactly as a completed reversal
+            // does. Zero means "subtract nothing", which is also what not knowing means - see the field.
+            if (Math.Abs(SquareError) > 1e-9)
+                squareErrorKnown = true;
+            Persist();
+            UpdateComputed();
+        }
+
         public static readonly DependencyProperty CurrentOffsetProperty =
             DependencyProperty.Register(nameof(CurrentOffset), typeof(double), typeof(AutoSquareProbeWizard),
                                         new PropertyMetadata(0d, (d, e) => ((AutoSquareProbeWizard)d).UpdateComputed()));
@@ -407,9 +441,14 @@ namespace CNC.Controls
             // square and half the difference is the machine. See the file header for the derivation.
             if (PairIsComparable)
             {
-                squareErrorDeg = (readNormal.Value.Skew + readReversed.Value.Skew) / 2d;
-                Persist();
+                squareErrorKnown = true;
+                SetCurrentValue(SquareErrorProperty, (readNormal.Value.Skew + readReversed.Value.Skew) / 2d);
             }
+
+            // Every half, not just a completed pair. A lone half IS the thing worth surviving a restart -
+            // it is twenty minutes of clamping and probing, and the second half is normally measured after
+            // the operator has been away from the machine.
+            Persist();
         }
 
         /// <summary>Both halves measured, and at the same squaring offset.</summary>
@@ -417,8 +456,15 @@ namespace CNC.Controls
         {
             get
             {
+                // Against each other AND against the offset in force NOW. The first alone was enough while
+                // the halves lived only in memory and Apply cleared them; once they survive restarts, a pair
+                // taken at 0.166 can be read back on a machine whose $17x has since been changed elsewhere -
+                // by the settings editor, by MDI, by the pins tab - and it would then report a machine error
+                // for a gantry that no longer exists. Falling back to (reading - square error) is correct
+                // there, and is what this makes happen.
                 return readNormal.HasValue && readReversed.HasValue
-                    && Math.Abs(readNormal.Value.Offset - readReversed.Value.Offset) <= 1e-6;
+                    && Math.Abs(readNormal.Value.Offset - readReversed.Value.Offset) <= 1e-6
+                    && Math.Abs(readNormal.Value.Offset - CurrentOffset) <= 1e-6;
             }
         }
 
@@ -452,14 +498,10 @@ namespace CNC.Controls
                 return null;
             }
 
-            if (squareErrorDeg.HasValue)
-            {
-                how = SkewBasis.Calibrated;
-                return skew.Value - squareErrorDeg.Value;
-            }
-
-            how = SkewBasis.Raw;
-            return skew.Value;
+            // Subtract unconditionally. Unknown is stored as zero, so this is the same arithmetic either
+            // way - only the label the operator sees differs.
+            how = squareErrorKnown ? SkewBasis.Calibrated : SkewBasis.Raw;
+            return skew.Value - SquareError;
         }
 
         /// <summary>
@@ -622,13 +664,13 @@ namespace CNC.Controls
                 case SkewBasis.Reversal:
                     return string.Format(CultureInfo.InvariantCulture,
                         "Reversal complete (both halves at offset {0:0.000}):  square {1:+0.0###;-0.0###;0}°  ·  machine {2:+0.0###;-0.0###;0}°\nnormal {3:+0.0###;-0.0###;0}° = square + machine,  reversed {4:+0.0###;-0.0###;0}° = square - machine. The square's error is now remembered.",
-                        readNormal.Value.Offset, squareErrorDeg ?? 0d, machine ?? 0d,
+                        readNormal.Value.Offset, SquareError, machine ?? 0d,
                         readNormal.Value.Skew, readReversed.Value.Skew);
 
                 case SkewBasis.Calibrated:
                     return string.Format(CultureInfo.InvariantCulture,
                         "Square error {0:+0.0###;-0.0###;0}° known from an earlier reversal - subtracted, so the machine error above is the gantry alone.",
-                        squareErrorDeg.Value);
+                        SquareError);
 
                 case SkewBasis.Raw:
                     string half = readNormal.HasValue || readReversed.HasValue
@@ -641,8 +683,8 @@ namespace CNC.Controls
                     return "This reading is the square's error and the machine's added together, and nothing here can separate them - correcting it to zero would square the gantry TO the square. Run the reversal to split them.\n" + half;
 
                 default:
-                    return squareErrorDeg.HasValue
-                        ? string.Format(CultureInfo.InvariantCulture, "Square error {0:+0.0###;-0.0###;0}° remembered from an earlier reversal; it will be subtracted from the next reading.", squareErrorDeg.Value)
+                    return squareErrorKnown
+                        ? string.Format(CultureInfo.InvariantCulture, "Square error {0:+0.0###;-0.0###;0}° known; it will be subtracted from the next reading.", SquareError)
                         : "No reversal done yet - a single reading cannot tell a crooked gantry from a crooked square.";
             }
         }
@@ -800,7 +842,7 @@ namespace CNC.Controls
             }
 
             // Filing the reading happens on the UI thread with the recompute, not here - CaptureReading
-            // writes squareErrorDeg and calls Persist(), and this runs on a comms thread.
+            // writes the square-error property and calls Persist(), and this runs on a comms thread.
             Dispatcher.BeginInvoke(new System.Action(() => { CaptureReading(); UpdateComputed(); }));
         }
 
@@ -1197,6 +1239,7 @@ namespace CNC.Controls
                 // property of the steel, not of the machine - so the next single reading still yields a
                 // true machine error by subtraction.
                 readNormal = readReversed = null;
+                Persist();
                 DiscardProgram();
                 UpdateComputed();
                 ReHome();
@@ -1247,6 +1290,7 @@ namespace CNC.Controls
                 DetectOffsetSetting();
                 ClearCorners();
                 readNormal = readReversed = null;   // as in ApplyOffset - the gantry has changed, the square has not
+                Persist();
                 DiscardProgram();
                 UpdateComputed();
                 ReHome();
@@ -1300,10 +1344,18 @@ namespace CNC.Controls
             reversed = p.Reversed;
             rbOrientReversed.IsChecked = reversed;
             rbOrientNormal.IsChecked = !reversed;
-            // A property of the steel, not of the session - see squareErrorDeg. HasSquareError rather
-            // than "is it non-zero", because a genuinely square square measures 0 and that reading is
-            // worth keeping.
-            squareErrorDeg = p.HasSquareError ? (double?)p.SquareErrorDeg : null;
+            // A property of the steel, not of the session.
+            squareErrorKnown = p.HasSquareError;
+            SquareError = p.SquareErrorDeg;
+            // The halves outlive the app too. Losing one to a restart used to mean re-clamping and
+            // re-running a half that had already been measured perfectly well - which happened on
+            // 2026-09-16 and had to be split by hand outside the app.
+            readNormal = p.HasNormal
+                ? (Reading?)new Reading { Skew = p.NormalSkew, BladeSpan = p.NormalBlade, TongueSpan = p.NormalTongue, Offset = p.NormalOffset }
+                : null;
+            readReversed = p.HasReversed
+                ? (Reading?)new Reading { Skew = p.ReversedSkew, BladeSpan = p.ReversedBlade, TongueSpan = p.ReversedTongue, Offset = p.ReversedOffset }
+                : null;
             chkReferenceTlo.IsChecked = p.ReferenceTlo;
         }
 
@@ -1320,8 +1372,18 @@ namespace CNC.Controls
                 GangedAxis = _gangedAxis,
                 InvertCorrection = invertCorrection,
                 Reversed = reversed,
-                HasSquareError = squareErrorDeg.HasValue,
-                SquareErrorDeg = squareErrorDeg ?? 0d,
+                HasSquareError = squareErrorKnown,
+                SquareErrorDeg = SquareError,
+                HasNormal = readNormal.HasValue,
+                NormalSkew = readNormal.HasValue ? readNormal.Value.Skew : 0d,
+                NormalOffset = readNormal.HasValue ? readNormal.Value.Offset : 0d,
+                NormalBlade = readNormal.HasValue ? readNormal.Value.BladeSpan : 0d,
+                NormalTongue = readNormal.HasValue ? readNormal.Value.TongueSpan : 0d,
+                HasReversed = readReversed.HasValue,
+                ReversedSkew = readReversed.HasValue ? readReversed.Value.Skew : 0d,
+                ReversedOffset = readReversed.HasValue ? readReversed.Value.Offset : 0d,
+                ReversedBlade = readReversed.HasValue ? readReversed.Value.BladeSpan : 0d,
+                ReversedTongue = readReversed.HasValue ? readReversed.Value.TongueSpan : 0d,
                 ReferenceTlo = chkReferenceTlo != null && chkReferenceTlo.IsChecked == true
             };
         }
@@ -1362,6 +1424,13 @@ namespace CNC.Controls
         // gives the MACHINE's error by subtraction and the reversal never has to be repeated.
         public bool HasSquareError = false;
         public double SquareErrorDeg = 0d;
+        // The two reversal halves, kept across restarts so a measured half is never thrown away by
+        // an app relaunch. Each carries the offset it was taken at - the pair is only splittable
+        // when those match, and storing it is what makes a mismatch detectable rather than silent.
+        public bool HasNormal = false;
+        public double NormalSkew = 0d, NormalOffset = 0d, NormalBlade = 0d, NormalTongue = 0d;
+        public bool HasReversed = false;
+        public double ReversedSkew = 0d, ReversedOffset = 0d, ReversedBlade = 0d, ReversedTongue = 0d;
         // Default ON: fitting the probe is a tool change, and the run is wrong-referenced without it.
         public bool ReferenceTlo = true;
     }

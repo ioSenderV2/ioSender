@@ -77,6 +77,9 @@
                 <RadioButton x:Uid="rb_aspreversed" x:Name="rbOrientReversed" Content="Reversed (flipped)" GroupName="AspOrient" VerticalAlignment="Center" Margin="14,0,0,0" Checked="Orientation_Checked"
                              ToolTip="The square FLIPPED OVER, with the far end of the blade registered in the fence and the heel out to the right. Mirroring reverses the sign of the square's own error but not the machine's, so measuring both ways separates them."/>
             </StackPanel>
+            <local:NumericField x:Uid="fld_aspsquareerr" Label="Square error:" ColonAt="160" Format="-0.0####" Unit="°" Margin="0,2"
+                ToolTip="The reference square's OWN out-of-squareness, subtracted from every reading so what you see is the gantry alone. A completed reversal fills this in automatically; type it by hand if the reversal that measured it happened in an earlier session. 0 = not known, which simply subtracts nothing."
+                Value="{Binding SquareError, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
             <TextBlock x:Name="txtReversal" TextWrapping="Wrap" Margin="5,2,5,4" FontSize="11" Foreground="#444444"/>
 
             <Separator Margin="5,8"/>
