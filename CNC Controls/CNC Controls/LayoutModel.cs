@@ -111,10 +111,17 @@ namespace CNC.Controls
         // fresh install that disagreed with "Reset to default" would be its own bug, and Config.Tabs is a
         // second authority that prunes this tree on every load (TabOrder.Apply).
         //
-        // 2026-08-12: back to the FULL tab bar as it stood before the 2026-08-03 cutback, by request - the
-        // compressed three-tab arrangement ships as a config OVERLAY you can apply instead (see
-        // ConfigOverlay.cs), which is the right way round: an existing install keeps its saved Layout for
-        // ever, so a crowded default that can be slimmed down beats a slim default nobody can opt out of.
+        // 2026-08-12: back to the FULL tab bar as it stood before the 2026-08-03 cutback, by request. That
+        // is the right way round: an existing install keeps its saved Layout for ever, so a crowded default
+        // that can be slimmed down beats a slim default nobody can opt out of.
+        //
+        // How a user slims it down is Settings > User Interface > Top-level tabs (MainPageEditor) - each
+        // view gets Tab bar / File menu / Tools menu / Not shown, applied on restart. An arrangement can
+        // then be handed to someone else as a config overlay (ConfigOverlay.cs), but NOTHING SHIPS one:
+        // there is no .ioconfig in this repo. An earlier version of this comment said the compressed
+        // three-tab arrangement "ships as a config OVERLAY you can apply instead", and that sentence was
+        // copied almost verbatim into the user manual on 2026-09-17 before the missing file was noticed.
+        // If a stock overlay is ever added, say where it lives.
         // The one thing NOT restored is the Tools CONTAINER tab - the Tools menu replaced it and stays.
         public static LayoutNode Build()
         {
