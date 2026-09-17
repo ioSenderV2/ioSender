@@ -3599,6 +3599,31 @@ namespace CNC.Core
 
             if (changed.Count > 0)
             {
+                // Suspend status polling for the duration. This is not tidiness - without it the ack wait
+                // below cannot reliably see its own ok, and a write the controller ACCEPTED is reported as
+                // a failure.
+                //
+                // AwaitAck waits while the stream state is AwaitAck OR DataReceived. Every reply reclassifies
+                // that state (TelnetStream ~392, SerialStream ~519): "ok" -> ACK, "error" -> NAK, anything
+                // else -> DataReceived. A status report is "anything else". So with the poller running at
+                // ~200 ms there is exactly ONE window - between this command's ok and the next status report -
+                // in which the predicate is false, and if the waiter's sampling misses it there is no second
+                // chance: every later reply is another status report. Over Telnet it is worse still, because
+                // the receive handler classifies a BATCH and the last reply wins, so an ok arriving in the
+                // same socket read as a status report is erased before anything can observe it.
+                //
+                // Observed 2026-09-16: "$171=0.319" was acked in 9 ms and Save still returned false 5.035 s
+                // later on the ack timeout ("[TelnetStream] AwaitAck: no ok/error within 5000ms"). The
+                // operator was told the write had failed while the controller was holding the new value.
+                //
+                // Same remedy the other synchronous exchanges in the app already use (TrinamicView's M122
+                // read, ProbingViewModel) - and in a finally, which those predate: a stuck suspend leaves the
+                // app blind for the rest of the SESSION.
+                bool polling = Grbl.GrblViewModel != null && Grbl.GrblViewModel.Poller.IsEnabled;
+                if (polling)
+                    PollGrbl.Suspend();
+                try
+                {
                 foreach (var setting in changed)
                 {
                     bool acked;
@@ -3630,6 +3655,14 @@ namespace CNC.Core
                     setting.IsDirty = setting.HasErrors;
                     if (!setting.HasErrors)
                         setting.SetLoadedBaseline();    // controller now holds this value
+                }
+                }
+                finally
+                {
+                    // Only if we stopped it. A caller that had deliberately stopped polling (a probing
+                    // sequence, a file transfer) must not have it started underneath them.
+                    if (polling)
+                        PollGrbl.Resume();
                 }
 
                 // Re-derive GrblInfo from the now-current settings (max travel, homing direction, step

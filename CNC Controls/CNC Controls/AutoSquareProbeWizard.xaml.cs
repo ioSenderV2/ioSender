@@ -931,9 +931,29 @@ namespace CNC.Controls
                 ReHome();
             }
             else
-                AppDialogs.Show(string.Format("Could not write ${0}. Only the actually-ganged axis accepts a write - check the {1} axis is the squared one.",
-                                              _offset.Id, "XYZ"[_gangedAxis]),
-                                "Squareness", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppDialogs.Show(WriteFailedMessage(), "Squareness", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+
+        /// <summary>
+        /// What to say when <see cref="GrblSettings.Save"/> reports failure - which is NOT the same as
+        /// "the controller refused it".
+        /// </summary>
+        /// <remarks>
+        /// This used to assert a cause: "Only the actually-ganged axis accepts a write - check the Y axis is
+        /// the squared one." On 2026-09-16 it said exactly that while the wire log showed $171=0.319 acked
+        /// in 9 ms and the controller holding the new value. Save had timed out waiting for an ok it could
+        /// not see past the status poller (fixed in GrblSettings.Save), and the dialog turned a timeout into
+        /// a confident, wrong diagnosis of the operator's machine configuration.
+        ///
+        /// So it names the possibilities instead of picking one, and points at the only thing that settles
+        /// it - the value the controller actually holds. A wrong-axis write IS one real cause; it is just
+        /// not a fact this code has established.
+        /// </remarks>
+        private string WriteFailedMessage()
+        {
+            return string.Format(
+                "${0} was not confirmed.\n\nThe controller did not acknowledge the write, so the value may or may not have been stored - check ${0} in Settings before relying on it, and re-home if it did land.\n\nIf it was genuinely refused, the usual cause is that {1} is not the ganged axis - only that one accepts a write, even though $170-$172 all report.",
+                _offset.Id, "XYZ"[_gangedAxis]);
         }
 
         private void ClearOffset()
@@ -960,9 +980,7 @@ namespace CNC.Controls
                 ReHome();
             }
             else
-                AppDialogs.Show(string.Format("Could not write ${0}. Only the actually-ganged axis accepts a write - check the {1} axis is the squared one.",
-                                              _offset.Id, "XYZ"[_gangedAxis]),
-                                "Squareness", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppDialogs.Show(WriteFailedMessage(), "Squareness", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         private void ReHome()
