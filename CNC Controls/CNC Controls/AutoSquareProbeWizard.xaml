@@ -53,6 +53,11 @@
             </StackPanel>
             <TextBlock x:Name="txtNoProbe" Foreground="#C0392B" TextWrapping="Wrap" Margin="5,0,5,4" FontSize="11" Visibility="Collapsed"
                        Text="No probe of the selected type is defined. Add one in Machine Setup Wizard &gt; Probe definitions."/>
+            <CheckBox x:Uid="chk_asptlo" x:Name="chkReferenceTlo" Content="Set TLO reference (touch the puck first)" Margin="20,6,0,0" VerticalAlignment="Center" IsChecked="True"
+                      Checked="ReferenceTlo_Changed" Unchecked="ReferenceTlo_Changed"
+                      ToolTip="Fitting the probe IS a tool change, and a bit fitted by hand has no tool length offset - so without this the run works against whatever offset the PREVIOUS tool left, and hands the machine back the same way. Touches the toolsetter puck to give the fitted probe its own offset, then puts it back at the end. Needs a Tool Setter probe defined; the box disables itself if there is none."/>
+            <TextBlock x:Name="txtNoToolSetter" Foreground="#C0392B" TextWrapping="Wrap" Margin="24,2,5,4" FontSize="11" Visibility="Collapsed"
+                       Text="No Tool Setter probe is defined, so no reference can be taken - the run will end in G49. Re-reference the tool before the next job."/>
 
             <Separator Margin="5,8"/>
             <TextBlock x:Uid="txt_aspfixture" Text="Fixture (Corner fence, validated position):" TextWrapping="Wrap" Margin="5,0,5,4"/>

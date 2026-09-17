@@ -26,6 +26,13 @@
  * below the probed top until 2026-09-16 - 0.2 mm below the square's underside, seeking through open air.
  * That is what #<_ls_facedepth> was added for; this is its first and so far only caller.
  *
+ * Tool length: the run touches the puck after the probe is fitted, through Setup's own baseline/reference/
+ * restore trio. Not for the measurement's sake - it is XY, and a tool length cannot tilt an angle - but
+ * because fitting the probe IS a tool change and a bit fitted by hand has no offset of its own. Skipping it
+ * leaves the run working against, and handing back, whatever offset the PREVIOUS tool left. The first cut
+ * of this file restored that inherited offset instead, which is worse than it sounds: it puts back a
+ * confident-looking number measured against a tool that is no longer in the spindle.
+ *
  * NOT YET BUILT - the reversal test. Measure, flip the square over, measure again: the square's own error
  * changes sign, the machine's does not, so the mean is the machine and half the difference is the square.
  * It is the only way to tell which of the two you are looking at, and it is cheap once probing is the
@@ -100,7 +107,7 @@ namespace CNC.Controls
             "1. Clamp the reference square down with its heel into the Corner Fence, blade along X and tongue along Y, sitting on a spacer that is INSET from its edges - the probe has to be able to reach the steel, and nothing else may be flush with it.\n\n" +
             "2. Zero the current offset first (the Clear button), so what you measure is the machine's raw mechanical error rather than the residual of a correction you have forgotten about.\n\n" +
             "3. Enter the square's arm lengths (roughly - they only aim the seek) and its thickness (accurately - it sets the probe depth).\n\n" +
-            "4. Generate, then Run. It parks at G30 to confirm the probe, then probes the heel and the far end of each arm.\n\n" +
+            "4. Generate, then Run. It parks at G30 to confirm the probe, touches the puck to give that probe its own tool length offset, then probes the heel and the far end of each arm - and puts the offset back at the end. Fitting the probe is a tool change, so without that reference the run would work against whatever offset the previous tool left, and hand the machine back the same way.\n\n" +
             "5. Read the measured skew. Apply offset, then Re-home for it to take effect.\n\n" +
             "6. RUN IT AGAIN. This is not optional and it is not a formality - it is how the correction's direction gets established. The skew should collapse toward zero. If it roughly DOUBLED instead, the sign is backwards for your machine: tick 'Invert correction direction', Apply, re-home and re-measure. Leave it ticked from then on.\n\n" +
             "What the number means: the skew is the angle between the square's two arms as the machine sees them, minus 90 degrees. It is the machine's error and the square's error added together, and nothing here can separate them - so a result at or below about 0.01 degrees is the square's accuracy talking, not the gantry's.\n\n" +
@@ -487,6 +494,13 @@ namespace CNC.Controls
                 IsTouchPlate = true;
 
             txtNoProbe.Visibility = ActiveProbe() == null ? Visibility.Visible : Visibility.Collapsed;
+
+            // Say so rather than silently doing nothing: the box stays tickable but a run cannot reference
+            // anything without a puck defined, and the consequence (ending in G49) is the one worth seeing
+            // BEFORE the run rather than discovering on the next job.
+            if (txtNoToolSetter != null)
+                txtNoToolSetter.Visibility = chkReferenceTlo != null && chkReferenceTlo.IsChecked == true && !WillReferenceTlo
+                                           ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void cbxProbeType_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -519,6 +533,15 @@ namespace CNC.Controls
             Persist();
             DetectOffsetSetting();
             UpdateComputed();
+        }
+
+        private void ReferenceTlo_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!IsInitialized)
+                return;
+            Persist();
+            DiscardProgram();   // the sitting program was built with/without the puck touch - stale either way
+            RefreshProbeChoices();
         }
 
         private void Invert_Changed(object sender, RoutedEventArgs e)
@@ -592,34 +615,20 @@ namespace CNC.Controls
         }
 
         /// <summary>
-        /// The tool length offset currently in force, from the controller's own <c>$#</c> report
-        /// (<c>[TLO:...]</c>), so the program can put back what probing takes away. NaN = not knowable.
+        /// Whether this run will reference the fitted probe at the puck: the operator asked for it AND a
+        /// Tool Setter probe is actually defined.
         /// </summary>
         /// <remarks>
-        /// pcorner.macro cancels the tool length offset on every call - deliberately, its absolute G53 moves
-        /// need true machine coordinates - and nothing puts it back, so a probing run that does not restore
-        /// it hands the machine over in G49. That is not cosmetic: on this machine a TLO is what makes one
-        /// work Z0 mean the same thing for every tool, so afterwards Z0 sits a whole tool length too deep.
-        /// The failure is silent and waits for the next job that does NOT emit an M6 - "same bit, same
-        /// spindle, nothing touched" - which is precisely when nothing re-applies an offset. It cut a
-        /// spoilboard on 2026-08-06, and Start Job grew EmitTloRestore in response.
-        ///
-        /// This tool cannot use EmitTloRestore: that recomputes the offset from #&lt;_probe_z&gt;/#&lt;_tlo_ref&gt;,
-        /// which only exist once a run has actually referenced a toolsetter, and this one deliberately does
-        /// not (the measurement is XY - a tool length cannot tilt an angle). So it restores the offset it
-        /// INHERITED instead, read live rather than reconstructed.
-        ///
-        /// Read at Generate time, which is the limitation: a tool change between Generate and Run would make
-        /// it stale. Any edit discards the program (OnPersistedPropertyChanged), and the realistic window is
-        /// the operator answering one MBOX, so this is narrow rather than absent - worth knowing, not worth
-        /// inventing a mechanism for. NaN when the report has not been read: the caller then emits NO restore
-        /// and says so in the program, because a guessed tool length is far worse than an admitted G49.
+        /// Gated on a toolsetter being DEFINED, not on its feeds - the puck probe's own feeds live in
+        /// tlo.macro now, where the puck is. Same gate, same wording, as the scratch wizard's.
         /// </remarks>
-        private static double LiveToolLengthOffset()
+        private bool WillReferenceTlo
         {
-            if (!GrblWorkParameters.IsLoaded)
-                return double.NaN;
-            return GrblWorkParameters.ToolLengtOffset.Z;   // sic - the property is spelled this way in Grbl.cs
+            get
+            {
+                return chkReferenceTlo != null && chkReferenceTlo.IsChecked == true
+                    && ProbeDefinitions.Items.Any(d => d.ProbeType == ProbeType.ToolSetter);
+            }
         }
 
         private void Generate()
@@ -668,7 +677,16 @@ namespace CNC.Controls
             c1x = c1y = c2x = c2y = c3x = c3y = null;   // a new run measures afresh; never mix two runs' corners
             UpdateComputed();
 
-            program = BuildProgram(fx, p, BladeLength, TongueLength, FaceDepth(), CornerTravelMarginMm, IsTouchPlate, LiveToolLengthOffset());
+            // The WCS to come back to is whichever one is ACTIVE - tlo.macro ends standing on the puck in
+            // G59.3, and a caller that continues from there in the wrong frame drives into the toolsetter.
+            // Falls back to G54 only when the model cannot say, which is the frame this program assumes
+            // anyway. Same reasoning, same fallback, as the scratch wizard's.
+            string returnWcs = model != null && !string.IsNullOrEmpty(model.WorkCoordinateSystem)
+                             ? model.WorkCoordinateSystem : "G54";
+
+            program = BuildProgram(fx, p, BladeLength, TongueLength, FaceDepth(), CornerTravelMarginMm, IsTouchPlate,
+                                   WillReferenceTlo, model != null && model.IsTloReferenceSet,
+                                   AppConfig.Settings.Base.TloRefBaseline, returnWcs);
             MacroProcessor.HandOffToJobTab(model, ProgramNameSquare, program, ViewType.Calibration, onHandoffEnd: EndHandoff);
             // OwnsRunBar, not isActiveTab: the handoff's tab switch has already run Activate(false)
             // synchronously by now, so isActiveTab is false and this write would simply be skipped.
@@ -696,7 +714,8 @@ namespace CNC.Controls
         /// </summary>
         private static string BuildProgram(Fixture fx, ProbeDefinition p, double bladeMm, double tongueMm,
                                            double faceDepthMm, double cornerTravelMarginMm, bool touchPlate,
-                                           double inheritedTloZ)
+                                           bool referenceTlo, bool tloAlreadyReferenced, double tloBaseline,
+                                           string returnWcs)
         {
             const double insetMm = 5d;
             double r = p.ProbeDiameter / 2d;
@@ -748,6 +767,31 @@ namespace CNC.Controls
             b.AppendLine(touchPlate
                 ? string.Format("(MBOX, OKCANCEL, Using touch plate: {0}. Fit the {1} bit or dowel it is set up for, clip the lead to the SQUARE - steel, so it conducts directly - and place the plate on the heel corner. Click OK. Cancel aborts.)", p.Name, p.TipDescription)
                 : string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. Check the square is clamped flat and its spacer is INSET from the edges - the probe must reach the steel and touch nothing else. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
+
+            // Give the tool that was just fitted its OWN tool length offset, by touching the puck. Fitting a
+            // probe IS a tool change, and a bit fitted by hand has no offset - tc.macro applies one on every
+            // M6, and no M6 runs here. Without this the run works against whatever offset the PREVIOUS tool
+            // left behind and hands the machine back the same way, which is the shape of the failure that
+            // cut a spoilboard on 2026-08-06: "the offset was never stale, just discarded".
+            //
+            // Setup's sequence, not a copy of it - the baseline/reference/restore trio was lifted into
+            // MacroProcessor for exactly this, and they are a SET used in order.
+            //
+            // Placed after the install prompt, because it must reference the probe that is NOW fitted, not
+            // whatever was in the spindle when the program was generated. No lift afterwards: tlo.macro
+            // guarantees it ends parked at G30 in returnWcs, which is where corner 1 expects to start from.
+            if (referenceTlo)
+            {
+                MacroProcessor.EmitTloBaseline(l => b.AppendLine(l), tloAlreadyReferenced, tloBaseline);
+                // 8 = the 3D probe stylus, which probes the MAIN input because it must not bear down on the
+                // puck. A touch-plate run has a rigid gauge pin or dowel in the spindle instead, so any id
+                // but 8 - tlo.macro reads that as "pushes the puck's own switch, use the toolsetter input".
+                // Do not pre-decide which input: the macro branches, and it cannot be done in a streamed
+                // program because o-word flow control cannot be streamed to grblHAL.
+                MacroProcessor.EmitTloReference(l => b.AppendLine(l), touchPlate ? 1 : 8, returnWcs);
+            }
+            else
+                b.AppendLine("(NOTE: no TLO reference taken, so the fitted probe has no tool length offset of its own and this run ends in G49. Re-reference the tool before the next job.)");
 
             // Corner 1 - the heel. #<_bottom> is a SEEK-DEPTH CAP and nothing more; it is the machine's own Z
             // floor, not a cached spoilboard reading.
@@ -816,26 +860,21 @@ namespace CNC.Controls
             b.AppendLine("(PRINT, SQ_C3Y=#<c3y>)");
             b.AppendLine("(WAITIDLE)");
 
-            // Put back the tool length offset pcorner.macro cancelled on every call - see
-            // LiveToolLengthOffset for why a probing run that skips this hands the machine back in G49, and
-            // what that cost on 2026-08-06. G43.1 sets the offset absolutely, so re-emitting it is free if
-            // it somehow survived.
+            // Put back the offset the reference above measured. pcorner.macro cancels it on every call -
+            // deliberately, its absolute G53 moves need true machine coordinates - and nothing else puts it
+            // back, so without this the run ends in G49 and work Z0 then sits a whole tool length too deep.
+            // G43.1 sets the offset absolutely, so re-emitting it costs nothing if it somehow survived.
+            // Guarded on referenceTlo because the trio is a SET: with no reference taken, #<_probe_z> and
+            // #<_tlo_ref> hold whatever a previous run left, and restoring from those would apply a
+            // confident-looking offset measured against a tool that is not in the spindle.
             //
             // BEFORE the footer, not after, and that ordering is load-bearing in the other direction:
             // EmitProgramFooter's own comment records that a program whose final lines do not MOVE reaches
             // Idle before the controller's "[MSG:Pgm End]" arrives, leaving the Run bar stuck on "Run".
             // So the park stays last. Parking at G30 with a live offset is what every ordinary job already
             // does, so nothing novel is being asked of the G53 moves in it.
-            if (double.IsNaN(inheritedTloZ))
-                // No invented value. An admitted G49 the operator can see beats a guessed tool length that
-                // silently puts work Z0 a tool length into the material.
-                b.AppendLine("(NOTE: no tool length offset was readable when this program was generated, so none is restored - the machine is left in G49. Re-reference the tool before the next job.)");
-            else if (Math.Abs(inheritedTloZ) > 1e-6)
-            {
-                b.AppendLine("(--- restore the tool length offset that was in force before this run ---)");
-                b.AppendLine(string.Format("G43.1 Z{0}", inheritedTloZ.ToInvariantString("0.0###")));
-                b.AppendLine(string.Format("(PRINT, SQ_TLO_RESTORED={0})", inheritedTloZ.ToInvariantString("0.0###")));
-            }
+            if (referenceTlo)
+                MacroProcessor.EmitTloRestore(l => b.AppendLine(l));
 
             b.AppendLine("(--- park at G30 - no origin/WCS is set by this tool, it only measures ---)");
             MacroProcessor.EmitProgramFooter(l => b.AppendLine(l), stopSpindle: false, parkAtG30: true, endWord: "M2");
@@ -968,6 +1007,7 @@ namespace CNC.Controls
             _gangedAxis = Math.Max(0, Math.Min(2, p.GangedAxis));
             invertCorrection = p.InvertCorrection;
             chkInvert.IsChecked = invertCorrection;
+            chkReferenceTlo.IsChecked = p.ReferenceTlo;
         }
 
         protected override AutoSquareProbeParams CaptureConfig()
@@ -981,7 +1021,8 @@ namespace CNC.Controls
                 FixtureName = SelectedFixture?.Name ?? restoreFixtureName,
                 Probe = IsTouchPlate ? "TouchPlate" : "ThreeDProbe",
                 GangedAxis = _gangedAxis,
-                InvertCorrection = invertCorrection
+                InvertCorrection = invertCorrection,
+                ReferenceTlo = chkReferenceTlo != null && chkReferenceTlo.IsChecked == true
             };
         }
 
@@ -1014,5 +1055,7 @@ namespace CNC.Controls
         public int GangedAxis = 1;               // 0=X, 1=Y, 2=Z
         // Resolved once by the operator against their own machine - see AutoSquareProbeWizard.invertCorrection.
         public bool InvertCorrection = false;
+        // Default ON: fitting the probe is a tool change, and the run is wrong-referenced without it.
+        public bool ReferenceTlo = true;
     }
 }
