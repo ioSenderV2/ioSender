@@ -591,6 +591,37 @@ namespace CNC.Controls
             return double.IsNaN(floor) ? double.NaN : floor + 1.0d;
         }
 
+        /// <summary>
+        /// The tool length offset currently in force, from the controller's own <c>$#</c> report
+        /// (<c>[TLO:...]</c>), so the program can put back what probing takes away. NaN = not knowable.
+        /// </summary>
+        /// <remarks>
+        /// pcorner.macro cancels the tool length offset on every call - deliberately, its absolute G53 moves
+        /// need true machine coordinates - and nothing puts it back, so a probing run that does not restore
+        /// it hands the machine over in G49. That is not cosmetic: on this machine a TLO is what makes one
+        /// work Z0 mean the same thing for every tool, so afterwards Z0 sits a whole tool length too deep.
+        /// The failure is silent and waits for the next job that does NOT emit an M6 - "same bit, same
+        /// spindle, nothing touched" - which is precisely when nothing re-applies an offset. It cut a
+        /// spoilboard on 2026-08-06, and Start Job grew EmitTloRestore in response.
+        ///
+        /// This tool cannot use EmitTloRestore: that recomputes the offset from #&lt;_probe_z&gt;/#&lt;_tlo_ref&gt;,
+        /// which only exist once a run has actually referenced a toolsetter, and this one deliberately does
+        /// not (the measurement is XY - a tool length cannot tilt an angle). So it restores the offset it
+        /// INHERITED instead, read live rather than reconstructed.
+        ///
+        /// Read at Generate time, which is the limitation: a tool change between Generate and Run would make
+        /// it stale. Any edit discards the program (OnPersistedPropertyChanged), and the realistic window is
+        /// the operator answering one MBOX, so this is narrow rather than absent - worth knowing, not worth
+        /// inventing a mechanism for. NaN when the report has not been read: the caller then emits NO restore
+        /// and says so in the program, because a guessed tool length is far worse than an admitted G49.
+        /// </remarks>
+        private static double LiveToolLengthOffset()
+        {
+            if (!GrblWorkParameters.IsLoaded)
+                return double.NaN;
+            return GrblWorkParameters.ToolLengtOffset.Z;   // sic - the property is spelled this way in Grbl.cs
+        }
+
         private void Generate()
         {
             if (model == null)
@@ -637,7 +668,7 @@ namespace CNC.Controls
             c1x = c1y = c2x = c2y = c3x = c3y = null;   // a new run measures afresh; never mix two runs' corners
             UpdateComputed();
 
-            program = BuildProgram(fx, p, BladeLength, TongueLength, FaceDepth(), CornerTravelMarginMm, IsTouchPlate);
+            program = BuildProgram(fx, p, BladeLength, TongueLength, FaceDepth(), CornerTravelMarginMm, IsTouchPlate, LiveToolLengthOffset());
             MacroProcessor.HandOffToJobTab(model, ProgramNameSquare, program, ViewType.Calibration, onHandoffEnd: EndHandoff);
             // OwnsRunBar, not isActiveTab: the handoff's tab switch has already run Activate(false)
             // synchronously by now, so isActiveTab is false and this write would simply be skipped.
@@ -664,7 +695,8 @@ namespace CNC.Controls
         /// caller did is set #&lt;_ls_facedepth&gt; for the thin material.
         /// </summary>
         private static string BuildProgram(Fixture fx, ProbeDefinition p, double bladeMm, double tongueMm,
-                                           double faceDepthMm, double cornerTravelMarginMm, bool touchPlate)
+                                           double faceDepthMm, double cornerTravelMarginMm, bool touchPlate,
+                                           double inheritedTloZ)
         {
             const double insetMm = 5d;
             double r = p.ProbeDiameter / 2d;
@@ -677,7 +709,14 @@ namespace CNC.Controls
             var b = new StringBuilder();
             MacroProcessor.EmitProgramHeader(l => b.AppendLine(l), "connected, homed, EXPR, noalarm",
                                              "(Squareness - probe a reference square's two arms and report the angle between them)");
-            MacroProcessor.EmitModalDefaults(l => b.AppendLine(l), cancelToolOffset: true);
+            // NOT cancelToolOffset: true. That was copied in from the stepper probe wizard, and
+            // EmitModalDefaults' own parameter documentation warns against it in as many words - on this
+            // machine the tool length offset is what makes one work Z0 mean the same thing for every tool.
+            // This program has no use for G49 anyway: it works entirely in machine coordinates, and
+            // pcorner.macro cancels the offset internally for its own G53 moves regardless. All emitting it
+            // here achieved was to discard the operator's offset a few lines earlier than the macro would.
+            // See the restore before the footer, which is what actually puts it back.
+            MacroProcessor.EmitModalDefaults(l => b.AppendLine(l));
             // Through EmitWcsWrite, never bare: this exact line, against a G54 carrying a 0.10 deg
             // rotation, corrupted the parser position and turned the G30 park's "G53 G0 Z0" lift into a
             // 662 mm rapid across the table on 2026-09-16. See EmitWcsWrite for the mechanism.
@@ -776,6 +815,27 @@ namespace CNC.Controls
             b.AppendLine("(PRINT, SQ_C3X=#<c3x>)");
             b.AppendLine("(PRINT, SQ_C3Y=#<c3y>)");
             b.AppendLine("(WAITIDLE)");
+
+            // Put back the tool length offset pcorner.macro cancelled on every call - see
+            // LiveToolLengthOffset for why a probing run that skips this hands the machine back in G49, and
+            // what that cost on 2026-08-06. G43.1 sets the offset absolutely, so re-emitting it is free if
+            // it somehow survived.
+            //
+            // BEFORE the footer, not after, and that ordering is load-bearing in the other direction:
+            // EmitProgramFooter's own comment records that a program whose final lines do not MOVE reaches
+            // Idle before the controller's "[MSG:Pgm End]" arrives, leaving the Run bar stuck on "Run".
+            // So the park stays last. Parking at G30 with a live offset is what every ordinary job already
+            // does, so nothing novel is being asked of the G53 moves in it.
+            if (double.IsNaN(inheritedTloZ))
+                // No invented value. An admitted G49 the operator can see beats a guessed tool length that
+                // silently puts work Z0 a tool length into the material.
+                b.AppendLine("(NOTE: no tool length offset was readable when this program was generated, so none is restored - the machine is left in G49. Re-reference the tool before the next job.)");
+            else if (Math.Abs(inheritedTloZ) > 1e-6)
+            {
+                b.AppendLine("(--- restore the tool length offset that was in force before this run ---)");
+                b.AppendLine(string.Format("G43.1 Z{0}", inheritedTloZ.ToInvariantString("0.0###")));
+                b.AppendLine(string.Format("(PRINT, SQ_TLO_RESTORED={0})", inheritedTloZ.ToInvariantString("0.0###")));
+            }
 
             b.AppendLine("(--- park at G30 - no origin/WCS is set by this tool, it only measures ---)");
             MacroProcessor.EmitProgramFooter(l => b.AppendLine(l), stopSpindle: false, parkAtG30: true, endWord: "M2");
