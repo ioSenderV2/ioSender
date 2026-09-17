@@ -1,11 +1,44 @@
 # Peek — step away from a paused job and come back
 
-**Status: SPEC ONLY. Nothing here is built.** Written 2026-09-17 against the code at `c42c7065`.
+**Status: SPEC. Nothing built yet.** Written 2026-09-17, **revised the same day** after the operator
+settled the three open questions. Code references are at `91312a8b`.
 
 Everything marked **VERIFIED** was read out of the source named beside it — grblHAL core at
-`c:\github\iMXRT1062\grblHAL_Teensy4\src\grbl`, or this repo. Everything else is design and is
-labelled as such. The distinction matters here more than usual: this feature moves a spindle while a
-job is half-finished.
+`c:\github\iMXRT1062\grblHAL_Teensy4\src\grbl`, or this repo. Everything else is design. The
+distinction matters here more than usual: this feature moves a spindle while a job is half-finished.
+
+---
+
+## 0. What changed in the revision, and why it matters
+
+The first draft paused **mid-block** with a feed hold, which forced a soft reset to regain control of
+the machine, which in turn forced reconstructing the entire modal frame from `$G` before the reset
+destroyed it.
+
+The operator's answer — **pause only at block boundaries, a slight delay is fine** — removes all of
+that:
+
+> Stop dispatching lines. Let the controller drain its own planner and report `Idle`. Nothing was
+> interrupted, so nothing is at risk, **no reset is needed, and the controller's parser state is
+> never lost.**
+
+The frame to capture shrinks from "everything" to "the two things the park itself disturbs". The
+most dangerous step in the original design is simply gone.
+
+The cost is the delay: Peek takes effect at the end of the block in flight plus whatever is already
+in the planner. Usually well under a second; on a single long cutting move it is that move. Feed
+Hold remains available as the immediate stop, and is unchanged.
+
+**This is the tool-change pause without the tool change** — and §7.1 is the one place that analogy
+breaks in a way that can hurt someone.
+
+### Settled
+
+| Question | Answer |
+|---|---|
+| Park where? | **`G30`.** Reuse `MacroRunner.EmitGotoG30`. |
+| Spindle while parked? | **Off.** Restored and given time to spin up before the job resumes. |
+| Interrupt mid-block? | **No — block boundaries only.** The delay is acceptable. |
 
 ---
 
@@ -14,133 +47,97 @@ job is half-finished.
 Mid-job, the operator wants to *look* — at the cut, at the chips, at whether the tab is holding.
 Today that means Stop and lose the run, or Feed Hold and peer past the gantry.
 
-**Peek**: pause, stand the machine somewhere you can see the work, look, then Cycle Start and the
-job carries on from where it stopped.
+**Peek**: pause at the next block boundary, park at `G30` with the spindle off, look, then Cycle
+Start — spindle back on, back to where it was, job carries on.
 
 ---
 
-## 2. Why the obvious implementation cannot work
+## 2. Why the mid-block version was abandoned
 
-The natural reading is "feed hold, then send a park move, then resume". Both halves of that are
-blocked in firmware.
+Kept because it explains why Peek is shaped the way it is, and because someone will propose the
+"obvious" version again.
 
 | # | Fact | Source |
 |---|---|---|
-| 1 | **Jogging is refused during Hold.** The jog handler gates on `state == STATE_IDLE \|\| (state & (STATE_JOG\|STATE_TOOL_CHANGE))`. `STATE_HOLD` is absent, so `$J=` returns `Status_IdleError` (error:8). | **VERIFIED** — `system.c`, `jog()` |
-| 2 | **G-code sent during Hold does not execute — it queues.** A line arriving in Hold is planned *behind* the interrupted block. On Cycle Start the machine finishes the cut it was in the middle of and *then* drives to the park. That is not a peek, it is a surprise. | **VERIFIED** — the planner is only drained by the cycle; `protocol.c` reloads the step segment buffer for `STATE_CYCLE\|STATE_HOLD\|…` but never starts new motion in Hold |
-| 3 | **grblHAL's own parking (`$41`) is not this.** One axis only (Z), positive retract only, requires homing, and its config comment states "machine coordinates must be in all negative space and does not work with `DEFAULT_HOMING_FORCE_SET_ORIGIN` enabled". It is driven by the safety-door state. | **VERIFIED** — `config.h`, Setting_ParkingEnable block |
+| 1 | **Jogging is refused during Hold.** The jog handler gates on `state == STATE_IDLE \|\| (state & (STATE_JOG\|STATE_TOOL_CHANGE))`. `STATE_HOLD` is absent → `Status_IdleError` (error:8). | **VERIFIED** — `system.c`, `jog()` |
+| 2 | **G-code sent during Hold queues, it does not execute.** It is planned *behind* the interrupted block, so Cycle Start finishes the cut first and *then* drives to the park. | **VERIFIED** — planner is only drained by the cycle |
+| 3 | **grblHAL's own parking (`$41`) is not this.** One axis (Z), positive retract only, requires homing, and its own config comment excludes `DEFAULT_HOMING_FORCE_SET_ORIGIN`. Door-driven. | **VERIFIED** — `config.h` |
+| 4 | Mid-block recovery therefore needs a soft reset, which is safe **only** from a *completed* hold: `sys.position_lost = st_is_stepping()`. | **VERIFIED** — `protocol.c` |
 
-### The mechanism that already does exactly this
-
-grblHAL's **manual tool change**. `tool_change.c`'s `restore()`: lift Z to `sys.home_position`, move
-XY back to the saved `previous` at that height, `protocol_buffer_synchronize()`, restore coolant and
-spindle with their configured start delays, then plunge Z back to `previous`. It runs on the Cycle
-Start event, and `STATE_TOOL_CHANGE` is one of only two non-idle states where jogging is permitted.
-**VERIFIED** — `tool_change.c`.
-
-That is Peek, complete, with a tool change welded to it. **We are not using it**, for two reasons:
-it can only be entered from an `M6` *in the program*, so peeks would have to be planned in advance;
-and on this machine `M6` runs `tc.macro`, which takes a toolsetter reference. A peek that touches
-off the puck is not a peek.
+All four still hold. They are simply no longer on Peek's path.
 
 ---
 
-## 3. The mechanism we do use
+## 3. The mechanism
 
-**A soft reset from a *completed* hold keeps machine position.**
+**The job is never interrupted; it is starved.**
 
-```c
-sys.position_lost = st_is_stepping();
+`StreamingSendFile` already ignores a mid-stream `Idle`:
+
+```csharp
+case StreamingState.Idle:
+    if (streamingState == StreamingState.Error) { … }
+    else
+        changed = false; // ignore
 ```
 
-**VERIFIED** — `protocol.c`, in the reset path. Position is marked lost *only if the steppers were
-still stepping*. After a hold has finished decelerating, they are not: the reset leaves the machine
-Idle, position intact, no `Alarm:3`.
+**VERIFIED** — `JobRunner.cs:1504`. A job ends on `JobFinished`, which the **pump** raises when it
+reaches the end of the program — not on the controller going quiet. So a controller that drains to
+`Idle` mid-program does not tear the job down. That is the property the whole feature rests on.
 
-So Peek is:
+And with the machine genuinely `Idle`:
 
-> **hold → wait for hold complete → capture the frame → soft reset → the machine is Idle and free →
-> move anywhere → come back → replay the frame → resume through the existing run-from-block path.**
-
-It ends the run and starts a new one. That is not a workaround to be hidden; it is what happens, and
-§8 says how to make it legible.
+- ordinary g-code executes immediately — no queueing behind anything;
+- jogging works (`CanJog` already includes `Idle` — **VERIFIED**, `JobRunner.cs:483`);
+- the DRO and MDI behave normally;
+- **the controller's parser state is untouched** — WCS, tool-length offset, feed rate, units, plane
+  and distance mode are all exactly as the program left them.
 
 ---
 
 ## 4. Sequence
 
-Each step names its gate. The gates are the feature.
-
 | Step | Action | Gate / why |
 |---|---|---|
-| **P1** | Send `CMD_FEED_HOLD`. | Peek is offered only while streaming — same condition as `runner.CanStop`. |
-| **P2** | **Wait for `Hold:0` in a status report.** Not a timer. | §3 holds only once motion has stopped. `Hold:1` is *decelerating*; resetting there loses position. `GrblState.Substate` is already parsed and available (`GrblViewModel`, the `newstate/substate` update path). Inferring completion from "I sent `!` 200 ms ago" is the failure this whole feature turns on. |
-| **P3** | Capture the **resume frame** (§5) — DRO, and `$G`. | `$G` answers in Hold: `output_parser_state` has **no state check at all** and is flagged `allow_blocking`. **VERIFIED** — `system.c` command table. This must happen *before* P4, because a soft reset returns the controller's parser to its power-up defaults. |
-| **P4** | Soft reset. | Clears the hold, stops the stream, leaves the machine Idle with position intact. |
-| **P5** | **Only now** emit the outbound park as ordinary g-code. | See the realtime-byte trap in §7.1. Nothing may be queued before P4. |
-| **P6** | Machine is Idle and unrestricted. Operator jogs, looks, whatever. | Idle means the jog pad, the DRO and the MDI all work normally — no special mode to maintain. |
-| **P7** | Operator presses **Cycle Start**. Emit the return, then re-run from the interrupted block. | Return is Z-clear → XY → plunge, mirroring `restore()`. |
+| **P1** | `peekState = Requested`. **Suspend the idle-kick watchdog** (§7.1). Stop dispatching new lines. | Offered only while streaming — same condition as `runner.CanStop`. |
+| **P2** | Let the controller finish what it already has. Wait for `Idle` in a status report. | This is the "slight delay". Nothing is interrupted; the machine stops where a block ends. |
+| **P3** | Capture the **resume frame** (§5) — two items, from `$G`. | `$G` answers here trivially (the machine is Idle), and nothing is destroying it. Kept as an explicit step because the park is about to change both items. |
+| **P4** | Emit `M5`, then `MacroRunner.EmitGotoG30`. | Spindle off per the decision. Park is the existing emitter — **do not write a second one** (#339). |
+| **P5** | Wait for `Idle` again. `peekState = Parked`. Run strip shows **Resume**. | The operator now has a fully normal idle machine: jog, look, MDI, whatever. |
+| **P6** | Operator presses **Cycle Start / Resume**. Emit the return: `G53 G0 Z0` → `G53 G0 X… Y…` (the captured position) → spindle back on → **dwell** → `G53 G0 … Z…` → restore motion mode. | Z clear, then XY, then spindle, then plunge — the order `tool_change.c`'s `restore()` uses, for the same reasons. |
+| **P7** | `peekState = None`, re-arm the idle-kick watchdog, resume dispatch. | The stream continues at the next un-dispatched line. No `Run(fromBlock)`, no re-parse, no prolog. |
 
-### The park target
+### Why there is no `Run(fromBlock)` any more
 
-**Not machine home. Use `G30`.** Home is where the limit switches are and is rarely a good vantage
-point. `G30` is already this app's park, it is already checked against the soft-limit envelope
-before a program runs (`MacroRunner`'s stored-position prerequisite), and `MacroRunner.EmitGotoG30`
-already exists and already carries the fixes from #316 and #359. **Reuse it. Do not write a second
-park emitter** — that is how the tool-length sequence came to have two copies that drifted three
-ways (#339).
+The first draft resumed through the run-from-block path. That is no longer needed and should **not**
+be used: nothing was torn down, `job.CurrBlock` and the pump's `sendIdx` are still valid, and
+re-entering `Run` would re-evaluate `PREREQ`, re-log a `Program start`, and re-run the
+generate-first branch logic. Peek resumes by *un-suspending what it suspended*.
+
+This also means §5 of the first draft — the `DefaultProlog` gap — no longer blocks Peek. It is still
+a real defect and is recorded in §9.
 
 ---
 
-## 5. The resume frame — and the gap this exposes
+## 5. The resume frame — two items
 
-`JobRunner.Run(fromBlock, …)` already exists and already works: it sets `model.BlockExecuting`,
-`job.CurrBlock/ACKPending/PendingLine` to `fromBlock` and streams from there. **VERIFIED.**
+Because the machine is never reset, only what the **park itself** disturbs must be restored.
 
-What it does **not** do is restore modal state. There is a prolog:
-
-```csharp
-public static readonly string[] DefaultProlog = { "G90 G94", "G17", "G21" };
-```
-
-**VERIFIED** — `GCodeJob.cs:292`. Distance mode, feed mode, plane, units. That is all.
-
-Two problems with leaning on it:
-
-1. **It is missing everything Peek needs.** No WCS, no spindle, no coolant, no tool-length offset, no
-   feed rate. Resume mid-cut on that and the spindle is *off*. For "start from this toolpath" it is
-   survivable, because a CAM section boundary usually re-declares `T`/`M6`/`S`/`M3` itself. Mid-block
-   nothing is re-declared.
-2. **Only one of the two start-from paths even sends it.** `StartSection` (the toolpath-group
-   right-click) enqueues it; `StartHere_Click` (start from the *selected line*) calls
-   `StartFromBlock.Execute` with no prolog at all. **VERIFIED** —
-   `GCodeListControl.xaml.cs`. That is a pre-existing inconsistency, not something Peek introduces,
-   but Peek would inherit it.
-
-**Design:** Peek builds its own resume prolog from what `$G` reported at P3, and the natural home for
-it is beside `DefaultProlog` — `GCodeJob.ResumeProlog(GrblParserState)` — so the two mid-program
-start paths can converge on it later.
-
-| Restore | From | Note |
+| Restore | Why | From |
 |---|---|---|
-| Units / distance / feed mode / plane | `$G` | What `DefaultProlog` already hardcodes; take the real values instead of assuming. |
-| **Work coordinate system** | `GrblParserState.WorkOffset` | The one that silently ruins the part if wrong. |
-| **Tool length offset** | `GrblParserState.ToolLengthOffset` | `G43.1`/`G49`. Getting this wrong is #340 — a machine handed back a whole tool length out. |
-| **Feed rate** `F` | `$G` | |
-| **Spindle** `M3`/`M4` + `S` | `GrblParserState.SpindleState` | Must be restarted **and allowed to reach speed** before re-entering the cut. `tool_change.c` uses `settings.spindle.on_delay` for exactly this; we have no equivalent and will need a dwell. |
-| **Coolant** `M7`/`M8` | `GrblParserState.CoolantState` | |
-| `G92` | — | **Deliberately not replayed.** A live `G92` survives the soft reset in the controller (and with `$384=0` it is persisted to NVS — #264). Re-issuing it would double it. Peek must *not* touch `G92`, and should refuse outright if one is live, because a peek is not the place to reason about it. |
+| **Spindle** `M3`/`M4` + `S` | We turn it off at P4 by decision. | `GrblParserState.SpindleState`, and `S` from `$G` |
+| **Motion mode** `G0`/`G1`/`G2`/`G3` | `EmitGotoG30` ends in `G0`, and `G0` is **modal**. If the program's next line is a bare `X… Y…` that relied on a live `G1`, it would **rapid into the cut**. | `GrblParserState.MotionMode` |
 
-⚠️ **Known defect in the class Peek would lean on.** `GrblParserState.IsPositionOffset` is inverted:
+Everything else is deliberately untouched, and the park must keep it that way:
 
-```csharp
-isOffset |= !(double.IsNaN(pos.Values[i]) || pos.Values[i] != 0d);
-```
-
-which is true when the value **is zero**. **VERIFIED** — `Grbl.cs`. It is reached only through
-`Get(bool addMissing)`, the vanilla-grbl workaround that synthesises `G43.1`/`G49`/`G92` entries for
-controllers that do not report them — so grblHAL is unaffected today. Fix it before Peek is offered
-on a plain-Grbl machine, or Peek will conclude "no tool offset" precisely when there is one.
+- `EmitGotoG30` emits only `G53 G0` lines — `G53` is non-modal, and no `F` word appears, so feed rate
+  survives. **VERIFIED** — `MacroRunner.cs:126`.
+- Do **not** emit `G90`, `G21` or `G17` "to be safe". Each would clobber live modal state that is
+  currently correct. This is the opposite of the mid-block design's needs.
+- **`G92` is never touched.** A live `G92` is still live; nothing resets it and nothing should
+  replay it.
+- Coolant is left running. It was not turned off, so it does not need restoring — and a coolant
+  restart has its own delay nobody asked for.
 
 ---
 
@@ -148,52 +145,93 @@ on a plain-Grbl machine, or Peek will conclude "no tool offset" precisely when t
 
 | Piece | Where | What |
 |---|---|---|
-| State machine | `JobRunner` | A `PeekState` (None / Holding / Parked / Returning) beside the existing `pendingOffsetClear` pattern. |
-| The wait for `Hold:0` and for `Idle` | `JobRunner`, driven off `GrblStateChanged` | **Copy `FlushPendingOffsetClear` exactly.** It exists because of this same class of race and is the proven shape (`JobRunner.cs:1128` and its comment). |
-| Outbound / return moves | `MacroRunner.EmitGotoG30` + a new return emitter | Return must **name X and Y**, never a bare Z-only `G53` — §7.2. |
-| Resume | `JobRunner.Run(peekBlock, honorActiveProgram: false)` | `honorActiveProgram: false` — a Generate-first tab must not hijack the resume. The existing `Run` already branches on Hold for plain resume; Peek's resume arrives with the machine **Idle**, so it takes the `Source.IsLoaded` branch. |
-| Program-fits check | already correct | `Run` runs `ProgramFitsMachine()` only when `fromBlock == 0`, so a resume does not re-litigate it. **VERIFIED.** |
-| `PREREQ` | already correct, and worth knowing | `PREREQ` rows are re-evaluated on every Cycle Start "including a mid-program start" — so a peek resume re-checks homed/`G30`/build options. That is right. |
-| Button | `JobControl.xaml`, beside Feed Hold and Stop | New `CanPeek` on `JobRunner` feeding an `IsPeekEnabled`/visibility pair, mirroring `CanFeedHold`/`CanStop`. Per #355 it should be **collapsed** when it means nothing, not greyed. Needs an `x:Uid` and a row in all 7 locale CSVs. |
+| State | `JobRunner` | `PeekState { None, Requested, Parked, Returning }`, beside the existing `pendingOffsetClear` field. |
+| Waits for `Idle` | `JobRunner`, off `GrblStateChanged` | **Copy `FlushPendingOffsetClear`'s shape** (`JobRunner.cs:1128`) — it exists for this same class of race and is proven. |
+| Dispatch suspend | `pump.Suspended` | Already used by the tool-change path and proven there. |
+| **Idle-kick guard** | `JobRunner.OnIdleKick` | **§7.1 — the one genuinely new safety requirement.** |
+| Park / return | `MacroRunner.EmitGotoG30` + a small return emitter | Return **names X and Y** (§7.2). |
+| Button | `JobControl.xaml` beside Feed Hold / Stop | New `CanPeek` → `IsPeekEnabled` + visibility, mirroring `CanFeedHold`/`CanStop`. **Collapsed** when meaningless, per #355. Needs an `x:Uid` + a row in all 7 locale CSVs. |
+| Key binding | `ActionKeyBinder`, **Program** group | Beside MDI and Status (#254) — that group exists precisely because its members must stay live *during a run*. Unbound by default. |
+| **Not** a menu item | — | The menu bar is disabled while a job streams (#307 relies on this), so a menu entry would be unreachable exactly when Peek is wanted. |
 | Record | `model.LogDetail` | §8. |
 
 ---
 
-## 7. Traps, each one already paid for
+## 7. Traps
 
-1. **🔴 A queued line cannot survive a realtime byte.** `CMD_STOP` is realtime: it bypasses the line
-   queue and flushes the controller's RX buffer. A `G92.1` written 4 ms earlier was discarded, and
-   with `$384=0` the orphaned offset then survived every power cycle and silently shifted work Z for
-   hours (#264; the comment lives at `JobRunner.cs:1119`). **Peek must never queue a move before the
-   reset.** Every motion in §4 is emitted *after* the controller is confirmed Idle.
-2. **🔴 A `G53` Z-only lift is not a safe lift.** If a rotation write has touched the active WCS, the
-   firmware's parser holds a corrupted position and the next move leaving an axis *unnamed* flies to
-   it — 662 mm across a table, observed (#358, #359). Peek's return **names X and Y**.
-3. **🔴 An unanswered query is unknown, not absent** (#243). If `$G` does not answer at P3, Peek
-   **aborts and leaves the machine held**. It must not park on a default frame — the whole point of
-   P3 is that the frame is unrecoverable afterwards.
-4. **The ack wait behind `$G`.** `GrblParserState.Get` uses `WaitFor.AckResponse` with a 400 ms
-   timeout and brackets it in `PollGrbl.Suspend()/Resume()`. That suspend is a **shared flag** an
-   inner helper can clear underneath you (#346), and this family of wait has been wrong three times
-   (#244 error-is-an-answer, #258 unbounded, #370 raced the poller). Do not assume it is reliable
-   here; instrument it on the first hardware run.
-5. **Spindle up to speed before re-entry.** The return must dwell. `tool_change.c` has
-   `settings.spindle.on_delay`; we do not, so it is ours to choose and to state.
-6. **The interrupted block is re-cut from its start.** Resume is per *line*, not per *point*. Usually
-   harmless, occasionally a witness mark. Say so in the prompt rather than letting it be discovered.
+### 7.1 🔴 The idle-kick watchdog will restart the job under you
+
+**The one hazard the block-boundary design introduces, and it is not obvious.**
+
+`JobRunner.OnIdleKick` nudges a pump that appears stalled:
+
+```csharp
+if (pumpActive && grblState.State == GrblStates.Idle)
+    pump?.KickIdle();
+```
+
+and the pump's handler drops stale accounting, clears barriers and calls `SendNext()`:
+
+```csharp
+pacer.ResetAccounting();
+probePending = false;
+SendNext();
+```
+
+**VERIFIED** — `JobRunner.cs:501`, `StreamPump.cs:663`.
+
+`pump.Suspended` does **not** stop this. `Suspended` is checked only in `OnReplyClassified`, which
+gates incoming *replies*; `KickIdle` arrives via `pacer.Post()`, which has no `Suspended` check at
+all. **VERIFIED** — `WirePacer.cs:198,207`.
+
+A parked machine is `pumpActive` **and** `Idle` — exactly the watchdog's trigger condition. Left
+alone, Peek would park the machine, the operator would lean in to look, and the watchdog would
+resume the program.
+
+**Why the tool-change pause is not exposed:** the controller reports `Tool`, not `Idle`, so the
+guard's `== GrblStates.Idle` is false and the kick never fires. That is luck, not design, and Peek
+does not inherit it.
+
+**Fix:** guard the kick on the peek state —
+`if (pumpActive && grblState.State == GrblStates.Idle && peekState == PeekState.None)`.
+Local, and at the one place that decides. Do **not** "fix" it by adding a `Suspended` check to
+`WirePacer.Post` — that path also carries abort and barrier signals, and suppressing those is how a
+stop gets swallowed.
+
+### 7.2 🔴 A `G53` Z-only lift is not a safe lift
+
+If a rotation write has touched the active WCS, the firmware's parser holds a corrupted position and
+the next move leaving an axis **unnamed** flies to it — 662 mm across a table, observed (#358,
+#359). `EmitGotoG30`'s first line is exactly such a move (`G53 G0 Z0`).
+
+In Peek's sequence no rotation write precedes the park, so it is safe — but it is safe *by
+circumstance*. The **return** move is ours to write and must name X and Y explicitly. Do not
+copy the lift's shape.
+
+### 7.3 `EmitGotoG30` needs expression support
+
+It emits `G53 G0 X[#5181] Y[#5182] Z[#5183]`. A controller not reporting `EXPR` cannot run it.
+Gate `CanPeek` on `GrblInfo.ExpressionsSupported`, or Peek fails at the moment it parks.
+
+### 7.4 An unanswered `$G` is unknown, not absent (#243)
+
+If `$G` does not answer at P3, **do not park**. Abort the peek with the job still streaming and say
+so. Parking on a default frame would resume with the wrong motion mode.
+
+### 7.5 The spindle must reach speed before the cut resumes
+
+The return needs a dwell between `M3 S…` and the final plunge. `tool_change.c` uses
+`settings.spindle.on_delay`; we have no equivalent, so it is ours to choose and to state.
 
 ---
 
 ## 8. Honesty about what it is
 
-Peek ends one run and starts another. The 3D view, the elapsed timer and the status log will all see
-two runs. Rather than disguise that:
+Unlike the first draft, Peek no longer splits the run in two — it is one run with a gap in it. So
+the log should say that, rather than nothing:
 
-- Log `Peek - paused at line N, parked at G30` and `Peek - resumed at line N` through `model.LogDetail`,
-  so the status log (#280) explains a job that has two starts.
-- The second `Program start` line should carry a `[RESUMED]` qualifier, the same way a dry run carries
-  `[DRY RUN]` — for the same reason: two runs that look identical afterwards is how "it ran fine" gets
-  said about something that did not.
+- `Peek - paused at line N, parked at G30` and `Peek - resumed at line N`, through `model.LogDetail`.
+- No `[RESUMED]` qualifier is needed on `Program start`, because there is no second `Program start`.
 
 ---
 
@@ -201,35 +239,45 @@ two runs. Rather than disguise that:
 
 Peek declines, with a reason, when:
 
-- the machine is not streaming a loaded program (it is not a jog helper);
-- the program is an **SD-card job** — the sender never sees those lines, so there is no block to
-  resume from. Same visibility rule that already excludes dry run;
-- a **`G92` offset is live** (§5);
-- `$G` did not answer (§7.3);
-- `G30` is unset or outside the soft-limit envelope — the existing stored-position check already
-  knows how to say this.
+- nothing is streaming (it is not a jog helper);
+- the program is an **SD-card job** — the controller streams those itself, so the sender cannot
+  starve it. Same visibility rule that already excludes dry run;
+- the controller does not report `EXPR` (§7.3);
+- `G30` is unset or outside the soft-limit envelope — the stored-position check already knows how to
+  say this;
+- `$G` did not answer (§7.4).
 
 ---
 
-## 10. Open questions — for the user, not for me
+## 10. Carried over — a real defect Peek no longer depends on
 
-1. **Park at `G30`, or at a Peek-specific position?** `G30` is reused and already envelope-checked,
-   but on this machine it is the tool-change park, which may not be where you want to *look* from.
-2. **Should Peek stop the spindle while parked?** Safer, and adds a spin-up to every resume. Or leave
-   it running, which is faster and is what a tool change does not do.
-3. **Is re-cutting the interrupted line acceptable**, or should Peek only ever pause at a block
-   boundary — which would make it approximate rather than immediate?
+Recorded so it is not lost with the redesign.
+
+`GCodeJob.DefaultProlog` is `{ "G90 G94", "G17", "G21" }` — **VERIFIED**, `GCodeJob.cs:292`. It
+restores no WCS, no spindle, no coolant, no tool-length offset and no feed rate, and **only one of
+the two mid-program start paths sends it**: `StartSection` enqueues it, `StartHere_Click` does not
+(**VERIFIED** — `GCodeListControl.xaml.cs`). Start-from-a-line therefore resumes on whatever modal
+state happens to be live.
+
+Separately, `GrblParserState.IsPositionOffset` is inverted — it returns true when the value **is**
+zero (**VERIFIED**, `Grbl.cs`). Reached only via the vanilla-Grbl workaround, so grblHAL is
+unaffected, but it would misreport tool-length offset on a plain-Grbl machine.
+
+Neither blocks Peek now. Both are worth their own fix.
 
 ---
 
 ## 11. First hardware test
 
-In this order, on scrap, with the spindle **off** for the first three:
+On scrap, spindle **off** for the first four:
 
-1. Peek with no program running → refused with a reason.
-2. Peek mid-air-cut, park, resume → confirm position returns to within a step, confirm `$G` before
-   and after match.
-3. Interrupt during a rapid, and again mid-arc — the arc is the one that exercises "re-cut from the
-   start of the line".
-4. Peek with a WCS rotation live, then check the return did **not** move X/Y unexpectedly (trap 7.2).
-5. Only then, spindle on, in wood.
+1. Peek with nothing running → refused with a reason.
+2. Peek during an air-cut program → confirm it pauses at a block *boundary*, parks at `G30`, and the
+   DRO matches the captured position on return.
+3. **Leave it parked for two minutes.** This is the test for §7.1 — the watchdog must not restart
+   the job. Watch the wire log for any line going out while parked.
+4. Peek during a long single move → confirm the delay is the rest of that move and nothing jerks.
+5. Peek with the program in `G1` and a following bare `X… Y…` line → confirm the return restores
+   `G1` and the next move is a **feed**, not a rapid. This is §5's second row, and the one that
+   would otherwise plough.
+6. Only then, spindle on, in wood.
