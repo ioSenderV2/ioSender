@@ -1118,7 +1118,8 @@
       <strong>Circle</strong>, <strong>Oval</strong>, <strong>Square</strong>, <strong>Rectangle</strong>,
       <strong>Surface</strong> (face a whole area), <strong>Text</strong> (engrave or V-carve with a V-bit),
       <strong>SVG artwork</strong> (engrave or V-carve a logo) and <strong>Indirect</strong> (repeat another
-      toolpath, or a whole group of them, somewhere else). Add one, then hang <strong>operations</strong>
+      toolpath, or a whole group of them, somewhere else). Text and SVG artwork have a page of their own —
+      see <a href="#carving">Engraving &amp; carving</a>. Add one, then hang <strong>operations</strong>
       underneath it: Pocket, Contour, Drill, Bore, Side finish, Bottom finish, Chamfer, Countersink, Surface,
       <strong>Engrave</strong>, <strong>Clear floor</strong> (an end mill flattens the floor a V-carve leaves)
       and <strong>Mark</strong> (a V-bit traces the outline as a shallow groove). Geometry belongs to the
@@ -1220,7 +1221,182 @@
       Running a work order in <strong>Dry Run</strong> neutralizes the spindle, the same as dry-running a
       loaded file. (It didn't always — a work order used to bypass that and could fire the spindle for real.)</div>
 
-    <div class="xref">Related: <a href="#setup">Setup</a> · <a href="#job">The Job screen</a> · <a href="#feeds-and-speeds">Feeds &amp; Speeds</a> · <a href="#machine-setup">Machine&nbsp;Setup</a></div>
+    <div class="xref">Related: <a href="#setup">Setup</a> · <a href="#carving">Engraving &amp; carving</a> · <a href="#job">The Job screen</a> · <a href="#feeds-and-speeds">Feeds &amp; Speeds</a> · <a href="#machine-setup">Machine&nbsp;Setup</a></div>
+  </section>
+
+  <!-- ===================== ENGRAVING & CARVING ===================== -->
+  <section class="topic" id="carving" data-title="Engraving &amp; carving" data-level="int"
+           data-track="novice:0,intermediate:6,machinist:7">
+    <h2>Engraving &amp; carving <a class="anchor" href="#carving">#</a></h2>
+    <div class="tags"><span class="tag int">Intermediate</span><span class="tag mac">Machinist</span></div>
+    <p>Two of a <a href="#work-order">Work Order</a>'s toolpath geometries put a <em>shape</em> into the
+    surface rather than cutting a part out of it: <strong>Text</strong> and <strong>SVG artwork</strong>. Both
+    hang the same <strong>Engrave</strong> operation underneath them, and underneath that they are the same
+    engine — it takes closed outlines and has never known whether a letter or a logo produced them. So
+    everything on this page about depth, bits and passes applies equally to a word and to a badge.</p>
+    <div class="callout note"><span class="k">Engrave is the only operation these two are offered</span><br>
+      A Text or SVG artwork toolpath offers <strong>Engrave</strong>, and <strong>Clear floor</strong> beside
+      it once there's a floor to clear. There is deliberately no Contour, Pocket or Chamfer: those trace or
+      clear a <em>shape</em>, and "the outline of the logo" is not a path that describes the logo. If you want
+      a border cut around artwork, that's an ordinary Circle or Rectangle toolpath sitting next to it.</div>
+
+    <div class="callout note"><span class="k">This is a mill, not a laser</span><br>
+      Everything here cuts with a <strong>V-bit</strong> in the spindle, on the machine Setup and Work Order
+      already describe. It is unrelated to burning an SVG on a diode laser, which is a separate path with its
+      own dialog.</div>
+
+    <h3>The two ways a letter gets cut</h3>
+    <p>Pick a toolpath with <strong>Geometry: Text</strong>, type into the <strong>Text</strong> box (Enter
+    gives you a second line), and the <strong>Font</strong> dropdown decides which of these you get. It is the
+    single most consequential choice on the panel:</p>
+    <table class="reftab">
+      <tr><th>Font choice</th><th>What the bit does</th><th>Best for</th></tr>
+      <tr><td><strong>(single stroke - engrave)</strong></td><td>Each letter is drawn as <em>one pass down its
+      centre line</em> — a pen line, not an outline to be cleared. The depth comes from the
+      <strong>Stroke width</strong> you ask for on the Engrave operation, plus the bit's angle.</td>
+      <td>Small lettering, serial numbers, anything where the letter is barely wider than the bit. The
+      geometry is generated, so it doesn't depend on a font being installed.</td></tr>
+      <tr><td><strong>Any installed font</strong></td><td><strong>V-carves</strong> the real glyph outline:
+      the bit rides the outline at a depth set by the <em>local</em> stroke width, so strokes widen and narrow
+      and the corners come to a point, the way the typeface actually draws.</td>
+      <td>Larger lettering, signs, anything where you want the carved look. <strong>Bold</strong> and
+      <strong>Italic</strong> tick beside the dropdown.</td></tr>
+    </table>
+    <p><strong>Cap height</strong> is the size you actually mean by "10&nbsp;mm lettering" — the height of a
+    capital. Round letters overshoot it a hair, as they should. Lowercase is engraved as uppercase, and a
+    character the font cannot draw is skipped rather than cut as a gap.</p>
+
+    <h3>Text fitted inside a shape</h3>
+    <p>Text doesn't have to be its own toolpath. Any <strong>Line</strong>, <strong>Circle</strong>,
+    <strong>Oval</strong>, <strong>Square</strong> or <strong>Rectangle</strong> carries a <strong>Text</strong>
+    checkbox: tick it and the same Text/Cap height/Font fields appear, and an Engrave operation is added that
+    cuts the lettering <em>inside</em> the shape. The shape still cuts exactly as it did — this is an addition
+    to it, not a replacement.</p>
+    <ul>
+      <li><strong>Leave Cap height at 0</strong> and the text is auto-sized to the largest that fits. Give it
+      an explicit size that <em>doesn't</em> fit and the job is refused at Generate rather than cut small —
+      and refused by the same resolver the compiler uses, so a refusal and a cut can never disagree about what
+      would have fitted.</li>
+      <li><strong>A Line is a baseline.</strong> The text runs along it at its angle; <em>Vertical align</em>
+      decides whether it sits on the line (Top), hangs below it (Bottom) or straddles it (Center), and
+      <em>Horizontal align</em> distributes it along the length.</li>
+      <li><strong>Curved shapes fit against the curve</strong>, not against a bounding box, and are
+      centre-only — sliding a block of text around inside a circle would void the fit guarantee.</li>
+      <li>The stock preview draws the fitted text live, at its real size and placement, as you type.</li>
+    </ul>
+
+    <h3>SVG artwork</h3>
+    <p>Choose <strong>Geometry: SVG artwork</strong>, browse to a <code>.svg</code>, and set <strong>Artwork
+    width</strong>. It carves exactly the way lettering does — same depth field, same passes, same stock
+    placement, same preview. <strong>Angle</strong> rotates it about its anchor, and the Engrave operation is
+    added for you, since it's the only one that applies.</p>
+    <ul>
+      <li><strong>Width measures the ink, not the page.</strong> Padding around a logo in the source file
+      doesn't count, so the number you type is the number you get on the wood. The height follows from the
+      artwork's own proportions.</li>
+      <li><strong>The file is referenced, not copied</strong> into the work order. Re-export the logo over the
+      same filename and the next Generate picks it up. A file that has moved or been renamed is reported at
+      Generate rather than quietly cutting something stale.</li>
+      <li><strong>The size readout answers the real question while you're still choosing</strong> — <em>"Artwork
+      is 3.81:1. At 150&nbsp;mm wide it cuts 150.0 x 39.3&nbsp;mm, 42 outlines."</em> — rather than at Generate,
+      when you have already committed.</li>
+      <li><strong>Artwork it cannot fully read is refused</strong>, with the reason named, both in the editor
+      and again at Generate. That is deliberate and it is the important behaviour here: silently cutting the
+      half it understood gives you a preview that looks plausible and a missing piece you don't discover until
+      it is missing from the work.</li>
+    </ul>
+
+    <h3>Negative — the artwork standing proud</h3>
+    <p>A V-carve normally cuts the logo <em>into</em> the wood. Tick <strong>Negative</strong> and it does the
+    opposite: everything <em>around</em> the artwork is carved away and the logo is left standing at the
+    original surface, the way a raised-letter sign is made. <strong>Panel</strong> decides what bounds the
+    recessed area:</p>
+    <table class="reftab">
+      <tr><th>Panel</th><th>What it carves</th><th>Needs</th></tr>
+      <tr><td><strong>Rectangle</strong></td><td>A frame the <strong>Border</strong> distance outside the
+      artwork's ink on every side (5&nbsp;mm by default). The readout states the resulting panel size, because
+      that — not the ink — is what has to fit your stock.</td><td>Nothing. Works on any artwork.</td></tr>
+      <tr><td><strong>Artwork outline</strong></td><td>The artwork's <em>own</em> enclosing outline — a
+      badge's border circle, say. Inside it floors, the rim stands at the surface, the art stands proud, and
+      the corners outside the circle are never touched. No Border is needed, so the field hides.</td>
+      <td>Artwork with a <em>single</em> outline enclosing everything else. The editor's readout tells you
+      whether the file you picked has one; if it hasn't, Generate refuses by name rather than quietly
+      substituting a rectangle.</td></tr>
+    </table>
+    <div class="callout warn"><span class="k">A negative needs a depth cap</span><br>
+      The panel floor is whatever <strong>Max carve depth</strong> says on the Engrave operation. Leave that at
+      0 and the background is carved as deep as the bit physically can, which on a narrow V-bit is a great
+      deal deeper than you want. Set a cap before running a negative.</div>
+
+    <h3>Depth — the part that surprises people</h3>
+    <p>A V-carve has <em>no depth setting</em>, and that is not an omission. Depth is a <em>consequence</em>:
+    at every point the bit descends until its cone exactly fills the local width of the shape. A hairline
+    stroke is shallow, a thick one is deep, and that is what produces the carved look. Two fields sit on top
+    of that:</p>
+    <table class="reftab">
+      <tr><th>Field</th><th>What it does</th></tr>
+      <tr><td><strong>Max carve depth</strong></td><td>A ceiling. <strong>0 = automatic</strong> — the deepest
+      the bit itself can reach. Because depth follows width, a cap <em>cannot touch anything already shallower
+      than it</em>: fine detail comes out byte-identical and only the areas wide enough to want more flatten
+      off. This is what makes a very sharp bit usable on artwork that mixes hairlines with thick strokes — a
+      15° bit cuts a 0.5&nbsp;mm stroke crisply where a 60° bit mushes it, but left uncapped it would drive the
+      widest feature ten millimetres into the stock. The bit's own limit stays a hard ceiling: a cap can lower
+      it, never raise it, and a request that had to be limited says so.</td></tr>
+      <tr><td><strong>Stroke width</strong></td><td>Single-stroke engraving only. How wide you want the
+      engraved line to be — width is what you can measure on the finished part. The plunge depth is worked back
+      from it and the bit's included angle, which is why the same 0.8&nbsp;mm line is 0.40&nbsp;mm deep on a 90°
+      bit and 0.69&nbsp;mm on a 60° one.</td></tr>
+    </table>
+    <div class="callout note"><span class="k">Depth of cut on a carve is a <em>step</em>, not a depth</span><br>
+      On a carve, the operation's <strong>Depth of cut</strong> is the axial step between depth levels — the
+      shallower levels are not geometry, they are just stepping down. Consecutive passes tile the cone exactly,
+      so a bigger step means fewer, heavier passes and the same finished shape, not a shallower carve. Set it
+      to the carve's full depth to cut each groove in one, if the bit will take it. If you have work orders
+      saved from before this field drove the carve, they'll generate noticeably fewer passes now — worth
+      watching the first one, particularly on a fine-tipped bit.</div>
+
+    <h3>Clearing the floor</h3>
+    <p>Where a carved area is wider than the cone can span, the V-bit floors it with rings of its own tip, and
+    the walls of adjacent rings meet in a ridge half a depth-step tall. The walls and the standing artwork come
+    out crisp; the floor is corrugated. <strong>Clear floor</strong> is a second operation on the same toolpath
+    — offered only where the toolpath actually V-carves — that sends an end mill over that floor to flatten
+    it.</p>
+    <ul>
+      <li><strong>Its depth is not a setting.</strong> The floor depth and the cone angle are read from the
+      sibling Engrave operation's V-bit and cap every time, so the mill's floor and the V-bit's floor are one
+      number by construction. Remove the Engrave, or give it a tool that isn't a V-bit, and you're told by
+      name rather than given a guess.</li>
+      <li><strong>Not offered on a single-stroke engrave</strong>, because there is no floor: a stroke font
+      cuts a pen line down each letter's centre, never a region wide enough for the cone to bottom out in. If
+      Clear floor isn't in the list, check the Font — that's usually why.</li>
+      <li><strong>Below carve floor</strong> (0.1&nbsp;mm by default) is the one number you do set, and it
+      matters: at <em>exactly</em> the carve's depth the mill's end face rides a surface the V-bit already
+      finished, removes nothing but ridge tops, and rubs — which burns hardwood. A tenth deeper keeps it taking
+      a continuous chip, and the step it leaves at the wall is invisible.</li>
+      <li><strong>Use a flat-bottomed end mill.</strong> A ball nose is the one profile that cannot flatten a
+      floor — it leaves a field of scallops — and is refused.</li>
+      <li>Anything narrower than the mill plus two wall toes stays the V-bit's work, so the two operations
+      divide the floor between them. The order is yours: run Clear floor <em>before</em> the Engrave and the
+      mill pockets solid wood, so it cannot rub at all.</li>
+    </ul>
+
+    <h3>Marking a line</h3>
+    <p><strong>Mark</strong> is the other V-bit operation, and it is offered on the plain shape geometries
+    rather than on artwork: the bit's tip rides the nominal outline with <em>no</em> cutter offset, leaving a
+    shallow groove — a stamp boundary, a fold line, a cut-here line. Unlike Contour it doesn't offset by a
+    radius or cut to a total depth; you set the groove's <strong>width</strong> and the depth follows from that
+    and the bit's angle, exactly as a stroke engrave does. A Mark is always one pass. Tick
+    <strong>Dashed</strong> and it becomes a dash-and-gap line: on a closed shape the pitch is nudged so a
+    whole number of dashes goes round and the pattern meets itself with no stub.</p>
+
+    <div class="callout tip"><span class="k">Generating a carve takes real time</span><br>
+      A V-carve is the most expensive thing Generate does — the depth field behind it is genuinely
+      computational. Generate says it is compiling and reports how long it took, and the result is cached, so
+      returning to a job doesn't pay for it twice. Changing anything that affects the cut — the artwork, its
+      width, the bit, the cap, the step — invalidates that cache correctly, so you never have to wonder whether
+      what you're looking at is stale.</div>
+
+    <div class="xref">Related: <a href="#work-order">Work Order</a> · <a href="#setup">Setup</a> · <a href="#feeds-and-speeds">Feeds &amp; Speeds</a> · <a href="#gcode-viewer">3D viewer</a></div>
   </section>
 
   <!-- ===================== MACHINE SETUP ===================== -->
