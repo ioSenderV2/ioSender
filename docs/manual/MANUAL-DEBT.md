@@ -278,12 +278,15 @@ assert something false. That is a stopgap, not a fix:
 - [x] **(2) Rebuild the audit** — DONE 2026-09-17, `MANUAL-AUDIT-2026-09-17.md`. It supersedes
       `MANUAL-AUDIT-2026-07-24.md`, `SCREENSHOT-AUDIT.md` and `SCREENSHOT-REFRESH-2026-07.md`, whose
       waves were paid off in v2.38 and v2.40 — open one of those only for history.
-- [ ] **(3a) The correction pass — cheapest, do it first.** The 16 OBSOLETE sites (§3 of the audit),
-      each with a line number. Includes **three wrong facts**: the work rotation is applied as `+θ`,
-      not its negative (`index.html:1042`); the File menu does **not** show *Load SVG Laser Job* on a
-      shipped build (`:551`); and Machine Setup's own topic still contains two callouts saying
-      opposite things about where Calibration lives (`:1202` vs `:1247`). Four of the sixteen are
-      siblings the 2026-09-17 pass missed because they were phrased differently.
+- [x] **(3a) The correction pass — DONE 2026-09-17** (`234cb927`). All 16 OBSOLETE sites from §3 of
+      the audit, including the three wrong facts (the rotation sign, the SVG-laser menu entry, and
+      the two Machine Setup callouts that contradicted each other). **Plus two sites the audit had
+      not catalogued**, found by sweeping for the claim rather than the wording: a second wording of
+      the Machine-Setup-is-a-window claim in the first-five-minutes list, and the
+      **`R0`-before-`G53` habit** advised in two places — which is now worse than useless, since an
+      `R0` is itself a rotation write and that is exactly what corrupts the parser position
+      (#358/#359). Replaced with a warning under `#offsets` saying what actually needs care.
+      "Run bar" was also unified to "run strip" throughout, the app's own name for it since #220.
 - [ ] **(3b) The missing topics** — §2 of the audit, **21** of them, not the ~15 this file used to
       estimate. Suggested order: **M1/M2 (SVG + text carving)** and **M3 (the laser path)** first,
       since those are the demo-able features and the largest gaps; then **M4 (Height Map)**, a whole

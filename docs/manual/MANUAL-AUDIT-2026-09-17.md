@@ -29,15 +29,16 @@ fixed their neighbours.
 | Bucket | Count |
 |---|---|
 | **MISSING** — shipped functionality with no usable manual coverage | **21** (M1–M21) |
-| **OBSOLETE** — manual asserts something that is no longer true | **16** (O1–O16) |
+| **OBSOLETE** — manual asserts something that is no longer true | **16** (O1–O16) — ✅ **all applied 2026-09-17**, plus 2 uncatalogued siblings |
 | **NEEDS UPDATING** — still-correct topics now incomplete | **13** (U1–U13) |
 | **Screenshots** — all 19 referenced figures predate #216 | 19 (+ 4 orphans) |
 | Changelog entries with no operator-visible surface | 61 of 156 (§7) |
 
-**Suggested running order**, unchanged from the debt file's recommendation and now backed by the
-item list: **M1/M2 (SVG + text carving) and M3 (laser)** first — they are the demo-able features and
-the largest gaps; then **O3, O5–O11** as a single correction pass (cheap, and O3 is a wrong fact
-about a safety-adjacent number); then M4 (Height Map) which needs the app driven; then the rest.
+**Running order.** §3 (the OBSOLETE pass) was taken first and is **done** — it was the cheap half
+and it carried the wrong facts. What remains, in order: **M1/M2 (SVG + text carving) and M3
+(laser)**, the demo-able features and the largest gaps; then **M4 (Height Map)**, which needs the app
+driven; then §4's thirteen, which can ride along with whichever topic they touch; then the rest of
+§2 and the reshoots.
 
 ---
 
@@ -75,6 +76,23 @@ unanswered query an empty answer.
 ---
 
 ## 3. OBSOLETE — the manual asserts something that is not true
+
+> ✅ **ALL 16 APPLIED 2026-09-17** (`234cb927`). Kept below as the record of what was wrong and what
+> settled it. The pass also turned up **two sites this table had missed**, both found by sweeping for
+> the *claim* rather than the wording — the trap §5.1 names:
+> - **O8 had a second wording**, `index.html:581`, "run Machine Setup once (**File → Machine**)" in
+>   the first-five-minutes list. Fixed with it.
+> - **O3 had a consequence this table did not follow through.** Two sites advised keeping an
+>   "`R0`-before-`G53` habit so a leftover rotation never contaminates a machine-coordinate move"
+>   (`:832`, `:1432`). Both halves of that are now wrong: grblHAL **exempts** machine moves from
+>   rotation, so there is nothing to contaminate — and an `R0` **is** a rotation write, which is the
+>   one thing that corrupts the parser's held position and turns the next Z-only `G53` lift into a
+>   full-table rapid (#358, #359; the mechanism is documented at `StartJobView.xaml.cs:2789`). The
+>   manual was advising the operator to do the dangerous thing as a safety habit. Replaced with a
+>   warning under `#offsets` that says what actually needs care.
+>
+> Terminology was unified in the same pass: **"run bar" → "run strip"** at six sites, the app's own
+> name for it since #220 and already what `#getting-started` said.
 
 Each row names the source that settles it. **O3, O5, O6, O7 and O12 are wrong facts, not stale
 emphasis** — an operator acting on them is misled.
@@ -142,8 +160,11 @@ harder than necessary.
 
 ## 6. Screenshots
 
-**All 19 referenced figures predate #216.** Two already carry an italic admission in their captions
-(added 2026-09-17) and are the standing priority. Ranked by how badly the shot misleads:
+**All 19 referenced figures predate #216.** **Five** now carry an italic admission in their captions
+— two from the 2026-09-17 text pass, and three added by the correction pass (`job-runscreen`,
+`machine-setup-calibration`, `settings-top-level-tabs`), whose content is *falsified* rather than
+merely dated. An admission is a stopgap; all five still owe a reshoot. Ranked by how badly the shot
+misleads:
 
 | Priority | File | Why | Note |
 |---|---|---|---|
