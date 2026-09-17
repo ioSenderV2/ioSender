@@ -523,32 +523,49 @@
     probing, work-offset setup, tool changes, machine commissioning and a live 3D view of the toolpath.</p>
 
     <h3>The main window at a glance</h3>
-    <p>The <strong>tab strip</strong> across the top carries only what you need <em>while a job runs</em>.
-    Everything else — commissioning, settings, probing, the hardware tuners — lives in the <strong>File</strong>
-    and <strong>Tools</strong> menus and opens in its own window. Four tabs, left to right:</p>
+    <p>A fresh install opens with the <strong>full tab strip</strong> across the top — nine tabs, left to
+    right. This is a starting point, not a fixed shape. <a href="#settings">Settings → User Interface →
+    Top-level tabs</a> gives every view a destination — <strong>Tab bar</strong>, <strong>File menu</strong>,
+    <strong>Tools menu</strong> or <strong>Not shown</strong> — and order within a destination is top to
+    bottom in that list, which is left to right on the tab bar. Changes are <strong>applied on restart</strong>.
+    That editor is how you get a compact bar: set the views you don't want on it to a menu, leave Setup, Job
+    and Work Order on the bar, and restart. A layout you like can be handed to someone else as a
+    <em>configuration overlay</em> (<strong>Help → Support → Export configuration overlay…</strong>), which
+    carries the arrangement without your machine settings.</p>
     <table class="reftab">
       <tr><th>Tab</th><th>What it's for</th></tr>
+      <tr><td><a href="#settings">Settings</a></td><td>Every preference, plus the controller's own <code>$</code> settings.</td></tr>
+      <tr><td><a href="#feeds-and-speeds">Feeds and Speeds</a></td><td>The cutting-data advisor, and the Fusion add-in import.</td></tr>
       <tr><td><a href="#setup">Setup</a></td><td>The front door: measure your stock, set the origin, and launch a job.</td></tr>
-      <tr><td><a href="#job">Job</a> (the g-code screen)</td><td>Load/stream g-code, jog, DRO, feed/spindle overrides, the run bar.</td></tr>
-      <tr><td><a href="#work-order">Work Order</a></td><td>Compose a quick job (pockets, drills, contours…) without a CAM round-trip.</td></tr>
+      <tr><td><a href="#job">Job</a> (the g-code screen)</td><td>Load/stream g-code, jog, DRO, feed/spindle overrides, the run strip.</td></tr>
       <tr><td><a href="#offsets">Offsets</a></td><td>The work-coordinate table — review, nudge and manage G54–G59.3.</td></tr>
+      <tr><td><a href="#sdcard">SD Card</a></td><td>Browse and run files held on the controller itself.</td></tr>
+      <tr><td><a href="#work-order">Work Order</a></td><td>Compose a quick job (pockets, drills, contours…) without a CAM round-trip.</td></tr>
+      <tr><td><a href="#machine-setup">Machine Setup</a></td><td>Commissioning: the eight-step wizard that describes your machine to ioSender.</td></tr>
+      <tr><td><a href="#lathe">Lathe Tools</a></td><td>The turning wizards — only enabled when the controller reports lathe mode.</td></tr>
     </table>
     <p>And the menu bar beside them:</p>
     <table class="reftab">
       <tr><th>Menu</th><th>What's in it</th></tr>
       <tr><td><strong>Connect…</strong></td><td>Not a menu but a command — opens the <a href="#connect">connection dialog</a>. Reads <em>Reconnect…</em> once you're connected.</td></tr>
-      <tr><td><strong>File</strong></td><td>Load Program, Load / New Work Order, then the two configuration destinations: <strong>Machine</strong> (<a href="#machine-setup">Machine&nbsp;Setup</a>) and <a href="#settings">Settings</a>.</td></tr>
-      <tr><td><strong>Tools</strong></td><td>Camera, <a href="#sdcard">SD Card</a>, <a href="#feeds-and-speeds">Feeds and Speeds</a>, Probing, Height Map, <a href="#lathe">Lathe Tools</a> — plus the <a href="#tools">hardware-gated</a> Tool table, Trinamic tuner and PID Tuner when your controller has them.</td></tr>
-      <tr><td><strong>Help</strong></td><td>Wiki, usage tips, a brief tour, video tutorials, error &amp; alarm codes, and <strong>Support</strong> (check for updates, roll back a version, open the app data folder).</td></tr>
+      <tr><td><strong>File</strong></td><td>Load Program, Load / New Work Order, Load SVG Laser Job — and any view you have moved off the tab strip.</td></tr>
+      <tr><td><strong>Tools</strong></td><td>Camera, Machine mirror, <strong>Calibration</strong>, Probing, Height Map — plus the <a href="#tools">hardware-gated</a> Tool table, Trinamic tuner and PID Tuner when your controller has them.</td></tr>
+      <tr><td><strong>Help</strong></td><td>Wiki, usage tips, a brief tour, video tutorials, error &amp; alarm codes, and <strong>Support</strong> (restart ioSender, check for updates, roll back a version, open the app data folder, apply or export a configuration overlay).</td></tr>
     </table>
+    <div class="callout note"><span class="k">Menu views open in a window — with four exceptions</span><br>
+    A view opened <em>from a menu</em> normally opens in its own window. The exceptions are
+    the four that need the run strip's Generate/Run button and jog pad — Setup, Work Order, Machine Setup and
+    Calibration — which open as a tab for the session instead, because those controls live in the main window
+    and nowhere else. Tabs opened that way carry a close <strong>×</strong>; one you placed on the strip
+    yourself does not.</div>
 
     <figure>
       <img src="img/main-window-tools-menu.png" alt="The ioSender main window with the Tools menu open, listing SD Card, Feeds and Speeds, Probing, Height Map and Lathe Tools, with the Job, Work Order and Offsets tabs behind it">
-      <figcaption>Everything else is one menu away. The bar keeps Setup, Job, Work Order and Offsets
-      (Setup sits behind the open menu here), while <strong>Tools</strong> holds SD Card, Feeds &amp;
-      Speeds, Probing, Height Map and Lathe Tools. No Camera entry until you bind a device, and no
-      Tool table / Trinamic / PID on a controller that doesn't have them — which is why this menu is
-      shorter than the list above.</figcaption>
+      <figcaption>The <strong>Tools</strong> menu open. What it holds depends on your hardware: no Camera
+      entry until you bind a device, and no Tool table / Trinamic / PID on a controller that doesn't have
+      them — which is why a real menu is usually shorter than the list above. <em>This shot predates the
+      restored full tab strip, so the bar behind it shows the older four-tab default and no Calibration
+      entry in the menu; the tables above describe what you will actually see.</em></figcaption>
     </figure>
 
     <div class="callout note"><span class="k">That split is a default, not a rule</span><br>
@@ -603,7 +620,9 @@
 
     <div class="callout tip"><span class="k">Tip</span><br>
       ioSender remembers your last successful target and can auto-reconnect if the connection drops
-      mid-session. The current target is shown in the status bar.</div>
+      mid-session. The current target reads at the <strong>right-hand end of the menu bar</strong> —
+      <em>Connected: TARGET</em> in green, or <em>Not connected</em> in red. It shares that row with the
+      menu, so it hides itself rather than crowd the menu on a narrow window.</div>
 
     <h3>What happens on connect</h3>
     <p>Once the link opens, ioSender runs a <strong>handshake</strong> with the controller: it reads the
@@ -791,10 +810,11 @@
     <ol>
       <li><strong>Steps/mm</strong> (<code>$100</code>–<code>$102</code>) — command a long known distance,
       measure the actual travel, correct the number. Do X, Y, Z.
-      <a href="#machine-setup">Machine&nbsp;Setup → 8 · Calibration → Stepper</a> automates the whole thing by
-      probing a reference block instead, so there's nothing to measure by hand.</li>
+      <strong>Tools → Calibration → Stepper calibration (probe)</strong> automates the whole thing by
+      probing a reference block instead, so there's nothing to measure by hand — and
+      <strong>Stepper calibration (scratch)</strong> does it with a V-bit and calipers when you have no probe.</li>
       <li><strong>Squaring &amp; tramming</strong> — get the gantry square to the axes
-      (<a href="#machine-setup">Machine&nbsp;Setup → 8 · Calibration → Squareness</a> uses a
+      (<strong>Tools → Calibration → Squareness</strong> uses a
       Phil&nbsp;Barrett offset on the ganged axis, <code>$170+</code>),
       the spindle perpendicular to the bed (surface a test patch, read the scallops), and the frame square
       (measure the diagonals of a big rectangle).</li>
@@ -1140,14 +1160,15 @@
     <h2>Machine Setup — commissioning a new controller <a class="anchor" href="#machine-setup">#</a></h2>
     <div class="tags"><span class="tag int">Intermediate</span><span class="tag mac">Machinist</span></div>
     <figure>
-      <img src="img/machine-setup-overview.png" alt="Machine Setup on step 1, with all nine steps listed in the navigation tree">
-      <figcaption>Machine Setup on <strong>1 · Machine</strong>. All nine steps sit in the tree on the left,
-      each with its status dot — green here, meaning this machine is fully commissioned — and step 8 expanded
-      to its Stepper and Squareness pages.</figcaption>
+      <img src="img/machine-setup-overview.png" alt="Machine Setup on step 1, with the steps listed in the navigation tree">
+      <figcaption>Machine Setup on <strong>1 · Machine</strong>. All eight steps sit in the tree on the left,
+      each with its status dot — green here, meaning this machine is fully commissioned.
+      <em>This shot predates the move of Calibration out to its own view, so it still shows a ninth step
+      expanded to Stepper and Squareness pages; those now live under <strong>Tools → Calibration</strong>.</em></figcaption>
     </figure>
     <p><strong>What you're looking at:</strong></p>
     <ul>
-      <li>The numbered steps down the left (1–9, plus Overview) are the guided sequence — work top to bottom; nothing is sent to the controller until you press Apply. It's the same searchable navigation tree as <a href="#settings">Settings</a>, and each step carries a <strong>status dot</strong> — green done, orange needs attention, red not set — so you can see at a glance what's left.</li>
+      <li>The numbered steps down the left (1–8, plus Overview) are the guided sequence — work top to bottom; nothing is sent to the controller until you press Apply. It's the same searchable navigation tree as <a href="#settings">Settings</a>, and each step carries a <strong>status dot</strong> — green done, orange needs attention, red not set — so you can see at a glance what's left.</li>
       <li><strong>Start from your machine</strong> — three dropdowns let you pick a known manufacturer/product/model (or Generic/custom) so the later steps start from sensible defaults instead of blank fields.</li>
       <li><strong>Firmware / Build</strong> — shows what's actually running on the connected controller right now; <strong>Check for Updates</strong> compares it against the latest published grblHAL build.</li>
       <li><strong>Check for Updates</strong> compares the running build against the latest published grblHAL build — here it reports <em>Up to date</em>. When a newer build does exist you get a <strong>Firmware update available</strong> prompt instead, and <strong>Flash Firmware</strong> reprograms the board (this disconnects ioSender and needs the board's own RESET/PROGRAM button pressed within the time shown).</li>
@@ -1175,16 +1196,25 @@
       <tr><td><strong>5 · Probe definitions</strong></td><td>Declare the probes fitted to this machine (touch plate / 3D probe / toolsetter) so probing and <a href="#setup">Setup</a> know what's available.</td><td>—</td></tr>
       <tr><td><strong>6 · Fixture definitions</strong></td><td>Define your own named workholding fixtures (a specific vise, fence, dog-hole grid…) that <a href="#setup">Setup</a> can pick from, with a captured machine-coordinate reference position.</td><td>—</td></tr>
       <tr><td><strong>7 · Controller macros</strong></td><td>Install the controller-side macro set onto the controller's storage (e.g. <em>Install ATC macros…</em>). This step queries the controller to show what's installed or outdated.</td><td>—</td></tr>
-      <tr><td><strong>8 · Calibration</strong></td><td>Two sub-pages. <strong>Stepper</strong> corrects steps/mm without any manual measuring: for X/Y it probes a reference block of known size against a validated Corner Fence; for Z it probes a 1-2-3 gauge block's top in each of its three known orientations and least-squares fits a new Z steps/mm from all three readings. <strong>Squareness</strong> checks and corrects gantry squareness on a ganged (dual-motor) axis. Only the ganged axis is writable and the offset is a fine trim.</td><td><code>$100</code>–<code>$102</code> <code>$170+</code></td></tr>
-      <tr><td><strong>9 · Build simulator</strong></td><td>Build a grblHAL simulator matching this machine's axes, probe and options — detected automatically, no picks needed — so you can test jobs offline (see <a href="#connect">Connect</a>).</td><td>—</td></tr>
+      <tr><td><strong>8 · Build simulator</strong></td><td>Build a grblHAL simulator matching this machine's axes, probe and options — detected automatically, no picks needed — so you can test jobs offline (see <a href="#connect">Connect</a>).</td><td>—</td></tr>
     </table>
+
+    <div class="callout note"><span class="k">Calibration has moved out</span><br>
+    It used to be step 8 here. It is now its own
+    view at <strong>Tools → Calibration</strong>, holding four pages: <strong>Stepper calibration (probe)</strong>
+    (corrects steps/mm by probing a reference block of known size against a validated Corner Fence for X/Y, and a
+    1-2-3 gauge block in three orientations for Z), <strong>Stepper calibration (scratch)</strong> (the same
+    correction with a V-bit and calipers, needing no probe and no fixture), <strong>Squareness (pins)</strong>
+    and <strong>Squareness (probe)</strong> (both correct gantry squareness on a ganged axis via
+    <code>$170+</code>). They moved because all four <em>generate a program and run it</em>, and that needs the
+    run strip — which exists only on the main window, so they have to open as a tab.</div>
 
     <h3>Why the order matters</h3>
     <p>The steps build on each other: you can't set useful <strong>soft limits</strong> (step 4) until the
     machine knows its <strong>travel</strong> and homing direction (steps 2–3); probing routines (step 5) need
-    the axes configured; the macros (step 7) assume a working, homeable machine; and calibration (step 8)
-    probes a fixture you defined in step 6 with a probe you declared in step 5. Working top-to-bottom
-    once gets you to a machine that homes, respects its own limits, probes, and measures true.</p>
+    the axes configured; and the macros (step 7) assume a working, homeable machine. Calibration comes after
+    all of it — it probes a fixture you defined in step 6 with a probe you declared in step 5. Working
+    top-to-bottom once gets you to a machine that homes, respects its own limits, probes, and measures true.</p>
 
     <h3>Defining a fixture (step 6)</h3>
     <p>A fixture is a named piece of workholding — a specific vise, a corner fence, a dog-hole grid — plus a
@@ -1263,8 +1293,8 @@
     <table class="reftab">
       <tr><th>Used to be here</th><th>Now</th></tr>
       <tr><td><strong>Surface Spoilboard</strong></td><td>A <strong>Surface</strong> toolpath in <a href="#work-order">Work Order</a> — same tool list, same feeds &amp; speeds advisor, same generate/run path and dry run as any other operation. Its <em>Entire Spoilboard</em> mode is a checkbox on the toolpath.</td></tr>
-      <tr><td><strong>Stepper calibration</strong> (manual / scratch / probe)</td><td><a href="#machine-setup">Machine&nbsp;Setup → 8 · Calibration → Stepper</a>. The manual and scratch methods are gone; the probe method is the one that survived.</td></tr>
-      <tr><td><strong>Auto Square</strong></td><td><a href="#machine-setup">Machine&nbsp;Setup → 8 · Calibration → Squareness</a>.</td></tr>
+      <tr><td><strong>Stepper calibration</strong> (manual / scratch / probe)</td><td><strong>Tools → Calibration</strong>. The manual method is gone; <strong>probe</strong> and <strong>scratch</strong> are both offered — scratch needs no probe and no fixture, so it is the answer for a machine that has neither.</td></tr>
+      <tr><td><strong>Auto Square</strong></td><td><strong>Tools → Calibration → Squareness (pins)</strong>, beside a newer <strong>Squareness (probe)</strong> that measures the gantry against a reference square instead of sighting drilled pins.</td></tr>
     </table>
 
     <div class="xref">Related: <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#work-order">Work Order</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a> · <a href="#settings">Settings</a></div>
