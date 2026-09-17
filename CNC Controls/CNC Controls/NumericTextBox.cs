@@ -299,6 +299,25 @@ namespace CNC.Controls
 
         private void CommitLengthText()
         {
+            // A read-only field has no typed edit to commit - and committing one anyway is actively
+            // destructive, not merely pointless. These fields are DISPLAYS, chained
+            //
+            //     source property -> NumericField.Value (OneWay) -> NumericTextBox.Value (TwoWay)
+            //
+            // and writing Value here sends that value back up the inner TwoWay binding. A write to the
+            // target of a OneWay binding CLEARS that binding, so the field stops tracking its source
+            // permanently - frozen on whatever it happened to be displaying, for the life of the window.
+            //
+            // Found 2026-09-16: CommitPendingEdits, added the same evening to flush typed values before a
+            // button reads them, walks EVERY NumericField under a panel. It hit the read-only "Current
+            // offset" display, which then sat at 0.450 while the controller and the panel's own heading
+            // both correctly read 0.370 - the Apply press broke its own readout. The same exposure exists
+            // on "Current steps/mm" and on all six machine-position readouts.
+            //
+            // The same guard OnTextChanged has carried all along, in the parse path that was missing it.
+            if (IsReadOnly || !IsEnabled)
+                return;
+
             if (NumericProperties.TryParseLength(Text, Unit, out double mm))
             {
                 updateText = false;
