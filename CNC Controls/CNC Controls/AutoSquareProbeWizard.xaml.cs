@@ -678,7 +678,10 @@ namespace CNC.Controls
             MacroProcessor.EmitProgramHeader(l => b.AppendLine(l), "connected, homed, EXPR, noalarm",
                                              "(Squareness - probe a reference square's two arms and report the angle between them)");
             MacroProcessor.EmitModalDefaults(l => b.AppendLine(l), cancelToolOffset: true);
-            b.AppendLine("G10 L2 P1 X0 Y0 Z0");
+            // Through EmitWcsWrite, never bare: this exact line, against a G54 carrying a 0.10 deg
+            // rotation, corrupted the parser position and turned the G30 park's "G53 G0 Z0" lift into a
+            // 662 mm rapid across the table on 2026-09-16. See EmitWcsWrite for the mechanism.
+            MacroProcessor.EmitWcsWrite(l => b.AppendLine(l), "G10 L2 P1 X0 Y0 Z0");
             if (GrblInfo.HasToolSetter)
                 b.AppendLine(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
 

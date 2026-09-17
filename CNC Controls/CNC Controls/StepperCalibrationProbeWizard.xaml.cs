@@ -838,7 +838,10 @@ namespace CNC.Controls
             MacroProcessor.EmitProgramHeader(l => b.AppendLine(l), "connected, homed, EXPR, noalarm",
                                              "(Stepper calibration - probe a reference block of known true size)");
             MacroProcessor.EmitModalDefaults(l => b.AppendLine(l), cancelToolOffset: true);
-            b.AppendLine("G10 L2 P1 X0 Y0 Z0");
+            // Through EmitWcsWrite, never bare - see its remarks. Same exposure the Squareness (probe)
+            // tool demonstrated on hardware: with a rotation live on the active WCS this line corrupts the
+            // parser position, and the G30 park's Z-only lift then traverses the table.
+            MacroProcessor.EmitWcsWrite(l => b.AppendLine(l), "G10 L2 P1 X0 Y0 Z0");
             if (GrblInfo.HasToolSetter)
                 b.AppendLine(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
 
@@ -995,7 +998,10 @@ namespace CNC.Controls
             MacroProcessor.EmitProgramHeader(l => b.AppendLine(l), "connected, homed, EXPR, noalarm",
                                              "(Stepper calibration - Z axis via a 1-2-3 gauge block)");
             MacroProcessor.EmitModalDefaults(l => b.AppendLine(l), cancelToolOffset: true);
-            b.AppendLine("G10 L2 P1 X0 Y0 Z0");
+            // Through EmitWcsWrite, never bare - see its remarks. Same exposure the Squareness (probe)
+            // tool demonstrated on hardware: with a rotation live on the active WCS this line corrupts the
+            // parser position, and the G30 park's Z-only lift then traverses the table.
+            MacroProcessor.EmitWcsWrite(l => b.AppendLine(l), "G10 L2 P1 X0 Y0 Z0");
             if (GrblInfo.HasToolSetter)
                 b.AppendLine(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
 

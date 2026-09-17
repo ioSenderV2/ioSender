@@ -586,7 +586,10 @@ namespace CNC.Controls
             b.AppendLine("(PREREQ, connected, homed, noalarm, EXPR)");
             b.AppendLine("G21 G90 G94 G17");
             b.AppendLine("G49");
-            b.AppendLine("G10 L2 P1 X0 Y0 Z0");   // clear G54 - absolute Z probe below runs in machine coords, same as pcorner.macro
+            // clear G54 - the absolute Z probe below runs in machine coords, same as pcorner.macro. Via
+            // EmitWcsWrite, never bare: with a rotation live on the active WCS this corrupts the parser
+            // position and the next move with an unnamed axis flies to it. See EmitWcsWrite.
+            MacroProcessor.EmitWcsWrite(l => b.AppendLine(l), "G10 L2 P1 X0 Y0 Z0");
             // Explicit main-probe-input select (Q0 - both 3D probe and Touch Plate use it, only Tool Setter
             // uses Q1, see GrblCommand.ProbeSelect's own callers) - not just relying on whatever was already
             // active. A prior interrupted tool-change leaves Q1 selected (tc.macro's own comment on this

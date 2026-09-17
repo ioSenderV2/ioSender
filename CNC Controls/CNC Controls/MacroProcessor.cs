@@ -1087,6 +1087,52 @@ namespace CNC.Controls
             MacroRunner.EmitGotoG30(L);
         }
 
+        /// <summary>
+        /// Emit a <c>G10 L2</c> write against the ACTIVE coordinate system, then repair the parser position
+        /// it corrupts. Use this for every such write - never the bare G10 L2 line.
+        /// </summary>
+        /// <remarks>
+        /// grblHAL (gcode.c, NonModal_Settings ~4259-4280) converts gc_state.position machine -> work, applies
+        /// the new coordinate data, then converts work -> machine. The two halves are guarded INDEPENDENTLY
+        /// when they have to be paired:
+        ///
+        ///     to-work    runs if OLD rotation != 0 AND old != new
+        ///     to-machine runs if NEW rotation != 0
+        ///
+        /// so whenever the active system carries a rotation, some write runs one half alone and the parser is
+        /// left holding coordinates in the wrong frame. The next move that leaves an axis UNNAMED then holds
+        /// that axis at the corrupted value - and a "G53 G0 Z0" lift is exactly that.
+        ///
+        /// It is NOT only rotation writes. Observed on hardware 2026-09-16 by the Squareness (probe) tool:
+        /// "G10 L2 P1 X0 Y0 Z0" - no R word at all - against a G54 holding a 0.10 deg rotation left the
+        /// rotation untouched (old == new != 0), so only the to-machine half ran. The machine was standing at
+        /// 20.001,-20.003 with WCO 128.392,-662.315; the very next line, a bare "G53 G0 Z0", rapided to
+        /// 148.4,-682.3 - MPos + WCO to a thousandth of a millimetre, 662 mm of unplanned Y at 16824 mm/min,
+        /// with a probe in the spindle. That commit (860656e5) repaired the rotation-write door; this is the
+        /// offset-write door beside it, and every "G10 L2 P1 X0 Y0 Z0" in the app was standing in it.
+        ///
+        /// The repair: after the write, command an ABSOLUTE move that NAMES X and Y, so the parser's position
+        /// is overwritten with a target rather than carried forward. Naming them from #&lt;_abs_x&gt;/#&lt;_abs_y&gt; is
+        /// what makes it self-correcting - those read the STEPPER position (ngc_params.c _absolute_pos), not
+        /// the parser's, so they are true however corrupt gc_state.position is.
+        ///
+        /// The G4 P0 is load-bearing, not politeness: those parameters are read at PARSE time, which runs
+        /// ahead of motion, so mid-stream they would answer with a position the machine has not reached yet
+        /// and the "no-op" move would drive BACKWARDS to it. mc_dwell calls protocol_buffer_synchronize
+        /// unconditionally, so after G4 P0 parse time == real position.
+        ///
+        /// Z is deliberately NOT named: only the plane axes are corrupted, and naming Z here would turn a
+        /// repair into a plunge.
+        ///
+        /// The real fix belongs in the firmware (pair the guards) and is tracked separately.
+        /// </remarks>
+        public static void EmitWcsWrite(System.Action<string> L, string g10Line)
+        {
+            L(g10Line);
+            L("G4 P0");                                    // drain the queue - #<_abs_*> are read at parse time
+            L("G53 G0 X[#<_abs_x>] Y[#<_abs_y>]");         // no-op move; resyncs the parser from the steppers
+        }
+
         // ---- tool length offset for the tool ALREADY in the spindle ------------------------------------
         //
         // Moved here from StartJobView 2026-09-14, unchanged, so the stepper-calibration wizards can use the

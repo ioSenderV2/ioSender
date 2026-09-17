@@ -2818,11 +2818,14 @@ namespace GCode_Sender
         // "no-op" move would drive BACKWARDS to it. mc_dwell calls protocol_buffer_synchronize unconditionally,
         // so after G4 P0 the queue is drained and parse time == real position. Z is deliberately NOT named: only
         // the plane axes are corrupted, and naming Z here would turn a repair into a plunge.
+        // The three lines moved to MacroProcessor.EmitWcsWrite 2026-09-16, unchanged, when the same corruption
+        // turned up through a write that carries NO R word at all - a plain "G10 L2 P1 X0 Y0 Z0" against a WCS
+        // that merely HAS a rotation. Four generators were emitting that bare, and they now share this repair
+        // rather than each growing a copy. Kept as a named wrapper because the rotation-write call sites read
+        // better for it, and because everything above documents why it exists.
         private static void EmitRotationWrite(Action<string> L, string g10Line)
         {
-            L(g10Line);
-            L("G4 P0");                                    // drain the queue - #<_abs_*> are read at parse time
-            L("G53 G0 X[#<_abs_x>] Y[#<_abs_y>]");         // no-op move; resyncs the parser from the steppers
+            MacroProcessor.EmitWcsWrite(L, g10Line);
         }
 
         private static string WcsCode(int wcsP)
@@ -3672,7 +3675,9 @@ namespace GCode_Sender
             }
 
             // Clear G54 so the Z probe below runs in machine coordinates (same reasoning as pcorner.macro).
-            L("G10 L2 P1 X0 Y0 Z0");
+            // Through EmitWcsWrite - the offset-write door onto the same parser corruption EmitRotationWrite
+            // guards the rotation-write door onto. No R word is needed to trigger it; see EmitWcsWrite.
+            MacroProcessor.EmitWcsWrite(L, "G10 L2 P1 X0 Y0 Z0");
             L("G90");
 
             L("(--- stock top Z, probed at the footprint centre ---)");
