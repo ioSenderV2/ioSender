@@ -219,13 +219,18 @@ box's saved layout; the script files the capture when you quit the app.
 
 ---
 
-## Debt from #216–#371 (shipped 2026-08-04 to 2026-09-17) — AUDIT NOT YET WRITTEN
+## Debt from #216–#371 (shipped 2026-08-04 to 2026-09-17) — AUDIT WRITTEN 2026-09-17
 
-**156 changelog entries** have shipped since the v2.40 payoff zeroed this file: 47 NEW, 30 CHG, 79 FIX.
-Nothing was recorded here as it shipped, so the list below is not the debt — it is the *start* of
-reconstructing it. By at-a-glance group: Commissioning & workflow tools 60, Machine setup & settings 23,
-Program view & G-code 22, Macros/console/keys 19, Jogging & main page 13, Polish 9, Files/SD/ATC 5,
-Connectivity 5.
+👉 **The item list is `docs/manual/MANUAL-AUDIT-2026-09-17.md`.** All 156 entries were read and
+sorted there into **21 MISSING / 16 OBSOLETE / 13 NEEDS-UPDATING / 19 stale figures**, with the
+evidence and the source that settles each one. Work from that file; this section is now just the
+status board over it.
+
+**156 changelog entries** shipped since the v2.40 payoff zeroed this file: 47 NEW, 30 CHG, 79 FIX.
+Nothing was recorded here as it shipped, which is the actual failure. Unlike July's *restyling* wave,
+most of this one is **new capability** — SVG carving, the diode-laser path, text and V-carving, four
+new Work Order operations, a rebuilt Height Map, a Calibration view, configuration overlays,
+parametric programs.
 
 ### Text — the five WRONG statements: DONE 2026-09-17
 These were not gaps, they described the app incorrectly. Each replacement was verified against source
@@ -262,20 +267,29 @@ Two figures now carry an italic line in their caption saying what they predate, 
 assert something false. That is a stopgap, not a fix:
 - [ ] `main-window-tools-menu.png` — shows the old four-tab bar and a Tools menu with no Calibration.
 - [ ] `machine-setup-overview.png` — shows nine steps with Calibration expanded.
-- [ ] Every other figure predates #216 and depicts an area that has since changed. Not individually
-      assessed — that belongs in the audit below.
+- [ ] Every other figure predates #216. **Now individually assessed** — see §6 of
+      `MANUAL-AUDIT-2026-09-17.md`, which ranks all 19 by how badly the shot misleads.
+      `job-runscreen.png` is priority 1, ahead of both of the above: the run strip replaced the run
+      bar and the bottom status bar (#220), on the most-visited topic in the manual. Of the four
+      orphaned images, **`heightmap.png` must not be deleted** — the new Height Map topic needs a
+      figure; the other three depict retired arrangements and can go.
 
 ### STILL OWED — deferred to follow-on sessions (user's call, 2026-09-17)
-- [ ] **(2) Rebuild the audit** from #216–#371 into a real checklist, the way
-      `MANUAL-AUDIT-2026-07-24.md` did for its wave. Until this exists there is no list, and the next
-      person starts where this one did: reading 156 changelog entries.
-- [ ] **(3) The missing topics.** Features with **zero** manual coverage: SVG artwork toolpaths; the whole
-      diode-laser path (File > Open burn, placement/anchoring, power stepping, skew compensation); Text
-      toolpaths; Shape text; Corner reliefs; Clear floor; Mark and Mark only; Indirect toolpaths and
-      groups; Save Drawing; Scribe square; Squareness (probe) and the reversal test; stepper calibration
-      (scratch); configuration overlays; the Job tab's split screen; parametric `(PROMPT)` programs;
-      Help > Restart ioSender. Roughly **15 topics or sub-topics that do not exist**. Suggested order:
-      laser and SVG carve first, since those are the demo-able features.
+- [x] **(2) Rebuild the audit** — DONE 2026-09-17, `MANUAL-AUDIT-2026-09-17.md`. It supersedes
+      `MANUAL-AUDIT-2026-07-24.md`, `SCREENSHOT-AUDIT.md` and `SCREENSHOT-REFRESH-2026-07.md`, whose
+      waves were paid off in v2.38 and v2.40 — open one of those only for history.
+- [ ] **(3a) The correction pass — cheapest, do it first.** The 16 OBSOLETE sites (§3 of the audit),
+      each with a line number. Includes **three wrong facts**: the work rotation is applied as `+θ`,
+      not its negative (`index.html:1042`); the File menu does **not** show *Load SVG Laser Job* on a
+      shipped build (`:551`); and Machine Setup's own topic still contains two callouts saying
+      opposite things about where Calibration lives (`:1202` vs `:1247`). Four of the sixteen are
+      siblings the 2026-09-17 pass missed because they were phrased differently.
+- [ ] **(3b) The missing topics** — §2 of the audit, **21** of them, not the ~15 this file used to
+      estimate. Suggested order: **M1/M2 (SVG + text carving)** and **M3 (the laser path)** first,
+      since those are the demo-able features and the largest gaps; then **M4 (Height Map)**, a whole
+      topic this file had never listed. Four items are **named-only** rather than absent (M11 scratch
+      calibration, M14 overlays, M20 machine mirror, M21 Restart) — a word count scores them as
+      covered and they are not.
 
 ### Process note — why this got to 156
 The rule at the top of this file ("when shipping a UI change, add the impact here") did not run once in
