@@ -216,3 +216,69 @@ box's saved layout; the script files the capture when you quit the app.
 - [ ] `settings-grbl.png` and `machine-setup-overview.png` were reshot 2026-08-03 and are current for
       the nav tree, but both now open as **windows** rather than tabs — worth a glance to check the
       window chrome in the shot doesn't misrepresent where they live.
+
+---
+
+## Debt from #216–#371 (shipped 2026-08-04 to 2026-09-17) — AUDIT NOT YET WRITTEN
+
+**156 changelog entries** have shipped since the v2.40 payoff zeroed this file: 47 NEW, 30 CHG, 79 FIX.
+Nothing was recorded here as it shipped, so the list below is not the debt — it is the *start* of
+reconstructing it. By at-a-glance group: Commissioning & workflow tools 60, Machine setup & settings 23,
+Program view & G-code 22, Macros/console/keys 19, Jogging & main page 13, Polish 9, Files/SD/ATC 5,
+Connectivity 5.
+
+### Text — the five WRONG statements: DONE 2026-09-17
+These were not gaps, they described the app incorrectly. Each replacement was verified against source
+before it was written, not against the changelog entry that caused the drift.
+
+- [x] **The four-tab default.** `#getting-started` said "Four tabs, left to right" and that everything else
+      "lives in the File and Tools menus". #248 restored the **full nine-tab bar** as the shipped default
+      (`DefaultLayout.Build()` **and** `Default-App.config`'s `TabsKeys`/Layout section, which agree:
+      Settings, Feeds and Speeds, Setup, Job, Offsets, SD Card, Work Order, Machine Setup, Lathe Tools).
+      Tab table and menu table both rewritten; the File/Tools menu contents were wrong with them, since
+      SD Card, Feeds and Speeds and Lathe Tools are tabs again.
+- [x] **"opens in its own window".** #332: a view whose descriptor sets `RequiresRunStrip` opens as a
+      **session tab** instead — Setup, Work Order, Machine Setup and Calibration. Stated as a note, with
+      the reason (the run strip's Generate/Run and jog pad exist only on the main window) and the
+      closable-tab rule from #333.
+- [x] **"Machine Setup → 8 · Calibration"**, four distinct sites. Calibration left Machine Setup in #332
+      and is `Tools → Calibration` with **four** pages: Stepper (probe), Stepper (scratch), Squareness
+      (pins), Squareness (probe). All four references repointed; the step-8 table row replaced by a note
+      saying where it went and why.
+- [x] **"All nine steps".** Machine Setup is **eight** steps now (1 Machine, 2 Home position, 3 Axis
+      information, 4 Homing & limits, 5 Probe definitions, 6 Fixture definitions, 7 Controller macros,
+      8 Build simulator — read off `GetPages()` and the `hdr*` headers). Caption, the "(1–9)" list item
+      and the "why the order matters" paragraph all corrected.
+- [x] **"The current target is shown in the status bar".** #220 retired the bottom status bar. The target
+      reads at the **right-hand end of the menu bar** (`UpdateMenuBarInfo`: "Connected: TARGET" green /
+      "Not connected" red, hidden on a narrow window). Corrected in `#connect`.
+
+**Nearly shipped an invented fact and caught it:** the first draft said a compressed three-tab arrangement
+"ships as a configuration overlay", which is what `DefaultLayout`'s own comment claims. There is **no
+`.ioconfig` in the repo** — only the apply/export mechanism. Sentence rewritten to the verifiable claim.
+
+### Screenshots — OWED
+Two figures now carry an italic line in their caption saying what they predate, rather than being left to
+assert something false. That is a stopgap, not a fix:
+- [ ] `main-window-tools-menu.png` — shows the old four-tab bar and a Tools menu with no Calibration.
+- [ ] `machine-setup-overview.png` — shows nine steps with Calibration expanded.
+- [ ] Every other figure predates #216 and depicts an area that has since changed. Not individually
+      assessed — that belongs in the audit below.
+
+### STILL OWED — deferred to follow-on sessions (user's call, 2026-09-17)
+- [ ] **(2) Rebuild the audit** from #216–#371 into a real checklist, the way
+      `MANUAL-AUDIT-2026-07-24.md` did for its wave. Until this exists there is no list, and the next
+      person starts where this one did: reading 156 changelog entries.
+- [ ] **(3) The missing topics.** Features with **zero** manual coverage: SVG artwork toolpaths; the whole
+      diode-laser path (File > Open burn, placement/anchoring, power stepping, skew compensation); Text
+      toolpaths; Shape text; Corner reliefs; Clear floor; Mark and Mark only; Indirect toolpaths and
+      groups; Save Drawing; Scribe square; Squareness (probe) and the reversal test; stepper calibration
+      (scratch); configuration overlays; the Job tab's split screen; parametric `(PROMPT)` programs;
+      Help > Restart ioSender. Roughly **15 topics or sub-topics that do not exist**. Suggested order:
+      laser and SVG carve first, since those are the demo-able features.
+
+### Process note — why this got to 156
+The rule at the top of this file ("when shipping a UI change, add the impact here") did not run once in
+six weeks. The 18 unticked boxes above it are July items superseded by later payoff sections that never
+ticked them, so **the checkbox state is not a live signal either** — read the dated section headers, not
+the boxes.
