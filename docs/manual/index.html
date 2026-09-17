@@ -548,7 +548,7 @@
     <table class="reftab">
       <tr><th>Menu</th><th>What's in it</th></tr>
       <tr><td><strong>Connect…</strong></td><td>Not a menu but a command — opens the <a href="#connect">connection dialog</a>. Reads <em>Reconnect…</em> once you're connected.</td></tr>
-      <tr><td><strong>File</strong></td><td>Load Program, Load / New Work Order, Load SVG Laser Job — and any view you have moved off the tab strip.</td></tr>
+      <tr><td><strong>File</strong></td><td>Load Program, Load / New Work Order — and any view you have moved off the tab strip.</td></tr>
       <tr><td><strong>Tools</strong></td><td>Camera, Machine mirror, <strong>Calibration</strong>, Probing, Height Map — plus the <a href="#tools">hardware-gated</a> Tool table, Trinamic tuner and PID Tuner when your controller has them.</td></tr>
       <tr><td><strong>Help</strong></td><td>Wiki, usage tips, a brief tour, video tutorials, error &amp; alarm codes, and <strong>Support</strong> (restart ioSender, check for updates, roll back a version, open the app data folder, apply or export a configuration overlay).</td></tr>
     </table>
@@ -577,8 +577,8 @@
     <h3>Your first five minutes</h3>
     <ol>
       <li><a href="#connect">Connect</a> to the controller (serial port or network).</li>
-      <li>If it's a brand-new machine, run <a href="#machine-setup">Machine&nbsp;Setup</a> once
-      (<strong>File → Machine</strong>).</li>
+      <li>If it's a brand-new machine, run <a href="#machine-setup">Machine&nbsp;Setup</a> once — it's a tab
+      on the strip.</li>
       <li>Learn to <a href="#jogging">jog</a> — move the machine safely by hand.</li>
       <li>Load some g-code on the <a href="#job">Job</a> tab, use <a href="#setup">Setup</a> to probe your
       stock, or compose a quick job in <a href="#work-order">Work Order</a>.</li>
@@ -673,11 +673,15 @@
     arrows stay exactly where they are.</p>
     <p><strong>Keyboard jogging</strong> — arrow keys for X/Y and Page&nbsp;Up/Down for Z. Hold a key for
     continuous motion; tap for a step. Holding <kbd>Ctrl</kbd> switches to a precise <strong>step jog</strong>
-    of the distance shown as <em>Jog step</em> in the status bar.</p>
-    <div class="callout note"><span class="k">Keyboard focus</span><br>
-      Keyboard jogging works whenever the <a href="#job">Job</a> screen is active — even if focus has drifted
-      to a side panel — but it's suppressed while you're typing in a text box (so you can enter numbers
-      without the machine lurching).</div>
+    of the distance shown as <em>Jog step</em> on the run strip.</p>
+    <div class="callout note"><span class="k">A jog key jogs wherever you are</span><br>
+      There is one rule, and it holds in <em>every</em> window — including dialogs: a jog key jogs and a
+      keyboard shortcut fires, <strong>unless you are typing</strong>. It's suppressed only by an input field
+      (text box, combo, list, slider or an open menu) where an arrow key already means something; a shortcut
+      carrying <kbd>Ctrl</kbd> or <kbd>Alt</kbd> still fires even with the caret in a field, because it can't
+      be mistaken for typing. Jogging while a setup dialog is open — lining a fixture up by eye — is the case
+      this was built for. And a key <em>release</em> always stops a continuous jog, whatever has focus by
+      then: that's a moving machine, not a UI detail.</div>
 
     <h3>Step vs continuous</h3>
     <p><strong>Step</strong> moves an exact distance per press — use small steps for fine positioning near the
@@ -825,9 +829,9 @@
       <li><strong>Tool-length strategy</strong> — a consistent reference (toolsetter) so a tool change doesn't
       move Z. Decide your master/reference tool. See <a href="#intro-to-cnc">Intro → tool changes</a>.</li>
       <li><strong>WCS discipline</strong> — use <code>G54</code>–<code>G59.3</code> deliberately; set offsets
-      with <code>G10&nbsp;L2/L20</code>; keep an <code>R0</code>-before-<code>G53</code> habit; know at every
-      line whether you're in machine or work space. Skew/rotation via <code>G10&nbsp;L2&nbsp;R</code>
-      (<a href="#setup">Setup</a> uses this).</li>
+      with <code>G10&nbsp;L2/L20</code>; know at every line whether you're in machine or work space.
+      Skew/rotation via <code>G10&nbsp;L2&nbsp;R</code> (<a href="#setup">Setup</a> uses this) — and see the
+      warning under <a href="#offsets">Work offsets</a> about what follows a rotation write.</li>
     </ol>
 
     <h3>Then verify</h3>
@@ -848,8 +852,10 @@
     <h2>The Job screen — running g-code <a class="anchor" href="#job">#</a></h2>
     <div class="tags"><span class="tag nov">Novice</span><span class="tag int">Intermediate</span></div>
     <figure>
-      <img src="img/job-runscreen.png" alt="The Job screen: DRO, g-code program list, jog pad and the run bar">
-      <figcaption>The Job screen with a program loaded: g-code list, live 3D view and the run bar.</figcaption>
+      <img src="img/job-runscreen.png" alt="The Job screen: DRO, g-code program list, jog pad and the run strip">
+      <figcaption>The Job screen with a program loaded: g-code list, live 3D view and the run strip.
+      <em>This shot predates the run strip described below — it shows the older run bar and a status bar
+      along the bottom of the window, which has since been retired.</em></figcaption>
     </figure>
     <p><strong>What you're looking at:</strong></p>
     <ul>
@@ -858,10 +864,16 @@
       <li><strong>Program limits</strong> — the loaded program's own footprint (min/max per axis), so you can sanity-check it fits your stock before running.</li>
       <li><strong>Coolant</strong> — manual Flood/Mist toggles, independent of whatever the running program itself commands.</li>
       <li><strong>The g-code list</strong> (centre) — the loaded program, line by line, with the current line highlighted as it runs. Hover any line for a plain-English tooltip explaining exactly what it does (shown here for <code>T1M6</code> — "Select tool 1", then "Tool change (M6)", in the same left-to-right order the words appear in the line) — click the tooltip to copy the line.</li>
-      <li><strong>Jogging / UI Jogging / Keyboard jogging</strong> (right) — the on-screen jog pad plus the distance/feed presets each jog step uses. The pad is the widest thing on that side; if the run bar's own compact jog controls are enough for you, untick <em>Show the jog pad on the Job tab</em> in <strong>Settings → User Interface → Job tab layout</strong> and the panels get that height back. Keyboard and game-controller jogging are unaffected either way.</li>
+      <li><strong>Jogging / UI Jogging / Keyboard jogging</strong> (right) — the on-screen jog pad plus the distance/feed presets each jog step uses. The pad is the widest thing on that side; if the run strip's own compact jog controls are enough for you, untick <em>Show the jog pad on the Job tab</em> in <strong>Settings → User Interface → Job tab layout</strong> and the panels get that height back. Keyboard and game-controller jogging are unaffected either way.</li>
       <li><strong>Work Parameters &amp; Spindle</strong> — the active work offset and tool, and manual spindle RPM/direction/override controls.</li>
       <li><strong>The fixture panel</strong> (far right, vertical) — quick-jump buttons to named machine positions like G28/G30/G54.</li>
-      <li><strong>The run bar</strong> (bottom) — Home/Unlock/Reset, the Run button and its mode dropdown, Feed Hold/Stop/Rewind, and the feed/rapids override sliders — see below.</li>
+      <li><strong>The run strip</strong> (bottom, spanning the window) — everything a running job needs, in one
+      place. On the left: the <strong>Run</strong> button and its mode dropdown, Feed Hold, Stop, the block
+      counter and an <strong>MDI</strong> button that opens the console ready to type; below them
+      Home/Unlock/Reset with the machine <strong>State</strong> beside them, then the coolant toggles and the
+      jog distance/feed presets. On the right, three groups — <strong>Jogging</strong>,
+      <strong>Signals</strong> and <strong>Overrides</strong> — see below. There is no longer a status bar
+      along the bottom of the window: everything it used to show is here or on the menu bar.</li>
     </ul>
     <p>The <strong>Job</strong> screen is where you load g-code, watch it, and run it. It's the home base
     you return to for every job.</p>
@@ -888,7 +900,7 @@
     <p>The loaded program appears as a scrolling line list beside the live <a href="#gcode-viewer">3D
     viewer</a>, which draws the whole toolpath and highlights progress as it runs.</p>
 
-    <h3>The run bar</h3>
+    <h3>The run strip's run controls</h3>
     <p>The main button is labelled <strong>Run</strong>, with a small dropdown beside it that picks which
     mode the next press starts in. Whichever mode you last picked becomes the button's own label, so the
     button always reads exactly what it's about to do:</p>
@@ -908,6 +920,12 @@
       <tr><td><strong>Reset</strong></td><td>Soft-reset the controller — stops motion, clears an <a href="#errors-alarms">alarm</a>, and returns to a known idle state.</td></tr>
       <tr><td><strong>Optional stop</strong></td><td>Honour <code>M1</code> optional-stop pauses in the program.</td></tr>
     </table>
+    <div class="callout note"><span class="k">Feed Hold and Stop come and go</span><br>
+      Neither is permanently on the strip. <strong>Feed Hold</strong> appears whenever the machine
+      <em>can</em> move — running, holding, jogging, mid-tool-change or with the door open — including while
+      you are only jogging, since a feed hold during a jog decelerates and cancels it. <strong>Stop</strong> is
+      about a <em>job</em>, so it appears exactly when there is something streaming to stop. A greyed-out
+      button still asks to be read; these simply aren't there when they'd mean nothing.</div>
     <div class="callout warn"><span class="k">Feed Hold vs Reset</span><br>
       <strong>Feed Hold</strong> is a graceful, resumable pause — use it first. <strong>Reset</strong> is the
       hard stop that also clears alarms but ends the job. Keep a hand near Feed Hold / Stop whenever you start
@@ -919,7 +937,7 @@
     <strong>run time</strong>. Overrides are how you dial in feeds by ear on the fly — see
     <a href="#clean-results">reading the cut</a>.</p>
     <div class="callout note"><span class="k">Where did the feed rate's units go?</span><br>
-      The run bar's <strong>Feed:</strong> readout drops the mm/min · in/min label — on that bar the room is
+      The run strip's <strong>Feed:</strong> readout drops the mm/min · in/min label — on that strip the room is
       better spent on digits — and states the unit in its tooltip instead. The full <em>Feed rate</em> panel
       still shows its unit inline, and both readouts now grow to fit a five-digit rate rather than clipping
       it.</div>
@@ -996,8 +1014,9 @@
       <li><strong>The Stock diagram</strong> (right) — a live schematic of the four probed corners, with each
       corner's angle and Z height plus the diagonal measurements, so you can see at a glance how square and
       flat the material really is.</li>
-      <li><strong>Copy size / Verify skew</strong> — copy the measured size back into the nominal fields, or
-      re-touch two corners to double-check the computed rotation.</li>
+      <li><strong>Copy size / Verify skew / Scribe square</strong> — copy the measured size back into the
+      nominal fields, re-check the frame the measure computed (see below), or cut a test rectangle you can
+      measure with calipers.</li>
       <li>The green <strong>Generate</strong>/Run button at the bottom of the window builds (then runs) the
       job once you're happy with the setup.</li>
     </ul>
@@ -1012,13 +1031,37 @@
       dial the material in by hand.</li>
       <li><strong>Set tool-length reference</strong> — probes the tool so Z is referenced correctly.</li>
       <li><strong>Set origin in</strong> — choose which corner (or centre) of the stock the g-code origin
-      sits at, then press <strong>Generate</strong> on the run bar at the bottom of the window (the shared
+      sits at, then press <strong>Generate</strong> on the run strip at the bottom of the window (the shared
       Run button reads "Generate" while this tab is focused and nothing's built yet).</li>
     </ol>
 
-    <div class="callout note"><span class="k">Verify skew</span><br>
-      <strong>Verify skew</strong> re-touches the two back corners to double-check the rotation it measured
-      before you commit to cutting.</div>
+    <div class="callout note"><span class="k">Verify skew — two modes</span><br>
+      <strong>Verify skew</strong> visits the six points of the measured frame to check it before you commit
+      to cutting. The <strong>Touch corners</strong> checkbox decides how:<br>
+      <strong>Ticked</strong> — it crosses to each point at machine top and then <em>probes all the way
+      down</em>. The descent <em>is</em> the probe, which is the point: a probing move stops on contact, so a
+      tool-length offset left over from a different tool can only make it touch high or miss — it cannot drive
+      into the stock. Each corner targets its own measured top, so the board's own flatness is followed rather
+      than assumed away.<br>
+      <strong>Unticked</strong> — a <strong>fly-over</strong>: the same six points are visited, nothing
+      descends and nothing is probed, and you sight the tip against each corner by eye. It needs no probe
+      defined or fitted at all (and the box clears itself, disabled, when you have no 3D probe). It sights
+      from <strong>2&nbsp;mm</strong> above the stock top, inset by the tool radius so the tool isn't covering
+      the very corner you're looking at — or pick a <strong>V-bit</strong> from the dropdown and its point
+      sits exactly on the corner with no inset. Each pair of back corners is crossed <em>at</em> that height,
+      so the gap between the ideal point and the probed one is something you watch happen rather than compare
+      from memory.</div>
+
+    <div class="callout note"><span class="k">Scribe square — a check you can measure</span><br>
+      Every other check here judges a <em>point</em>, and a point can only be judged by eye. <strong>Scribe
+      square</strong> cuts a rectangle inset 10&nbsp;mm from every edge of the measured frame, 0.25&nbsp;mm
+      deep with the selected V-bit, turning an angular error into a <strong>taper</strong> you read with
+      calipers over the full length of the stock: get the rotation right and the gap to the front edge is a
+      constant 10&nbsp;mm end to end; get the sign wrong and it tapers by twice the length times the sine of
+      the angle — millimetres, unmissable with a rule. The panel states the numbers to expect, so they are
+      predictions to check rather than just output. It has its own button, deliberately not a third mode on
+      Verify skew: <strong>this one runs the spindle and leaves a permanent mark on the part</strong>, and that
+      must not sit one checkbox away from a check that touches nothing.</div>
 
     <div class="callout note"><span class="k">Conductive stock &amp; the Touch Plate</span><br>
       A Touch Plate probe reads electrical continuity, so it needs a conductive path. ioSender reads
@@ -1038,8 +1081,13 @@
     <div class="callout warn"><span class="k">Behind the scenes</span><br>
       Setup writes a controller-side <code>start_job.macro</code> and performs an automatic 3D (or touch
       plate) probe as part of the sequence. It must land on the Job tab to bootstrap the controller
-      handshake. The work rotation uses grblHAL's <code>G10&nbsp;L2&nbsp;R</code> — measured skew is applied
-      as its negative. There's no completion gate: nothing hides other tabs until Setup has "provably" run —
+      handshake. The work rotation uses grblHAL's <code>G10&nbsp;L2&nbsp;R</code>, and the measured skew is
+      applied <strong>as itself</strong>, not negated: work +X maps to machine direction
+      (cos&nbsp;θ, sin&nbsp;θ), so aligning the work frame to a stock edge at +θ takes <code>R+θ</code>. The
+      <em>origin</em> written alongside it is counter-rotated, because grblHAL rotates the <em>sum</em> of
+      offset and position — the pivot is <strong>machine</strong> zero, not the WCS origin, so a raw origin
+      would land at R&nbsp;×&nbsp;C instead of the corner that was probed, by an error that grows with how far
+      out on the table the stock sits. There's no completion gate: nothing hides other tabs until Setup has "provably" run —
       Generate simply asks, once, whether to proceed on the currently cached origin and tool-length
       reference.</div>
 
@@ -1066,11 +1114,18 @@
     </figure>
     <p><strong>What you're looking at:</strong></p>
     <ul>
-      <li><strong>Toolpaths</strong> — the geometry: line, circle, oval, square, rectangle or
-      <strong>surface</strong>. Add one, then hang <strong>operations</strong> underneath it: pocket, contour,
-      drill, bore, side finish, bottom finish, chamfer. Geometry belongs to the toolpath; the operations act
-      on it — that's why a counterbore is just one circle carrying a shallow bore, a through drill and a
-      chamfer on the same centreline, rather than a special case.</li>
+      <li><strong>Toolpaths</strong> — the geometry. Nine kinds: <strong>Line</strong>,
+      <strong>Circle</strong>, <strong>Oval</strong>, <strong>Square</strong>, <strong>Rectangle</strong>,
+      <strong>Surface</strong> (face a whole area), <strong>Text</strong> (engrave or V-carve with a V-bit),
+      <strong>SVG artwork</strong> (engrave or V-carve a logo) and <strong>Indirect</strong> (repeat another
+      toolpath, or a whole group of them, somewhere else). Add one, then hang <strong>operations</strong>
+      underneath it: Pocket, Contour, Drill, Bore, Side finish, Bottom finish, Chamfer, Countersink, Surface,
+      <strong>Engrave</strong>, <strong>Clear floor</strong> (an end mill flattens the floor a V-carve leaves)
+      and <strong>Mark</strong> (a V-bit traces the outline as a shallow groove). Geometry belongs to the
+      toolpath; the operations act on it — that's why a counterbore is just one circle carrying a shallow
+      bore, a through drill and a chamfer on the same centreline, rather than a special case. Which
+      operations are offered depends on the geometry: only a V-carving toolpath is offered Clear floor, only
+      a shape with corners is offered corner reliefs.</li>
       <li><strong>Enable checkboxes</strong> per row — untick a toolpath or operation to leave it out of the
       next Generate; ticking/unticking a toolpath cascades to its operations, and back.</li>
       <li><strong>Feeds and speeds</strong> — a dialog proposes chipload-based feed/speed/depth-of-cut
@@ -1116,11 +1171,25 @@
       dialog in this shot.</figcaption>
     </figure>
 
-    <div class="callout note"><span class="k">Entire Spoilboard ignores your origin on purpose</span><br>
-      It deliberately does <em>not</em> trust the work order's coordinate system: it touches off its own fresh
-      Z0 and works in machine coordinates, because the whole point of resurfacing is that the board is
-      <em>not</em> where you last thought it was. It borrows a scratch WCS slot and restores it afterwards, so
-      establishing that temporary origin never steps on your real one.</div>
+    <div class="callout note"><span class="k">Entire Spoilboard ignores your origin — unless you tell it not to</span><br>
+      By default it deliberately does <em>not</em> trust the work order's coordinate system: it touches off its
+      own fresh Z0 and works in machine coordinates, because the whole point of resurfacing is that the board
+      is <em>not</em> where you last thought it was. It borrows a scratch WCS slot and restores it afterwards,
+      so establishing that temporary origin never steps on your real one.<br>
+      There is one case where that is actively wrong, and a checkbox for it: <strong>Use the work origin
+      already set</strong>, nested under <em>Entire spoilboard</em> and only available while that is ticked.
+      After a <em>Full work surface</em> height-map run, Z0 is the highest of sixteen probed points — and the
+      self-touch-off would throw that away and replace it with one eyeballed touch at one spot, which cannot
+      tell you whether you touched a high spot or a low one. Off by default; tick it when an origin you trust
+      more already exists.</div>
+    <div class="callout note"><span class="k">"Entire spoilboard" means the board, not the travel</span><br>
+      Both this and the height map's <em>Full work surface</em> used to take the machine's travel limits
+      (<code>$130</code>/<code>$131</code>) as the extent of the board. That is only true where the board
+      fills the table — on a machine with the toolsetter mounted off the front edge, the last stretch of Y
+      travel is air, and a raster across it runs the cutter through nothing at best. If your board is smaller
+      than your travel, describe it in <a href="#machine-setup">Machine&nbsp;Setup</a> step&nbsp;3's
+      <strong>Work surface (spoilboard)</strong> section and both features read it. Leave it undefined and
+      they assume the board fills the table, exactly as before.</div>
 
     <h3>Which coordinate system it runs in</h3>
     <p>A work order carries its own <strong>WCS</strong> field. Leave it on <strong>Follow Setup</strong> and
@@ -1175,7 +1244,8 @@
       <li><strong>Firmware information</strong> (the <code>$I</code> window shown here) — a read-only dump of the controller's reported firmware, version, build, axis count and enabled options — handy when reporting a problem.</li>
       <li><strong>Forget machine / Reload / Preview / Apply</strong> (bottom right) — Apply is the only button that actually writes settings to the controller; Preview lets you review the resulting <code>$</code> settings first.</li>
     </ul>
-    <p><strong>Machine Setup</strong> — opened from <strong>File → Machine</strong>, in its own window — is a
+    <p><strong>Machine Setup</strong> — a tab on the strip in a fresh install, and still a tab if you move it
+    into a menu, because it needs the run strip's Generate/Run button and jog pad — is a
     guided wizard that walks you through the settings a new machine needs before it can safely home and run —
     in plain-English steps instead of a wall of <code>$</code> numbers. Do it <strong>once</strong> when you first connect a controller (and again after a firmware
     reset). It writes real grbl settings to the controller's <a href="#intro-to-cnc">NVRAM</a>, so it's how
@@ -1185,7 +1255,7 @@
       If setup isn't finished, ioSender opens straight on the <em>first incomplete step</em> — so you can't
       accidentally try to run a half-configured machine. Once all the steps are done, it stops nagging.</div>
 
-    <h3>The nine steps</h3>
+    <h3>The eight steps</h3>
     <p>An <strong>Overview</strong> page lists them; each is a numbered entry in the tree that you complete in order.</p>
     <table class="reftab">
       <tr><th>Step</th><th>What you set</th><th>grbl settings</th></tr>
@@ -1241,13 +1311,17 @@
       stepper</strong> works from a 1-2-3 block: enter its known true sizes, and the generated program probes
       the spoilboard once, then the block's top in each of its three orientations, and fits a new Z steps/mm
       from all three. <strong>Save steps/mm</strong> writes the correction. <strong>XY steppers</strong> is
-      the other method on this page. Note the nine steps and their status dots down the left.</figcaption>
+      the other method on this page. <em>This shot predates the move of Calibration out of Machine Setup, so
+      it shows it as a ninth step with the steps numbered accordingly; the same two methods now live under
+      <strong>Tools → Calibration</strong>, beside two more.</em></figcaption>
     </figure>
 
-    <div class="callout note"><span class="k">Calibration lives here now</span><br>
-      Stepper calibration and squareness used to be standalone wizards on the Tools tab, disconnected from
-      the rest of commissioning. They're steps in this sequence instead — same guided order as homing, soft
-      limits and the TLO reference — so a machine gets set up in one pass. See
+    <div class="callout note"><span class="k">Where calibration has been</span><br>
+      Stepper calibration and squareness started as standalone wizards on the old Tools tab, disconnected
+      from the rest of commissioning; they were folded in here as a ninth step, and have now moved out again
+      to <strong>Tools → Calibration</strong> — not a change of mind, but a consequence of what they do. All
+      four <em>generate a program and run it</em>, and the Generate/Run button lives on the run strip, which
+      exists only on the main window. See the callout above for where they are, and
       <a href="#accuracy-calibration">Accuracy &amp; calibration</a> for what the numbers mean.</div>
 
     <div class="callout warn"><span class="k">Have your facts ready</span><br>
@@ -1358,8 +1432,26 @@
       Under the hood, offsets are set with <code>G10&nbsp;L2</code> (define a WCS in absolute machine
       coordinates) or <code>G10&nbsp;L20</code> (define it so the <em>current</em> position equals given work
       coordinates — what "zero here" does). A work rotation for skewed stock uses <code>G10&nbsp;L2&nbsp;R</code>.
-      Keep an <code>R0</code>-before-<code>G53</code> habit so a leftover rotation never contaminates a
-      machine-coordinate move. See <a href="#accuracy-calibration">Accuracy &amp; calibration → WCS discipline</a>.</div>
+      See <a href="#accuracy-calibration">Accuracy &amp; calibration → WCS discipline</a>.</div>
+
+    <div class="callout warn"><span class="k">A <code>G53</code> move right after a rotation write</span><br>
+      An active rotation does <em>not</em> contaminate a machine-coordinate move — grblHAL exempts
+      <code>G53</code> from rotation, so there is no need to clear the rotation before one, and the
+      <code>R0</code>-before-<code>G53</code> habit this page used to advise is <strong>worse than
+      useless</strong>: an <code>R0</code> is itself a rotation write, and that is the thing to be careful
+      about.<br>
+      Writing the rotation of the coordinate system that is <em>currently active</em> — setting it, clearing
+      it, or restating it — leaves the firmware's parser holding a corrupted position, and the next move that
+      leaves an axis <em>unnamed</em> flies to whatever that corrupt value says. A bare
+      <code>G53&nbsp;G0&nbsp;Z0</code> "safe lift" is exactly such a move, and on a real machine one has
+      traversed the entire table at rapid. It does not even need an <code>R</code> word: a plain
+      <code>G10&nbsp;L2&nbsp;P1&nbsp;X0&nbsp;Y0&nbsp;Z0</code> against a WCS that merely <em>has</em> a
+      rotation is enough.<br>
+      <strong>ioSender repairs this in every program it generates</strong> — each rotation write is followed
+      by a dwell and an absolute move naming X and Y from the machine's own stepper position, which overwrites
+      whatever the parser believed. If you write <code>G10&nbsp;L2</code> by hand at the MDI, or in a macro of
+      your own, do the same: follow it with a move that <em>names</em> the axes rather than a Z-only lift.
+      A <code>G53</code> Z-only lift is not a safe lift on its own.</div>
 
     <div class="xref">Related: <a href="#setup">Setup</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a> · <a href="#intro-to-cnc">Intro → coordinates</a></div>
   </section>
@@ -1381,7 +1473,8 @@
       <li><strong>Save / Restart / Reset to Default</strong> (bottom) is a shared footer; which buttons appear depends on the page (Reset only shows where the page actually has resettable settings).</li>
       <li>On the <strong>Grbl</strong> page specifically, the footer gains <strong>Reload / Backup / Restore / Copy to simulator</strong> — Backup/Restore snapshot and roll back a whole settings set; Copy to simulator pushes the same settings into the bundled offline simulator so it matches your real machine.</li>
     </ul>
-    <p><strong>Settings</strong> — opened from <strong>File → Settings</strong>, in its own window — holds the
+    <p><strong>Settings</strong> — the first tab on the strip in a fresh install, or wherever you have moved
+    it to — holds the
     controller's settings plus ioSender's own preferences, in one place. They're organised as a tree of five
     categories:</p>
     <table class="reftab">
@@ -1434,29 +1527,46 @@
     <h3>Where each view lives</h3>
     <p><strong>Settings → User Interface → Top-level tabs</strong> lists every view with a destination beside
     it: <strong>Tab bar</strong>, <strong>File menu</strong>, <strong>Tools menu</strong>, or
-    <strong>Not shown</strong>. The main bar ships cut back to what you need while a job runs, with the rest in
-    the menus — but that's only a default. Put Probing back on the bar, move Offsets into a menu, hide what you
+    <strong>Not shown</strong>. A fresh install ships the <strong>full tab bar</strong> — nine tabs — and this
+    is how you slim it down: move the views you don't want on it into a menu, and restart. That way round on
+    purpose, because a saved layout is never overwritten by an upgrade: a crowded default you can cut back
+    beats a slim one nobody can opt out of. Move Offsets into a menu, put Probing on the bar, hide what you
     never touch. The ▲▼ buttons set the order within whichever destination a view is assigned to (left to right
-    on the bar, top to bottom in a menu). Changes apply on restart.</p>
+    on the bar, top to bottom in a menu). Changes apply on restart — and a layout you like can be handed to
+    someone else as a <em>configuration overlay</em>.</p>
     <p>Settings, Machine Setup and Job can be moved between the bar and a menu but not hidden — ioSender puts
     them back rather than let a layout lock you out.</p>
 
     <figure>
       <img src="img/settings-top-level-tabs.png" alt="Settings, User Interface, Top-level tabs: a row per view with a destination dropdown, opened on Offsets to show Tab bar, File menu, Tools menu and Not shown">
-      <figcaption>The placement editor: one row per view, one destination each. Setup, Job, Work Order
-      and Offsets are on the tab bar; Machine Setup and Settings are in the File menu; SD Card through
-      Lathe Tools are in Tools. The ▲▼ buttons order a view within whichever destination it's assigned
-      to, and the change takes effect on the next restart.</figcaption>
+      <figcaption>The placement editor: one row per view, one destination each. The ▲▼ buttons order a view
+      within whichever destination it's assigned to, and the change takes effect on the next restart.
+      <em>This shot predates the restored full tab strip, so it shows a cut-back arrangement with Machine
+      Setup and Settings in the File menu; a fresh install now has all nine on the bar, and this editor is
+      how you get back to something like the layout shown here.</em></figcaption>
     </figure>
 
     <h3>Binding a key to a tab or menu entry</h3>
-    <p><strong>Settings → User Interface → Keyboard</strong> has one group, <strong>Top Level Tabs</strong>,
-    holding every top-level destination: the views (Job, Setup, Offsets, Probing, Settings, Machine Setup, the
-    tool and tuner windows…) and the main-menu commands that aren't views (Connect, Load Program, Load/New Work
-    Order, Camera, and the Help entries). All start unbound. Sub-pages within a view — a particular Settings
-    page or Machine Setup step — are deliberately not bindable; shortcuts address top-level destinations only.</p>
+    <p><strong>Settings → User Interface → Keyboard</strong> groups these three ways:</p>
+    <table class="reftab">
+      <tr><th>Group</th><th>Holds</th></tr>
+      <tr><td><strong>Top Level Tabs</strong></td><td>The <em>views</em> — Job, Setup, Offsets, Probing,
+      Settings, Machine Setup, the tool and tuner windows… Anything that can sit on the tab strip.</td></tr>
+      <tr><td><strong>Top Level Menu Items</strong></td><td>The built-in main-menu <em>commands</em>, which
+      are not views and cannot be placed on the strip — Connect, the File entries, the Help entries. Listed
+      immediately above the tabs, because they're related; kept separate, because a tab can be moved and a
+      File command cannot.</td></tr>
+      <tr><td><strong>Program</strong></td><td>The run strip's two smallest buttons: <strong>MDI</strong>
+      (opens the console with the caret in its input box) and <strong>Status</strong> (the message history).
+      These are the ones worth reaching without the mouse, and unlike the menu commands they
+      <strong>stay live during a run</strong> — which is exactly when you want them.</td></tr>
+    </table>
+    <p>All start unbound. Sub-pages within a view — a particular Settings page or Machine Setup step — are
+    deliberately not bindable; shortcuts address top-level destinations only.</p>
     <p>A shortcut for a menu command is refused whenever that entry is greyed out, so a key can never do
-    something the menu itself is currently refusing.</p>
+    something the menu itself is currently refusing. The same holds for the two run-strip buttons: the key
+    presses the actual button, so it can't drift from what clicking does, and it's refused while the button
+    is disabled.</p>
 
     <h3>Keeping ioSender up to date</h3>
     <p><strong>Help → Support → Check for updates...</strong> checks GitHub for a newer released version and
