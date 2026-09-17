@@ -1072,7 +1072,13 @@ namespace CNC.Controls
             b.AppendLine("(WAITIDLE)");
 
             if (touchPlate)
-                b.AppendLine("(MBOX, OK, Move the touch plate to the far end of the BLADE - the long arm, along X - then click OK.)");
+                // Names the corner THIS orientation probes second, not the one the normal run does. In the
+                // reversed run the second probe is the heel, so the original wording would have sent the
+                // plate to the wrong end of the blade - and a touch plate in the wrong place does not fail,
+                // it returns a confident coordinate for the wrong corner.
+                b.AppendLine(reversedOrientation
+                    ? "(MBOX, OK, Move the touch plate to the HEEL - the outside corner where the two arms meet, at the RIGHT-hand end of the blade - then click OK.)"
+                    : "(MBOX, OK, Move the touch plate to the far end of the BLADE - the long arm, along X - then click OK.)");
 
             // Corner 2 - the blade's far end (X-neighbour). Its Y face is the blade's front edge, which is
             // the reference the skew is measured from; its X face is the blade's end, which only sets the
@@ -1094,7 +1100,11 @@ namespace CNC.Controls
             b.AppendLine("(WAITIDLE)");
 
             if (touchPlate)
-                b.AppendLine("(MBOX, OK, Move the touch plate to the far end of the TONGUE - the short arm, along Y - then click OK.)");
+                // The tongue's far end in both orientations - but at the BACK-RIGHT when reversed and the
+                // BACK-LEFT when not, so the corner is named rather than left to be inferred.
+                b.AppendLine(reversedOrientation
+                    ? "(MBOX, OK, Move the touch plate to the far end of the TONGUE - the short arm running BACK from the heel, so the BACK-RIGHT corner - then click OK.)"
+                    : "(MBOX, OK, Move the touch plate to the far end of the TONGUE - the short arm, along Y, so the BACK-LEFT corner - then click OK.)");
 
             // Corner 3 - the tongue's far end, always. Which pcorner corner that IS depends on the
             // orientation: with the heel at the front-left the tongue runs back from it and its end is the
