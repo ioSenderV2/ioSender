@@ -42,6 +42,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
+using CNC.GCode;   // SpindleState / MotionMode - the two modal values a peek has to put back
+
 namespace CNC.Core
 {
     public class JobRunner : ViewModelBase
@@ -380,6 +382,53 @@ namespace CNC.Core
         // FlushPendingOffsetClear and ResetRunModeAfterJob's own note about the realtime-byte race.
         private bool pendingOffsetClear = false;
 
+        // ---- Peek (docs/Architecture-Peek.md) ------------------------------------------------------
+        //
+        // Peek STARVES the stream rather than interrupting it: dispatch stops, the controller drains its
+        // own planner and reports Idle, and only then does anything move. Nothing is cut short, so no soft
+        // reset is needed and - the property the whole feature rests on - the CONTROLLER'S PARSER STATE IS
+        // NEVER LOST. WCS, tool-length offset, feed rate, units, plane and distance mode are all still
+        // exactly as the program left them when the job resumes.
+        //
+        // That it is safe to let the controller go Idle mid-program is not an assumption: StreamingSendFile's
+        // Idle case is an explicit "changed = false; // ignore". A job ends on JobFinished, which the PUMP
+        // raises at end of program - not on the controller going quiet.
+        //
+        // Only two things must be restored, because only two things are disturbed: the spindle (we turn it
+        // off by decision) and MOTION MODE - EmitGotoG30 ends in G0 and G0 is modal, so a following bare
+        // "X.. Y.." line that relied on a live G1 would rapid into the cut.
+        public enum PeekState
+        {
+            None,
+            Requested,      // dispatch suspended, waiting for the controller to drain to Idle
+            Parking,        // park emitted, waiting for it to complete
+            Parked,         // operator is looking; machine is an ordinary idle machine
+            Returning       // return emitted, waiting for it to complete before dispatch resumes
+        }
+
+        private PeekState peekState = PeekState.None;
+        private Position peekReturnTo;                       // machine coords captured at the pause
+        private SpindleState peekSpindle = SpindleState.Off; // what to put back
+        private string peekSpindleRpm = string.Empty;
+        private MotionMode peekMotionMode = MotionMode.G0;
+        private int peekLine;
+
+        /// <summary>Peek is available: a program is streaming and the machine can be parked safely.</summary>
+        public bool CanPeek
+        {
+            get { return _canPeek; }
+            set { if (_canPeek != value) { _canPeek = value; OnPropertyChanged(); } }
+        }
+        private bool _canPeek = false;
+
+        /// <summary>True while a peek is in progress - the run strip offers Resume instead of Peek.</summary>
+        public bool IsPeeking
+        {
+            get { return _isPeeking; }
+            set { if (_isPeeking != value) { _isPeeking = value; OnPropertyChanged(); } }
+        }
+        private bool _isPeeking = false;
+
         private volatile StreamingState streamingState = StreamingState.NoFile;
         private GrblState grblState;
         private GrblViewModel model;
@@ -497,7 +546,24 @@ namespace CNC.Core
         /// <summary>The host's watchdog timer fired: nudge a pump that has stalled with the controller idle.</summary>
         public void OnIdleKick()
         {
-            PumpLog.W(string.Format("IDLEKICK timer fire  pumpActive={0} state={1}", pumpActive, grblState.State));
+            PumpLog.W(string.Format("IDLEKICK timer fire  pumpActive={0} state={1} peek={2}", pumpActive, grblState.State, peekState));
+
+            // 🔴 A PARKED MACHINE IS pumpActive AND Idle - exactly this watchdog's trigger condition. Without
+            // this guard Peek would park the machine, the operator would lean in to look, and the kick would
+            // resume the program: OnIdleKick drops the pump's accounting, clears its barriers and calls
+            // SendNext().
+            //
+            // pump.Suspended does NOT stop it. Suspended is checked only in WirePacer.OnReplyClassified,
+            // which gates incoming REPLIES; KickIdle arrives via WirePacer.Post(), which has no Suspended
+            // check at all. The tool-change pause is not exposed to this only because the controller reports
+            // Tool rather than Idle there, so the test below is false - luck, not design, and Peek does not
+            // inherit it.
+            //
+            // Guarded HERE rather than by teaching WirePacer.Post about Suspended: that path also carries
+            // abort and barrier signals, and suppressing those is how a stop gets swallowed.
+            if (peekState != PeekState.None)
+                return;
+
             if (pumpActive && grblState.State == GrblStates.Idle)
                 pump?.KickIdle();
         }
@@ -1245,6 +1311,169 @@ namespace CNC.Core
         /// controller is somewhere it will actually be parsed. No-op unless one is pending.
         /// </summary>
         /// <param name="state">The state just reported, or null to read the current one.</param>
+        /// <summary>
+        /// Begin a peek: stop dispatching and let the controller drain to Idle. Motion happens in
+        /// ServicePeek, never here - at this moment the machine is still cutting.
+        /// See docs/Architecture-Peek.md.
+        /// </summary>
+        public bool Peek()
+        {
+            if (peekState != PeekState.None)
+                return false;
+
+            // Refusals, each with a reason. A silent decline is the fault #331 existed to fix.
+            if (!(pumpActive || JobTimer.IsRunning) || !Source.IsLoaded)
+                return RefusePeek("Peek needs a running program - there is nothing to pause.");
+
+            // The controller streams an SD-card job itself, so the sender cannot starve it. Same visibility
+            // rule that already excludes dry run.
+            if (model.IsSDCardJob)
+                return RefusePeek("Peek is not available for an SD card job - the controller streams it directly, so the sender cannot pause it.");
+
+            // EmitGotoG30 parks via G53 G0 X[#5181] Y[#5182] Z[#5183]. Without expression support those are
+            // not evaluated and the park is meaningless - refuse before anything stops rather than after.
+            if (!GrblInfo.ExpressionsSupported)
+                return RefusePeek("Peek needs a controller that supports expressions (EXPR) - the park uses the stored G30 parameters.");
+
+            peekLine = pumpActive ? pump.PendingLine : job.PendingLine;
+            peekState = PeekState.Requested;
+            IsPeeking = true;
+            CanPeek = false;
+
+            // Stop feeding. The controller keeps running what it already has - that is the "slight delay",
+            // and it is what makes this safe: nothing is cut short.
+            if (pumpActive)
+                pump.Suspended = true;
+
+            model.LogDetail(string.Format("Peek - pausing at the end of the current block (line {0})", peekLine));
+            DebugLog.Write("run", string.Format("Peek: requested at line {0}, dispatch suspended", peekLine));
+
+            ServicePeek(grblState.State);
+            return true;
+        }
+
+        private bool RefusePeek(string why)
+        {
+            // Flagged, not a plain status message: a plain one clears the error flag and the only thing that
+            // surfaces an arriving message pops the log window for a FLAGGED message only - which is how the
+            // jog go-to buttons' eight refusals went into a log nobody had open (#250).
+            model.SetError(why);
+            DebugLog.Write("run", "Peek: REFUSED - " + why);
+            return false;
+        }
+
+        /// <summary>
+        /// Resume from a peek: put the spindle and the machine back, then let dispatch continue. Deliberately
+        /// NOT Run(fromBlock) - nothing was torn down, so re-entering Run would re-evaluate PREREQ, log a
+        /// second "Program start" and run the generate-first branch logic. Peek resumes by un-suspending
+        /// exactly what it suspended.
+        /// </summary>
+        public bool ResumePeek()
+        {
+            if (peekState != PeekState.Parked)
+                return false;
+
+            peekState = PeekState.Returning;
+            DebugLog.Write("run", "Peek: returning");
+
+            // Z clear, then XY, then the spindle, then plunge - the order tool_change.c's restore() uses,
+            // and for the same reasons. X and Y are NAMED on every line: a bare Z-only G53 is not a safe
+            // lift (#358/#359), and while nothing in this sequence writes a rotation, the return is ours to
+            // write and must not copy the lift's shape.
+            Comms.com.WriteCommand("G53 G0 Z0");
+            Comms.com.WriteCommand(string.Format("G53 G0 X{0} Y{1}",
+                peekReturnTo.X.ToInvariantString(), peekReturnTo.Y.ToInvariantString()));
+
+            if (peekSpindle != SpindleState.Off)
+            {
+                Comms.com.WriteCommand(string.Format("{0}{1}",
+                    peekSpindle == SpindleState.CCW ? "M4" : "M3",
+                    string.IsNullOrEmpty(peekSpindleRpm) ? string.Empty : "S" + peekSpindleRpm));
+                // The spindle must REACH speed before the cut resumes. tool_change.c has
+                // settings.spindle.on_delay for exactly this; we have no equivalent, so the dwell is ours.
+                Comms.com.WriteCommand("G4P" + PeekSpindleDelay.ToInvariantString());
+            }
+
+            Comms.com.WriteCommand(string.Format("G53 G0 X{0} Y{1} Z{2}",
+                peekReturnTo.X.ToInvariantString(), peekReturnTo.Y.ToInvariantString(), peekReturnTo.Z.ToInvariantString()));
+
+            // Motion mode last, so the program's next line behaves as it would have. G0 is modal and the
+            // park just set it; a following bare "X.. Y.." that relied on G1 would otherwise RAPID.
+            switch (peekMotionMode)
+            {
+                case MotionMode.G1: Comms.com.WriteCommand("G1"); break;
+                case MotionMode.G2: Comms.com.WriteCommand("G2"); break;
+                case MotionMode.G3: Comms.com.WriteCommand("G3"); break;
+                default: break;     // already G0
+            }
+
+            ServicePeek(grblState.State);
+            return true;
+        }
+
+        /// <summary>Seconds to dwell after restarting the spindle, before the tool re-enters the cut.</summary>
+        public static double PeekSpindleDelay { get; set; } = 3d;
+
+        /// <summary>
+        /// Drives the peek through its states on each status report. Same shape as FlushPendingOffsetClear
+        /// below - a deferred action gated on the controller genuinely reaching Idle - because that is the
+        /// proven answer to this class of race.
+        /// </summary>
+        private void ServicePeek(GrblStates now)
+        {
+            if (peekState == PeekState.None || now != GrblStates.Idle)
+                return;
+
+            switch (peekState)
+            {
+                case PeekState.Requested:
+                    // Drained. Capture what the park is about to disturb, THEN park. $G is asked for here
+                    // rather than at the button press because the machine is now quiet.
+                    peekReturnTo = new Position(model.MachinePosition);
+
+                    if (!GrblParserState.Get(model))
+                    {
+                        // An unanswered query is UNKNOWN, not "no spindle, G0" (#243). Parking on an invented
+                        // frame would resume in the wrong motion mode. Abort with the job still streaming.
+                        peekState = PeekState.None;
+                        IsPeeking = false;
+                        if (pumpActive)
+                            pump.Suspended = false;
+                        RefusePeek("Peek aborted - the controller did not report its parser state ($G). The job has not been paused.");
+                        return;
+                    }
+
+                    peekSpindle = GrblParserState.SpindleState;
+                    peekSpindleRpm = GrblParserState.IsActive("S") ?? string.Empty;
+                    peekMotionMode = GrblParserState.MotionMode;
+
+                    peekState = PeekState.Parking;
+                    DebugLog.Write("run", string.Format("Peek: drained at {0}; spindle={1} S={2} motion={3} - parking",
+                        peekReturnTo.ToString(), peekSpindle, peekSpindleRpm, peekMotionMode));
+
+                    Comms.com.WriteCommand("M5");
+                    MacroRunner.EmitGotoG30(l => Comms.com.WriteCommand(l));
+                    break;
+
+                case PeekState.Parking:
+                    peekState = PeekState.Parked;
+                    model.LogDetail(string.Format("Peek - parked at G30, spindle off (line {0})", peekLine));
+                    model.Message = "Peeking - press Resume to go back and carry on";
+                    break;
+
+                case PeekState.Returning:
+                    peekState = PeekState.None;
+                    IsPeeking = false;
+                    model.LogDetail(string.Format("Peek - resumed at line {0}", peekLine));
+                    DebugLog.Write("run", "Peek: resumed, dispatch un-suspended");
+                    model.Message = string.Empty;
+                    if (pumpActive)
+                        pump.Suspended = false;
+                    CanPeek = true;
+                    break;
+            }
+        }
+
         private void FlushPendingOffsetClear(GrblStates? state = null)
         {
             if (!pendingOffsetClear)
@@ -1281,7 +1510,34 @@ namespace CNC.Core
                 pump?.Abort();
             }
             ResetRunModeAfterJob();
+            CancelPeek();
             CancelIdleKick?.Invoke();
+        }
+
+        /// <summary>
+        /// Abandon a peek without returning the machine - the run it belonged to is over (Stop, alarm, reset,
+        /// connection lost; AbortPump is the shared path for all of them). Deliberately emits NO motion: the
+        /// job is gone, so driving the spindle back to a position from that job would be a move nobody asked
+        /// for. The machine is left parked at G30 with the spindle off, which is a safe place to be told bad
+        /// news.
+        /// </summary>
+        private void CancelPeek()
+        {
+            if (peekState == PeekState.None)
+                return;
+
+            DebugLog.Write("run", string.Format("Peek: CANCELLED in state {0} - the run ended; machine left where it is", peekState));
+            model.LogDetail("Peek - abandoned, the run ended while paused");
+
+            peekState = PeekState.None;
+            IsPeeking = false;
+            CanPeek = false;
+            model.Message = string.Empty;
+
+            // Un-suspend so the pump is not left half-held for whatever comes next; it is being aborted
+            // around this call anyway, and leaving the flag set outlives the object that owns it.
+            if (pump != null)
+                pump.Suspended = false;
         }
 
         public void SendRTCommand(string command)
@@ -1520,6 +1776,10 @@ namespace CNC.Core
                         CanFeedHold = (FeedHoldArmed = true) && !model.FeedHoldDisabled;
                         CanStop = true;
                         CanRewind = false;
+                        // Peek rides with Stop: both mean "a program is streaming". It clears itself while a
+                        // peek is in progress (Peek() sets it false, ServicePeek restores it on resume) so the
+                        // button cannot be pressed twice.
+                        CanPeek = peekState == PeekState.None;
                         break;
 
                     case StreamingState.Error:
@@ -1801,6 +2061,7 @@ namespace CNC.Core
             // alarm, or a reset - each of which leaves the controller somewhere the G92.1 cannot be parsed
             // at the moment the job ends.
             FlushPendingOffsetClear(newstate.State);
+            ServicePeek(newstate.State);
 
             // Pump-stall watchdog: a pump-streamed run (e.g. Load Stock's O-word/probe program) can deadlock
             // with the controller idle but the pump believing its buffer is full, so the tail (final G30 park +
@@ -1812,8 +2073,8 @@ namespace CNC.Core
 
             if (newstate.State != GrblStates.Idle)
                 CancelIdleKick?.Invoke();
-            else if (pumpActive)
-                RequestIdleKick?.Invoke();
+            else if (pumpActive && peekState == PeekState.None)
+                RequestIdleKick?.Invoke();   // never ARM the stall watchdog during a peek either - see OnIdleKick
 
             // An alarm must release the pump (and, critically, Comms.com.AckSink) IMMEDIATELY, regardless of
             // which tab currently has focus - this is a comms-safety concern, not a UI-state one. Confirmed
