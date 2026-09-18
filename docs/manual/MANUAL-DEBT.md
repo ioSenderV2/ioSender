@@ -219,6 +219,27 @@ box's saved layout; the script files the capture when you quit the app.
 
 ---
 
+## Debt from the toolpath outline (#376, shipped 2026-09-17) — RECORDED AS IT SHIPPED
+
+The program list now groups into collapsible **toolpath sections on any file with tool changes**, not
+just on ioSenderV2 Fusion add-in output. That also makes two commands reachable that most users will
+never have seen, because on an ordinary file they were not offered.
+
+- [ ] **`#job` — a sub-section on the outline.** Where sections come from (an M6, or the add-in's own
+      markers), the **Program start** and **Program end** groups, and the naming convention worth
+      telling people about: *a comment immediately above the tool change becomes the toolpath's name*.
+      That is opt-in behaviour a reader can use in their own posts and hand-written files.
+- [ ] **`#job` — the two run commands**, right-click on a group: **Start from this toolpath** (runs
+      Program start, then from there to the end) and **Run just this toolpath** (Program start, that
+      toolpath, Program end). Both now run the program's own preamble rather than a synthetic one.
+- [ ] **Screenshot**: this wants a figure of the grouped list with one section expanded. Fold into the
+      `job-runscreen.png` reshoot already owed as priority 1 of the audit's §6 — a job loaded with
+      three toolpaths would cover the run strip, Peek, and the outline in one shot.
+- [ ] **Worth a mention in `#work-order`** too: a generated work order now outlines by tool change like
+      any other program.
+
+---
+
 ## Debt from Peek (shipped 2026-09-17) — RECORDED AS IT SHIPPED
 
 Logged the same day, which is the whole point of this file and is what did not happen for the six
