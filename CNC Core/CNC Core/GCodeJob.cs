@@ -298,6 +298,131 @@ namespace CNC.Core
             HasSections = true;
         }
 
+        // How far above an M6 to look for a name, as a backstop for a file that opens with a long comment
+        // header and no executable line to stop at. The real bound is the executable line - see below.
+        private const int ToolChangeNameLookback = 10;
+
+        // Everything before the first tool change: the preamble, the modal setup, the initial positioning.
+        // It belongs to no tool, but it must belong to SOMETHING - a null Section would group under a blank
+        // header, which reads as a bug rather than as "this is the lead-in".
+        private const string LeadInSectionName = "Program start";
+
+        /// <summary>
+        /// Fallback outline: derive sections from the program's TOOL CHANGES when it carries none of the
+        /// Fusion add-in's (--- name ---) markers.
+        ///
+        /// Applied AFTER the parse rather than during it, deliberately. Add-in output has both markers and
+        /// M6s, and sectioning on both interleaved would split every operation in two - once at the marker
+        /// and again a line or two later at the tool change. Running afterwards, gated on HasSections, makes
+        /// the markers win by construction rather than by getting the ordering right.
+        ///
+        /// The name is the T-number, which is always true, plus the first comment of the contiguous comment
+        /// run immediately above the M6 - so a post (or a person) that writes
+        ///
+        ///     (Finish contour)
+        ///     T2 M6
+        ///
+        /// gets "T2 - Finish contour", and one that writes nothing gets "T2". The comment is a SUFFIX, never
+        /// the identity: a file whose header comments run straight into its first M6 will produce something
+        /// like "T1 - Program 1001", which is noise, but the section is still correctly identified.
+        ///
+        /// The search stops at the first line that DOES anything. A comment separated from the tool change
+        /// by g-code belongs to that g-code, not to the tool change - that boundary, not a line count, is
+        /// what keeps this from wandering up the file. The line cap only covers the case where there is no
+        /// executable line to stop at.
+        /// </summary>
+        private void ApplyToolChangeSections()
+        {
+            if (HasSections || blocks == null || blocks.Count == 0)
+                return;
+
+            var starts = new List<int>();
+            for (int i = 0; i < blocks.Count; i++)
+                if (blocks[i].HasToolChange)
+                    starts.Add(i);
+
+            if (starts.Count == 0)
+                return;
+
+            string current = LeadInSectionName;
+            int next = 0;
+
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                if (next < starts.Count && i == starts[next])
+                {
+                    current = ToolChangeSectionName(i);
+                    blocks[i].IsSectionStart = true;
+                    next++;
+                }
+                blocks[i].Section = current;
+            }
+
+            // Only the lead-in exists if the very first block is the tool change; harmless either way.
+            if (starts[0] > 0)
+                blocks[0].IsSectionStart = true;
+
+            HasSections = true;
+            DebugLog.Write("gcode", string.Format("Outline: no section markers - derived {0} section(s) from tool changes", starts.Count));
+        }
+
+        // "T2", plus the first comment of the run immediately above the tool change when there is one.
+        private string ToolChangeSectionName(int toolChangeIndex)
+        {
+            // Plenty of posts put the T word on its own line ahead of the M6 rather than on it - "T2" then
+            // "M6" - so a T on the tool-change line is the common case, not the only one. Walk back over the
+            // same window for the most recent one before giving up.
+            string tool = ToolNumberOf(blocks[toolChangeIndex].Data);
+            if (tool == null)
+                for (int i = toolChangeIndex - 1; i >= Math.Max(0, toolChangeIndex - ToolChangeNameLookback) && tool == null; i--)
+                    if (!blocks[i].IsComment)
+                        tool = ToolNumberOf(blocks[i].Data);
+
+            if (tool == null)
+                tool = "Tool change";
+
+            string name = null;
+
+            int limit = Math.Max(0, toolChangeIndex - ToolChangeNameLookback);
+            for (int i = toolChangeIndex - 1; i >= limit; i--)
+            {
+                string text = (blocks[i].Data ?? string.Empty).Trim();
+
+                if (text.Length == 0)
+                    continue;               // blank lines do not break the run
+
+                if (!blocks[i].IsComment)
+                    break;                  // an executable line: anything above it is not about this tool change
+
+                // Keep walking: we want the FIRST comment of the run, not the closest. Where a post emits an
+                // operation name and then a tool description, the operation name is the outer one and is the
+                // one worth showing.
+                string inner = text.TrimStart('(').TrimEnd(')').Trim();
+                if (inner.Length > 0)
+                    name = inner;
+            }
+
+            if (string.IsNullOrEmpty(name))
+                return tool;
+
+            if (name.Length > 40)
+                name = name.Substring(0, 39).TrimEnd() + "…";
+
+            return tool + " - " + name;
+        }
+
+        // The T word on the tool-change line. Text rather than the parsed token because this runs over
+        // already-emitted blocks, whose Tokens may be empty for a line that failed to parse - and a line
+        // that failed to parse can still be the one carrying the tool change.
+        private static readonly Regex rxToolWord = new Regex(@"(?:^|[^A-Za-z])T\s*(\d+)", RegexOptions.IgnoreCase);
+
+        // null when the line carries no T word, so the caller can keep looking rather than settling.
+        private static string ToolNumberOf(string block)
+        {
+            var m = rxToolWord.Match(block ?? string.Empty);
+            return m.Success ? "T" + m.Groups[1].Value.TrimStart('0').PadLeft(1, '0') : null;
+        }
+
         // Whether AddBlock prepends N<line> numbers (when GrblInfo.UseLinenumbers is also set).
         // Default true preserves existing callers; LoadFile takes its own addLineNumber arg.
         // Reset to true by Reset().
@@ -616,6 +741,7 @@ namespace CNC.Core
             if (action == Action.End)
             {
                 ComputeLimits();
+                ApplyToolChangeSections();   // markers already won if there were any - see the method
                 FileChanged?.Invoke(filename);
             }
         }
@@ -658,6 +784,10 @@ namespace CNC.Core
         // buffered blocks have been flushed to the bound collection and the limits computed.
         public void RaiseFileChanged()
         {
+            // Background load: the blocks are in the bound collection by now, so the tool-change outline can
+            // be derived over them exactly as on the foreground path. Must run BEFORE FileChanged, which is
+            // what ultimately drives HasOutline and the grouping.
+            ApplyToolChangeSections();
             FileChanged?.Invoke(filename);
         }
 
