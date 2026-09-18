@@ -580,10 +580,14 @@ namespace CNC.Controls
             // a prompt confidently telling the operator the program had no start-up section when it did.
             bool haveLeadIn = GCode.File.Data.Count > 0 && GCode.File.Data[0].Section == GCodeJob.LeadInSectionName;
 
+            // Says what HAPPENS, not how it works. An earlier draft explained the neutralise-and-stream
+            // mechanism and warned about the cost on a large file; the operator's reading was that it had
+            // become confusing, and they were right - the streaming cost is a consequence of the design, not
+            // a decision being put to them at this moment.
             string prompt = runOnlyThisToolpath
                 ? (haveLeadIn
-                    ? string.Format("Run only toolpath \"{0}\"?\r\rThe program's own start-up and wind-down run around it, and every other toolpath is passed over. The whole file is streamed to keep the line numbering honest, so a very large program takes a while even though only this toolpath cuts.", group.Name)
-                    : string.Format("Run only toolpath \"{0}\"?\r\rThe program will stop at the end of this toolpath. It has no start-up section, so units, plane and work offset will be whatever the machine currently holds.", group.Name))
+                    ? string.Format("Run only toolpath \"{0}\"?\r\rThis runs the entire file, skipping every toolpath except this one. Program start and Program end still run.", group.Name)
+                    : string.Format("Run only toolpath \"{0}\"?\r\rThe program stops at the end of this toolpath. There is no Program start section to run, so units, plane and work offset will be whatever the machine currently holds.", group.Name))
                 : string.Format("Start the run from toolpath \"{0}\" and continue to the end?", group.Name);
 
             if (AppDialogs.Show(prompt, "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
