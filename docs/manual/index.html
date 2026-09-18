@@ -1241,6 +1241,76 @@
     because Setup is shared with a plain loaded file — its live selection isn't something a work order saved
     weeks ago can treat as a stable reference.</p>
 
+    <h3>Repeating a toolpath elsewhere &mdash; Indirect and groups</h3>
+    <p>A toolpath with <strong>Geometry: Indirect</strong> is not a shape at all. It carries no dimensions and
+    no operations of its own: it <em>borrows</em> both, live, from another toolpath you name as its
+    <strong>source</strong>, and supplies only a different position to run them at. That is the difference
+    between it and <em>Duplicate</em>, which forks an independent copy &mdash; change the original's diameter
+    or add a chamfer to it, and every Indirect copy picks the change up at the next Generate. A duplicate
+    does not.</p>
+    <ul>
+      <li><strong>Absolute or Relative.</strong> An Indirect toolpath's position can be an ordinary
+      coordinate, or an <em>offset from its source</em>. Relative is the one to reach for when the pair
+      belongs together &mdash; move the original and the copy follows it, still 120&nbsp;mm to the right.</li>
+      <li><strong>Group a set, then copy the set.</strong> Give several toolpaths the same
+      <strong>Group</strong> label and the tree collects them under one header you can enable or disable
+      together. An Indirect toolpath can then point at the <em>group</em> rather than at one toolpath, and it
+      copies the whole arrangement &mdash; rigidly, so the members keep their spacing. The payoff is the part
+      worth planning around: <strong>add a toolpath to the group and it appears in every copy.</strong></li>
+      <li><strong>Hold a member back per copy.</strong> Each Indirect copy can skip individual members of the
+      group it borrows, which is how you cut the full set in one place and all-but-one somewhere else. The
+      anchor stays the anchor either way, so holding a member back never slides the rest sideways.</li>
+      <li><strong>Only real toolpaths carry a group</strong>, and an Indirect one cannot point at another
+      Indirect. Between them those two rules make a circular reference impossible to build rather than
+      something to be warned about.</li>
+      <li>A pattern belongs to the <em>source</em>: a group of patterned toolpaths copies as a group of
+      patterned toolpaths, and the Indirect toolpath has no pattern of its own to multiply it by. A broken
+      reference &mdash; a source renamed or deleted &mdash; is reported in the tree rather than quietly
+      cutting nothing.</li>
+    </ul>
+
+    <h3>Corner reliefs (dogbones)</h3>
+    <p>A round cutter cannot leave a square inside corner, so a square part will not seat in the pocket cut
+    for it &mdash; the corner keeps a radius the part's corner has to go into. <strong>Corner reliefs</strong>,
+    a checkbox on <strong>Square</strong> and <strong>Rectangle</strong> toolpaths, fixes that the way a
+    joiner does: at each corner the cutter pokes out along the diagonal until its circle passes through the
+    true corner point, clearing exactly the material a square peg needs.</p>
+    <ul>
+      <li><strong>It is opt-in because it leaves a mark.</strong> Each relief overcuts both walls by a little
+      under a third of the cutter's radius &mdash; a small round nick in the corner. That is the trade: a part
+      that seats, against two visible nicks per corner.</li>
+      <li><strong>Only inside corners are relieved.</strong> The reliefs are cut by the passes that run
+      internal walls &mdash; Pocket and Side finish. A <strong>Contour</strong> ignores the setting entirely,
+      because its corners are convex and a round cutter already reproduces them exactly.</li>
+      <li><strong>The relief is sized by the cutter that cuts it</strong>, not by the toolpath, so the same
+      rectangle roughed with a 1/4" and finished with a 1/8" gets the right relief in each pass rather than
+      one compromise.</li>
+    </ul>
+
+    <h3>Save Drawing &mdash; the work order as a shop drawing</h3>
+    <p>Right-click the stock diagram and choose <strong>Save Drawing&hellip;</strong> to write the whole work
+    order as a dimensioned <strong>PDF</strong>: a drawing of the blank with every feature on it, and a
+    <strong>feature schedule</strong> underneath keyed to it. This is what makes a work order portable &mdash;
+    to a second machine, to a manual drill, or to somebody else's bench.</p>
+    <ul>
+      <li><strong>Balloons key the drawing to the table.</strong> Each feature gets a lettered, colour-matched
+      balloon, and the table lists its geometry, position, quantity, operations and tooling. The drawing
+      itself carries only the dimensions with nowhere else to live &mdash; overall stock size, the keep-out
+      margin, the origin &mdash; because forty leader lines fighting each other is worse than a hole
+      chart.</li>
+      <li><strong>Every instance of a pattern is listed with its own X and Y</strong>, not just a count. A
+      "Qty 6" tells the person at the other machine that a pattern exists and leaves them reconstructing six
+      positions from a pitch and a corner, by hand, next to a running spindle. The numbers are already known,
+      so they are printed.</li>
+      <li><strong>It is a drawing of the work order, not of your screen.</strong> The selection highlight is
+      left off, and a held-back toolpath is printed dimmed and labelled rather than omitted &mdash; its
+      balloon keeps its letter and colour, because a key that changes is not a key.</li>
+      <li><strong>It needs a stock size</strong>, and at least one toolpath; without them the menu entry is
+      disabled rather than producing a sheet that dimensions a placeholder. Long feature schedules spill onto
+      further pages and the drawing keeps page one to itself &mdash; the drawing is the part that goes to the
+      machine, so it is not the part that gets shrunk.</li>
+    </ul>
+
     <h3>Your own tools</h3>
     <p>The tool list isn't fixed. Add your own cutters alongside the built-ins from the
     <strong>Feeds &amp; Speeds</strong> dialog's tool editor — an added tool behaves identically to a built-in
