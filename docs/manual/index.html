@@ -2307,7 +2307,12 @@
       <strong>Hover the matched entry's label in the tree</strong> and it tells you why it matched:
       <em>Matched text: …</em> or <em>Matched tooltip: …</em>, quoting the words it hit and, for a tooltip,
       naming the control they belong to. So the answer isn't just "it's on this page somewhere" — it's
-      "hover <em>Send comments</em>". A correct match never has to read as a wrong one.</div>
+      "hover <em>Send comments</em>". A correct match never has to read as a wrong one.<br>
+      Open the page and the search goes one further: <strong>every control that matched is outlined on the
+      page itself</strong> and the first is scrolled into view, so you are not left reading a settings page
+      hunting for the word. An outline drawn <strong>dashed</strong> means the match is in that control's
+      <em>tooltip</em> rather than in anything visible — the same "hover me" it always was, now marked where
+      the control actually is.</div>
 
     <div class="callout note"><span class="k">Why the Grbl page keeps its own tree</span><br>
       Inside the <strong>Grbl</strong> page you still get the familiar group tree and <code>$</code>-search —
@@ -2318,9 +2323,65 @@
 
     <div class="callout tip"><span class="k">Grbl page vs Machine Setup</span><br>
       <a href="#machine-setup">Machine Setup</a> is the <em>guided subset</em> that gets a new machine running;
-      the <strong>Grbl</strong> page here is the <em>full</em> list for fine-tuning. It also keeps
-      <strong>backups / restore points</strong>, and the auto-save / prompt-on-save options control whether
-      changes are written to the controller immediately or after confirmation.</div>
+      the <strong>Grbl</strong> page here is the <em>full</em> list for fine-tuning. The auto-save /
+      prompt-on-save options control whether changes are written to the controller immediately or after
+      confirmation.</div>
+
+    <h3>Restore points &mdash; going back to a moment</h3>
+    <p>ioSender snapshots two different things as you work: the <strong>controller's</strong>
+    <code>$</code> settings, and <strong>its own configuration</strong> &mdash; profiles, probe and fixture
+    definitions, the work surface, the layout. Both land in the same backup folder with the same timestamp,
+    and <strong>Restore</strong>, on the Grbl page, lists them as what they are: <em>moments</em>.</p>
+    <ul>
+      <li>Each entry says <strong>when it was taken, how long ago, and what it holds</strong> &mdash; one of
+      the two, or both.</li>
+      <li>You then choose <strong>what to put back</strong>: machine settings, app configuration, or
+      both.</li>
+      <li>That ordering is the point. "It was fine an hour ago" is a statement about a <em>time</em>, and the
+      old list asked you to already know <em>which kind</em> of file held the thing that broke &mdash; which
+      is the thing you are trying to find out.</li>
+    </ul>
+
+    <h3>Configuration overlays</h3>
+    <p>An <strong>overlay</strong> is a fragment of a configuration &mdash; a <code>.ioconfig</code> file
+    holding just some of the sections a full <code>App.config</code> has. Layering one lets you adopt a
+    specific change, most usefully <em>somebody else's screen layout</em>, without touching your machine
+    settings, profiles, fixtures, macros or keymaps. It exists because an upgraded install keeps its own
+    saved layout forever: without this, a new arrangement can reach a new installation and never reach
+    yours.</p>
+    <p>All three commands live under <strong>Help &rarr; Support</strong>:</p>
+    <table class="reftab">
+      <tr><th>Command</th><th>What it does</th></tr>
+      <tr><td><strong>Apply configuration overlay&hellip;</strong></td><td>Layers a <code>.ioconfig</code>
+      onto this profile. It backs the current configuration up first and <strong>restarts ioSender</strong>
+      to apply it; afterwards it tells you which sections it actually took.</td></tr>
+      <tr><td><strong>Export configuration overlay&hellip;</strong></td><td>Writes your screen layout out as
+      a <code>.ioconfig</code> somebody else can apply. <strong>Machine identity is never included</strong>
+      &mdash; not the port, the network host or the machine itself.</td></tr>
+      <tr><td><strong>Undo configuration overlay</strong></td><td>Puts the configuration back exactly as it
+      was immediately before the last overlay. Restarts too.</td></tr>
+    </table>
+    <p>A section can be layered in one of two ways: <strong>replace</strong>, the default, where the
+    overlay's copy supplants yours wholesale &mdash; what a layout wants &mdash; or <strong>merge</strong>,
+    where only the fields the overlay actually carries are grafted onto yours, so a fragment can flip three
+    settings without carrying all eighty. There is no separate overlay format to learn: an overlay is a
+    working configuration with the sections you don't want deleted.</p>
+    <div class="callout tip"><span class="k">Try one for a single run</span><br>
+      Starting ioSender with <code>-overlay&nbsp;&lt;file&gt;</code> applies the overlay for that launch
+      only &mdash; the way to see what a layout does before adopting it. It is transient in a strong sense:
+      for that run <em>every</em> save is diverted to a side file, so nothing the session does can write the
+      overlay into your real profile. Relaunch without the flag and you are back exactly where you were.</div>
+
+    <h3>Two more under Help &rarr; Support</h3>
+    <ul>
+      <li><strong>Restart ioSender&hellip;</strong> sits alone at the top of the menu because it is a
+      <em>recovery</em> action, not a convenience: it saves your settings, closes and reopens, which clears
+      anything held only in memory for this session &mdash; a stuck connection state being the usual reason
+      to reach for it. It asks first.</li>
+      <li><strong>Machine mirror</strong>, under <strong>Tools</strong>, is a read-only live view of the
+      machine state as seen through the client/server wire protocol. It is a developer's diagnostic: any
+      disagreement between it and the main window is a protocol bug.</li>
+    </ul>
 
     <div class="callout note"><span class="k">Camera is opt-in</span><br>
       The Camera menu only appears once a device is bound: go to <strong>Settings → Application → Camera</strong>,
