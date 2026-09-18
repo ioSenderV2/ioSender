@@ -256,6 +256,10 @@ namespace GCode_Sender
         {
             model = m;
             RefreshProbes();
+            CNC.Core.DebugLog.Write("heightmap", string.Format(
+                "RunHeightMapAndStore: entered - area {0:0.###},{1:0.###} to {2:0.###},{3:0.###}, grid {4:0.##} x {5:0.##}, probes offered {6}, selected '{7}'",
+                minX, minY, maxX, maxY, gridX, gridY, cbxProbe.Items.Count,
+                (cbxProbe.SelectedItem as ProbeDefinition)?.Name ?? "(none)"));
             HeightMap.MinX = minX; HeightMap.MaxX = maxX;
             HeightMap.MinY = minY; HeightMap.MaxY = maxY;
             HeightMap.GridSizeX = Math.Max(gridX, 1d);
@@ -263,7 +267,10 @@ namespace GCode_Sender
             StartProbing();
 
             if (!HeightMap.HasHeightMap)
+            {
+                CNC.Core.DebugLog.Write("heightmap", "RunHeightMapAndStore: StartProbing returned with NO MAP - nothing stored");
                 return;
+            }
 
             // Work zero in MACHINE coordinates, which is what the stored map is stamped against - see
             // SetupHeightMap for why a map without the setup it belongs to is a hazard rather than a
@@ -688,6 +695,7 @@ namespace GCode_Sender
                 model = DataContext as GrblViewModel ?? CNC.Core.Grbl.GrblViewModel;
             if (model == null)
             {
+                CNC.Core.DebugLog.Write("heightmap", "StartProbing: REFUSED - no controller model");
                 AppDialogs.Show(Loc("HmNoController"), "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
@@ -695,13 +703,18 @@ namespace GCode_Sender
             var p = cbxProbe.SelectedItem as ProbeDefinition;
             if (p == null)
             {
+                CNC.Core.DebugLog.Write("heightmap", string.Format(
+                    "StartProbing: REFUSED - no probe selected ({0} offered)", cbxProbe.Items.Count));
                 AppDialogs.Show(Loc("HmSelectProbe"), "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
 
             var pr = EnsureProbing();
             if (pr == null)
+            {
+                CNC.Core.DebugLog.Write("heightmap", "StartProbing: REFUSED - no probing engine");
                 return;
+            }
 
             // ---- Full work surface: anchor the origin FIRST, then map in it ----
             //

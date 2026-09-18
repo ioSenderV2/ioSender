@@ -2364,6 +2364,9 @@ namespace GCode_Sender
                     // The height map pass first (it is the rest of what the operator asked for), THEN any
                     // held-back advice. RunHeightMapPass blocks until the grid is probed, so the warning
                     // lands after it rather than on top of it.
+                    DebugLog.Write("heightmap", string.Format(
+                        "run finished: jobFinished={0} wantHeightMap={1} - height map pass {2}",
+                        jobFinished, wantHeightMap, jobFinished && wantHeightMap ? "WILL RUN" : "SKIPPED"));
                     Dispatcher.BeginInvoke(new System.Action(() =>
                     {
                         if (jobFinished && wantHeightMap)
@@ -2426,8 +2429,16 @@ namespace GCode_Sender
         private void RunHeightMapPass()
         {
             double w = measuredX ?? fldWidth.Value, h = measuredY ?? fldHeight.Value;
+            DebugLog.Write("heightmap", string.Format(
+                "RunHeightMapPass: area {0:0.###} x {1:0.###} (measured {2} x {3}), grid {4:0.##} x {5:0.##}",
+                w, h, measuredX.HasValue ? measuredX.Value.ToString("0.###") : "none",
+                measuredY.HasValue ? measuredY.Value.ToString("0.###") : "none",
+                fldHeightMapGridX.Value, fldHeightMapGridY.Value));
             if (w <= 0d || h <= 0d)
+            {
+                DebugLog.Write("heightmap", "RunHeightMapPass: ABANDONED - the stock area is zero");
                 return;
+            }
             var hm = new HeightMapView();
             hm.RunHeightMapAndStore(model, 0d, 0d, w, h, fldHeightMapGridX.Value, fldHeightMapGridY.Value);
         }
