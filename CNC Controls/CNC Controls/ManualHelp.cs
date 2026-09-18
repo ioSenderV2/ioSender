@@ -90,12 +90,88 @@ namespace CNC.Controls
 
             try
             {
-                Process.Start(url);
+                // Process.Start on a URL is ShellExecute, and ShellExecute DISCARDS THE FRAGMENT of a
+                // file:// URL: it resolves the URL to a local path and opens the file, so everything after
+                // the '#' is gone before any browser sees it. Confirmed on this machine 2026-09-18 - the
+                // address bar showed plain index.html with no anchor, for a URL that definitely had one.
+                //
+                // That is the whole reason context help "just opened the manual". The anchor map, the topic
+                // resolution and the page's own hash handling were all correct and all innocent; the app
+                // never had a way to tell, because a stripped anchor and a missing one look identical.
+                //
+                // So a local, anchored URL is handed to the BROWSER EXECUTABLE as an argument - a browser
+                // keeps the fragment of a URL on its command line. Anything else (the https fallback, or a
+                // plain URL with no anchor) goes through the shell exactly as before: https keeps its
+                // fragment through ShellExecute, and with no anchor there is nothing to lose.
+                bool localAnchored = !string.IsNullOrEmpty(anchor) &&
+                                     url.StartsWith("file:", StringComparison.OrdinalIgnoreCase);
+
+                if (!localAnchored || !OpenInDefaultBrowser(url))
+                    Process.Start(url);
             }
             catch
             {
                 // Opening help must never take down the app - swallow (no browser, blocked, etc.).
             }
+        }
+
+        /// <summary>
+        /// Launch the user's default browser with <paramref name="url"/> as a command-line argument.
+        /// Returns false if the default browser cannot be resolved or will not start, so the caller can
+        /// fall back to the shell - a manual opened at the wrong place still beats one that does not open.
+        /// </summary>
+        static bool OpenInDefaultBrowser(string url)
+        {
+            try
+            {
+                string exe = DefaultBrowserExe();
+                if (string.IsNullOrEmpty(exe) || !File.Exists(exe))
+                    return false;
+
+                Process.Start(new ProcessStartInfo(exe, "\"" + url + "\"") { UseShellExecute = false });
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// The executable Windows would use for an http link: the user's UrlAssociations choice, resolved
+        /// through its ProgId's shell open command. Read rather than assumed - "the default browser" is a
+        /// per-user setting and hard-coding one would send half the readers somewhere they do not use.
+        /// </summary>
+        static string DefaultBrowserExe()
+        {
+            string progId;
+            using (var choice = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                       @"SOFTWARE\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice"))
+                progId = choice?.GetValue("ProgId") as string;
+
+            if (string.IsNullOrEmpty(progId))
+                return null;
+
+            string command;
+            using (var cmd = Microsoft.Win32.Registry.ClassesRoot.OpenSubKey(progId + @"\shell\open\command"))
+                command = cmd?.GetValue(null) as string;
+
+            if (string.IsNullOrEmpty(command))
+                return null;
+
+            // Typically: "C:\...\msedge.exe" --single-argument %1
+            // Only the executable is wanted; the URL is passed as an ordinary argument, which is what keeps
+            // the fragment intact. A switch like --single-argument is that browser's way of taking an
+            // unescaped URL and is not needed - nor safe to pass on blindly to a different browser.
+            command = command.Trim();
+            if (command.StartsWith("\""))
+            {
+                int end = command.IndexOf('"', 1);
+                return end > 1 ? command.Substring(1, end - 1) : null;
+            }
+
+            int space = command.IndexOf(' ');
+            return space > 0 ? command.Substring(0, space) : command;
         }
 
         static string ResolveBase()
