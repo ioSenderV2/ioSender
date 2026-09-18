@@ -587,7 +587,28 @@ namespace CNC.Core
         }
         public bool ProgramEnd { get { return _pgmEnd; } set { _pgmEnd = value; if (_pgmEnd) OnPropertyChanged(); } }
         public int GrblError { get { return State.GrblState.Error; } set { State.GrblState.Error = value; OnPropertyChanged(); } }
-        public StreamingState StreamingState { get { return _streamingState; } set { if (_streamingState != value) { _streamingState = value; OnPropertyChanged(); } } }
+        public StreamingState StreamingState { get { return _streamingState; } set { if (_streamingState != value) { _streamingState = value; if (value == StreamingState.JobFinished) _jobFinishedSeq++; OnPropertyChanged(); } } }
+
+        private int _jobFinishedSeq;
+
+        /// <summary>
+        /// Bumped every time streaming reaches JobFinished. Compare it against the value captured when a
+        /// watcher armed: differing means a job finished in between, whether or not anyone SAW it.
+        /// </summary>
+        /// <remarks>
+        /// A PropertyChanged handler carries no value - it reads StreamingState when it runs - so two
+        /// transitions that queue while the UI thread is busy are both read as the LATER state, and
+        /// JobFinished simply never appears to have happened. Not theoretical: a modal dialog raised from
+        /// the last PRINT of a Setup measure run held the UI thread across the program's own end (M2, Pgm
+        /// End, a logged 414 ms marshal stall), the handoff watcher logged terminal=Idle jobFinished=False
+        /// for a run that had completed perfectly, and the height-map pass gated on that flag never ran -
+        /// silently, because "the run finished and nothing followed" looks like a run that had nothing to
+        /// follow it (2026-09-18).
+        ///
+        /// A counter rather than a latched bool: nothing has to remember to clear it, and two runs in a row
+        /// are distinguishable from one.
+        /// </remarks>
+        public int JobFinishedSeq { get { return _jobFinishedSeq; } }
         public string WorkCoordinateSystem { get { return State.WorkCoordinateSystem; } private set { State.WorkCoordinateSystem = value; OnPropertyChanged(); } }
         // The machine's own state, owned separately from this view model's display concerns - step 5 of
         // the client/server split. These properties forward to it and return the SAME instances they always

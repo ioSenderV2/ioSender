@@ -1369,7 +1369,12 @@ namespace GCode_Sender
         // (their reference point is derived from the ENTERED exact size, so this class of error compounds
         // there too). One-shot per run (sizeWarningShown) - only checked once all 4 corners have arrived,
         // not re-shown as later PRINT lines (spoilZ, skew, ...) keep calling ShowResult.
-        private const double SizeMismatchWarnMm = 0.5d;
+        // 1.0 mm, not 0.5: at half a millimetre this fired on stock that was simply cut a little off, and a
+        // warning that cries wolf on good material teaches the operator to click through the one that
+        // matters. The error it is really looking for is proportional - the 429 mm panel above was out by
+        // 1.2-1.5 mm - so a millimetre still catches it while leaving ordinary stock alone. User's call from
+        // the machine, 2026-09-18.
+        private const double SizeMismatchWarnMm = 1.0d;
         private void CheckSizeAgainstEntered(int probed)
         {
             if (sizeWarningShown || probed < 4 || chkExactSize.IsChecked != true || !measuredX.HasValue || !measuredY.HasValue)
@@ -1381,14 +1386,33 @@ namespace GCode_Sender
                 return;
 
             sizeWarningShown = true;
-            Dispatcher.BeginInvoke(new System.Action(() => AppDialogs.Show(string.Format(
+
+            // HELD until the whole run is over - see ShowPendingSizeWarning. This fires on the fourth
+            // corner's PRINT, which arrives with the program still streaming, and a modal dialog there
+            // stops the operator's own sequence dead: the height map pass that should follow waits behind
+            // a message box nobody asked for mid-run. It also held the UI thread across the program's end
+            // and cost the run its JobFinished notification (2026-09-18).
+            pendingSizeWarning = string.Format(
                 "Measured size ({0} x {1}) differs from the entered exact size ({2} x {3}) by more than {4} - " +
                 "X off by {5}, Y off by {6}. That's larger than normal probe noise for stock claimed to be exact; " +
                 "it looks like the machine isn't moving the commanded distance. Consider running Stepper calibration " +
-                "(Machine Setup > Tools) to check steps/mm on each axis.",
+                "(Tools > Calibration) to check steps/mm on each axis.",
                 FormatLen(measuredX.Value), FormatLen(measuredY.Value), FormatLen(fldWidth.Value), FormatLen(fldHeight.Value),
-                FormatLen(SizeMismatchWarnMm), FormatLen(dx), FormatLen(dy)),
-                "Setup", MessageBoxButton.OK, MessageBoxImage.Warning)));
+                FormatLen(SizeMismatchWarnMm), FormatLen(dx), FormatLen(dy));
+        }
+
+        // The size-mismatch warning, raised once everything the run was going to do has been done. It is
+        // advice about calibration, not about this job - nothing waits on the answer, so it has no business
+        // interrupting a program that is still running or a height map that is still probing.
+        private string pendingSizeWarning;
+
+        private void ShowPendingSizeWarning()
+        {
+            if (string.IsNullOrEmpty(pendingSizeWarning))
+                return;
+            string text = pendingSizeWarning;
+            pendingSizeWarning = null;
+            AppDialogs.Show(text, "Setup", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         // Copy the measured stock size to the clipboard as "X Y [Z]" (mm) for pasting into the Fusion
@@ -2337,8 +2361,15 @@ namespace GCode_Sender
                     // EndHandoff is the handoff's own onHandoffEnd now (it runs just before this, for every
                     // Generate-first tab), so it is no longer called from here - it was the prototype the
                     // shared callback was generalised from.
-                    if (jobFinished && wantHeightMap)
-                        Dispatcher.BeginInvoke(new System.Action(RunHeightMapPass));
+                    // The height map pass first (it is the rest of what the operator asked for), THEN any
+                    // held-back advice. RunHeightMapPass blocks until the grid is probed, so the warning
+                    // lands after it rather than on top of it.
+                    Dispatcher.BeginInvoke(new System.Action(() =>
+                    {
+                        if (jobFinished && wantHeightMap)
+                            RunHeightMapPass();
+                        ShowPendingSizeWarning();
+                    }));
                 },
                 startDelayMs: startDelay,
                 alreadyPushed: alreadyLoaded);

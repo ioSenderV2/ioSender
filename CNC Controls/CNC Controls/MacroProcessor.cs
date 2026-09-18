@@ -438,6 +438,11 @@ namespace CNC.Controls
                 return;
             }
             _borrowedWatcherArmed = true;
+            // Captured at ARM time: a completed job is then detectable from the counter even if the
+            // JobFinished transition itself is never observed, which happens whenever the UI thread is busy
+            // long enough for JobFinished and Idle to coalesce - a modal dialog raised by the running
+            // program is enough. See GrblViewModel.JobFinishedSeq.
+            int finishedSeqAtArm = model.JobFinishedSeq;
             bool started = false, jobFinished = false, sawError = false;
             _borrowedHandler = (s, e) =>
             {
@@ -450,7 +455,7 @@ namespace CNC.Controls
                 // both were live incidents, 2026-08-08.
                 if (st == StreamingState.Send && model.FileName == _borrowedName)
                     started = true;
-                if (st == StreamingState.JobFinished)
+                if (st == StreamingState.JobFinished || model.JobFinishedSeq != finishedSeqAtArm)
                     jobFinished = true;
                 // Latch a failed run: the terminal only arrives at the Idle that follows the operator's
                 // reset/unlock, by which time StreamingState no longer says anything went wrong.
@@ -876,6 +881,11 @@ namespace CNC.Controls
             // even a run that finishes inside the start call's own event pumping cannot be missed.
             // Left in place through an Error/Halted (alarm) on purpose: the pop then happens on the
             // Idle that follows the operator's reset/unlock, so they can see what failed first.
+            // Captured at ARM time: a completed job is then detectable from the counter even if the
+            // JobFinished transition itself is never observed, which happens whenever the UI thread is busy
+            // long enough for JobFinished and Idle to coalesce - a modal dialog raised by the running
+            // program is enough. See GrblViewModel.JobFinishedSeq.
+            int finishedSeqAtArm = model.JobFinishedSeq;
             bool started = false, jobFinished = false, sawError = false;
             System.ComponentModel.PropertyChangedEventHandler handler = null;
             handler = (s, e) =>
@@ -889,7 +899,7 @@ namespace CNC.Controls
                 // on a foreign terminal - disarming without popping this macro's pushed slot.
                 if (st == StreamingState.Send && model.FileName == name)
                     started = true;
-                if (st == StreamingState.JobFinished)
+                if (st == StreamingState.JobFinished || model.JobFinishedSeq != finishedSeqAtArm)
                     jobFinished = true;
                 // Latch a failed run: this watcher only completes at the Idle/NoFile that follows the
                 // operator's reset/unlock, so without the latch an alarmed run would be treated exactly
