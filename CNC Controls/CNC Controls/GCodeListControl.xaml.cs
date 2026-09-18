@@ -589,34 +589,48 @@ namespace CNC.Controls
                 ? (haveLeadIn
                     ? string.Format("Run only toolpath \"{0}\"?\r\rThis will run Program start, this toolpath, and Program end. In that order.", group.Name)
                     : string.Format("Run only toolpath \"{0}\"?\r\rThe program stops at the end of this toolpath. There is no Program start section to run, so units, plane and work offset will be whatever the machine currently holds.", group.Name))
-                : string.Format("Start the run from toolpath \"{0}\" and continue to the end?", group.Name);
+                : (haveLeadIn
+                    ? string.Format("Start the run from toolpath \"{0}\"?\r\rThis will run Program start, then from this toolpath to the end of the program.", group.Name)
+                    : string.Format("Start the run from toolpath \"{0}\" and continue to the end?\r\rThere is no Program start section to run, so units, plane and work offset will be whatever the machine currently holds.", group.Name));
 
             if (AppDialogs.Show(prompt, "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
                 return;
 
-            // "Run just this toolpath" now runs the program's OWN preamble and wind-down around the chosen
-            // section, rather than the section alone. That is a correctness change, not a convenience: on its
-            // own, a section sets no units, plane or work offset - it inherited whatever happened to be live -
-            // and it ended with the spindle still turning and the tool wherever the cut stopped.
+            // BOTH commands run the program's OWN preamble rather than a synthetic prolog, whenever there is
+            // one to run. That is a correctness change, not a convenience: started mid-program, a section
+            // sets no units, no plane and no work offset - it inherited whatever happened to be live. The
+            // three-word prolog only ever covered the first two of those.
             //
-            // The run therefore covers the whole file, and everything outside {Program start, this section,
-            // Program end} is neutralised to an empty comment by the pump. Sent rather than skipped so the
-            // per-line status and the ack accounting stay aligned with the list on screen; the cost is that a
-            // very large program streams in full while cutting only part of itself.
+            // Expressed as a filter over the whole program rather than a block range, because neither
+            // command's real extent is contiguous: both begin with Program start and then jump. The pump
+            // advances past a filtered-out block without sending anything.
             //
-            // Falls back to the old behaviour - bound the run to the section, queue the synthetic prolog -
-            // when the outline has no Program start to run, which is any file whose very first block is
-            // already inside a section.
-            if (runOnlyThisToolpath && haveLeadIn)
+            // Falls back to the old behaviour - bound the run, queue the synthetic prolog - for a program
+            // with no Program start section, which is any file whose very first block is already inside a
+            // section.
+            if (haveLeadIn)
             {
                 string chosen = first.Section;
-                model.RunBlockFilter = i =>
-                {
-                    var b = i >= 0 && i < GCode.File.Data.Count ? GCode.File.Data[i] : null;
-                    return b != null && (b.Section == GCodeJob.LeadInSectionName ||
-                                         b.Section == chosen ||
-                                         b.Section == GCodeJob.EpilogueSectionName);
-                };
+                int from = startIndex;
+
+                model.RunBlockFilter = runOnlyThisToolpath
+                    // Program start, this toolpath, Program end. In that order.
+                    ? (System.Func<int, bool>)(i =>
+                    {
+                        var b = i >= 0 && i < GCode.File.Data.Count ? GCode.File.Data[i] : null;
+                        return b != null && (b.Section == GCodeJob.LeadInSectionName ||
+                                             b.Section == chosen ||
+                                             b.Section == GCodeJob.EpilogueSectionName);
+                    })
+                    // Program start, then from this toolpath to the end - so everything after the chosen
+                    // section runs too, Program end included, by virtue of being after it.
+                    : (i =>
+                    {
+                        if (i >= from)
+                            return true;
+                        var b = i >= 0 && i < GCode.File.Data.Count ? GCode.File.Data[i] : null;
+                        return b != null && b.Section == GCodeJob.LeadInSectionName;
+                    });
                 // The program's own preamble replaces the synthetic prolog - it is the real thing the author
                 // wrote, so nothing needs re-establishing by hand.
                 model.StartFromBlock.Execute(0);
