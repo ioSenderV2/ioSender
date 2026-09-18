@@ -307,6 +307,14 @@ namespace CNC.Core
         // header, which reads as a bug rather than as "this is the lead-in".
         private const string LeadInSectionName = "Program start";
 
+        // ...and its counterpart: the wind-down after the last cut - spindle off, park, M30.
+        public const string EpilogueSectionName = "Program end";
+
+        // Spindle stop, which is what a program's wind-down opens with. Matched as text for the same reason
+        // as the T word below: this runs over already-emitted blocks, and a line that failed to parse still
+        // has to be readable here.
+        private static readonly Regex rxSpindleStop = new Regex(@"(?:^|[^A-Za-z])M0*5(?:[^\d]|$)", RegexOptions.IgnoreCase);
+
         /// <summary>
         /// Fallback outline: derive sections from the program's TOOL CHANGES when it carries none of the
         /// Fusion add-in's (--- name ---) markers.
@@ -362,8 +370,39 @@ namespace CNC.Core
             if (starts[0] > 0)
                 blocks[0].IsSectionStart = true;
 
+            ApplyEpilogueSection(starts[starts.Count - 1]);
+
             HasSections = true;
             DebugLog.Write("gcode", string.Format("Outline: no section markers - derived {0} section(s) from tool changes", starts.Count));
+        }
+
+        /// <summary>
+        /// Split the program's wind-down off the last toolpath, so "Program end" is its own section: spindle
+        /// stop, the park, M30.
+        ///
+        /// Anchored on the spindle stop, which is what a wind-down opens with - but searched only AFTER the
+        /// LAST tool change, and that restriction is the whole safety of it. Programs routinely stop the
+        /// spindle between every toolpath (the sample file does), so "the last M5 in the file" without that
+        /// anchor would be right by luck; with a program whose final toolpath has no M5 of its own it would
+        /// reach back and swallow a real cutting section into the epilogue.
+        ///
+        /// If the last toolpath emits no spindle stop at all there is simply no epilogue section - the
+        /// wind-down stays part of that toolpath, which is where it already was.
+        /// </summary>
+        private void ApplyEpilogueSection(int lastToolChangeIndex)
+        {
+            int start = -1;
+            for (int i = lastToolChangeIndex + 1; i < blocks.Count; i++)
+                if (!blocks[i].IsComment && rxSpindleStop.IsMatch(blocks[i].Data ?? string.Empty))
+                    start = i;      // keep the LAST one after the last tool change
+
+            if (start < 0)
+                return;
+
+            for (int i = start; i < blocks.Count; i++)
+                blocks[i].Section = EpilogueSectionName;
+
+            blocks[start].IsSectionStart = true;
         }
 
         // "T2", plus the first comment of the run immediately above the tool change when there is one.
