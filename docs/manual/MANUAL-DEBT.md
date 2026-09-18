@@ -342,9 +342,16 @@ assert something false. That is a stopgap, not a fix:
         the two panel kinds, the depth model and **Max carve depth**, plus the parts of **M5** that
         belong with a carve (Clear floor, Mark, Mark dashed). Written from the app's tooltips, every
         claim checked in source.
-  - [ ] **M3 — the diode-laser path.** The other demo-able feature and the next one up. Remember the
-        gate: it is held back unless launched with `-enableSVGLaserJob`, so the topic has to say so
-        or it documents something the reader cannot find.
+  - [x] **M3 — DONE 2026-09-17** (`cca9e5f4`). New topic **`#laser` "Burning an SVG on a diode
+        laser"**, after `#carving` (intermediate:7). The gate is stated in a warning box before
+        anything else: no `-enableSVGLaserJob`, no menu entry **and** no row in Settings → Keyboard,
+        so the feature is absent rather than hidden. Written from the dialog's tooltips and the
+        emitter, not the changelog. Four things the audit had not catalogued and that a reader needs:
+        placement is **refused rather than trimmed** (and why that is not advisory on a machine with
+        `$20=0`/`$21=0`); the power ramp's **CLAMPED** warning; shading depth is set by the
+        **interval** as much as the power, which is why the readout leads with an areal figure; and an
+        **aborted job leaves the `G92` applied**, because `G92.1` is on the last line.
+        **Still owed: a figure** — the dialog's three tabs, already listed in §6.
   - [ ] **M5 remainder — Mark only.** A property of the *run*, not of a carve, so it belongs in
         `#work-order` rather than in `#carving`.
   - [ ] **M4 (Height Map)** — a whole topic this file had never listed; needs the app driven.

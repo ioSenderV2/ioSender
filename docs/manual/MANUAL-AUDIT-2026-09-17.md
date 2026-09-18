@@ -28,17 +28,18 @@ fixed their neighbours.
 
 | Bucket | Count |
 |---|---|
-| **MISSING** — shipped functionality with no usable manual coverage | **21** (M1–M21) — ✅ **M1, M2 done 2026-09-17** (new `#carving` topic); 19 left |
+| **MISSING** — shipped functionality with no usable manual coverage | **21** (M1–M21) — ✅ **M1, M2, M3 done 2026-09-17** (new `#carving` and `#laser` topics); 18 left |
 | **OBSOLETE** — manual asserts something that is no longer true | **16** (O1–O16) — ✅ **all applied 2026-09-17**, plus 2 uncatalogued siblings |
 | **NEEDS UPDATING** — still-correct topics now incomplete | **13** (U1–U13) |
 | **Screenshots** — all 19 referenced figures predate #216 | 19 (+ 4 orphans) |
 | Changelog entries with no operator-visible surface | 61 of 156 (§7) |
 
 **Running order.** §3 (the OBSOLETE pass) was taken first and is **done** — it was the cheap half
-and it carried the wrong facts. What remains, in order: **M1/M2 (SVG + text carving) and M3
-(laser)**, the demo-able features and the largest gaps; then **M4 (Height Map)**, which needs the app
-driven; then §4's thirteen, which can ride along with whichever topic they touch; then the rest of
-§2 and the reshoots.
+and it carried the wrong facts. The two demo-able features are **done** too: M1/M2 (`#carving`) and
+M3 (`#laser`). What remains, in order: **M4 (Height Map)**, which needs the app
+driven, and the **M5 remainder** (Mark only, which belongs in `#work-order`); then
+§4's thirteen, which can ride along with whichever topic they touch; then the rest of §2 and the
+reshoots.
 
 ---
 
@@ -61,6 +62,17 @@ driven; then §4's thirteen, which can ride along with whichever topic they touc
 >
 > Still owed for these two: **screenshots**. A carve in the Work Order tree with the stock preview,
 > and a negative badge, both listed in §6.
+
+> ✅ **M3 is DONE 2026-09-17** (`cca9e5f4`) — topic **`#laser` "Burning an SVG on a diode laser"**,
+> placed after `#carving` (intermediate:7). The `-enableSVGLaserJob` gate is the first thing on the
+> page, in a warning box, and says the quiet half too: no flag means no keyboard row either, so there
+> is nothing to bind and nothing to find. Written from the dialog's tooltips and
+> `SvgLaserSettings`/`SvgLaserProgram`, with four behaviours this table had not catalogued —
+> a placement outside the envelope is **refused, not trimmed** (and stated as non-advisory because
+> these machines run `$20=0`/`$21=0`); the ramp's **CLAMPED** warning, without which a test strip
+> compares a value against itself; shading depth follows the **interval** as much as the power, hence
+> the areal readout; and an **aborted job leaves the `G92` applied**, because `G92.1` is the last
+> line. Still owed: the three-tab dialog figure in §6.
 
 "Usable" is doing work in that heading. Several of these are *named* somewhere — in a menu table or
 a one-line parenthetical — without anything that would let an operator use them. Those are marked
