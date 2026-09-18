@@ -41,14 +41,16 @@
 
                     <GroupBox x:Uid="hm_grpArea" Header="Area to probe" Margin="0,6,0,0">
                         <StackPanel Margin="6">
-                            <StackPanel Orientation="Horizontal">
+                            <!-- Wraps for the same reason the run buttons do: a mode you cannot see is a mode
+                                 you cannot choose, and this pair decides what the whole run does. -->
+                            <WrapPanel Orientation="Horizontal">
                                 <RadioButton x:Uid="hm_areaProgram" x:Name="rbAreaProgram" Content="From setup" GroupName="hmarea" IsChecked="True"
                                              VerticalAlignment="Center" Checked="AreaProgram_Checked"
                                              ToolTip="Probe over the stock Setup measured, in its work coordinates - the same size the work order is built against. Falls back to the loaded program's extent if Setup has no stock size yet."/>
-                                <RadioButton x:Uid="hm_areaTable" x:Name="rbAreaTable" Content="Full work surface" GroupName="hmarea" Margin="18,0,0,0"
+                                <RadioButton x:Uid="hm_areaTable" x:Name="rbAreaTable" Content="Full work surface" GroupName="hmarea" Margin="18,0,0,2"
                                              VerticalAlignment="Center" Checked="AreaTable_Checked"
                                              ToolTip="Map the whole table, and set the work origin from it - no Setup and no existing work origin needed. The XY origin is placed at the spoilboard corner before probing, and work Z0 is set to the highest point probed, ready to surface from."/>
-                            </StackPanel>
+                            </WrapPanel>
                             <StackPanel x:Name="pnlAreaXW" Orientation="Horizontal" Margin="0,6,0,0">
                                 <cnccontrols:NumericField Label="X:" ColonAt="20" Format="-####0.0##"
                                     Value="{Binding HeightMap.MinX, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
@@ -113,25 +115,32 @@
             <StackPanel Grid.Row="1" Margin="0,8,8,0">
                 <TextBlock x:Name="txtNoProbe" Foreground="#C0392B" TextWrapping="Wrap" Visibility="Collapsed"
                            Text="No probe defined. Add a 3D probe, touch plate or edge finder in Machine Setup Wizard &gt; Probe definitions."/>
-                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <Button x:Uid="hm_start" x:Name="btnStart" Content="Start" MinWidth="70" MinHeight="26" Click="Start_Click"
+                <!-- A WrapPanel, not a horizontal StackPanel: seven buttons do not fit this column at the
+                     default layout's width, and a StackPanel answers that by putting the last of them off
+                     the edge of the screen with nothing to say so. Save and Load - the two that keep a map
+                     you have just spent twenty minutes probing - were the ones that disappeared. A run
+                     control that cannot be reached is worse than one that is merely cramped, so the row is
+                     allowed to take a second line instead. Margins are on the leading/bottom edges so the
+                     wrapped line is spaced from the one above it. -->
+                <WrapPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <Button x:Uid="hm_start" x:Name="btnStart" Content="Start" MinWidth="70" MinHeight="26" Margin="0,0,8,4" Click="Start_Click"
                             Style="{StaticResource PrimaryButtonStyle}"
                             ToolTip="Start probing the height map grid."/>
-                    <Button x:Uid="hm_continue" x:Name="btnContinue" Content="Continue" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Continue_Click" IsEnabled="False"
+                    <Button x:Uid="hm_continue" x:Name="btnContinue" Content="Continue" MinWidth="70" MinHeight="26" Margin="0,0,8,4" Click="Continue_Click" IsEnabled="False"
                             ToolTip="Resume a run that is holding for the touch plate to be moved. Cycle Start does the same thing."/>
-                    <Button x:Uid="hm_retry" x:Name="btnRetry" Content="Retry" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Retry_Click" IsEnabled="False"
+                    <Button x:Uid="hm_retry" x:Name="btnRetry" Content="Retry" MinWidth="70" MinHeight="26" Margin="0,0,8,4" Click="Retry_Click" IsEnabled="False"
                             ToolTip="Clear the alarm and carry on from the point that failed, keeping the readings already taken. Only offered when the controller reports the alarm as recoverable."/>
-                    <Button x:Uid="hm_stop" x:Name="btnStop" Content="Stop" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Stop_Click"
+                    <Button x:Uid="hm_stop" x:Name="btnStop" Content="Stop" MinWidth="70" MinHeight="26" Margin="0,0,8,4" Click="Stop_Click"
                             IsEnabled="False"
                             ToolTip="Cancel the height map probing in progress."/>
-                    <Button x:Uid="hm_apply" Content="Apply" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Apply_Click"
+                    <Button x:Uid="hm_apply" Content="Apply" MinWidth="70" MinHeight="26" Margin="0,0,8,4" Click="Apply_Click"
                             IsEnabled="{Binding HeightMap.CanApply, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
                             ToolTip="Rewrite the loaded program to follow the probed surface."/>
-                    <Button x:Uid="hm_save" Content="Save" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Save_Click"
+                    <Button x:Uid="hm_save" Content="Save" MinWidth="70" MinHeight="26" Margin="0,0,8,4" Click="Save_Click"
                             ToolTip="Save the height map to a file (.map) to reuse later."/>
-                    <Button x:Uid="hm_load" Content="Load" MinWidth="70" MinHeight="26" Margin="8,0,0,0" Click="Load_Click"
+                    <Button x:Uid="hm_load" Content="Load" MinWidth="70" MinHeight="26" Margin="0,0,8,4" Click="Load_Click"
                             ToolTip="Load a previously saved height map (.map) file."/>
-                </StackPanel>
+                </WrapPanel>
             </StackPanel>
         </Grid>
 
