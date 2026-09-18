@@ -935,15 +935,35 @@ namespace GCode_Sender
                 int point = i + 1;
                 var here = order[i];
 
-                // Traverse from the previous point, as a relative step. Not emitted for the first point of
-                // this attempt: the machine was positioned there absolutely, above.
+                // Traverse to the point ABSOLUTELY, naming both X and Y, then back to G91 for the Z work
+                // below. Not emitted for the first point of this attempt: the machine was positioned there
+                // absolutely, above.
+                //
+                // This used to be a relative step per axis, and on a rotated WCS that is a crash waiting for
+                // a machine without soft limits. grblHAL's rotation support does not handle G91: gcode.c's
+                // rotation block (~3057) treats the block's axis values as an ABSOLUTE work coordinate - it
+                // adds the G5x offset and rotates - and the distance-mode code below it then adds the
+                // current position on top for an incremental block, with no rotation awareness at all. The
+                // absolute branch right beside it HAS that awareness; the incremental one was never given
+                // any.
+                //
+                // Measured here 2026-09-18 on a G54 carrying 0.38 degrees: "G0Y47.167" in G91 became
+                // 47.167 + (-635.370) + (-634.365), about -1222, and grblHAL refused it with ALARM:2 on the
+                // first retract of a height map. A Z-only move in the same program was fine, because Z is
+                // not in the rotated plane and the rotation block is skipped for it - which is exactly how
+                // the fault disguised itself as a Z problem.
+                //
+                // Naming both X and Y also keeps this on the well-tested branch of that rotation code (the
+                // one where the block names every axis of the plane), rather than the branch that has to
+                // synthesise the missing one.
+                //
+                // The firmware fix belongs in the incremental branch and is tracked for a firmware session.
                 if (i > startIndex)
                 {
-                    double dx = here.X - order[i - 1].X, dy = here.Y - order[i - 1].Y;
-                    if (Math.Abs(dx) > 0.0005d)
-                        pr.Program.AddRapid(string.Format("X{0}", dx.ToInvariantString(model.Format)));
-                    if (Math.Abs(dy) > 0.0005d)
-                        pr.Program.AddRapid(string.Format("Y{0}", dy.ToInvariantString(model.Format)));
+                    pr.Program.Add("G90");
+                    pr.Program.AddRapid(string.Format("X{0}Y{1}",
+                        here.X.ToInvariantString(model.Format), here.Y.ToInvariantString(model.Format)));
+                    pr.Program.Add(string.Format("G91F{0}", pr.ProbeFeedRate.ToInvariantString()));
                 }
 
                 // The first point of ANY attempt searches long: on a fresh run nothing knows where the board
