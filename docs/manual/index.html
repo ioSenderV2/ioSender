@@ -2068,7 +2068,7 @@
       <tr><th>Step</th><th>What you set</th><th>grbl settings</th></tr>
       <tr><td><strong>1 · Machine</strong></td><td>Start from your machine — pick your machine so the later steps begin from sensible defaults instead of blanks.</td><td>—</td></tr>
       <tr><td><strong>2 · Home position</strong></td><td>The corner your machine homes to (front-left / front-right / back-left / back-right). Must match where your limit switches actually are — this is also machine origin.</td><td><code>$23</code></td></tr>
-      <tr><td><strong>3 · Axis information</strong></td><td>Per axis: travel, max rate, steps/mm, invert direction, limit-switch type and home direction. A <em>Live</em> column shows the controller's current value as you edit.</td><td><code>$3</code> <code>$5</code> <code>$23</code> <code>$1nn</code></td></tr>
+      <tr><td><strong>3 · Axis information</strong></td><td>Per axis: travel, max rate, steps/mm, invert direction, limit-switch type and home direction. A <em>Live</em> column shows the controller's current value as you edit. Also <strong>Work surface (spoilboard)</strong> — see below.</td><td><code>$3</code> <code>$5</code> <code>$23</code> <code>$1nn</code></td></tr>
       <tr><td><strong>4 · Homing &amp; limits</strong></td><td>Enable limit switches, homing, force-origin and soft limits; set pull-off, locate/seek feed rates and debounce.</td><td><code>$27</code> <code>$24</code> <code>$25</code> <code>$26</code></td></tr>
       <tr><td><strong>5 · Probe definitions</strong></td><td>Declare the probes fitted to this machine (touch plate / 3D probe / toolsetter) so probing and <a href="#setup">Setup</a> know what's available.</td><td>—</td></tr>
       <tr><td><strong>6 · Fixture definitions</strong></td><td>Define your own named workholding fixtures (a specific vise, fence, dog-hole grid…) that <a href="#setup">Setup</a> can pick from, with a captured machine-coordinate reference position.</td><td>—</td></tr>
@@ -2078,13 +2078,30 @@
 
     <div class="callout note"><span class="k">Calibration has moved out</span><br>
     It used to be step 8 here. It is now its own
-    view at <strong>Tools → Calibration</strong>, holding four pages: <strong>Stepper calibration (probe)</strong>
+    view at <a href="#calibration"><strong>Tools → Calibration</strong></a>, holding four pages: <strong>Stepper calibration (probe)</strong>
     (corrects steps/mm by probing a reference block of known size against a validated Corner Fence for X/Y, and a
     1-2-3 gauge block in three orientations for Z), <strong>Stepper calibration (scratch)</strong> (the same
     correction with a V-bit and calipers, needing no probe and no fixture), <strong>Squareness (pins)</strong>
     and <strong>Squareness (probe)</strong> (both correct gantry squareness on a ganged axis via
     <code>$170+</code>). They moved because all four <em>generate a program and run it</em>, and that needs the
     run strip — which exists only on the main window, so they have to open as a tab.</div>
+
+    <h3>Work surface &mdash; the board, not the travel (step 3)</h3>
+    <p>Travel describes what the <strong>gantry</strong> can reach. The spoilboard is a different fact, and on
+    many machines a smaller one: a toolsetter mounted off the front edge means the last stretch of Y travel is
+    air the machine must keep being allowed to reach, or a tool change could never get to the puck. Step 3's
+    <strong>Work surface (spoilboard)</strong> section is where you say so.</p>
+    <ul>
+      <li>Tick <strong>the spoilboard is smaller than the machine's travel</strong> and give the board's edges
+      <strong>in machine coordinates</strong> &mdash; the same numbers the DRO shows with the spindle over each
+      corner. Jog to a corner and read them off.</li>
+      <li>Leave it unticked and the whole travel envelope is treated as board, which is exactly how the app
+      behaved before this existed. A machine whose board does cover the table needs nothing here.</li>
+      <li>Two features read it, and both of them <em>raster a cutter across the whole thing</em>:
+      <a href="#work-order">Work Order</a>'s <strong>Entire spoilboard</strong> Surface toolpath and the
+      <a href="#heightmap">Height Map</a>'s <strong>Full work surface</strong> mode. Left undeclared on a
+      machine where it isn't true, both run the cutter through open air at one end.</li>
+    </ul>
 
     <h3>Why the order matters</h3>
     <p>The steps build on each other: you can't set useful <strong>soft limits</strong> (step 4) until the
