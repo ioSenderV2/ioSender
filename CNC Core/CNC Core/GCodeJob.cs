@@ -305,7 +305,7 @@ namespace CNC.Core
         // Everything before the first tool change: the preamble, the modal setup, the initial positioning.
         // It belongs to no tool, but it must belong to SOMETHING - a null Section would group under a blank
         // header, which reads as a bug rather than as "this is the lead-in".
-        private const string LeadInSectionName = "Program start";
+        public const string LeadInSectionName = "Program start";
 
         // ...and its counterpart: the wind-down after the last cut - spindle off, park, M30.
         public const string EpilogueSectionName = "Program end";
@@ -436,18 +436,72 @@ namespace CNC.Core
                 // Keep walking: we want the FIRST comment of the run, not the closest. Where a post emits an
                 // operation name and then a tool description, the operation name is the outer one and is the
                 // one worth showing.
-                string inner = text.TrimStart('(').TrimEnd(')').Trim();
+                string inner = CommentTextOf(text);
                 if (inner.Length > 0)
                     name = inner;
             }
 
+            name = TidySectionName(name, tool);
+
+            return string.IsNullOrEmpty(name) ? tool : tool + " - " + name;
+        }
+
+        // The text INSIDE a comment line, which is not the same as the line with its outer parens trimmed:
+        // blocks carry their N-number prefix when line numbering is on, so "N3952(TOOLPATH ...)" trimmed of
+        // '(' at the front loses nothing and keeps "N3952" in the name. Cut from the first '(' to the last
+        // ')' instead, and fall back to the line minus any leading N-word when there are no parens at all.
+        private static readonly Regex rxLeadingLineNumber = new Regex(@"^\s*N\d+\s*", RegexOptions.IgnoreCase);
+
+        private static string CommentTextOf(string line)
+        {
+            int open = line.IndexOf('(');
+            int close = line.LastIndexOf(')');
+
+            if (open >= 0 && close > open)
+                return line.Substring(open + 1, close - open - 1).Trim();
+
+            return rxLeadingLineNumber.Replace(line, string.Empty).Trim();
+        }
+
+        // Our own Work Order compiler writes "(TOOLPATH T6 LogoSVG - v-carve Snowflake - 31387 lines)". The
+        // useful part is the middle: the word TOOLPATH is scaffolding, the tool number is already the label
+        // we are appending to, and the line count is bookkeeping. Stripping them turns
+        // "T6 - TOOLPATH T6 LogoSVG - v-carve Sno..." into "T6 - LogoSVG - v-carve Snowflake".
+        //
+        // The T-number rule is general rather than a special case for that one format: plenty of posts emit
+        // "(T2 D=6.35 flat end mill)", which would read just as redundantly.
+        private static readonly Regex rxToolpathPrefix = new Regex(@"^TOOLPATH\s+", RegexOptions.IgnoreCase);
+        private static readonly Regex rxLineCountSuffix = new Regex(@"\s*-\s*\d+\s*lines?\s*$", RegexOptions.IgnoreCase);
+
+        private static string TidySectionName(string name, string tool)
+        {
             if (string.IsNullOrEmpty(name))
-                return tool;
+                return name;
 
-            if (name.Length > 40)
-                name = name.Substring(0, 39).TrimEnd() + "…";
+            name = rxToolpathPrefix.Replace(name, string.Empty);
+            name = rxLineCountSuffix.Replace(name, string.Empty);
 
-            return tool + " - " + name;
+            // Drop a leading repeat of the tool we are already labelling with, plus whatever separates it.
+            if (!string.IsNullOrEmpty(tool) && name.StartsWith(tool, StringComparison.OrdinalIgnoreCase))
+            {
+                string rest = name.Substring(tool.Length);
+                if (rest.Length == 0 || !char.IsLetterOrDigit(rest[0]))
+                    name = rest.TrimStart(' ', '-', ':', '–').Trim();
+            }
+
+            name = System.Text.RegularExpressions.Regex.Replace(name, @"\s+", " ").Trim();
+
+            // Truncate on a word boundary where there is one reasonably near the limit - cutting mid-word
+            // ("v-carve Sno...") reads as corruption rather than as an abbreviation.
+            const int cap = 44;
+            if (name.Length > cap)
+            {
+                string cut = name.Substring(0, cap);
+                int space = cut.LastIndexOf(' ');
+                name = (space > cap / 2 ? cut.Substring(0, space) : cut).TrimEnd() + "…";
+            }
+
+            return name;
         }
 
         // The T word on the tool-change line. Text rather than the parsed token because this runs over

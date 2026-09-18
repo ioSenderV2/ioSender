@@ -573,8 +573,12 @@ namespace CNC.Controls
 
             // Whether the program has a lead-in to run decides both what the prompt promises and which branch
             // below runs, so it is settled before the operator is asked rather than after.
-            int firstSectionStart = GCode.File.Data.IndexOf(GCode.File.Data.FirstOrDefault(b => b.IsSectionStart));
-            bool haveLeadIn = firstSectionStart > 0;
+            //
+            // Asked by NAME, not by "where is the first section start". The lead-in's own first block IS
+            // marked as a section start - it has to be, or the group would not render - so a "first section
+            // start > 0" test could never be true and this always took the no-lead-in branch. The symptom was
+            // a prompt confidently telling the operator the program had no start-up section when it did.
+            bool haveLeadIn = GCode.File.Data.Count > 0 && GCode.File.Data[0].Section == GCodeJob.LeadInSectionName;
 
             string prompt = runOnlyThisToolpath
                 ? (haveLeadIn
@@ -603,10 +607,10 @@ namespace CNC.Controls
                 string chosen = first.Section;
                 model.RunBlockFilter = i =>
                 {
-                    if (i < firstSectionStart)
-                        return true;                                    // Program start
                     var b = i >= 0 && i < GCode.File.Data.Count ? GCode.File.Data[i] : null;
-                    return b != null && (b.Section == chosen || b.Section == GCodeJob.EpilogueSectionName);
+                    return b != null && (b.Section == GCodeJob.LeadInSectionName ||
+                                         b.Section == chosen ||
+                                         b.Section == GCodeJob.EpilogueSectionName);
                 };
                 // The program's own preamble replaces the synthetic prolog - it is the real thing the author
                 // wrote, so nothing needs re-establishing by hand.
