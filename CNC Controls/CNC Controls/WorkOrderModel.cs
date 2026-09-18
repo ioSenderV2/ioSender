@@ -689,6 +689,18 @@ namespace CNC.Controls
         // something to describe as already true.
         public bool MarkOnly = false;
 
+        // Apply the height map Setup probed to this work order's generated program.
+        //
+        // SAVED with the work order, like every other option here, because a job that needs compensation
+        // needs it every time it is cut - and because the alternative, asking at each Generate, is a
+        // question most operators answer the same way every day until the one day they do not read it.
+        //
+        // What makes that safe is that the map carries the setup it was probed against (SetupHeightMap's
+        // stamp) and Generate REFUSES when they no longer agree, rather than warning. A stale map is not a
+        // degraded result, it is a wrong one: every Z shifted by a surface that is no longer under the
+        // cutter, in a program that still reads correctly. Nothing about the emitted g-code would show it.
+        public bool ApplyHeightMap = false;
+
         // The dimple, stored as a real operation rather than as a handful of loose Mark* fields.
         //
         // That shape is what lets the ordinary Feeds and Speeds dialog edit it - tool, diameter, RPM, feed,

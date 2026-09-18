@@ -1987,3 +1987,5 @@ CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,btn_peek:System.Windows.Contr
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,btn_peek:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Pause at the end of the current block, park at G30 with the spindle off so you can look at the work, then resume where it left off."
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_peek:System.String.$Content,None,True,True,,Peek
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,str_peekresume:System.String.$Content,None,True,True,,Resume
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_woheightmap:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Apply height map
+CNC.Controls.WPF.g.en-US.resources:workorderview.baml,chk_woheightmap:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Compensate the generated program for the surface Setup probed: every cutting move follows the measured surface instead of a flat plane. Needs a height map probed by Setup's 'Probe height map' action. Generate refuses if the map no longer matches the current setup - re-measuring or re-homing invalidates it.

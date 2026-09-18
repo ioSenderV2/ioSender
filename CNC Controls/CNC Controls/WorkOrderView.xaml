@@ -66,6 +66,9 @@
                             ToolTip="Pick the drill that makes the dimples and set its depth, spindle speed and plunge feed - the same dialog every other operation uses, with the same recommendations."/>
                 </StackPanel>
                 <TextBlock x:Name="txtMarkOnlySummary" Foreground="#586069" FontSize="11" Margin="18,2,0,0" TextWrapping="Wrap"/>
+                <CheckBox x:Uid="chk_woheightmap" x:Name="chkApplyHeightMap" Content="Apply height map" Margin="0,4,0,0" Click="chkApplyHeightMap_Click"
+                          ToolTip="Compensate the generated program for the surface Setup probed: every cutting move follows the measured surface instead of a flat plane. Needs a height map probed by Setup's 'Probe height map' action. Generate refuses if the map no longer matches the current setup - re-measuring or re-homing invalidates it."/>
+                <TextBlock x:Name="txtHeightMapSummary" Foreground="#586069" FontSize="11" Margin="18,2,0,0" TextWrapping="Wrap"/>
                 <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                     <Label x:Uid="lbl_wowcs" Content="Origin (WCS):" Padding="0,0,4,0" VerticalAlignment="Center"
                            ToolTip="Which work coordinate system this work order's origin/tool length reference lives in. &quot;Follow Setup&quot; (the default) always uses whatever Setup is currently set to; pin a specific one instead if this work order's origin needs to stay on a particular WCS even after Setup moves on to a different job."/>

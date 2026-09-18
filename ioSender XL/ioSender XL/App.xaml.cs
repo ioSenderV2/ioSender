@@ -211,6 +211,10 @@ namespace GCode_Sender
             // keypress handler before the first model is built (MainWindow.xaml instantiates one).
             CNC.Controls.KeypressHandler.Register();
             CNC.Controls.ButtonClickSound.Init();
+            // Work Order (CNC Controls) asking the height map (CNC Controls Probing) to compensate its
+            // generated program - the reference only runs one way, so the two are tied together here where
+            // both are visible. Same shape as the registrations above.
+            RegisterHeightMapCompensation();
 
             // Single instance: if another ioSender is already running, hand it our file arg (if any),
             // surface its window, and exit. Runs before any window/heavy init so this stays invisible.
@@ -501,5 +505,40 @@ namespace GCode_Sender
 
             return path;
         }
+        // Wires CNC.Controls.HeightMapCompensation to the real map and the real transform. Every member is
+        // null until this runs, and the seam treats unwired as "refuse", so a build without the Probing
+        // assembly disables the Work Order option instead of silently generating an uncompensated program
+        // for someone who ticked the box.
+        private static void RegisterHeightMapCompensation()
+        {
+            CNC.Controls.Probing.SetupHeightMap.Load();
+
+            CNC.Controls.HeightMapCompensation.HasMap = () => CNC.Controls.Probing.SetupHeightMap.HasMap;
+            CNC.Controls.HeightMapCompensation.Describe = () => CNC.Controls.Probing.SetupHeightMap.Describe();
+            CNC.Controls.HeightMapCompensation.WhyNotApplicable = () =>
+                CNC.Controls.Probing.SetupHeightMap.WhyNotApplicable(
+                    CNC.Core.Grbl.GrblViewModel?.WorkPositionOffset,
+                    CNC.Controls.Probing.SetupHeightMap.Width,
+                    CNC.Controls.Probing.SetupHeightMap.Height);
+
+            CNC.Controls.HeightMapCompensation.ApplyToLoadedProgram = () =>
+            {
+                var model = CNC.Core.Grbl.GrblViewModel;
+                if (model == null)
+                    return "No controller connection, so there is nothing to apply the height map to.";
+                if (!model.IsFileLoaded)
+                    return "No program is loaded, so there is nothing to apply the height map to.";
+                try
+                {
+                    new CNC.Controls.Probing.GCodeTransform().ApplyHeightMap(model, CNC.Controls.Probing.SetupHeightMap.Map);
+                    return null;
+                }
+                catch (Exception ex)
+                {
+                    return "The height map could not be applied: " + ex.Message;
+                }
+            };
+        }
+
     }
 }

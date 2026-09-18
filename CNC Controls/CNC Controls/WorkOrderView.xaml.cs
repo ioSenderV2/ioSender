@@ -1772,6 +1772,44 @@ namespace CNC.Controls
             OnWorkOrderChanged();
         }
 
+        private void chkApplyHeightMap_Click(object sender, RoutedEventArgs e)
+        {
+            if (loadingFields)
+                return;
+            workOrder.ApplyHeightMap = chkApplyHeightMap.IsChecked == true;
+            UpdateHeightMapSummary();
+            OnWorkOrderChanged();
+        }
+
+        // Says which map would be used and whether it still fits this setup. The age is the part that
+        // matters: "probed 3 min ago" and "probed 14 Sep" are the same tick box and very different claims,
+        // and the operator is the only one who knows whether the stock has been touched since.
+        private void UpdateHeightMapSummary()
+        {
+            if (txtHeightMapSummary == null || chkApplyHeightMap == null)
+                return;
+
+            bool available = HeightMapCompensation.Available;
+            chkApplyHeightMap.IsEnabled = available;
+
+            if (!available)
+            {
+                txtHeightMapSummary.Text = "No height map probed - run Setup with 'Probe height map' ticked.";
+                return;
+            }
+
+            if (!workOrder.ApplyHeightMap)
+            {
+                txtHeightMapSummary.Text = string.Empty;
+                return;
+            }
+
+            string why = HeightMapCompensation.Refusal();
+            txtHeightMapSummary.Text = why == null
+                ? HeightMapCompensation.DescribeMap()
+                : "This map cannot be used as things stand - Generate will explain. " + HeightMapCompensation.DescribeMap();
+        }
+
         // Spells out what Mark only will actually emit, because the whole hazard of this setting is a program
         // that LOOKS like the job and is not. Counting the holes here means the operator sees "9 hole centres"
         // and can tell at a glance whether that matches the part in front of them.
@@ -3653,6 +3691,39 @@ namespace CNC.Controls
             // handoff's own now. This tab used to write its own copy of it one line after the call, which
             // simply overwrote the shared one - and would now silently drop the Esc half of it.
             MacroProcessor.HandOffToJobTab(model, ProgramName, toLoad, ViewType.WorkOrder, stats);
+
+            // Height map compensation, AFTER the handoff: the transform rewrites the LOADED program, and
+            // the handoff above is what makes this program the loaded one. Doing it here rather than inside
+            // the compiler is deliberate - the map is a property of the machine and the setup, not of the
+            // work order's geometry, and the same transform then serves a generated program and a loaded
+            // file identically.
+            if (workOrder.ApplyHeightMap)
+                ApplyHeightMapToGeneratedProgram();
+        }
+
+        // Apply the stored map, or refuse and say why - never silently skip. A work order that asked for
+        // compensation and did not get it would otherwise cut an uncompensated job while the operator
+        // believes the opposite, which is the one outcome worse than not running at all. The refusal is
+        // modal for the same reason: the status line is not where you put news that changes what the
+        // machine is about to do.
+        private void ApplyHeightMapToGeneratedProgram()
+        {
+            string why = HeightMapCompensation.Refusal();
+            if (why == null)
+                why = HeightMapCompensation.ApplyToLoadedProgram?.Invoke();
+
+            if (why == null)
+            {
+                model.Message = "Height map applied to the generated program - " + HeightMapCompensation.DescribeMap();
+                DebugLog.Write("heightmap", "applied to the generated work order program");
+                return;
+            }
+
+            DebugLog.Write("heightmap", "NOT applied to the generated program: " + why);
+            AppDialogs.Show(why + Environment.NewLine + Environment.NewLine +
+                "The program has been generated WITHOUT height map compensation.",
+                "Apply height map", MessageBoxButton.OK, MessageBoxImage.Warning);
+            model.Message = "Height map NOT applied - the program is uncompensated.";
         }
 
         // The name this tab's generated program is loaded under. It is an IDENTITY, not a label: the
@@ -3895,6 +3966,8 @@ namespace CNC.Controls
             chkSkipFirstToolChange.IsChecked = workOrder.SkipFirstToolChange;
             chkMarkOnly.IsChecked = workOrder.MarkOnly;
             UpdateMarkOnlySummary();
+            chkApplyHeightMap.IsChecked = workOrder.ApplyHeightMap;
+            UpdateHeightMapSummary();
             cbxWcs.SelectedIndex = Math.Min(Math.Max(workOrder.Wcs, 0), 6);
             loadingFields = false;
 
@@ -4135,6 +4208,8 @@ namespace CNC.Controls
             chkSkipFirstToolChange.IsChecked = workOrder.SkipFirstToolChange;
             chkMarkOnly.IsChecked = workOrder.MarkOnly;
             UpdateMarkOnlySummary();
+            chkApplyHeightMap.IsChecked = workOrder.ApplyHeightMap;
+            UpdateHeightMapSummary();
             cbxWcs.SelectedIndex = Math.Min(Math.Max(workOrder.Wcs, 0), 6);
             loadingFields = false;
 
@@ -4163,6 +4238,8 @@ namespace CNC.Controls
             chkSkipFirstToolChange.IsChecked = workOrder.SkipFirstToolChange;
             chkMarkOnly.IsChecked = workOrder.MarkOnly;
             UpdateMarkOnlySummary();
+            chkApplyHeightMap.IsChecked = workOrder.ApplyHeightMap;
+            UpdateHeightMapSummary();
             cbxWcs.SelectedIndex = Math.Min(Math.Max(workOrder.Wcs, 0), 6);
             loadingFields = false;
             RebuildTree(workOrder.Toolpaths.FirstOrDefault());
