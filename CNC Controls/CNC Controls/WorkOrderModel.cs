@@ -676,9 +676,17 @@ namespace CNC.Controls
         // dimples on the way to the program. See it for what survives and what does not.
         //
         // Persisted with everything else, which is deliberate but not free: an operator who marks a part in
-        // the morning and presses Generate in the afternoon would get dimples again. That is why the Run
-        // bar's button says "Generate (mark only)" while this is set and why the program's own header says
-        // so in the first line - the .macro outlives the UI state that produced it.
+        // the morning and presses Generate in the afternoon would get dimples again. Two things say so, and
+        // neither is the run strip: the summary line under the checkbox (WorkOrderView.UpdateMarkOnlySummary,
+        // which states the hole count and the dimple) and the program's own header, which opens with
+        // "*** MARK ONLY" and "The holes are NOT drilled here" - the .macro outlives the UI state that
+        // produced it, so the warning has to travel in the file.
+        //
+        // This comment used to claim the Run bar's button reads "Generate (mark only)" while this is set.
+        // It does not and never did: JobControl.UpdateRunButtonLabel takes the button's text from the
+        // GenerateLabel resource and nothing in the run strip reads this flag. Corrected 2026-09-18 after
+        // the claim was nearly copied into the manual. If that label IS wanted, it is a real change - not
+        // something to describe as already true.
         public bool MarkOnly = false;
 
         // The dimple, stored as a real operation rather than as a handful of loose Mark* fields.

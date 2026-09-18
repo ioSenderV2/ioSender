@@ -27,22 +27,41 @@ namespace CNC.Controls
 
         // ViewType -> manual anchor. Keep in sync with the section ids in docs/manual/index.html
         // (see docs/manual/README.md "Anchor map"). A ViewType absent here opens the manual home.
+        //
+        // An anchor that no longer exists is WORSE than being absent: the browser opens the manual and
+        // silently does not scroll, so F1 looks like it worked and landed on the wrong page. Two of these
+        // sat here for weeks - "start-job" (the topic was renamed #setup on 2026-07-31) and "probing" (the
+        // topic was deleted on 2026-08-01) - because nothing checks a string in this file against the
+        // manual. If you rename or remove a topic, grep this map in the same edit.
         static readonly Dictionary<ViewType, string> Topics = new Dictionary<ViewType, string>
         {
-            { ViewType.StartJob,      "start-job" },
-            { ViewType.GRBL,          "job" },
-            { ViewType.MachineSetup,  "machine-setup" },
-            { ViewType.Tools,         "tools" },
-            { ViewType.Probing,       "probing" },
-            { ViewType.Offsets,       "offsets" },
-            { ViewType.GRBLConfig,    "settings" },
-            { ViewType.SDCard,        "sdcard" },
-            { ViewType.GCodeViewer,   "gcode-viewer" },
-            { ViewType.HeightMap,     "heightmap" },
-            { ViewType.LatheWizards,  "lathe" },
-            { ViewType.TrinamicTuner, "tools" },
-            { ViewType.PIDTuner,      "tools" }
+            { ViewType.StartJob,       "setup" },
+            { ViewType.GRBL,           "job" },
+            { ViewType.MachineSetup,   "machine-setup" },
+            { ViewType.Tools,          "tools" },
+            // The Probing tab has had no topic of its own since it left the recommended workflow; what an
+            // operator wants from it now lives under Setup (its Dynamic fixture does ad-hoc probing, its
+            // Actions cover the height map). Pointing there beats the manual's front page.
+            { ViewType.Probing,        "setup" },
+            { ViewType.Offsets,        "offsets" },
+            { ViewType.GRBLConfig,     "settings" },
+            { ViewType.SDCard,         "sdcard" },
+            { ViewType.GCodeViewer,    "gcode-viewer" },
+            { ViewType.HeightMap,      "heightmap" },
+            { ViewType.LatheWizards,   "lathe" },
+            { ViewType.FeedsAndSpeeds, "feeds-and-speeds" },
+            { ViewType.WorkOrder,      "work-order" },
+            { ViewType.Calibration,    "calibration" },
+            { ViewType.TrinamicTuner,  "tools" },
+            { ViewType.PIDTuner,       "tools" }
         };
+
+        /// <summary>
+        /// Every anchor this map can hand out, for a test or a build-time check against the manual.
+        /// Exposed rather than left implicit because the failure it guards - an anchor that quietly
+        /// stopped existing - is invisible at runtime.
+        /// </summary>
+        public static IEnumerable<string> AllTopics { get { return Topics.Values; } }
 
         public static string TopicFor(ViewType view)
         {
