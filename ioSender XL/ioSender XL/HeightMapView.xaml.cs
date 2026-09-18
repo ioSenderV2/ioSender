@@ -864,6 +864,26 @@ namespace GCode_Sender
             int startIndex = Math.Max(0, Math.Min(fromPoint - 1, order.Count - 1));
             var startpos = new Position(order[startIndex].X, order[startIndex].Y, 0d);
 
+            // LIFT FIRST, to machine top. Two things below depend on starting there and neither enforced it:
+            // the traverse to the first point, which otherwise crosses the work at whatever height the head
+            // was left at, and the first probe's search distance, which is computed as the drop from machine
+            // Z0 (see searchZ) and becomes a target beyond travel from anywhere lower.
+            //
+            // Both bit on real hardware 2026-09-18. A run alarmed part way, leaving the head at machine
+            // Z-85.6, and the operator pressed Start again: the program traversed at that height and then
+            // asked for 128 mm of search from it, targeting Z-213 against a 135 mm axis - ALARM:2 before
+            // anything was touched. The comment on searchZ said "it starts at machine Z0 (the top)" and that
+            // was an assumption, not a guarantee.
+            //
+            // A bare "G53 G0 Z0" is the app's standard safe lift and must stay bare - naming X/Y in it is a
+            // mistake this codebase has made and reverted twice (see MacroRunner's park comment).
+            if (!pr.WaitForIdle("G53G0Z0"))
+            {
+                AppDialogs.Show(string.Format(Loc("HmNotIdle"), model.GrblState.State),
+                    "Height map", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
             if (!pr.WaitForIdle(string.Format("G90G0X{0}Y{1}", startpos.X.ToInvariantString(model.Format), startpos.Y.ToInvariantString(model.Format))))
             {
                 AppDialogs.Show(string.Format(Loc("HmNotIdle"), model.GrblState.State),
