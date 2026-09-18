@@ -3733,7 +3733,13 @@ namespace CNC.Controls
             if (why == null)
             {
                 model.Message = "Height map applied to the generated program - " + HeightMapCompensation.DescribeMap();
-                DebugLog.Write("heightmap", "applied to the generated work order program");
+                // Count and identity AFTER the transform. The program list came up empty on real hardware
+                // while the 3D view showed the compensated toolpath, which is three different faults wearing
+                // the same face: no blocks at all, blocks the grid was never told about, or blocks still
+                // arriving one notification at a time. The count tells them apart.
+                DebugLog.Write("heightmap", string.Format(
+                    "applied to the generated work order program - file '{0}' now has {1} block(s), loaded={2}",
+                    GCode.File.FileName, GCode.File.Blocks, GCode.File.IsLoaded));
                 return;
             }
 
