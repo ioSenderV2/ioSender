@@ -1,4 +1,4 @@
-/*
+﻿/*
  * HeightMapCompensation.cs - part of CNC Controls library
  *
  * The seam between a Work Order that wants its program height-compensated and the code that can actually
@@ -39,6 +39,12 @@ namespace CNC.Controls
         /// explaining why nothing was applied.
         /// </summary>
         public static Func<string> ApplyToLoadedProgram;
+
+        /// <summary>
+        /// Adopt a .map file as the current map. Returns null on success, or operator-facing text.
+        /// Used for the sidecar a work order carries beside it.
+        /// </summary>
+        public static Func<string, string> LoadFromFile;
 
         public static bool Available { get { return HasMap != null && HasMap(); } }
 

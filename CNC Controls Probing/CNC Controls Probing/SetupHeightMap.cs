@@ -171,6 +171,113 @@ namespace CNC.Controls.Probing
                 Map.SizeX, Map.SizeY, Width, Height, when);
         }
 
+        // ---- a .map file that carries the setup it belongs to -------------------------------------
+        //
+        // HeightMap.Save writes <heightmap ...> with its own attributes and HeightMap.Load reads the ones it
+        // knows by name, ignoring the rest - so the stamp rides along in the same file as extra attributes,
+        // and a stamped map still opens in anything that reads the old format.
+        //
+        // Why it has to ride along at all: a saved map is the thing an operator keeps NEXT TO A JOB and
+        // opens weeks later. Re-stamping it with the live origin at load time - which is what happens
+        // without this - makes every map look like it belongs to whatever setup is in front of you, which
+        // is precisely the state the staleness refusal exists to catch. A map that cannot say which setup
+        // it was probed against is not trustworthy, and now it says.
+
+        private const string StampProbed = "SetupProbedUtc";
+        private const string StampOx = "SetupOriginX", StampOy = "SetupOriginY", StampOz = "SetupOriginZ";
+        private const string StampW = "SetupWidth", StampH = "SetupHeight";
+
+        /// <summary>Write <paramref name="map"/> to <paramref name="path"/> with the stamp it is held under.</summary>
+        public static void SaveMapWithStamp(HeightMap map, string path, Position liveOrigin, double width, double height)
+        {
+            if (map == null)
+                return;
+
+            map.Save(path);
+
+            // The stamp this map is KNOWN by, when it is the one in hand - so saving does not quietly
+            // relabel a map with wherever the machine happens to be standing now. Only a map with no stamp
+            // of its own falls back to the live position.
+            bool known = Map == map && !double.IsNaN(OriginX);
+            double ox = known ? OriginX : (liveOrigin != null ? liveOrigin.X : double.NaN);
+            double oy = known ? OriginY : (liveOrigin != null ? liveOrigin.Y : double.NaN);
+            double oz = known ? OriginZ : (liveOrigin != null ? liveOrigin.Z : double.NaN);
+            double w = known && Width > 0d ? Width : width;
+            double h = known && Height > 0d ? Height : height;
+            DateTime when = known ? ProbedUtc : DateTime.UtcNow;
+
+            if (double.IsNaN(ox))
+                return;    // nothing truthful to stamp it with; leave the file as a plain map
+
+            try
+            {
+                var doc = XDocument.Load(path);
+                var root = doc.Root;
+                root.SetAttributeValue(StampProbed, when.ToString("o", CultureInfo.InvariantCulture));
+                root.SetAttributeValue(StampOx, ox.ToString("R", CultureInfo.InvariantCulture));
+                root.SetAttributeValue(StampOy, oy.ToString("R", CultureInfo.InvariantCulture));
+                root.SetAttributeValue(StampOz, oz.ToString("R", CultureInfo.InvariantCulture));
+                root.SetAttributeValue(StampW, w.ToString("R", CultureInfo.InvariantCulture));
+                root.SetAttributeValue(StampH, h.ToString("R", CultureInfo.InvariantCulture));
+                doc.Save(path);
+                DebugLog.Write("heightmap", "saved " + path + " stamped " + Describe());
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write("heightmap", "saved the map but could not stamp it: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Load a .map and adopt it as the setup's map, WITH the stamp the file carries.
+        /// </summary>
+        /// <returns>null on success, or operator-facing text explaining why it was not adopted.</returns>
+        public static string LoadMapWithStamp(string path)
+        {
+            try
+            {
+                var map = HeightMap.Load(path);
+                if (map == null)
+                    return "That file could not be read as a height map.";
+
+                var root = XDocument.Load(path).Root;
+                var probed = root.Attribute(StampProbed);
+                var ox = root.Attribute(StampOx);
+
+                Map = map;
+
+                if (probed == null || ox == null)
+                {
+                    // An unstamped map - an older file, or one saved before stamping existed. Adopted, but
+                    // with the origin marked unknown, so the work order refuses it rather than compensating
+                    // against a surface nobody can tie to this setup.
+                    ProbedUtc = DateTime.UtcNow;
+                    OriginX = OriginY = OriginZ = double.NaN;
+                    Width = map.Max.X - map.Min.X;
+                    Height = map.Max.Y - map.Min.Y;
+                    DebugLog.Write("heightmap", "loaded " + path + " - NO STAMP, so the setup it belongs to is unknown");
+                    return null;
+                }
+
+                ProbedUtc = DateTime.Parse(probed.Value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+                OriginX = double.Parse(ox.Value, CultureInfo.InvariantCulture);
+                OriginY = double.Parse(root.Attribute(StampOy).Value, CultureInfo.InvariantCulture);
+                OriginZ = double.Parse(root.Attribute(StampOz).Value, CultureInfo.InvariantCulture);
+                Width = double.Parse(root.Attribute(StampW).Value, CultureInfo.InvariantCulture);
+                Height = double.Parse(root.Attribute(StampH).Value, CultureInfo.InvariantCulture);
+                _loadAttempted = true;
+
+                DebugLog.Write("heightmap", "loaded " + path + " stamped " + Describe());
+                Save();     // becomes the current stored map, stamp and all
+                return null;
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write("heightmap", "could not load " + path + ": " + ex.Message);
+                return "That height map could not be loaded: " + ex.Message;
+            }
+        }
+
         private static void Save()
         {
             try

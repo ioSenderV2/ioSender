@@ -48,6 +48,9 @@ namespace CNC.Controls
         // The .workorder file this came from/was last saved to - null until one of those happens. Drives the
         // title bar (name, no path or extension) and Save's suggested filename.
         private string currentFilePath = null;
+
+        // The work order file whose sidecar map has already been looked for - see Activate.
+        private string sidecarCheckedFor = null;
         // Set by New's name prompt, cleared by the first successful Save - lets the title bar and Save's
         // suggested filename reflect what the operator typed before there's an actual file on disk yet.
         private string pendingName = null;
@@ -3245,6 +3248,15 @@ namespace CNC.Controls
                 // gone. Generate hands the program to the Job tab as the loaded job; the run half of
                 // the bar belongs there now. ActiveRun stays null for the same reason - there is no
                 // second engine to route a run through.
+                // The work order restored at startup gets its sidecar here rather than in the restore
+                // itself, which runs before this view is built - model and controls are both null there.
+                // Once per file: re-adopting on every visit would undo a map deliberately loaded since.
+                if (currentFilePath != null && currentFilePath != sidecarCheckedFor)
+                {
+                    sidecarCheckedFor = currentFilePath;
+                    LoadSidecarHeightMap(currentFilePath);
+                }
+
                 // A map can be probed or loaded while this tab sits in the background, and the option's
                 // enabled state and summary are both computed from it - so re-ask on every activation
                 // rather than only when a work order is loaded. Without this, probing a map and coming
@@ -3878,6 +3890,51 @@ namespace CNC.Controls
             }
         }
 
+        /// <summary>
+        /// Pick up the height map saved beside this work order, if it asks for one.
+        /// </summary>
+        /// <remarks>
+        /// A work order that needs compensation and the survey it needs are one job, and an operator who
+        /// keeps them together - functional_test.workorder and functional_test.map in the same folder - has
+        /// already said so by naming them that way. Making them open together is the operator's own idea and
+        /// removes the step where the option is ticked, the map is on disk, and the two have not been
+        /// introduced.
+        ///
+        /// ONLY when the work order actually asks for compensation. Adopting a sidecar for every work order
+        /// opened would silently replace a map just probed for the job in hand, which is a worse surprise
+        /// than an option that needs one click.
+        ///
+        /// The map is adopted with the stamp the FILE carries, so a sidecar probed against a setup that has
+        /// since moved is still refused at Generate. Convenience here must not become a way of laundering a
+        /// stale map into a job.
+        /// </remarks>
+        private void LoadSidecarHeightMap(string workOrderPath)
+        {
+            if (!workOrder.ApplyHeightMap || string.IsNullOrEmpty(workOrderPath) || HeightMapCompensation.LoadFromFile == null)
+                return;
+
+            string map = System.IO.Path.ChangeExtension(workOrderPath, ".map");
+            if (!System.IO.File.Exists(map))
+            {
+                DebugLog.Write("workorder", "no height map beside this work order (looked for " + map + ")");
+                return;
+            }
+
+            string why = HeightMapCompensation.LoadFromFile(map);
+            if (why == null)
+            {
+                DebugLog.Write("workorder", "adopted the height map beside this work order: " + map);
+                if (model != null)
+                    model.Message = "Loaded the height map saved with this work order - " + HeightMapCompensation.DescribeMap();
+            }
+            else
+                AppDialogs.Show("The height map saved beside this work order could not be loaded." +
+                    Environment.NewLine + Environment.NewLine + why,
+                    "Work order", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+            UpdateHeightMapSummary();
+        }
+
         // Make a just-written file THE work order file: association, boot-restore pointer, clean dirty
         // state, repainted title. The bookkeeping SaveToDisk always did, shared with Open Copy/Rename.
         private void AdoptWorkOrderFile(string path)
@@ -4202,6 +4259,8 @@ namespace CNC.Controls
 
             workOrder = loaded;
             currentFilePath = dlg.FileName;
+            sidecarCheckedFor = currentFilePath;
+            LoadSidecarHeightMap(currentFilePath);
             pendingName = null;
             AppConfig.Settings.Base.LastWorkOrderFilePath = currentFilePath;
             AppConfig.Settings.Base.LastWorkOrderName = null;

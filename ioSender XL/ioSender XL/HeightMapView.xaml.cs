@@ -1603,7 +1603,16 @@ namespace GCode_Sender
 
             var file = new SaveFileDialog { AddExtension = true, Title = Loc("HmSaveTitle"), Filter = Loc("HmFileFilter") };
             if (file.ShowDialog() == true)
-                HeightMap.Map.Save(file.FileName);
+            {
+                // Stamped, so the file records the setup it was probed against - see SetupHeightMap. A map
+                // kept beside a job and reopened weeks later is the whole reason Save exists, and without
+                // the stamp it would be adopted as belonging to whatever setup was in front of you.
+                SetupHeightMap.SaveMapWithStamp(HeightMap.Map, file.FileName,
+                    model != null ? model.WorkPositionOffset : null,
+                    HeightMap.MaxX - HeightMap.MinX, HeightMap.MaxY - HeightMap.MinY);
+                if (model != null)
+                    model.Message = "Height map saved to " + file.FileName;
+            }
         }
 
         private void Load_Click(object sender, RoutedEventArgs e)
@@ -1627,15 +1636,14 @@ namespace GCode_Sender
             HeightMap.HasHeightMap = true;
             HeightMap.CanApply = model != null && model.IsFileLoaded;
 
-            // A loaded map is as usable as a probed one, so it is kept for the work order the same way.
-            // Only probing did that at first, which made "save a map, load it next to the work order that
-            // needs it" - the obvious way to keep a survey with a job - the one route that left the work
-            // order's option disabled (2026-09-18).
-            //
-            // Stamped with the CURRENT work origin: loading a map is a statement that it belongs to the
-            // setup in front of you. If it does not, the stamp is what the staleness refusal then compares,
-            // and it refuses for the right reason.
-            StoreForWorkOrder();
+            // Adopt it for the work order WITH THE STAMP THE FILE CARRIES, rather than re-stamping it with
+            // the live origin. Re-stamping made every loaded map look like it belonged to the setup in
+            // front of you, which is exactly the state the staleness refusal exists to catch. A file
+            // written before stamping existed is adopted with its origin marked unknown, and refused rather
+            // than trusted.
+            string why = SetupHeightMap.LoadMapWithStamp(fileName);
+            if (why != null)
+                AppDialogs.Show(why, "Height map", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         private void Limits_Click(object sender, RoutedEventArgs e)

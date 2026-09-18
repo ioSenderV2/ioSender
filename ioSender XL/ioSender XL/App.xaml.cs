@@ -511,8 +511,6 @@ namespace GCode_Sender
         // for someone who ticked the box.
         private static void RegisterHeightMapCompensation()
         {
-            CNC.Controls.Probing.SetupHeightMap.Load();
-
             CNC.Controls.HeightMapCompensation.HasMap = () => CNC.Controls.Probing.SetupHeightMap.HasMap;
             CNC.Controls.HeightMapCompensation.Describe = () => CNC.Controls.Probing.SetupHeightMap.Describe();
             CNC.Controls.HeightMapCompensation.WhyNotApplicable = () =>
@@ -520,6 +518,9 @@ namespace GCode_Sender
                     CNC.Core.Grbl.GrblViewModel?.WorkPositionOffset,
                     CNC.Controls.Probing.SetupHeightMap.Width,
                     CNC.Controls.Probing.SetupHeightMap.Height);
+
+            CNC.Controls.HeightMapCompensation.LoadFromFile =
+                path => CNC.Controls.Probing.SetupHeightMap.LoadMapWithStamp(path);
 
             CNC.Controls.HeightMapCompensation.ApplyToLoadedProgram = () =>
             {
