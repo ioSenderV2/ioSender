@@ -55,8 +55,8 @@ ioSender.g.en-US.resources:mainwindow.baml,mnu_loadFolder:System.Windows.Control
 ioSender.g.en-US.resources:heightmapview.baml,hm_grpProbe:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Probe
 ioSender.g.en-US.resources:heightmapview.baml,hm_lblProbe:System.Windows.Controls.ContentControl.Content,Label,True,True,,Probe:
 ioSender.g.en-US.resources:heightmapview.baml,hm_grpArea:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Area to probe
-ioSender.g.en-US.resources:heightmapview.baml,hm_areaProgram:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,From program
-ioSender.g.en-US.resources:heightmapview.baml,hm_areaProgram:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Probe over the loaded job's XY extent, in the current work coordinates."
+ioSender.g.en-US.resources:heightmapview.baml,hm_areaProgram:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,From setup
+ioSender.g.en-US.resources:heightmapview.baml,hm_areaProgram:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Probe over the stock Setup measured, in its work coordinates - the same size the work order is built against. Falls back to the loaded program's extent if Setup has no stock size yet."
 ioSender.g.en-US.resources:heightmapview.baml,hm_areaTable:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Full table
 ioSender.g.en-US.resources:heightmapview.baml,hm_areaTable:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Probe the whole in-bounds machine travel envelope (referenced to the homed corner, like Surface spoilboard)."
 ioSender.g.en-US.resources:heightmapview.baml,hm_width:CNC.Controls.NumericField.Label,None,False,True,,W:

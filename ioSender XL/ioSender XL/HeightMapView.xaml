@@ -42,9 +42,9 @@
                     <GroupBox x:Uid="hm_grpArea" Header="Area to probe" Margin="0,6,0,0">
                         <StackPanel Margin="6">
                             <StackPanel Orientation="Horizontal">
-                                <RadioButton x:Uid="hm_areaProgram" x:Name="rbAreaProgram" Content="From program" GroupName="hmarea" IsChecked="True"
+                                <RadioButton x:Uid="hm_areaProgram" x:Name="rbAreaProgram" Content="From setup" GroupName="hmarea" IsChecked="True"
                                              VerticalAlignment="Center" Checked="AreaProgram_Checked"
-                                             ToolTip="Probe over the loaded job's XY extent, in the current work coordinates."/>
+                                             ToolTip="Probe over the stock Setup measured, in its work coordinates - the same size the work order is built against. Falls back to the loaded program's extent if Setup has no stock size yet."/>
                                 <RadioButton x:Uid="hm_areaTable" x:Name="rbAreaTable" Content="Full work surface" GroupName="hmarea" Margin="18,0,0,0"
                                              VerticalAlignment="Center" Checked="AreaTable_Checked"
                                              ToolTip="Map the whole table, and set the work origin from it - no Setup and no existing work origin needed. The XY origin is placed at the spoilboard corner before probing, and work Z0 is set to the highest point probed, ready to surface from."/>
@@ -145,7 +145,7 @@
                     <Run Text=" Probing happens in the current work coordinates, so jog to the stock corner and zero X/Y (the Setup tab can do this). The area below is in those work coordinates, so this is how it knows where the stock is."/>
                     <LineBreak/>
                     <Run FontWeight="Bold" Text="2. Choose the area + grid."/>
-                    <Run Text=" 'From program' covers the loaded job's footprint (load it, then 'Set from program limits'); 'Full travel' covers the machine bed. Edit X/Y/W/H to fine-tune. Smaller grid = denser and slower (a gently-curved spoilboard often needs only 3x3 or 4x4)."/>
+                    <Run Text=" 'From setup' covers the stock Setup measured - the same size the work order is built against. 'Full work surface' covers the spoilboard instead. Edit X/Y/W/H to fine-tune. A coarser grid is faster (a gently-curved board often needs only 3x3 or 4x4)."/>
                     <LineBreak/>
                     <Run FontWeight="Bold" Text="3. Pick the probe + jog Z to a safe clearance."/>
                     <Run Text=" Park Z a few mm above the surface - the probe descends from there and retracts back to it between points. Probe depth is how far DOWN to search (at least the clearance plus the surface variation). Probe feed is the gentle approach speed; Settle dwell pauses before each probe for a fragile probe to release."/>

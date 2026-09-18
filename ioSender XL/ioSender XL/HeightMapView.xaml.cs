@@ -347,13 +347,37 @@ namespace GCode_Sender
                     HeightMap.MaxY = HeightMap.MinY + h;
                 }
             }
-            else if (model != null && model.IsFileLoaded)
+            else if (!AreaFromSetup() && model != null && model.IsFileLoaded)
             {
+                // Only when Setup has nothing to say. A program's extent is where the CUTS happen, which is
+                // a subset of the stock and not always a centred one, so a grid built from it can leave the
+                // edges of the workpiece unprobed and the interpolation extrapolating past its own data.
                 HeightMap.MinX = model.ProgramLimits.MinX;
                 HeightMap.MaxX = model.ProgramLimits.MaxX;
                 HeightMap.MinY = model.ProgramLimits.MinY;
                 HeightMap.MaxY = model.ProgramLimits.MaxY;
             }
+        }
+
+        /// <summary>
+        /// Fill the area from Setup's stock size - the authoritative one. Returns false when Setup has no
+        /// size yet, so the caller can fall back.
+        /// </summary>
+        /// <remarks>
+        /// Setup's stock is the same StartJobConfig.Section that Work Order reads and writes, so the grid,
+        /// the job and the compensation all describe one piece of material. The area is 0,0 to Width,Height
+        /// because that IS the stock in Setup's work coordinates: Setup puts work zero on the front-left
+        /// corner.
+        /// </remarks>
+        private bool AreaFromSetup()
+        {
+            var s = StartJobConfig.Section;
+            if (s == null || s.Width <= 0d || s.Height <= 0d)
+                return false;
+
+            HeightMap.MinX = 0d; HeightMap.MaxX = s.Width;
+            HeightMap.MinY = 0d; HeightMap.MaxY = s.Height;
+            return true;
         }
 
         private void RefreshProbes()
@@ -1503,7 +1527,19 @@ namespace GCode_Sender
             RefreshPreview();
         }
 
-        private void AreaProgram_Checked(object sender, RoutedEventArgs e) { Area = AreaSource.Program; RememberArea(false); }
+        private void AreaProgram_Checked(object sender, RoutedEventArgs e)
+        {
+            Area = AreaSource.Program;
+            RememberArea(false);
+            // Picking the mode re-reads Setup: choosing "From setup" and being shown last week's numbers
+            // would make the label a lie. Falls back to the loaded program's extent when Setup has no size.
+            if (!loadingConfig)
+            {
+                DefaultArea();
+                UpdateAreaModeUi();
+                RefreshPreview();
+            }
+        }
         private void AreaTable_Checked(object sender, RoutedEventArgs e) { Area = AreaSource.FullTravel; RememberArea(true); }
 
         private void RememberArea(bool full)
