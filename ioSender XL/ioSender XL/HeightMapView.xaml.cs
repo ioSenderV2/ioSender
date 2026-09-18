@@ -1626,6 +1626,16 @@ namespace GCode_Sender
             RefreshSurface();
             HeightMap.HasHeightMap = true;
             HeightMap.CanApply = model != null && model.IsFileLoaded;
+
+            // A loaded map is as usable as a probed one, so it is kept for the work order the same way.
+            // Only probing did that at first, which made "save a map, load it next to the work order that
+            // needs it" - the obvious way to keep a survey with a job - the one route that left the work
+            // order's option disabled (2026-09-18).
+            //
+            // Stamped with the CURRENT work origin: loading a map is a statement that it belongs to the
+            // setup in front of you. If it does not, the stamp is what the staleness refusal then compares,
+            // and it refuses for the right reason.
+            StoreForWorkOrder();
         }
 
         private void Limits_Click(object sender, RoutedEventArgs e)

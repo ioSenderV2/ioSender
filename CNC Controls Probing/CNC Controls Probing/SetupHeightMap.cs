@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SetupHeightMap.cs - part of CNC Controls Probing library
  *
  * The height map Setup probed, kept until a Work Order asks for it.
@@ -59,7 +59,29 @@ namespace CNC.Controls.Probing
         public static double Width { get; private set; }
         public static double Height { get; private set; }
 
-        public static bool HasMap { get { return Map != null; } }
+        public static bool HasMap { get { EnsureLoaded(); return Map != null; } }
+
+        private static bool _loadAttempted;
+
+        /// <summary>
+        /// Read the stored map in on first use.
+        /// </summary>
+        /// <remarks>
+        /// NOT at startup, which is where this was called from first and why it never worked:
+        /// Resources.ConfigPath is "./" until AppConfig.Load resolves it, and the registration ran before
+        /// that - so it looked for the map beside the executable, found nothing, and returned without a
+        /// word. The stored files were sitting in %AppData% the whole time and the work order's option
+        /// stayed disabled with nothing to explain it (2026-09-18).
+        ///
+        /// First use is always long after the config is up, and it costs one file check.
+        /// </remarks>
+        private static void EnsureLoaded()
+        {
+            if (_loadAttempted || Map != null)
+                return;
+            _loadAttempted = true;
+            Load();
+        }
 
         private static string MapPath { get { return Path.Combine(Resources.ConfigPath, "setup-heightmap.map"); } }
         private static string StampPath { get { return Path.Combine(Resources.ConfigPath, "setup-heightmap.stamp"); } }
@@ -107,6 +129,7 @@ namespace CNC.Controls.Probing
         /// </remarks>
         public static string WhyNotApplicable(Position liveOrigin, double width, double height)
         {
+            EnsureLoaded();
             if (Map == null)
                 return "No height map has been probed. Run Setup with 'Probe height map' ticked first.";
 
@@ -134,6 +157,7 @@ namespace CNC.Controls.Probing
         /// <summary>How old the map is, for the Work Order's own summary line.</summary>
         public static string Describe()
         {
+            EnsureLoaded();
             if (Map == null)
                 return "no height map probed";
 
@@ -179,7 +203,11 @@ namespace CNC.Controls.Probing
             try
             {
                 if (!File.Exists(MapPath) || !File.Exists(StampPath))
+                {
+                    // Logged, because "no map stored" and "looked in the wrong place" are the same silence.
+                    DebugLog.Write("heightmap", "no stored setup map at " + MapPath);
                     return;
+                }
 
                 var stamp = XElement.Load(StampPath);
                 ProbedUtc = DateTime.Parse(stamp.Attribute("ProbedUtc").Value, CultureInfo.InvariantCulture,

@@ -1794,7 +1794,7 @@ namespace CNC.Controls
 
             if (!available)
             {
-                txtHeightMapSummary.Text = "No height map probed - run Setup with 'Probe height map' ticked.";
+                txtHeightMapSummary.Text = "No height map available - probe one from Setup or the Height Map view, or load a saved .map there.";
                 return;
             }
 
@@ -3245,6 +3245,12 @@ namespace CNC.Controls
                 // gone. Generate hands the program to the Job tab as the loaded job; the run half of
                 // the bar belongs there now. ActiveRun stays null for the same reason - there is no
                 // second engine to route a run through.
+                // A map can be probed or loaded while this tab sits in the background, and the option's
+                // enabled state and summary are both computed from it - so re-ask on every activation
+                // rather than only when a work order is loaded. Without this, probing a map and coming
+                // straight back here showed the option still greyed out.
+                UpdateHeightMapSummary();
+
                 MacroProcessor.SupportsGenerateMode = true;
                 MacroProcessor.AllowRunModesWhenGenerated = true;
                 MacroProcessor.ActiveGenerate = Generate;
