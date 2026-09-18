@@ -960,9 +960,22 @@ namespace GCode_Sender
                     "point {0}/{1}: grid [{2},{3}] target X{4:0.###} Y{5:0.###} (work), probe down {6:0.###} mm, retract {7:0.###} mm",
                     point, order.Count, here.Col, here.Row, here.X, here.Y, thisSearch, hover));
 
-                // Hold so the plate can be moved - never before the first point of an attempt, where the
-                // operator is already standing at it.
-                if (HeightMap.AddPause && i > startIndex)
+                // Hold so the plate can be placed - INCLUDING before the first point.
+                //
+                // It used to skip the first, on the reasoning that the operator was already standing at it
+                // with the plate down. That was true when the only way here was to jog to the start and
+                // press Start on this tab. It stopped being true when Setup began handing over: the head is
+                // wherever Setup parked it, the operator is at the keyboard, and the machine would rapid to
+                // point 1 and probe with nothing under it.
+                //
+                // And that is not a harmless miss. The first probe of any attempt searches LONG (see the
+                // note above), so with no plate it reaches bare stock and records point 1 short by the
+                // plate's thickness - one wrong corner in a surface every Z in the job is then shifted by,
+                // with nothing on screen to say so. A resume is the same case for the same reason: whatever
+                // interrupted the run took the operator away from the machine.
+                //
+                // The cost of holding when the plate IS already down is one press of Continue.
+                if (HeightMap.AddPause)
                     pr.Program.AddPause();
 
                 // AddProbingAction composes the distance into the program text as it is added, so setting
