@@ -1,4 +1,4 @@
-/*
+﻿/*
  * BulkObservableCollection.cs - part of CNC Core
  *
  * A plain ObservableCollection<T> fires one CollectionChanged notification PER item added - fine for a
@@ -10,6 +10,7 @@
  * thousands of incremental ones.
  */
 
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
@@ -39,6 +40,47 @@ namespace CNC.Core
             OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs("Count"));
             OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs("Item[]"));
             OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        }
+
+        /// <summary>
+        /// Suppress change notifications for the duration of the returned scope, then raise ONE Reset.
+        /// </summary>
+        /// <remarks>
+        /// For a builder that has to add items one at a time because each one is parsed as it arrives -
+        /// AddRange and ReplaceAll both want the finished list up front, which such a builder does not have.
+        ///
+        /// The cost of not having this was measured on real hardware 2026-09-18: applying a height map to a
+        /// 43,000-block program rebuilt it through GCode.AddBlock, one change notification per block, into a
+        /// live DataGrid-bound collection. It took THIRTY SECONDS, during which the program list showed
+        /// nothing - so a transform that had worked looked exactly like one that had silently failed.
+        /// </remarks>
+        public IDisposable DeferNotifications()
+        {
+            return new DeferScope(this);
+        }
+
+        private sealed class DeferScope : IDisposable
+        {
+            private readonly BulkObservableCollection<T> owner;
+            private readonly bool wasSuppressed;
+
+            public DeferScope(BulkObservableCollection<T> owner)
+            {
+                this.owner = owner;
+                wasSuppressed = owner.suppressNotification;
+                owner.suppressNotification = true;
+            }
+
+            public void Dispose()
+            {
+                if (wasSuppressed)
+                    return;     // an outer scope owns the notification
+
+                owner.suppressNotification = false;
+                owner.OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs("Count"));
+                owner.OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs("Item[]"));
+                owner.OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+            }
         }
 
         // ReplaceAll: Clear (also suppressed - Clear() would otherwise fire its own Reset immediately)

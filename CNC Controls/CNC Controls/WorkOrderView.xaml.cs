@@ -3727,12 +3727,26 @@ namespace CNC.Controls
         private void ApplyHeightMapToGeneratedProgram()
         {
             string why = HeightMapCompensation.Refusal();
+
+            // Say what is happening BEFORE it happens, and hold the wait cursor for the duration. Applying a
+            // map rewrites every cutting move in the program, so it is the one step here that takes long
+            // enough to look like nothing happening - and on a large program it emptied the list while it
+            // worked, which read as a failure rather than as work in progress.
+            var clock = System.Diagnostics.Stopwatch.StartNew();
             if (why == null)
-                why = HeightMapCompensation.ApplyToLoadedProgram?.Invoke();
+            {
+                model.Message = "Applying the height map to the generated program...";
+                using (new UIUtils.WaitCursor())
+                    why = HeightMapCompensation.ApplyToLoadedProgram?.Invoke();
+            }
 
             if (why == null)
             {
-                model.Message = "Height map applied to the generated program - " + HeightMapCompensation.DescribeMap();
+                // With the elapsed time, for the same reason Generate reports its own: a step that takes
+                // seconds should say it finished and how long it took, or the operator is left deciding for
+                // themselves whether it worked.
+                model.Message = string.Format("Height map applied to the generated program in {0:0.0} s - {1}",
+                    clock.Elapsed.TotalSeconds, HeightMapCompensation.DescribeMap());
                 // Count and identity AFTER the transform. The program list came up empty on real hardware
                 // while the 3D view showed the compensated toolpath, which is three different faults wearing
                 // the same face: no blocks at all, blocks the grid was never told about, or blocks still

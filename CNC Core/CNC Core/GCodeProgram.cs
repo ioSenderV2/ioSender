@@ -1,4 +1,4 @@
-/*
+﻿/*
  * GCodeProgram.cs - part of CNC Core library
  *
  * A loaded G-code program: the GCodeJob model (blocks, tokens, parser, bounding box) plus the load
@@ -274,6 +274,12 @@ namespace CNC.Core
         public bool AddLineNumbers { get { return Program.AddLineNumbers; } set { Program.AddLineNumbers = value; } }
 
         public ObservableCollection<GCodeBlock> Data { get { return Program.Blocks; } }
+
+        /// <summary>
+        /// Hold the block list's change notifications back while a program is rebuilt block by block,
+        /// raising one Reset at the end - see GCodeJob.DeferBlockNotifications.
+        /// </summary>
+        public System.IDisposable DeferBlockNotifications() { return Program.DeferBlockNotifications(); }
         public int Blocks { get { return Program.Blocks.Count; } }
         public List<GCodeToken> Tokens { get { return Program.Tokens; } }
         public Queue<string> Commands { get { return Program.commands; } }

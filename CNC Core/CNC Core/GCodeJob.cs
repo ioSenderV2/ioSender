@@ -253,6 +253,24 @@ namespace CNC.Core
         // INotifyCollectionChanged/IList; callers that need the bulk API (GCode.cs's load/Pop paths) cast.
         public ObservableCollection<GCodeBlock> blocks = new BulkObservableCollection<GCodeBlock>();
 
+        /// <summary>
+        /// Hold back the block collection's change notifications while a program is built a block at a
+        /// time, raising one Reset at the end. Always returns something disposable, so a caller need not
+        /// know what the collection actually is.
+        /// </summary>
+        /// <remarks>
+        /// AddBlock parses each line as it arrives, so neither AddRange nor ReplaceAll fits - they want the
+        /// finished list. Without this, a 43,000-block rebuild spent thirty seconds notifying a bound
+        /// DataGrid once per block, showing an empty program list throughout (2026-09-18).
+        /// </remarks>
+        public IDisposable DeferBlockNotifications()
+        {
+            var bulk = blocks as BulkObservableCollection<GCodeBlock>;
+            return bulk != null ? bulk.DeferNotifications() : (IDisposable)new NoDefer();
+        }
+
+        private sealed class NoDefer : IDisposable { public void Dispose() { } }
+
         public Queue<string> commands = new Queue<string>();
 
         public delegate bool ToolChangedHandler(int toolNumber);
