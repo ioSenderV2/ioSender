@@ -87,10 +87,33 @@ namespace GCode_Sender
             set { HeightMapConfig.Current.DivisionsY = Math.Max(2, value); SaveConfig(); UpdateAreaModeUi(); }
         }
 
+        /// <summary>
+        /// Write the whole panel back to the config and flush it.
+        /// </summary>
+        /// <remarks>
+        /// It used to only flush: Divisions and Drop allowance write straight into HeightMapConfig.Current
+        /// through their own setters, so those survived, while the hold checkbox, the grid size and the
+        /// probe selection did not - the checkbox was saved only as a SIDE EFFECT of changing the area
+        /// radio, and the other two were never persisted at all. Reported from the machine 2026-09-18.
+        ///
+        /// Copying the lot here, from one place, is what stops that pattern coming back: a new control on
+        /// this page is remembered by being read here, rather than by someone remembering to add a handler.
+        /// </remarks>
         private void SaveConfig()
         {
-            if (!loadingConfig)
-                AppConfig.Settings.Save();
+            if (loadingConfig)
+                return;
+
+            var cfg = HeightMapConfig.Current;
+            cfg.HoldAtEachPoint = HeightMap.AddPause;
+            if (HeightMap.GridSizeX > 0d) cfg.GridSizeX = HeightMap.GridSizeX;
+            if (HeightMap.GridSizeY > 0d) cfg.GridSizeY = HeightMap.GridSizeY;
+
+            var probe = cbxProbe.SelectedItem as ProbeDefinition;
+            if (probe != null)
+                cfg.ProbeName = probe.Name;
+
+            AppConfig.Settings.Save();
         }
 
         private bool loadingConfig;
@@ -108,6 +131,17 @@ namespace GCode_Sender
             try
             {
                 HeightMap.AddPause = cfg.HoldAtEachPoint;
+                HeightMap.GridSizeX = cfg.GridSizeX > 0d ? cfg.GridSizeX : 25d;
+                HeightMap.GridSizeY = cfg.GridSizeY > 0d ? cfg.GridSizeY : 25d;
+
+                // By NAME - see the config's own note on why not an index.
+                if (!string.IsNullOrEmpty(cfg.ProbeName))
+                {
+                    var want = cbxProbe.Items.OfType<ProbeDefinition>()
+                                       .FirstOrDefault(x => x.Name == cfg.ProbeName);
+                    if (want != null)
+                        cbxProbe.SelectedItem = want;
+                }
 
                 if (cfg.FullWorkSurface)
                 {
@@ -240,6 +274,7 @@ namespace GCode_Sender
                 // a window nobody is looking at. UpdateRunUi asserts the same thing on every refresh; this
                 // covers the case where the view goes away without one.
                 ShutterRemote.Stop();
+                SaveConfig();
             }
         }
 
@@ -675,6 +710,7 @@ namespace GCode_Sender
 
             runActive = true;
             UpdateRunUi();
+            SaveConfig();   // what was actually used is what should come back next time
 
             try
             {
@@ -1473,8 +1509,27 @@ namespace GCode_Sender
             {
                 // Handed back rather than shown - see the call site. Telling the operator has to wait until
                 // the run has actually been ended.
-                warning = string.Format(Loc("HmCaptureShort"),
-                    readings.Count, map.TotalPoints, string.Empty);
+                //
+                // The {2} slot is for WHY, and it used to be passed string.Empty - so a run that stopped
+                // because the probe never made contact said only that the map could not be built, and the
+                // operator was left to work out the rest at the machine. The controller had already said it:
+                // a probe that triggers reports PRB:...:1 and one that does not reports :0, which is exactly
+                // what GrblViewModel.IsProbeSuccess carries. Reported 2026-09-18, after a magnetic probe
+                // lead fell off at point 7 of 77.
+                string why;
+                if (!model.IsProbeSuccess)
+                    why = string.Format(CultureInfo.CurrentCulture,
+                        "{2}{2}Point {0} never made contact - the probe did not trigger within its search distance."
+                        + "{2}{2}Check the probe is plugged in and its lead is not snagged; for a touch plate, that it is"
+                        + " actually under the tool and the magnet is attached. Then use Retry to carry on from point {0}"
+                        + " - the {1} readings already taken are kept.",
+                        readings.Count + 1, readings.Count, Environment.NewLine);
+                else
+                    why = string.Format(CultureInfo.CurrentCulture,
+                        "{2}{2}The run stopped after point {0}. Retry carries on from point {1}, keeping what was taken.",
+                        readings.Count, readings.Count + 1, Environment.NewLine);
+
+                warning = string.Format(Loc("HmCaptureShort"), readings.Count, map.TotalPoints, why);
                 return;
             }
 
@@ -1600,8 +1655,7 @@ namespace GCode_Sender
             if (loadingConfig)
                 return;
             HeightMapConfig.Current.FullWorkSurface = full;
-            HeightMapConfig.Current.HoldAtEachPoint = HeightMap.AddPause;
-            AppConfig.Settings.Save();
+            SaveConfig();
         }
 
         private void cbxProbe_SelectionChanged(object sender, SelectionChangedEventArgs e)

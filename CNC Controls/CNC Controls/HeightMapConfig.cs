@@ -39,6 +39,20 @@ namespace CNC.Controls
         /// <summary>Hold at each point so a touch plate can be moved.</summary>
         public bool HoldAtEachPoint { get; set; } = true;
 
+        /// <summary>Grid spacing in mm, used by every area mode except Full work surface (which counts
+        /// divisions instead). Remembered for the same reason the divisions are: it is a property of how
+        /// this operator works, not of one run.</summary>
+        public double GridSizeX { get; set; } = 25d;
+        public double GridSizeY { get; set; } = 25d;
+
+        /// <summary>
+        /// The probe last used here, BY NAME. A name rather than an index because the probe list is edited
+        /// in Machine Setup - an index silently points at a different probe the moment one is added above
+        /// it, and "silently probes with the wrong geometry" is the failure this is meant to prevent, not
+        /// cause. An unmatched name simply falls back to the first available probe.
+        /// </summary>
+        public string ProbeName { get; set; } = string.Empty;
+
         /// <summary>
         /// Where the highest point of the last map was, in WORK coordinates, and whether there is one.
         ///
