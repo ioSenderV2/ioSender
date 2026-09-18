@@ -36,10 +36,9 @@ fixed their neighbours.
 
 **Running order.** §3 (the OBSOLETE pass) was taken first and is **done** — it was the cheap half
 and it carried the wrong facts. The two demo-able features are **done** too: M1/M2 (`#carving`) and
-M3 (`#laser`). What remains, in order: **M4 (Height Map)**, which needs the app
-driven, and the **M5 remainder** (Mark only, which belongs in `#work-order`); then
-§4's thirteen, which can ride along with whichever topic they touch; then the rest of §2 and the
-reshoots.
+M3 (`#laser`), and so is the **M5 remainder** (Mark only, in `#work-order`). What remains, in order:
+**M4 (Height Map)**, which needs the app driven; then §4's thirteen, which can ride along with
+whichever topic they touch; then the rest of §2 and the reshoots.
 
 ---
 
@@ -73,6 +72,20 @@ reshoots.
 > compares a value against itself; shading depth follows the **interval** as much as the power, hence
 > the areal readout; and an **aborted job leaves the `G92` applied**, because `G92.1` is the last
 > line. Still owed: the three-tab dialog figure in §6.
+
+> ✅ **The M5 remainder is DONE 2026-09-17** (`14e8adc1`) — **Mark only**, written into
+> `#work-order` under *Running a Work Order* rather than into `#carving`, because it is a property of
+> the run. From `WorkOrderCompiler.ResolveMarkOnly`: one dimple per **toolpath** (not per operation),
+> patterns and Indirect shadows included; a Bore counts as a hole; no enabled Drill or Bore resolves
+> to an empty program and is refused before Generate; the dimple carries its own tool and feeds, with
+> the **dimple's** diameter rather than the bit's nominal one. The hazard is a warning box: the flag
+> **persists with the work order**, and only the summary line and the program's two MARK ONLY header
+> lines say so.
+>
+> 🔴 **Found while checking it:** `WorkOrderModel.cs:680` claims the run strip's button reads
+> "Generate (mark only)" while the flag is set — **that string is nowhere in the repo**, and it is
+> the reason the comment gives for persisting the flag at all. A comment-only guarantee; the topic
+> does not repeat it.
 
 "Usable" is doing work in that heading. Several of these are *named* somewhere — in a menu table or
 a one-line parenthetical — without anything that would let an operator use them. Those are marked

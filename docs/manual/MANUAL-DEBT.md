@@ -352,8 +352,17 @@ assert something false. That is a stopgap, not a fix:
         **interval** as much as the power, which is why the readout leads with an areal figure; and an
         **aborted job leaves the `G92` applied**, because `G92.1` is on the last line.
         **Still owed: a figure** — the dialog's three tabs, already listed in §6.
-  - [ ] **M5 remainder — Mark only.** A property of the *run*, not of a carve, so it belongs in
-        `#work-order` rather than in `#carving`.
+  - [x] **M5 remainder — Mark only. DONE 2026-09-17** (`14e8adc1`). In `#work-order`, under
+        Running a Work Order, because it is a property of the *run*. Says the four things only the
+        compiler knows — one dimple per **toolpath** (a Drill and a Bore on one toolpath is one
+        hole), a Bore counts, no hole means an empty program refused up front, and the dimple's own
+        tool/feeds through the ordinary dialog with the **dimple's** diameter rather than the bit's
+        — plus the hazard as a warning: **the setting persists with the work order**, and what tells
+        you is the summary line and the program's two MARK ONLY header lines.
+        🔴 **App bug found while writing it:** `WorkOrderModel.cs:680` says the run strip's
+        button reads "Generate (mark only)" while this is set. **No such string exists in the repo** —
+        the comment is aspirational, and it is the justification given for persisting the flag. Either
+        build it or correct the comment; the manual does not claim it.
   - [ ] **M4 (Height Map)** — a whole topic this file had never listed; needs the app driven.
   - [ ] **M6–M21** — the rest, in §2 of the audit.
 
