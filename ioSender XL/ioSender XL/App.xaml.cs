@@ -515,7 +515,7 @@ namespace GCode_Sender
             CNC.Controls.HeightMapCompensation.Describe = () => CNC.Controls.Probing.SetupHeightMap.Describe();
             CNC.Controls.HeightMapCompensation.WhyNotApplicable = () =>
                 CNC.Controls.Probing.SetupHeightMap.WhyNotApplicable(
-                    CNC.Core.Grbl.GrblViewModel?.WorkPositionOffset,
+                    CNC.Core.Grbl.GrblViewModel,
                     CNC.Controls.Probing.SetupHeightMap.Width,
                     CNC.Controls.Probing.SetupHeightMap.Height);
 

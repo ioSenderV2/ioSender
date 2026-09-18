@@ -50,10 +50,49 @@ namespace CNC.Controls.Probing
         /// "is this still my setup?" answerable at a glance.</summary>
         public static DateTime ProbedUtc { get; private set; }
 
-        /// <summary>Work zero in MACHINE coordinates when the map was probed - the setup it belongs to.</summary>
+        /// <summary>
+        /// Work zero in MACHINE coordinates when the map was probed - the setup it belongs to. WITHOUT the
+        /// tool length offset; see WorkOrigin.
+        /// </summary>
         public static double OriginX { get; private set; }
         public static double OriginY { get; private set; }
         public static double OriginZ { get; private set; }
+
+        /// <summary>
+        /// Where work zero sits in machine coordinates, with the TOOL taken out of it. False when the
+        /// controller has not reported enough to say.
+        /// </summary>
+        /// <remarks>
+        /// NOT the work position offset on its own, which is what this used to compare and what produced a
+        /// false refusal on real hardware 2026-09-18: grblHAL's WCO is the WCS offset PLUS G92 PLUS THE TOOL
+        /// LENGTH OFFSET, so fitting a different tool moves it. The operator had changed nothing - G54 read
+        /// 150.304, -635.370, -77.936 before and after - but the TLO went from -25.766 to -16.540 and the
+        /// map was refused for a work origin that had "moved" by exactly that 9.226 mm.
+        ///
+        /// Taking the tool out is not a loosening: work Z0 means the same physical plane whatever is in the
+        /// spindle - that is what a tool length offset IS - so a map probed with one tool describes the same
+        /// surface for the next. G92 stays IN, because a G92 shift genuinely does move the origin out from
+        /// under the map, as does re-zeroing Z, and both must still refuse.
+        /// </remarks>
+        private static bool WorkOrigin(GrblViewModel model, out double x, out double y, out double z)
+        {
+            x = y = z = double.NaN;
+
+            var wco = model?.WorkPositionOffset;
+            if (wco == null || double.IsNaN(wco.X) || double.IsNaN(wco.Y) || double.IsNaN(wco.Z))
+                return false;
+
+            var tlo = model.ToolOffset;
+            // No tool offset reported at all is the ordinary no-TLO case, not a failure - it is zero.
+            double tx = tlo == null || double.IsNaN(tlo.X) ? 0d : tlo.X;
+            double ty = tlo == null || double.IsNaN(tlo.Y) ? 0d : tlo.Y;
+            double tz = tlo == null || double.IsNaN(tlo.Z) ? 0d : tlo.Z;
+
+            x = wco.X - tx;
+            y = wco.Y - ty;
+            z = wco.Z - tz;
+            return true;
+        }
 
         /// <summary>The stock extent that was mapped, in work coordinates.</summary>
         public static double Width { get; private set; }
@@ -89,14 +128,15 @@ namespace CNC.Controls.Probing
         /// <summary>
         /// Keep <paramref name="map"/> as the setup's map, stamped with the setup it was probed against.
         /// </summary>
-        /// <param name="origin">Work zero in machine coordinates - the work position offset.</param>
-        public static void Store(HeightMap map, Position origin, double width, double height)
+        /// <param name="model">The live controller state - work zero is taken from it, see WorkOrigin.</param>
+        public static void Store(HeightMap map, GrblViewModel model, double width, double height)
         {
             Map = map;
             ProbedUtc = DateTime.UtcNow;
-            OriginX = origin != null ? origin.X : double.NaN;
-            OriginY = origin != null ? origin.Y : double.NaN;
-            OriginZ = origin != null ? origin.Z : double.NaN;
+            WorkOrigin(model, out double ox, out double oy, out double oz);
+            OriginX = ox;
+            OriginY = oy;
+            OriginZ = oz;
             Width = width;
             Height = height;
 
@@ -127,22 +167,23 @@ namespace CNC.Controls.Probing
         /// probed a grid and ticked a box, is the kind of refusal that gets worked around rather than
         /// understood. The caller puts this text in front of them.
         /// </remarks>
-        public static string WhyNotApplicable(Position liveOrigin, double width, double height)
+        public static string WhyNotApplicable(GrblViewModel model, double width, double height)
         {
             EnsureLoaded();
             if (Map == null)
                 return "No height map has been probed. Run Setup with 'Probe height map' ticked first.";
 
-            if (liveOrigin == null || double.IsNaN(OriginX))
+            if (!WorkOrigin(model, out double lx, out double ly, out double lz) || double.IsNaN(OriginX))
                 return "The work origin is unknown, so there is no way to tell whether the stored map belongs to this setup.";
 
-            if (Math.Abs(liveOrigin.X - OriginX) > Tolerance ||
-                Math.Abs(liveOrigin.Y - OriginY) > Tolerance ||
-                Math.Abs(liveOrigin.Z - OriginZ) > Tolerance)
+            if (Math.Abs(lx - OriginX) > Tolerance ||
+                Math.Abs(ly - OriginY) > Tolerance ||
+                Math.Abs(lz - OriginZ) > Tolerance)
                 return string.Format(CultureInfo.CurrentCulture,
                     "The work origin has moved since the height map was probed - it was at machine {0:0.###}, {1:0.###}, {2:0.###} and is now at {3:0.###}, {4:0.###}, {5:0.###}.\n\n"
-                    + "The map describes the surface under the OLD origin, so applying it would shift every Z by a surface that is no longer under the cutter. Re-run Setup's height map.",
-                    OriginX, OriginY, OriginZ, liveOrigin.X, liveOrigin.Y, liveOrigin.Z);
+                    + "The map describes the surface under the OLD origin, so applying it would shift every Z by a surface that is no longer under the cutter. Re-run Setup's height map.\n\n"
+                    + "(A tool change does not move the work origin - the tool length offset is not part of these numbers.)",
+                    OriginX, OriginY, OriginZ, lx, ly, lz);
 
             if (width > 0d && height > 0d &&
                 (Math.Abs(width - Width) > Tolerance || Math.Abs(height - Height) > Tolerance))
@@ -188,7 +229,7 @@ namespace CNC.Controls.Probing
         private const string StampW = "SetupWidth", StampH = "SetupHeight";
 
         /// <summary>Write <paramref name="map"/> to <paramref name="path"/> with the stamp it is held under.</summary>
-        public static void SaveMapWithStamp(HeightMap map, string path, Position liveOrigin, double width, double height)
+        public static void SaveMapWithStamp(HeightMap map, string path, GrblViewModel model, double width, double height)
         {
             if (map == null)
                 return;
@@ -199,9 +240,10 @@ namespace CNC.Controls.Probing
             // relabel a map with wherever the machine happens to be standing now. Only a map with no stamp
             // of its own falls back to the live position.
             bool known = Map == map && !double.IsNaN(OriginX);
-            double ox = known ? OriginX : (liveOrigin != null ? liveOrigin.X : double.NaN);
-            double oy = known ? OriginY : (liveOrigin != null ? liveOrigin.Y : double.NaN);
-            double oz = known ? OriginZ : (liveOrigin != null ? liveOrigin.Z : double.NaN);
+            WorkOrigin(model, out double lx, out double ly, out double lz);
+            double ox = known ? OriginX : lx;
+            double oy = known ? OriginY : ly;
+            double oz = known ? OriginZ : lz;
             double w = known && Width > 0d ? Width : width;
             double h = known && Height > 0d ? Height : height;
             DateTime when = known ? ProbedUtc : DateTime.UtcNow;

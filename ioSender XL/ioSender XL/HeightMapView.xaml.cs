@@ -334,7 +334,7 @@ namespace GCode_Sender
 
             double w = setupWidth > 0d ? setupWidth : HeightMap.MaxX - HeightMap.MinX;
             double h = setupHeight > 0d ? setupHeight : HeightMap.MaxY - HeightMap.MinY;
-            SetupHeightMap.Store(HeightMap.Map, model.WorkPositionOffset, w, h);
+            SetupHeightMap.Store(HeightMap.Map, model, w, h);
             model.Message = "Height map probed and kept - tick 'Apply height map' on the work order to use it.";
         }
 
@@ -1607,8 +1607,7 @@ namespace GCode_Sender
                 // Stamped, so the file records the setup it was probed against - see SetupHeightMap. A map
                 // kept beside a job and reopened weeks later is the whole reason Save exists, and without
                 // the stamp it would be adopted as belonging to whatever setup was in front of you.
-                SetupHeightMap.SaveMapWithStamp(HeightMap.Map, file.FileName,
-                    model != null ? model.WorkPositionOffset : null,
+                SetupHeightMap.SaveMapWithStamp(HeightMap.Map, file.FileName, model,
                     HeightMap.MaxX - HeightMap.MinX, HeightMap.MaxY - HeightMap.MinY);
                 if (model != null)
                     model.Message = "Height map saved to " + file.FileName;
