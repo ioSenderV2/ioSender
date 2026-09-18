@@ -23,6 +23,10 @@ namespace CNC.Core
         public string Shape;    // "FLAT" | "BALL" | "VBIT"
         public double Angle;    // V-bit included angle (degrees), 0 for flat/ball
         public double Length;   // tool length (mm) - DefaultLengthMm when the comment omits L=
+        // What the tool IS, in the operator's own words, from the trailing "- ..." of the comment:
+        // (TOOL T=1 D=6.35 TYPE=FLAT - 1/4" 2 flute end mill). Empty when the comment carries none -
+        // Fusion's own post writes the numbers only.
+        public string Description;
     }
 
     public struct GCodeStockInfo
@@ -42,8 +46,11 @@ namespace CNC.Core
         // the tool's actual length) - a plausible generic stickout, not a measured value.
         public const double DefaultLengthMm = 40d;
 
+        // The trailing "- <description>" is optional and runs to the closing paren: our own Work Order
+        // compiler writes the operator's custom-tool name there, and it is the only place in a generated
+        // program that says what the tool actually IS.
         private static readonly Regex rxTool =
-            new Regex(@"\(\s*TOOL\s+T=(\d+)\s+D=([0-9.]+)\s+TYPE=(\w+)(?:\s+A=([0-9.]+))?(?:\s+L=([0-9.]+))?", RegexOptions.IgnoreCase);
+            new Regex(@"\(\s*TOOL\s+T=(\d+)\s+D=([0-9.]+)\s+TYPE=(\w+)(?:\s+A=([0-9.]+))?(?:\s+L=([0-9.]+))?(?:\s*-\s*([^)]*))?", RegexOptions.IgnoreCase);
         // OX/OY are OPTIONAL, so a Fusion post's plain (STOCK X= Y= Z=) still matches exactly as before.
         // Signed, because the stock's minimum corner sits at negative work coordinates whenever the origin
         // is anywhere but that corner.
@@ -113,7 +120,14 @@ namespace CNC.Core
             if (m.Groups[5].Success)
                 double.TryParse(m.Groups[5].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out len);
 
-            info = new GCodeToolInfo { Diameter = d, Shape = m.Groups[3].Value.ToUpperInvariant(), Angle = ang, Length = len };
+            info = new GCodeToolInfo
+            {
+                Diameter = d,
+                Shape = m.Groups[3].Value.ToUpperInvariant(),
+                Angle = ang,
+                Length = len,
+                Description = m.Groups[6].Success ? m.Groups[6].Value.Trim() : string.Empty
+            };
             return true;
         }
 

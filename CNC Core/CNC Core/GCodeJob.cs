@@ -370,6 +370,14 @@ namespace CNC.Core
             if (starts.Count == 0)
                 return;
 
+            // What each T-number IS, from the program's own (TOOL T=n ... - description) declarations. Read
+            // from the HEADER - everything above the first tool change - because that is where a program
+            // declares its tools ("so it's clear what each T-number is before the first M6 asks for it", the
+            // Work Order compiler's own words), and scanning the whole program would mean a regex over every
+            // one of 43,000 blocks for no gain. Not read from GCodeProgramComments: that is refreshed on
+            // FileChanged, which this runs BEFORE, so it would still describe the PREVIOUS program.
+            var declared = GCodeProgramComments.ParseTools(HeaderLines(starts[0]));
+
             string current = LeadInSectionName;
             int next = 0;
 
@@ -377,7 +385,7 @@ namespace CNC.Core
             {
                 if (next < starts.Count && i == starts[next])
                 {
-                    current = ToolChangeSectionName(i);
+                    current = ToolChangeSectionName(i, declared);
                     blocks[i].IsSectionStart = true;
                     next++;
                 }
@@ -424,7 +432,14 @@ namespace CNC.Core
         }
 
         // "T2", plus the first comment of the run immediately above the tool change when there is one.
-        private string ToolChangeSectionName(int toolChangeIndex)
+        // The program's lines above its first tool change.
+        private IEnumerable<string> HeaderLines(int firstToolChangeIndex)
+        {
+            for (int i = 0; i < firstToolChangeIndex && i < blocks.Count; i++)
+                yield return blocks[i].Data ?? string.Empty;
+        }
+
+        private string ToolChangeSectionName(int toolChangeIndex, IReadOnlyDictionary<int, GCodeToolInfo> declared)
         {
             // Plenty of posts put the T word on its own line ahead of the M6 rather than on it - "T2" then
             // "M6" - so a T on the tool-change line is the common case, not the only one. Walk back over the
@@ -437,6 +452,15 @@ namespace CNC.Core
 
             if (tool == null)
                 tool = "Tool change";
+
+            // What the tool IS beats what its first operation is called. A section is one TOOL's worth of
+            // the program - with Group by tool a single section holds every operation that shares the bit -
+            // so naming it after the first of them ("T1 - Contour - contour, 19.5 mm deep") describes a
+            // fraction of what is in it and hides the one thing the operator needs at a tool change: which
+            // bit to fit. Asked for 2026-09-18, looking at exactly that outline.
+            if (declared != null && tool.Length > 1 && int.TryParse(tool.Substring(1), out int toolNumber) &&
+                 declared.TryGetValue(toolNumber, out var info) && !string.IsNullOrEmpty(info.Description))
+                return tool + " - " + info.Description;
 
             string name = null;
 
