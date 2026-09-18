@@ -587,7 +587,7 @@ namespace CNC.Controls
             // they run, is the whole truth.
             string prompt = runOnlyThisToolpath
                 ? (haveLeadIn
-                    ? string.Format("Run only toolpath \"{0}\"?\r\rThis will run Program start, this toolpath, and Program end. That's it.", group.Name)
+                    ? string.Format("Run only toolpath \"{0}\"?\r\rThis will run Program start, this toolpath, and Program end. In that order.", group.Name)
                     : string.Format("Run only toolpath \"{0}\"?\r\rThe program stops at the end of this toolpath. There is no Program start section to run, so units, plane and work offset will be whatever the machine currently holds.", group.Name))
                 : string.Format("Start the run from toolpath \"{0}\" and continue to the end?", group.Name);
 
