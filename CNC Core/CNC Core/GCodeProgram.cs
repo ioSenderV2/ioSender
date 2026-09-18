@@ -286,7 +286,21 @@ namespace CNC.Core
             Program.AddBlock(block, action);
 
             if(action == Action.End && !_transient && Model != null)
+            {
                 Model.Blocks = Blocks;   // transient programs don't drive the job's block-count display
+
+                // Every generated program lands here - Work Order, the lathe wizards, the transforms, the
+                // converters - because they all build through AddBlock and finish with Action.End rather
+                // than going through LoadFile. Without this the outline was silently unavailable to all of
+                // them: LoadText clears HasOutline on the way IN and nothing ever set it again, so a work
+                // order with three tool changes showed a flat list while the sections existed underneath.
+                //
+                // Set AFTER Program.AddBlock rather than before, unlike the Pop path's careful ordering,
+                // because HasSections is not known until the parse it performs has finished. FileChanged has
+                // therefore already fired by now; the grouping is applied by GCodeListControl's own
+                // HasOutline-changed handler instead, against blocks that are final by this point.
+                Model.HasOutline = Program.HasSections;
+            }
         }
 
         public void AddBlock(string block)
@@ -562,9 +576,10 @@ namespace CNC.Core
                 if (ok[0])
                 {
                     Program.RaiseFileChanged();
-                    // Recognizes the Fusion add-in's (--- seq: name (Tn) ---) section markers
-                    // (GCodeJob.ParseFileLines calls BeginSection on a match) - an ordinary file with no such
-                    // markers leaves this false.
+                    // True for the Fusion add-in's (--- seq: name (Tn) ---) section markers, which
+                    // ParseFileLines turns into sections as it reads - and, for a file carrying none, for
+                    // the sections GCodeJob derives from the program's TOOL CHANGES instead. Read after
+                    // RaiseFileChanged because that is what applies the tool-change fallback.
                     Model.HasOutline = Program.HasSections;
                     Model.Blocks = Blocks;
                 }
