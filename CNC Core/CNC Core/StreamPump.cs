@@ -323,6 +323,35 @@ namespace CNC.Core
 
                 GCodeBlock block = source.Data[sendIdx];
 
+                // Outside the sections this run was asked to cut ("Run just this toolpath"): advance past
+                // the block WITHOUT sending anything, the same way a consumed directive row below does.
+                //
+                // An earlier version rewrote these to an empty comment so the per-line status column stayed
+                // populated. That was the wrong trade and the operator found it immediately: on a 31,000-line
+                // V-carve, reaching the third toolpath meant streaming and acknowledging tens of thousands of
+                // empty comments - minutes of waiting to cut something the machine could have started on at
+                // once. A skipped line has no ack to account for, so skipping outright costs nothing and
+                // removes the wait entirely; the status column simply does not mark those rows, which is
+                // honest - they did not run.
+                if (blockFilter != null && !blockFilter(sendIdx))
+                {
+                    bool fLast = pgmEndLine == sendIdx;
+                    sendIdx = fLast ? -1 : sendIdx + 1;
+                    if (fLast && pacer.Outstanding == 0)
+                    {
+                        // Degenerate but reachable: the program's last block is one we are skipping, so no
+                        // later ack will run the finished check. Same barrier-tail pattern as the directive
+                        // rows below.
+                        PumpLog.W("JOB FINISHED (filtered block was tail)");
+                        pacer.Abort();
+                        PostControl(onJobFinished);
+                        break;
+                    }
+                    if (fLast)
+                        break;
+                    continue;
+                }
+
                 // (WAITIDLE) - consumed by the SENDER, never written to the wire (unified streaming
                 // engine Step 3; MacroRunner.Run did exactly this in its own loop). Arm the barrier and
                 // stop dispatching; OnBarrierStatus releases it once everything outstanding is acked and
@@ -438,18 +467,6 @@ namespace CNC.Core
                 // case above); HasSpindleOrCoolantOn is precomputed at load time from the real G-code
                 // parser's tokens (GCodeJob.ParseFileLines/AddBlock), not a fragile regex re-check here.
                 else if (model.IsDryRunMode && block.HasSpindleOrCoolantOn)
-                {
-                    line = "()";
-                    len = line.Length + 1;
-                }
-
-                // Outside the sections this run was asked to cut ("Run just this toolpath"): neutralised the
-                // same way, and deliberately SENT rather than skipped - the empty comment keeps the ack
-                // accounting and the per-line status column aligned with the displayed program, so the list
-                // still marks progress through the whole file and the operator can see what was passed over.
-                // The cost is that the entire program streams; for a very large file that is real wire time
-                // spent doing nothing, which is the trade this mechanism makes knowingly.
-                else if (blockFilter != null && !blockFilter(sendIdx))
                 {
                     line = "()";
                     len = line.Length + 1;
