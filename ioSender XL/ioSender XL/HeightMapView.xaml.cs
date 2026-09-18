@@ -241,42 +241,59 @@ namespace GCode_Sender
 
         #endregion
 
-        // Public entry point for Setup's "Probe height map" checkbox (see StartJobView) - reuses THIS tab's
-        // own probing engine rather than re-deriving it, per the "reuse existing engines" convention.
-        // Blocking: StartProbing's Program.Execute pumps synchronously, the same as every other
-        // Probing-engine caller in this codebase (CenterFinderControl etc.) - fine to call from Setup's own
-        // post-run continuation. area is in the WORK coordinates Setup just set.
+        // Setup's "Probe height map" hands over to THIS view, filled in and ready for the operator to
+        // press Start. It does NOT probe by itself.
         //
-        // It PROBES AND STORES. It used to probe and immediately Apply to whatever program was loaded, and
-        // that one line dictated the whole workflow: a work order had to be generated BEFORE running Setup,
-        // so there was something to apply to - backwards, since Work Order composes against the stock size
-        // Setup measures. Now the map goes to SetupHeightMap and Work Order's Generate is the only thing
-        // that applies one. One application path, so nothing can double-compensate a program either.
-        public void RunHeightMapAndStore(GrblViewModel m, double minX, double minY, double maxX, double maxY, double gridX, double gridY)
+        // It used to: Setup built a HeightMapView with new(), never showed it, and drove its probing engine
+        // from a post-run continuation. That failed silently on real hardware twice in a row, and the reason
+        // it could is the shape - an unshown view has no realized UI, so its own probe dropdown has nothing
+        // selected and StartProbing refuses with a message box; a continuation with six silent exits and no
+        // logging then looks exactly like "nothing happened". Two guesses at which exit it took were both
+        // wrong.
+        //
+        // As a visible step in the real tab there is nothing to guess about: the operator sees the area, the
+        // grid and the probe, presses Start, and watches the Steps/Program/Surface panes do it. The map is
+        // stored for the work order however it was probed - see StoreForWorkOrder.
+        public void PrepareForSetup(GrblViewModel m, double width, double height, double gridX, double gridY)
         {
             model = m;
             RefreshProbes();
-            CNC.Core.DebugLog.Write("heightmap", string.Format(
-                "RunHeightMapAndStore: entered - area {0:0.###},{1:0.###} to {2:0.###},{3:0.###}, grid {4:0.##} x {5:0.##}, probes offered {6}, selected '{7}'",
-                minX, minY, maxX, maxY, gridX, gridY, cbxProbe.Items.Count,
-                (cbxProbe.SelectedItem as ProbeDefinition)?.Name ?? "(none)"));
-            HeightMap.MinX = minX; HeightMap.MaxX = maxX;
-            HeightMap.MinY = minY; HeightMap.MaxY = maxY;
+
+            rbAreaProgram.IsChecked = true;          // an explicit area, not the whole table
+            HeightMap.MinX = 0d; HeightMap.MaxX = width;
+            HeightMap.MinY = 0d; HeightMap.MaxY = height;
             HeightMap.GridSizeX = Math.Max(gridX, 1d);
             HeightMap.GridSizeY = Math.Max(gridY, 1d);
-            StartProbing();
+            UpdateAreaModeUi();
 
-            if (!HeightMap.HasHeightMap)
-            {
-                CNC.Core.DebugLog.Write("heightmap", "RunHeightMapAndStore: StartProbing returned with NO MAP - nothing stored");
+            setupWidth = width;
+            setupHeight = height;
+
+            tabView.SelectedItem = tabSteps;
+            CNC.Core.DebugLog.Write("heightmap", string.Format(
+                "PrepareForSetup: {0:0.###} x {1:0.###} mm, grid {2:0.##} x {3:0.##}, probes offered {4}",
+                width, height, gridX, gridY, cbxProbe.Items.Count));
+
+            if (model != null)
+                model.Message = "Setup done - press Start here to probe the height map over the measured stock.";
+        }
+
+        // The stock area Setup measured, remembered so the stored map can be stamped with it even though the
+        // operator presses Start themselves.
+        private double setupWidth, setupHeight;
+
+        // Keep whatever was just probed for a work order to apply. Runs for EVERY completed map, not only a
+        // Setup-initiated one: a map is a map, and an operator who probed one from this tab on purpose has
+        // no reason to expect it to be unavailable to the work order they are about to generate.
+        private void StoreForWorkOrder()
+        {
+            if (!HeightMap.HasHeightMap || model == null)
                 return;
-            }
 
-            // Work zero in MACHINE coordinates, which is what the stored map is stamped against - see
-            // SetupHeightMap for why a map without the setup it belongs to is a hazard rather than a
-            // convenience. WorkPositionOffset is exactly that: machine position minus work position.
-            SetupHeightMap.Store(HeightMap.Map, model.WorkPositionOffset, maxX - minX, maxY - minY);
-            model.Message = "Height map probed and kept for this setup - tick 'Apply height map' on the work order to use it.";
+            double w = setupWidth > 0d ? setupWidth : HeightMap.MaxX - HeightMap.MinX;
+            double h = setupHeight > 0d ? setupHeight : HeightMap.MaxY - HeightMap.MinY;
+            SetupHeightMap.Store(HeightMap.Map, model.WorkPositionOffset, w, h);
+            model.Message = "Height map probed and kept - tick 'Apply height map' on the work order to use it.";
         }
 
         // Create (once) the Probing engine view model bound to the live controller model.
@@ -633,6 +650,7 @@ namespace GCode_Sender
                 // usable again. A Start button stuck disabled is its own kind of hang.
                 runActive = false;
                 UpdateRunUi();
+                StoreForWorkOrder();
             }
         }
 

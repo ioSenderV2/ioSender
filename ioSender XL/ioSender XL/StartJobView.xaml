@@ -401,7 +401,7 @@
                                       ToolTip="Probe all four corners to measure the true stock size and skew. When off, the width/height above are used as-is and only the front-left origin (and optional TLO reference) is set."/>
                             <CheckBox x:Uid="ls_heightmap" x:Name="chkHeightMap" Content="Probe height map" IsChecked="False" Margin="18,2,0,2" VerticalAlignment="Center"
                                       IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
-                                      ToolTip="After the origin/size are set, probe a grid over the measured stock area and apply the resulting height map to the loaded job - folds the Height Map tab's own probing into this run. Requires Measure (needs the stock area)."/>
+                                      ToolTip="After the origin/size are set, open the Height Map view filled in for the measured stock, ready to probe. You press Start there, and the map is kept for a work order to apply - tick 'Apply height map' on the work order. Requires Measure (needs the stock area). You can also skip this and run Tools > Height Map yourself at any time."/>
                             <StackPanel Orientation="Horizontal" Margin="36,2,0,2" Visibility="{Binding ElementName=chkHeightMap, Path=IsChecked, Converter={StaticResource ToVisibleConverter}}">
                                 <cnccontrols:NumericField x:Name="fldHeightMapGridX" x:Uid="ls_hmGridX" Label="Grid X:" ColonAt="55" Unit="mm" Format="###0.0#" Value="25" Margin="0,0,10,0"
                                                           ToolTip="Grid spacing along X for the height-map probe (mm between probed points)."/>

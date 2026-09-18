@@ -2421,26 +2421,38 @@ namespace GCode_Sender
             }
         }
 
-        // Continuation after a Start Job run whose "Probe height map" checkbox was on: probe a grid over the
-        // just-established stock area and KEEP it for the work order to apply (GCode_Sender.HeightMapView.
-        // RunHeightMapAndStore - the Height Map tab's own engine, not re-derived here). Area is the WCS Start
-        // Job just set: (0,0) to the measured size (all 4 corners probed) or the estimated width/height
-        // otherwise - both are already in the work coordinates the origin block above established.
+        // Continuation after a Setup run whose "Probe height map" checkbox was on: open the Height Map
+        // view, filled in for the stock just measured, and leave the operator to press Start.
+        //
+        // An extra STEP, not a hidden one. Setup used to drive an unshown HeightMapView's probing engine
+        // from here; it failed silently twice on real hardware, because an unrealized view has no probe
+        // selected and the refusal is a message box behind a window. The operator's instruction after the
+        // second failure was to make it a visible step in the tab that owns this job, which is also the one
+        // place the whole thing is already explained on screen.
         private void RunHeightMapPass()
         {
             double w = measuredX ?? fldWidth.Value, h = measuredY ?? fldHeight.Value;
             DebugLog.Write("heightmap", string.Format(
-                "RunHeightMapPass: area {0:0.###} x {1:0.###} (measured {2} x {3}), grid {4:0.##} x {5:0.##}",
-                w, h, measuredX.HasValue ? measuredX.Value.ToString("0.###") : "none",
-                measuredY.HasValue ? measuredY.Value.ToString("0.###") : "none",
-                fldHeightMapGridX.Value, fldHeightMapGridY.Value));
+                "RunHeightMapPass: handing over to the Height Map tab - area {0:0.###} x {1:0.###}, grid {2:0.##} x {3:0.##}",
+                w, h, fldHeightMapGridX.Value, fldHeightMapGridY.Value));
+
             if (w <= 0d || h <= 0d)
             {
                 DebugLog.Write("heightmap", "RunHeightMapPass: ABANDONED - the stock area is zero");
                 return;
             }
-            var hm = new HeightMapView();
-            hm.RunHeightMapAndStore(model, 0d, 0d, w, h, fldHeightMapGridX.Value, fldHeightMapGridY.Value);
+
+            var main = Application.Current.MainWindow as MainWindow;
+            var view = main?.OpenViewWindow(ViewType.HeightMap) as HeightMapView;
+            if (view == null)
+            {
+                DebugLog.Write("heightmap", "RunHeightMapPass: the Height Map view is not available in this build");
+                AppDialogs.Show("Setup is done, but the Height Map view could not be opened - open it from Tools when you are ready to probe.",
+                    "Probe height map", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            view.PrepareForSetup(model, w, h, fldHeightMapGridX.Value, fldHeightMapGridY.Value);
         }
 
         // Verify skew: after a measure run, re-establish the WCS (origin + measured rotation) from the retained
