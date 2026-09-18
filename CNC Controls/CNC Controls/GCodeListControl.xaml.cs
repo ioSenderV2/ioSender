@@ -605,9 +605,14 @@ namespace CNC.Controls
 
         private void StartHere_Click(object sender, RoutedEventArgs e)
         {
+            // Warning, not a question. The prompt now NAMES what is and is not re-established and points at
+            // Start from toolpath as the supported route (see the VerifyStartFrom resource) - the old wording
+            // asked "are you sure the controller is in the correct state" without ever saying which parts of
+            // that state the app was about to leave alone. OKCancel rather than YesNo because the operator is
+            // acknowledging a limitation rather than answering a question, and it defaults to Cancel.
             if (grdGCode.SelectedItems.Count == 1 &&
                  AppDialogs.Show(string.Format(LibStrings.FindResource("VerifyStartFrom"), ((GCodeBlock)(grdGCode.SelectedItems[0])).LineNum),
-                                  "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes)
+                                  "ioSender", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) == MessageBoxResult.OK)
             {
                 // The SAME modal-reset prolog StartSection queues. Starting from a selected LINE skips
                 // whatever set the distance/feed mode, plane and units earlier in the program for exactly

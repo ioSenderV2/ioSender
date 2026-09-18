@@ -319,7 +319,7 @@ CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_validateMin:System.String
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_validateNotIP4:System.String.$Content,None,True,True,,输入无效：不是 IP4 地址。
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_validateRange:System.String.$Content,None,True,True,,输入无效：允许的范围为 {0} - {1}.
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_verifySendController:System.String.$Content,None,True,True,,您确定要将选定的行发送到控制器吗？
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_verifyStartFrom:System.String.$Content,None,True,True,,您确定控制器处于从块 {0} 开始的正确状态吗？
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_verifyStartFrom:System.String.$Content,None,True,True,,"Start from block {0}? Only units, plane and distance/feed mode are restored. The work offset, tool length offset, feed rate and spindle are NOT - the run uses whatever the machine currently holds, and anything the program set before this line is skipped. Start from toolpath is the supported way to run part of a program: a toolpath begins at a section boundary, where the program declares its own tool, speed and offsets. Continue anyway?"
 CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,tab_alarms:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,报警代码
 CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_basicConfig:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Basic settings
 CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,tab_errors:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,错误代码

@@ -43,7 +43,12 @@
     <system:String x:Uid="str_grblStateSleep" x:Key="StateSleep">SLEEP</system:String>
     <system:String x:Uid="str_settingsSaved" x:Key="SettingsSaved">Settings saved.</system:String>
     <system:String x:Uid="str_keymappingsSaved" x:Key="KeymappingsSaved">Keymappings saved to {0}</system:String>
-    <system:String x:Uid="str_verifyStartFrom" x:Key="VerifyStartFrom">Are you sure the controller is in the correct state to start from block {0}?</system:String>
+    <!-- Deliberately states the LIMITATION rather than asking "are you sure": the old wording asked the
+         operator to confirm something the app had not told them. Starting mid-program restores only what
+         GCodeJob.DefaultProlog carries, and the difference between this and Start from toolpath is not that
+         the app does more there - it is that a toolpath begins at a section boundary, where the PROGRAM
+         re-declares its own tool, speed and offsets. See GCodeListControl.StartHere_Click. -->
+    <system:String x:Uid="str_verifyStartFrom" x:Key="VerifyStartFrom">Start from block {0}? Only units, plane and distance/feed mode are restored. The work offset, tool length offset, feed rate and spindle are NOT - the run uses whatever the machine currently holds, and anything the program set before this line is skipped. Start from toolpath is the supported way to run part of a program: a toolpath begins at a section boundary, where the program declares its own tool, speed and offsets. Continue anyway?</system:String>
     <system:String x:Uid="str_verifySendController" x:Key="VerifySendController">Are you sure you want to send the selected blocks to the controller?</system:String>
     <system:String x:Uid="str_themeBlack" x:Key="ThemeBlack">Black</system:String>
     <system:String x:Uid="str_themeDark" x:Key="ThemeDark">Dark</system:String>

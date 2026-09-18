@@ -321,7 +321,7 @@ CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_validateMin:System.String
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_validateNotIP4:System.String.$Content,None,True,True,,Invalid input: not an IP4 address..
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_validateRange:System.String.$Content,None,True,True,,Invalid input: allowed range is {0} - {1}.
 CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_verifySendController:System.String.$Content,None,True,True,,Are you sure you want to send the selected blocks to the controller?
-CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_verifyStartFrom:System.String.$Content,None,True,True,,Are you sure the controller is in the correct state to start from block {0}?
+CNC.Controls.WPF.g.en-US.resources:libstrings.baml,str_verifyStartFrom:System.String.$Content,None,True,True,,"Start from block {0}? Only units, plane and distance/feed mode are restored. The work offset, tool length offset, feed rate and spindle are NOT - the run uses whatever the machine currently holds, and anything the program set before this line is skipped. Start from toolpath is the supported way to run part of a program: a toolpath begins at a section boundary, where the program declares its own tool, speed and offsets. Continue anyway?"
 CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,tab_alarms:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Alarm codes
 CNC.Controls.WPF.g.en-US.resources:grblconfigview.baml,tab_basicConfig:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Basic settings
 CNC.Controls.WPF.g.en-US.resources:errorsandalarms.baml,tab_errors:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Error codes
