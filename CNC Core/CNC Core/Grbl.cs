@@ -1664,12 +1664,23 @@ namespace CNC.Core
             return addMissing;
         }
 
+        // "Does this position carry a real, non-zero offset on any axis?"
+        //
+        // The test was INVERTED and had been since it was written: !(IsNaN || != 0) reduces to
+        // !IsNaN && == 0, i.e. it answered true when the value was exactly ZERO and false when a genuine
+        // offset was present. Both callers above then did the opposite of what they meant - a machine
+        // holding a real tool-length offset had G49 (offset cancelled) synthesised into the parser state,
+        // one with none got G43.1, and a G92 of all zeros was reported as an active offset.
+        //
+        // Only reachable through Get(addMissing), the vanilla-grbl workaround for controllers that do not
+        // report G43.1/G49/G92 in their $G reply, so grblHAL has never been affected. That is why it
+        // survived: the machine this is developed against never takes this path.
         private static bool IsPositionOffset(Position pos)
         {
             bool isOffset = false;
 
             foreach (int i in GrblInfo.AxisFlags.ToIndices())
-                isOffset |= !(double.IsNaN(pos.Values[i]) || pos.Values[i] != 0d);
+                isOffset |= !double.IsNaN(pos.Values[i]) && pos.Values[i] != 0d;
 
             return isOffset;
         }

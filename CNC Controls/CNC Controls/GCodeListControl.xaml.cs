@@ -609,6 +609,21 @@ namespace CNC.Controls
                  AppDialogs.Show(string.Format(LibStrings.FindResource("VerifyStartFrom"), ((GCodeBlock)(grdGCode.SelectedItems[0])).LineNum),
                                   "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes)
             {
+                // The SAME modal-reset prolog StartSection queues. Starting from a selected LINE skips
+                // whatever set the distance/feed mode, plane and units earlier in the program for exactly
+                // the same reason starting from a toolpath does - but only StartSection ever sent it, so
+                // this path resumed on whatever modal state happened to be live from the last thing the
+                // machine did. Two routes into one operation, one of them arbitrarily unprotected.
+                //
+                // Deliberately NOT widened while fixing the inconsistency: the prolog restores units,
+                // plane and distance/feed mode, and it does NOT restore the WCS, the tool-length offset,
+                // the feed rate or the spindle. Adding those is a real gap (see docs/Architecture-Peek.md
+                // section 10) but it is a DESIGN change, not a bug fix - a blind M3 in a prolog would start
+                // a spindle on a resume the operator may not be standing at. Making the two paths agree is
+                // the defect; what they agree ON is a separate decision.
+                foreach (var line in GCodeJob.DefaultProlog)
+                    GCode.File.Commands.Enqueue(line);
+
                 (DataContext as GrblViewModel).StartFromBlock.Execute(grdGCode.SelectedIndex);
             }
         }
