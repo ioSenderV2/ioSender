@@ -1158,6 +1158,48 @@
     you back to Work Order and restores whatever program was loaded before the run, so re-running the Work
     Order never clobbers a file you had open.</p>
 
+    <h3>Mark only &mdash; dimple the hole centres and cut nothing else</h3>
+    <p>Some holes are better drilled somewhere else. A router that flexes will not drill aluminium properly,
+    so the job splits in two: the machine <em>marks</em> where the holes go, the marks are deepened with a
+    punch, and the holes themselves are drilled on a pillar or mag drill. <strong>Mark only</strong> &mdash; a
+    checkbox beside <em>Group operations by tool</em> &mdash; is that first half. Generate then emits a
+    program that puts a shallow dimple at the centre of every <strong>Drill</strong> and <strong>Bore</strong>
+    in the work order and <em>cuts nothing else</em>.</p>
+    <p>It is a property of the <strong>run</strong>, not of the work order's content. Nothing you authored is
+    changed or stripped: every drill keeps its real diameter and depth, because the work order is still the
+    document that says what gets drilled at each dimple. Only the generated program is reduced.</p>
+    <ul>
+      <li><strong>One dimple per toolpath, not per operation.</strong> A toolpath carrying both a Drill and a
+      Bore describes one hole and is punched once. A <em>pattern</em> on the toolpath comes across intact, so
+      a 3&nbsp;&times;&nbsp;2 grid still yields six dimples &mdash; and an <strong>Indirect</strong>
+      toolpath's borrowed holes are marked along with the rest.</li>
+      <li><strong>A Bore counts as a hole.</strong> It is milled rather than drilled, but its centre is
+      exactly as much a place you are about to put a drill.</li>
+      <li><strong>Everything else is left out</strong> &mdash; that is the point, not a side effect. A work
+      order with no enabled Drill or Bore would reduce to an empty program, so it is refused before Generate
+      rather than emitting a file that parks and does nothing.</li>
+      <li><strong>The dimple has its own tool and feeds.</strong> The <strong>Feeds and Speeds&hellip;</strong>
+      button that appears under the checkbox opens the same dialog every other operation uses &mdash; tool,
+      diameter, depth, spindle speed, plunge, with the same recommendations. The diameter there is the
+      <em>dimple's</em>, not the bit's. It defaults to a 3.175&nbsp;mm (1/8") dimple 1.4&nbsp;mm deep, and it
+      is never pecked: one plunge is the whole thing.</li>
+      <li><strong>The bit has to come to a point.</strong> A twist drill, a V-bit or a countersink will do; an
+      end mill leaves a flat bottom a punch cannot find, and you are told so rather than left to discover it
+      on the part.</li>
+      <li><strong>Read the summary line against the part in front of you.</strong> It states what will
+      actually be emitted &mdash; <em>"9 hole centres: 1/8" drill at &Oslash;3.175&nbsp;mm x 1.4&nbsp;mm deep,
+      8000&nbsp;RPM, plunge 400. Every other operation is left out."</em> If that count doesn't match the
+      holes you can see, something is disabled that you meant to keep.</li>
+    </ul>
+    <div class="callout warn"><span class="k">This setting is saved with the work order</span><br>
+      Mark a part in the morning, reopen the work order in the afternoon and press Generate, and you get
+      dimples again &mdash; the tick is remembered like every other field. Two things tell you, and it is
+      worth knowing both, because this is a program that <em>looks</em> like the job and is not: the summary
+      under the checkbox while you are in the tab, and the generated program's own first lines, which say
+      <strong>*** MARK ONLY</strong> with the hole count, the dimple depth and the bit, followed by <em>"The
+      holes are NOT drilled here, and every other operation is left out."</em> Those travel with a saved
+      program, so a <code>.macro</code> found next week can still be told apart from the real job.</div>
+
     <h3>Surfacing the spoilboard</h3>
     <p>Flattening the spoilboard is a <strong>Surface</strong> toolpath like any other operation — same tool
     list, same feeds &amp; speeds advisor, same generate/run path, same dry run. Tick <strong>Entire
