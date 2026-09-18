@@ -82,6 +82,24 @@ namespace CNC.Controls
                 ? Application.Current.MainWindow
                 : null;
 
+            // THE ACTIVE WINDOW FIRST. The rule this method exists to enforce is "a message box is never
+            // behind anything", and keying only off Topmost enforced it only against Topmost windows - an
+            // ordinary auxiliary window shown with Show() (the fixture editor, a wizard's own window) still
+            // got prompts owned by the main window, which puts them BEHIND the window the operator is
+            // actually using.
+            //
+            // The consequence is not cosmetic and was hit on real hardware 2026-09-18: Test position failed
+            // its probe, raised its "probe never made contact" prompt behind the fixture dialog, and modality
+            // then greyed out that dialog's own buttons. From the front it looked like OK had latched
+            // disabled for no reason - the operator ran $X, rebuilt, and reported a hang. There was no hang;
+            // there was an invisible question waiting for an answer.
+            //
+            // Active is the right general answer because the box belongs on top of whatever the operator is
+            // working in, whether or not that window declared itself Topmost.
+            foreach (Window w in Application.Current.Windows)
+                if (w.IsVisible && w.IsActive)
+                    return w;
+
             foreach (Window w in Application.Current.Windows)
                 if (w != main && w.IsVisible && w.Topmost)
                     return w;

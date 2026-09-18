@@ -270,6 +270,14 @@ namespace CNC.Controls
                 return;
             }
 
+            // What was captured, and what the machine said at the moment of the click. A fixture position
+            // that turns out to be somewhere the head merely PASSED THROUGH is indistinguishable afterwards
+            // from one captured correctly - the value is a real machine position either way, and nothing on
+            // the wire records a capture. Asked on real hardware 2026-09-18 and could not be answered.
+            CNC.Core.DebugLog.Write("fixture", string.Format(
+                "Set position: {0} captured '{1}' | live MPos {2} | state {3}",
+                fx.Name, coords, model.MachinePosition.ToString(), model.GrblState.State));
+
             fx.Coords = coords;
             // A stale CornerOffsetX/Y is meaningless once the reference it was measured from moves - clear it
             // here (the one place a re-jog genuinely happens), not in the Coords setter itself (see the
