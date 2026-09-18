@@ -1242,8 +1242,8 @@
 
     <div class="callout note"><span class="k">This is a mill, not a laser</span><br>
       Everything here cuts with a <strong>V-bit</strong> in the spindle, on the machine Setup and Work Order
-      already describe. It is unrelated to burning an SVG on a diode laser, which is a separate path with its
-      own dialog.</div>
+      already describe. It is unrelated to <a href="#laser">burning an SVG on a diode laser</a>, which is a
+      separate path with its own dialog and its own emitter.</div>
 
     <h3>The two ways a letter gets cut</h3>
     <p>Pick a toolpath with <strong>Geometry: Text</strong>, type into the <strong>Text</strong> box (Enter
@@ -1397,6 +1397,213 @@
       what you're looking at is stale.</div>
 
     <div class="xref">Related: <a href="#work-order">Work Order</a> · <a href="#setup">Setup</a> · <a href="#feeds-and-speeds">Feeds &amp; Speeds</a> · <a href="#gcode-viewer">3D viewer</a></div>
+  </section>
+
+  <!-- ===================== SVG LASER ===================== -->
+  <section class="topic" id="laser" data-title="Burning an SVG on a diode laser" data-level="int"
+           data-track="novice:0,intermediate:7,machinist:0">
+    <h2>Burning an SVG on a diode laser <a class="anchor" href="#laser">#</a></h2>
+    <div class="tags"><span class="tag int">Intermediate</span></div>
+    <p>A diode laser engraver is a different machine from the router the rest of this manual describes, and
+    ioSender treats it as one. <strong>File &rarr; Load SVG Laser Job&hellip;</strong> takes a
+    <code>.svg</code>, asks how big, how hard and where, and hands the resulting program to the
+    <a href="#job">Job screen</a> like any other file. It is not a <a href="#work-order">Work Order</a>
+    toolpath and it is not the V-carving on the <a href="#carving">Engraving &amp; carving</a> page: those
+    emit grblHAL &mdash; bracket expressions, tool changes, tool-length offsets, a Z depth per pass &mdash;
+    and a laser controller is usually plain Grbl, which rejects all of it. The two paths share only the
+    geometry reader, so the same logo file works on either.</p>
+
+    <div class="callout warn"><span class="k">You have to switch this on: <code>-enableSVGLaserJob</code></span><br>
+      The menu entry is <strong>hidden by default</strong> and appears only when ioSender is started with
+      <code>-enableSVGLaserJob</code> on its command line (case doesn't matter). That is per launch, not a
+      remembered setting: no flag, no entry &mdash; and nothing in <a href="#settings">Settings &rarr;
+      Keyboard</a> to bind either, so the whole feature is genuinely absent rather than merely out of sight.
+      It is held back because a laser job that reaches the material with the wrong exposure spends the
+      material, and the path is still earning its time on real machines.</div>
+
+    <h3>What the machine has to have</h3>
+    <ul>
+      <li><strong><code>$32=1</code> &mdash; laser mode.</strong> With it on, Grbl blanks the beam during a
+      rapid by itself and scales power with speed, which is what stops corners burning dark as the head
+      decelerates into them. The dialog reads <code>$32</code> and says so in the pinned note at the bottom;
+      with laser mode off it warns you, and writes the warning into the program's header as well. Rapids are
+      emitted with <code>S0</code> regardless, so a file is not relying on a setting being right.</li>
+      <li><strong><code>$30</code> &mdash; the full-power S value.</strong> An S word means nothing on its
+      own: S150 is a light mark against a <code>$30</code> of 1000 and full power against a <code>$30</code>
+      of 255. The dialog reads it live and shows every power as a percentage of it.</li>
+      <li><strong>No homing needed.</strong> These machines usually don't have it, so there is no work
+      coordinate system to set. <strong>The head's position when the job starts becomes 0,0</strong> &mdash;
+      you jog to the corner of the material and burn from there.</li>
+    </ul>
+    <div class="callout warn"><span class="k">Which corner &mdash; the one instruction that spoils the work</span><br>
+      Most diode engravers park at the <strong>back-left</strong> corner and their whole table lies at
+      <em>negative</em> Y: the work is <em>in front of</em> the origin. An ordinary router is the mirror of
+      that. The <strong>Origin is the back-left corner</strong> tick on the Artwork tab is where you state
+      which you have, and the dialog then spells the instruction out in the pinned note &mdash; <em>jog to the
+      artwork's TOP-left corner</em> for a back-left machine, <em>LOWER-left</em> for a front-left one. Get it
+      backwards and the job runs off the back edge into the stop, which on a machine with soft and hard limits
+      both switched off is a stalled axis, not an error message.</div>
+
+    <h3>The dialog, tab by tab</h3>
+    <p>Pick the file and the <strong>SVG to laser</strong> dialog opens. Its three tabs are the three separate
+    questions; the note pinned underneath them is always visible, because that is where the things that spoil
+    material are said.</p>
+    <table class="reftab">
+      <tr><th>Tab</th><th>Decides</th></tr>
+      <tr><td><strong>Artwork</strong></td><td>How big the art is, and where on the table it goes.</td></tr>
+      <tr><td><strong>Copies</strong></td><td>How many of it, how far apart &mdash; and the power ramp that
+      turns those copies into a test strip.</td></tr>
+      <tr><td><strong>Burn</strong></td><td>Power, feed, passes, shading, and the machine's squareness
+      correction.</td></tr>
+    </table>
+    <p>Everything except the beam switch and the file name is <strong>remembered between jobs</strong>. Power
+    and feed for a material are found by burning test strips, and re-deriving them every session is how a
+    good setting gets lost.</p>
+
+    <h3>Artwork &mdash; size and placement</h3>
+    <ul>
+      <li><strong>Width measures the ink, not the page.</strong> The artwork is normalised to its own
+      outline, so padding in the source file counts for nothing and the number you type is the number you get
+      on the material. The line under the field states the height that implies.</li>
+      <li><strong>Origin X / Origin Y</strong> move the whole job in from the parked corner. Leave them at
+      zero and the artwork starts exactly where the head is standing &mdash; fine for a bench job you jog to,
+      useless for a fixture, where the work sits in a known place and the file has to reach it. This is also
+      the only way to move the art: adding whitespace to the SVG does nothing, because nothing was drawn in
+      it.</li>
+      <li>The readout on the Copies tab states <strong>the whole rectangle every copy occupies</strong>, in X
+      and Y. That is the number to check against your travel &mdash; a modest pitch can still add up to a
+      reach that does not fit.</li>
+    </ul>
+
+    <div class="callout warn"><span class="k">A placement that doesn't fit is refused, not trimmed</span><br>
+      Press OK and the placement is checked before anything is emitted: X behind the stop, Y on the wrong
+      side of the origin for the anchor you chose, or a reach past the travel the controller reports. A
+      refusal puts you back in the dialog <em>with your numbers intact</em>. The travel test only runs when
+      the machine has actually told ioSender what its travel is; an envelope is never invented. This is a
+      refusal rather than a warning for one reason: on a machine with <code>$20=0</code> and
+      <code>$21=0</code> &mdash; soft limits and hard limits both off, which is the usual state of these
+      engravers &mdash; nothing below this point will catch the move. The gantry simply drives into the
+      stop.<br>
+      One slip gets an offer instead of a refusal: a <strong>Pitch Y signed the wrong way</strong>, which
+      steps the copies away from the table. The dialog names the value it thinks you meant and asks. It is
+      not applied silently &mdash; if you really did mean +Y, the job would otherwise run and quietly not be
+      the one you pictured.</div>
+
+    <h3>Copies &mdash; and the test strip</h3>
+    <p><strong>Copies</strong> repeats the same artwork across a fixture, each one a <strong>Pitch X</strong>
+    / <strong>Pitch Y</strong> further on than the last. Doing it here rather than by duplicating the art in
+    the SVG keeps one drawing as the single source of the shape: change the logo once and every copy changes.
+    <strong>Pitch is signed</strong>, and on a back-left origin the table lies at negative Y, so stacking
+    copies front-to-back needs a <em>negative</em> Pitch Y.</p>
+    <p>Underneath that is the feature worth knowing about even if you only ever burn one part:</p>
+    <ul>
+      <li><strong>Power step</strong> adds an S value to each copy after the first. 50 with a power of 200
+      gives 200, 250, 300&hellip; &mdash; the same artwork at rising exposure, in one job, on one piece of
+      material, same focus, same session. Negative ramps down. <strong>Fill step</strong> does the same for
+      the shading power, independently.</li>
+      <li>The readout states what the ramp actually produces, first copy to last, and says
+      <strong>CLAMPED</strong> if it runs past <code>$30</code>. That matters: power cannot exceed full, so an
+      overshooting ramp burns two or more copies at the <em>same</em> power while the file claims they differ,
+      and a test strip that silently compares a value against itself is worse than no test strip.</li>
+      <li>Leave both steps at 0 and every copy burns identically.</li>
+    </ul>
+
+    <h3>Burn &mdash; exposure, passes and shading</h3>
+    <table class="reftab">
+      <tr><th>Field</th><th>What it does</th></tr>
+      <tr><td><strong>Enable beam</strong></td><td>Untick it for a <strong>dry run</strong>: the head follows
+      the entire path at the same feeds, every S word is 0 and the laser is never enabled, so you can watch
+      where the job lands before spending material. <strong>Not remembered</strong> &mdash; it comes back
+      ticked on every import, because a "no burn" that survived into a later session shows up as a job that
+      ran perfectly and marked nothing. The state is stated in the pinned note and written into the program
+      header.</td></tr>
+      <tr><td><strong>Power (S)</strong> and <strong>Feed</strong></td><td>Shown as a percentage of
+      <code>$30</code>, and combined into the number that actually matters: <strong>exposure</strong>, power
+      divided by feed &mdash; how much beam energy lands per millimetre travelled. That, not the S value on
+      its own, is what decides whether wood browns or chars.</td></tr>
+      <tr><td><strong>Travel</strong></td><td>Feed for the rapids between outlines. Beam off.</td></tr>
+      <tr><td><strong>Passes</strong></td><td>How many times each outline is traced. Several light passes
+      generally beat one hot one &mdash; less charring, and less chance of the beam wandering out of focus as
+      the surface chars away from it.</td></tr>
+      <tr><td><strong>M4 dynamic power</strong></td><td>On (and with <code>$32=1</code>) power scales with
+      speed, so corners are not burned dark as the machine decelerates into them. Untick for
+      <strong>M3</strong> constant power, which suits cutting through more than engraving.</td></tr>
+    </table>
+    <p><strong>Shading</strong> &mdash; <em>Fill enclosed areas</em> &mdash; scans back and forth across the
+    inside of each shape instead of only tracing its boundary. Holes and counters are left unburned: the gap
+    inside a ring, the middle of an <em>o</em>. It has its own power and feed, because shading covers area
+    where an outline draws edges, and its own <strong>Interval</strong> &mdash; the spacing between scan
+    lines, around the beam's spot size. 0.1&nbsp;mm suits a typical diode; tighter overlaps and darkens,
+    wider leaves visible banding. <strong>Trace outline after shading</strong> lays the boundary on top at the
+    end so the edge comes out crisp.</p>
+    <ul>
+      <li><strong>The readout compares the shading's burn with the outline's</strong>, which the two pairs of
+      numbers on their own hide: an outline at S150/F1200 and a fill at S400/F3000 look like a large power
+      increase and are in fact the same burn.</li>
+      <li><strong>Depth of a fill is set by the interval as much as by the power.</strong> A fill is a raster
+      of lines a fixed distance apart, so halving the interval puts twice the energy into the same square
+      millimetre while every number on the tab stays where it was. The readout therefore leads with an
+      <em>areal</em> figure, power &divide; (feed &times; interval), and names the interval in the same
+      breath. Treat it as relative, never as a prediction &mdash; a fill at S600/F800 with a 0.1&nbsp;mm
+      interval took nearly 7&nbsp;mm out of cedar.</li>
+      <li><strong>Shading is slow, and it tells you before you start</strong> rather than forty minutes in:
+      the estimate states the number of scan lines and an upper bound in minutes. It assumes every line
+      crosses the full width, so the real time is shorter.</li>
+    </ul>
+
+    <h3>Squareness &mdash; correcting a racked gantry in software</h3>
+    <p>A lightweight engraver's gantry can sit slightly racked, carrying the head a little forward as it
+    travels in X, so a commanded square burns as a parallelogram. Where the frame cannot be squared
+    mechanically &mdash; and on a belt-driven machine it may not hold &mdash; the Burn tab compensates for it.
+    You do not type a coefficient; you type <strong>three numbers you measured off a burned test square</strong>:</p>
+    <ul>
+      <li><strong>D1</strong> &mdash; the diagonal from the parked home corner to the far corner.</li>
+      <li><strong>D2</strong> &mdash; the other diagonal.</li>
+      <li><strong>Side</strong> &mdash; the square's side.</li>
+    </ul>
+    <p>The shear follows from <code>(D1&sup2; &minus; D2&sup2;) / (4 &times; Side&sup2;)</code> and the
+    readout states it both as a coefficient and as the correction it amounts to at the far side of the bed.
+    Only the <em>difference</em> of the diagonals matters, so a ruler that reads both a few millimetres short
+    &mdash; as one does against a charred corner &mdash; cancels out. <strong>Zero any one of the three and
+    compensation is off.</strong></p>
+    <div class="callout tip"><span class="k">The numbers belong to the frame's state when you measured them</span><br>
+      Burn a square, measure both diagonals and a side, type them in, burn another. A frame that gets moved,
+      re-tensioned or carried outside loses its set &mdash; re-measure rather than trusting a stored figure.
+      Equal diagonals mean no correction, which is what you are aiming at.</div>
+
+    <h3>What it writes, and the one thing to know about aborting</h3>
+    <p>The program that lands on the Job screen is deliberately readable. Exposure is emitted as
+    <strong>named constants</strong> at the top &mdash; a power and a feed, plus a second pair when shading is
+    on &mdash; and the placement as <strong>two more</strong>, so retuning the job is editing a handful of
+    numbers rather than hundreds of cut moves &mdash; and a per-copy power ramp is just the same
+    constant re-declared part way down. Everything below the header is the artwork's own geometry from 0,0:
+    the placement is applied <em>once</em>, by the rapid that moves in to it. Where the controller does not
+    support expressions the constants are substituted as the file loads, so what reaches the wire is always
+    literal S and F words. Saving the program keeps the constants rather than the substituted literals.</p>
+    <p>The header is written for the day the file is opened again without the dialog: artwork size and outline
+    count, power against <code>$30</code>, feeds, M3 or M4, the placement, which corner the anchor means,
+    whether the beam was disabled, and a <code>$32</code> warning if one applied.</p>
+    <div class="callout warn"><span class="k">An aborted laser job leaves the offset set</span><br>
+      Because there is no homing and no work coordinate system, the job labels the parked corner as 0,0 with
+      <strong>G92</strong> and clears it with <strong>G92.1</strong> on its last line. Stop the job part way
+      and that clear never runs, so the temporary origin stays applied and the next job starts from the wrong
+      place. Send <strong>G92.1</strong> from the MDI after any abort. The program says so in its own
+      comments too.</div>
+
+    <h3>When it refuses the artwork</h3>
+    <p>Each of these is a refusal with the reason named, before anything is emitted &mdash; a partial logo
+    looks like a successful job right up until you notice a piece missing, by which point the material is
+    spent.</p>
+    <ul>
+      <li><strong>Nothing measurable</strong> &mdash; the file has no drawable outlines.</li>
+      <li><strong>Unreadable</strong> &mdash; the importer says what it could not parse.</li>
+      <li><strong>No closed outlines</strong> &mdash; it read the file and there is nothing to trace.</li>
+      <li><strong>Elements it cannot handle</strong> &mdash; this one <em>asks</em> rather than refuses,
+      listing what will be missing, and defaults to No. What it can read will burn; the rest is simply
+      absent.</li>
+    </ul>
+
+    <div class="xref">Related: <a href="#carving">Engraving &amp; carving</a> &middot; <a href="#job">The Job screen</a> &middot; <a href="#settings">Settings</a> &middot; <a href="#gcode-viewer">3D viewer</a></div>
   </section>
 
   <!-- ===================== MACHINE SETUP ===================== -->
