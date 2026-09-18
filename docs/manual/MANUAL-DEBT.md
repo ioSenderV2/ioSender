@@ -153,10 +153,10 @@ Needs `-testserver`, so it needs the user's explicit turn-by-turn go-ahead.
       recoverable; only reshoot if a Tools figure is ever wanted again.
 
 ### Known app bug found while auditing (NOT a manual bug)
-- [ ] Machine Setup's in-app **Overview** step list (`MachineSetupWizard.xaml`, `ov_s1`–`ov_s6`) stops at six
-      entries and is wrong from 6 onward — it says "6 · Controller macros" when step 6 is Fixture definitions
-      and 7 is Controller macros. Missing Fixture definitions, Calibration and Build simulator entirely.
-      Fixing it means 3 new `x:Uid` rows through `tools/locadd.py` across all 7 locales.
+- [x] **FIXED 2026-09-17** (`c42c7065`). Machine Setup's in-app **Overview** list stopped at six entries
+      and was mislabelled from 6 on. It is now `ov_s1`–`ov_s8`, matching `GetPages()` and the manual's
+      eight steps. (Carried here as open until 2026-09-18 on the strength of a memory note rather than
+      a look at the file — the note was a week out of date. Read the source.)
 
 ---
 
@@ -359,10 +359,12 @@ assert something false. That is a stopgap, not a fix:
         tool/feeds through the ordinary dialog with the **dimple's** diameter rather than the bit's
         — plus the hazard as a warning: **the setting persists with the work order**, and what tells
         you is the summary line and the program's two MARK ONLY header lines.
-        🔴 **App bug found while writing it:** `WorkOrderModel.cs:680` says the run strip's
-        button reads "Generate (mark only)" while this is set. **No such string exists in the repo** —
-        the comment is aspirational, and it is the justification given for persisting the flag. Either
-        build it or correct the comment; the manual does not claim it.
+        ✅ **The comment claiming a "Generate (mark only)" button was corrected** (`2e26663b`).
+        It was a wrong COMMENT, not a bug: `JobControl.UpdateRunButtonLabel` takes the button's text
+        from the `GenerateLabel` resource and nothing in the run strip reads the flag — so nothing
+        misbehaved, but the claim was the stated justification for persisting `MarkOnly` and was one
+        edit from reaching the manual. The comment now names the two things that really do say so: the
+        summary line under the checkbox and the program's `*** MARK ONLY` header.
   - [x] **M4 (Height Map) — DONE 2026-09-17** (`0ddc3062`). Topic **`#heightmap`**, anchored on that
         name deliberately: `ManualHelp.cs` maps `ViewType.HeightMap` to it, so F1 from the view lands
         there. Covers the two modes as different jobs, the extent coming from Machine Setup step 3's
@@ -391,13 +393,15 @@ assert something false. That is a stopgap, not a fix:
         setting — errors-only is the behaviour and the setting is the pop-up's dwell time. Written
         from source, which is why it was caught.
 
-### 🔴 Two F1 anchors point at topics that no longer exist — APP FIX, not a manual fix
-`ManualHelp.cs`'s `Topics` map still says `ViewType.StartJob → "start-job"` and
-`ViewType.Probing → "probing"`. **Neither anchor exists**: `#start-job` was renamed `#setup` on
-2026-07-31 and `#probing` was deleted on 2026-08-01. F1 from Setup therefore lands on the manual with
-nothing to scroll to. Two other views are simply absent from the map and open the home page:
-**WorkOrder** and **Calibration** — and `#calibration` now exists to point at, as does `#work-order`.
-One dictionary, four lines.
+### ✅ The F1 anchors are FIXED (`2e26663b`, 2026-09-18)
+`ManualHelp.cs`'s map had drifted from the manual and the failure is silent — a dead anchor still
+opens the manual, the browser just does not scroll, so F1 looks like it worked. `StartJob` pointed at
+`start-job` (renamed `#setup` 2026-07-31) and `Probing` at `probing` (deleted 2026-08-01); `Probing`
+now points at `#setup`, where what that tab did actually lives. **FeedsAndSpeeds**, **WorkOrder** and
+**Calibration** were absent from the map and opened the front page; all three are in it now. Every
+anchor was checked mechanically against the section ids here, including the two literal
+`ManualHelp.Open` call sites, and `ManualHelp.AllTopics` is exposed so that check can be automated.
+**The rule this leaves:** rename or delete a topic and grep `ManualHelp.cs` in the same edit.
 
 ### Process note — why this got to 156
 The rule at the top of this file ("when shipping a UI change, add the impact here") did not run once in

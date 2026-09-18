@@ -82,10 +82,10 @@ not a manual fix: the four stale/missing F1 anchors in `ManualHelp.cs` — see M
 > **persists with the work order**, and only the summary line and the program's two MARK ONLY header
 > lines say so.
 >
-> 🔴 **Found while checking it:** `WorkOrderModel.cs:680` claims the run strip's button reads
-> "Generate (mark only)" while the flag is set — **that string is nowhere in the repo**, and it is
-> the reason the comment gives for persisting the flag at all. A comment-only guarantee; the topic
-> does not repeat it.
+> ✅ **Followed up 2026-09-18** (`2e26663b`): `WorkOrderModel.cs`'s claim that the run strip reads
+> "Generate (mark only)" was a wrong **comment**, not a bug — `UpdateRunButtonLabel` takes that text
+> from a resource and nothing in the strip reads the flag. Corrected in place; the topic never
+> repeated it.
 
 > ✅ **M4 is DONE 2026-09-17** (`0ddc3062`) — topic **`#heightmap`**. The anchor is not a style
 > choice: `ManualHelp.cs:41` maps `ViewType.HeightMap` to `"heightmap"`, so F1 from the view lands on
@@ -110,10 +110,10 @@ not a manual fix: the four stale/missing F1 anchors in `ManualHelp.cs` — see M
 > alone) and the only setting is the dwell. Caught by writing from source rather than from this row —
 > which is the method §5 recommends, working.
 >
-> 🔴 **Found while writing: four broken F1 anchors**, an app fix. `ManualHelp.cs` maps
-> `ViewType.StartJob` to `"start-job"` and `ViewType.Probing` to `"probing"`, and **neither anchor has
-> existed since July**; `WorkOrder` and `Calibration` are absent from the map altogether, though both
-> now have topics to point at.
+> ✅ **Four broken F1 anchors, found while writing and FIXED 2026-09-18** (`2e26663b`).
+> `ManualHelp.cs` mapped `StartJob` to `"start-job"` and `Probing` to `"probing"`, neither of which
+> had existed since July, and omitted `FeedsAndSpeeds`, `WorkOrder` and `Calibration` entirely. Every
+> anchor now resolves against this manual's section ids.
 
 "Usable" is doing work in that heading. Several of these are *named* somewhere — in a menu table or
 a one-line parenthetical — without anything that would let an operator use them. Those are marked
@@ -303,9 +303,8 @@ sentence (#237, #261, #274, #292 are the clearest). Where that is true the §4 r
 
 - **Videos.** Four topics still carry `data-video="pending"` — connect, setup, work-order,
   machine-setup. Tracked separately.
-- **The in-app bug that makes the app contradict the manual.** `MachineSetupWizard.xaml`'s Overview
-  list is `ov_s1`–`ov_s6` — **six** entries ending "6 · Controller macros", which is really step 7,
-  omitting Fixture definitions and Build simulator. The manual (once O5/O6 are fixed) correctly says
-  eight. That is an **app** fix — two new `x:Uid` rows through `tools/locadd.py` × 7 locales — and it
-  is in the way of the Machine Setup topic being trustworthy. Open since 2026-08-03.
+- **The in-app bug that made the app contradict the manual — ✅ FIXED 2026-09-17** (`c42c7065`),
+  the day after this audit was written. `MachineSetupWizard.xaml`'s Overview list stopped at six
+  entries and was mislabelled from 6 on; it is now `ov_s1`–`ov_s8` and agrees with the manual's eight
+  steps. Had been open since 2026-08-03.
 - **`#intro-to-cnc`.** Conceptual, not tied to a release; unchanged by this wave.
