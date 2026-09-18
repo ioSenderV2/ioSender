@@ -274,9 +274,13 @@ namespace CNC.Controls
             // that turns out to be somewhere the head merely PASSED THROUGH is indistinguishable afterwards
             // from one captured correctly - the value is a real machine position either way, and nothing on
             // the wire records a capture. Asked on real hardware 2026-09-18 and could not be answered.
+            // Position has no ToString worth printing - the first cut of this line logged the TYPE NAME,
+            // which is exactly the half that mattered (was the capture the live position, or a stale one?).
             CNC.Core.DebugLog.Write("fixture", string.Format(
-                "Set position: {0} captured '{1}' | live MPos {2} | state {3}",
-                fx.Name, coords, model.MachinePosition.ToString(), model.GrblState.State));
+                "Set position: {0} captured '{1}' | live MPos {2:F3},{3:F3},{4:F3} | state {5}",
+                fx.Name, coords,
+                model.MachinePosition.X, model.MachinePosition.Y, model.MachinePosition.Z,
+                model.GrblState.State));
 
             fx.Coords = coords;
             // A stale CornerOffsetX/Y is meaningless once the reference it was measured from moves - clear it
