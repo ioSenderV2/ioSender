@@ -814,11 +814,11 @@
     <ol>
       <li><strong>Steps/mm</strong> (<code>$100</code>–<code>$102</code>) — command a long known distance,
       measure the actual travel, correct the number. Do X, Y, Z.
-      <strong>Tools → Calibration → Stepper calibration (probe)</strong> automates the whole thing by
+      <a href="#calibration"><strong>Tools → Calibration → Stepper calibration (probe)</strong></a> automates the whole thing by
       probing a reference block instead, so there's nothing to measure by hand — and
       <strong>Stepper calibration (scratch)</strong> does it with a V-bit and calipers when you have no probe.</li>
       <li><strong>Squaring &amp; tramming</strong> — get the gantry square to the axes
-      (<strong>Tools → Calibration → Squareness</strong> uses a
+      (<a href="#calibration"><strong>Tools → Calibration → Squareness</strong></a> uses a
       Phil&nbsp;Barrett offset on the ganged axis, <code>$170+</code>),
       the spindle perpendicular to the bed (surface a test patch, read the scallops), and the frame square
       (measure the diagonals of a big rectangle).</li>
@@ -843,7 +843,141 @@
       Closed-loop steppers and servos remove the "lost steps" failure mode, but they don't fix geometry — a
       machine that's out of square is out of square whether or not it can report position. You still calibrate.</div>
 
-    <div class="xref">Related: <a href="#settings">Settings (grbl $)</a> · <a href="#machine-setup">Machine&nbsp;Setup → Calibration</a> · <a href="#offsets">Work offsets</a></div>
+    <div class="xref">Related: <a href="#calibration">Calibration — the four wizards</a> · <a href="#settings">Settings (grbl $)</a> · <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#offsets">Work offsets</a></div>
+  </section>
+
+  <!-- ===================== CALIBRATION ===================== -->
+  <section class="topic" id="calibration" data-title="Calibration — the four wizards" data-level="mac"
+           data-track="novice:0,intermediate:0,machinist:3">
+    <h2>Calibration &mdash; the four wizards <a class="anchor" href="#calibration">#</a></h2>
+    <div class="tags"><span class="tag mac">Machinist</span></div>
+    <p><strong>Tools &rarr; Calibration</strong> holds the tools that measure the machine itself and write the
+    correction back into its settings. There are four, in two pairs &mdash; and the pairing is the thing to
+    understand before you pick one:</p>
+    <table class="reftab">
+      <tr><th>Wizard</th><th>Corrects</th><th>Instrument</th><th>Needs</th></tr>
+      <tr><td><strong>Stepper calibration (probe)</strong></td><td>steps/mm,
+      <code>$100</code>&ndash;<code>$102</code></td><td>Probes a reference block whose true size you already
+      know.</td><td>A 3D probe <em>or</em> a touch plate, and a validated Corner Fence fixture.</td></tr>
+      <tr><td><strong>Stepper calibration (scratch)</strong></td><td>the same</td><td>Scratches candidate
+      lines with a V-bit; you measure them with calipers.</td><td>A V-bit and a caliper. <strong>No probe, no
+      fixture.</strong></td></tr>
+      <tr><td><strong>Squareness (probe)</strong></td><td>the gantry's squaring offset,
+      <code>$170</code>&ndash;<code>$172</code></td><td>Probes a reference square clamped in the fence.</td>
+      <td>A probe, the fence, and a decent engineer's square.</td></tr>
+      <tr><td><strong>Squareness (pins)</strong></td><td>the same</td><td>Drills an L, you drop pins in it and
+      sight a framing square against them.</td><td>A drill bit, three pins, a framing square. <strong>No
+      probe.</strong></td></tr>
+    </table>
+    <p>Each pair is the same measurement by two instruments, and neither member is redundant: the probe
+    versions resolve roughly an order of magnitude finer and cost nothing to repeat, and the other two are the
+    answer on a machine with no probe defined. A tab whose instrument you don't have is disabled, and the
+    selection falls back to its sibling rather than sitting on dead content.</p>
+    <div class="callout note"><span class="k">It used to be Machine Setup step 8</span><br>
+      Calibration was a step inside the Machine&nbsp;Setup wizard until it was lifted out whole. The reason is
+      worth knowing because it explains the shape of these tools: all four are <strong>Generate-first</strong>
+      &mdash; they build a program and run it from the run strip &mdash; and Machine Setup opens as a
+      separate window, which put each wizard and the button that drives it in different windows. Calibration
+      opens as a tab, with the run strip directly underneath.</div>
+    <div class="callout warn"><span class="k">A squaring offset needs firmware that has one</span><br>
+      <code>$170</code>&ndash;<code>$172</code> exist only where the axis is built ganged and auto-squared,
+      and <strong>only the ganged axis accepts a write</strong> &mdash; all three show in Settings, which is
+      misleading. Without the setting both squareness tabs stay useful as <em>gauges</em>: measure the error,
+      correct it mechanically, measure again. Only the Apply step goes away.</div>
+
+    <h3>Steps/mm without a probe &mdash; the scratch method</h3>
+    <p>This is the one calibration with no hardware dependency at all, so it is the one to reach for first on
+    a new machine. Instead of measuring one cut and doing the arithmetic, it cuts <strong>several candidate
+    step values at once</strong> and lets you pick the winner by measurement.</p>
+    <ol>
+      <li>Pick the <strong>axis</strong>; its current steps/mm is read from the setting and shown.</li>
+      <li>Set the <strong>Span</strong> (how far apart the two marks of a pair are &mdash; longer is a better
+      lever), the <strong>Delta</strong> in steps/mm between candidates, and the number of <strong>Test
+      points</strong>. The panel states where the pattern reaches, whether it fits the envelope, and the
+      smallest stock it will sit on.</li>
+      <li><strong>Generate</strong> and run. The program scratches one numbered pair of marks per
+      candidate.</li>
+      <li>Measure each pair with calipers, type the reading into the <strong>Measured</strong> column, and the
+      row whose implied steps/mm is closest goes green. <strong>Save steps/mm</strong> writes that row's value
+      to the setting.</li>
+    </ol>
+    <div class="callout note"><span class="k">How it cuts several step values in one program</span><br>
+      Steps/mm cannot be changed part way through a program, so the candidates are not <em>set</em> &mdash;
+      they are <em>simulated</em>. Each pair is commanded at <code>span &times; candidate &divide;
+      current</code>, which produces motion physically identical to running with that steps/mm. Measuring the
+      spacing therefore measures the candidate, with nothing to reset afterwards.</div>
+    <ul>
+      <li><strong>The two marks of a pair have separate depths</strong>, which looks fussy and is not: the
+      reference surface is not flat, and a spoilboard that dips more than the cut depth across the span marks
+      one end and misses the other &mdash; and a pair with one mark missing cannot be measured at all. Depth
+      does not affect the result; the measurement is the spacing between the two line <em>centres</em>, and a
+      V-bit's centre is under the spindle axis at any depth.</li>
+      <li><strong>Reference the loaded bit at the puck</strong> is on by default and should stay on unless the
+      bit arrived through a tool change in this same session. Work Z0 means "the stock top" only for a tool
+      that <em>has</em> a length offset; a bit fitted by hand without one cuts at the previous tool's
+      depth.</li>
+    </ul>
+
+    <h3>Squareness by probing &mdash; and the reversal test</h3>
+    <p>The pin method makes the machine the writer and a framing square the reader: it drills its own idea of
+    a right angle and you judge the gap by eye. <strong>Squareness (probe)</strong> inverts that &mdash; the
+    square is the artifact and the probe is the reader. It probes three corners of the square through the same
+    corner-probing macro Setup uses, and turns the result into a squaring-offset correction.</p>
+    <p>The inversion buys three things, and they are why this is the method to use if you have a probe at
+    all:</p>
+    <ul>
+      <li><strong>Resolution.</strong> A gap sighted at a pin is good to a few hundredths of a millimetre;
+      probe repeatability is an order better. Over a 600&nbsp;mm blade that is thousandths of a degree rather
+      than hundredths.</li>
+      <li><strong>A free iteration.</strong> Applying a correction changes the gantry angle &mdash; so the L
+      you just drilled sits at the <em>old</em> angle and cannot verify the new one. Every pin iteration costs
+      a fresh L, a bit, a touch-off and more spoilboard. A re-probe costs two minutes.</li>
+      <li><strong>The reversal test</strong>, which is the only way to know your square is any good.</li>
+    </ul>
+    <div class="callout warn"><span class="k">A single reading cannot tell the square from the machine</span><br>
+      What one measurement gives you is <em>square + machine</em>, added together and inseparable &mdash; so
+      correcting it to zero does not square the gantry, it squares the gantry <strong>to your square</strong>,
+      errors and all. <strong>Flip the square over</strong> and measure again: mirroring reverses the sign of
+      the square's own error and not the machine's, so the two averages separate them &mdash;
+      <em>square&nbsp;=&nbsp;(normal&nbsp;+&nbsp;reversed)&nbsp;&divide;&nbsp;2</em> and
+      <em>machine&nbsp;=&nbsp;(normal&nbsp;&minus;&nbsp;reversed)&nbsp;&divide;&nbsp;2</em>. Both halves must
+      be measured at the same squaring offset with no homing in between, or they describe two different
+      machines.</div>
+    <p>The flip is physical, and the panel tells you how to do it: a mirrored L cannot lie with both arms in
+    the same quadrant, so the <strong>Reversed</strong> orientation registers the far end of the blade in the
+    fence and puts the heel out to the right. The result is then <strong>stored as the square's own
+    error</strong> and subtracted from every later reading &mdash; which is the real payoff, because the
+    reversal is a property of a physical object and never has to be repeated. If a reversal was done in an
+    earlier session you can type its figure straight into the square-error field.</p>
+
+    <h3>Applying a squareness correction</h3>
+    <ol>
+      <li><strong>Clear the offset first</strong>, once, before the first measurement &mdash; the Clear button
+      zeroes <code>$17x</code> and re-homes, so what you then measure is the machine's raw mechanical error
+      rather than the sum of the error and an old correction.</li>
+      <li>Choose the ganged axis (usually Y), the probe, and the fixture the square is clamped in. Give the
+      arm lengths and the square's <em>actual measured</em> thickness &mdash; that thickness sets how far
+      below the top the side faces are probed, and being out by much has the probe seeking past the edge
+      through open air.</li>
+      <li>Measure, then <strong>Apply offset</strong> and <strong>Re-home</strong>. The proposed number is the
+      current offset <em>plus</em> the correction the measured skew implies, and it is editable.</li>
+      <li><strong>Re-measure.</strong> That is the step, not an optional check.</li>
+    </ol>
+    <div class="callout warn"><span class="k">The direction is not derivable &mdash; and the correction has a limit</span><br>
+      Which way a positive offset racks the gantry depends on which rail your firmware's ganged motor drives,
+      and nothing reports that. <strong>If the first Apply makes the measured skew bigger rather than
+      smaller, tick <em>Invert correction direction</em> and apply again</strong> &mdash; then leave it
+      ticked. And watch for the other end of it: if two successive Applies stop moving the measurement, the
+      offset has run out of authority and what is left is mechanical. Chasing it with an ever-larger number
+      does nothing.</div>
+    <div class="callout tip"><span class="k">Tick the tool-length reference</span><br>
+      Fitting the probe <em>is</em> a tool change, and a bit fitted by hand has no length offset of its own.
+      With <strong>Set TLO reference</strong> ticked the run touches the puck first and restores the offset
+      afterwards. It is not for the measurement's sake &mdash; this is an XY angle and a tool length cannot
+      tilt it &mdash; but without it the run works against, and hands the machine back, whatever offset the
+      previous tool left.</div>
+
+    <div class="xref">Related: <a href="#accuracy-calibration">Accuracy &amp; calibration</a> &middot; <a href="#machine-setup">Machine&nbsp;Setup</a> &middot; <a href="#setup">Setup</a> &middot; <a href="#settings">Settings</a></div>
   </section>
 
   <!-- ===================== THE JOB SCREEN ===================== -->
@@ -1061,7 +1195,10 @@
       the angle — millimetres, unmissable with a rule. The panel states the numbers to expect, so they are
       predictions to check rather than just output. It has its own button, deliberately not a third mode on
       Verify skew: <strong>this one runs the spindle and leaves a permanent mark on the part</strong>, and that
-      must not sit one checkbox away from a check that touches nothing.</div>
+      must not sit one checkbox away from a check that touches nothing. It needs <strong>all four corners
+      probed and a V-bit selected</strong>, and it follows the probed surface &mdash; the cut depth is
+      interpolated from the four corner tops, so a stock that is a few tenths out of flat still scribes an
+      even line rather than deep at one corner and missing at another.</div>
 
     <div class="callout note"><span class="k">Conductive stock &amp; the Touch Plate</span><br>
       A Touch Plate probe reads electrical continuity, so it needs a conductive path. ioSender reads
