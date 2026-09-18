@@ -234,6 +234,13 @@ namespace GCode_Sender
                 UpdateRunUi();
                 UpdateWarnings();
             }
+            else
+            {
+                // Leaving the view with a hook installed would leave the volume keys swallowed app-wide by
+                // a window nobody is looking at. UpdateRunUi asserts the same thing on every refresh; this
+                // covers the case where the view goes away without one.
+                ShutterRemote.Stop();
+            }
         }
 
         public void CloseFile() { }
@@ -606,6 +613,15 @@ namespace GCode_Sender
             btnStart.IsEnabled = !busy;
             btnStop.IsEnabled = busy;
             btnContinue.IsEnabled = holding;
+
+            // The shutter remote listens ONLY while the machine is actually waiting for the operator - see
+            // ShutterRemote for why a global keyboard hook has to be this short-lived. Asserted from the
+            // current state on every UI refresh rather than toggled on transitions, so there is no path
+            // through a stop, an alarm or a closed window that can leave the hook installed.
+            if (holding && AppConfig.Settings.Base.HeightMapRemote)
+                ShutterRemote.Start(() => Continue_Click(null, null));
+            else
+                ShutterRemote.Stop();
 
             // Retry is offered only when there is something to resume INTO and the controller is in a state
             // it can be brought out of. An unrecoverable alarm - one that lost machine position - must not
