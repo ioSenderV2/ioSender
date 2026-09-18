@@ -1131,16 +1131,33 @@ namespace CNC.Controls
         /// and the "no-op" move would drive BACKWARDS to it. mc_dwell calls protocol_buffer_synchronize
         /// unconditionally, so after G4 P0 parse time == real position.
         ///
-        /// Z is deliberately NOT named: only the plane axes are corrupted, and naming Z here would turn a
-        /// repair into a plunge.
+        /// Z IS NAMED TOO, since 2026-09-18. It was not, on the reasoning that "only the plane axes are
+        /// corrupted, and naming Z here would turn a repair into a plunge". The first half of that is wrong
+        /// and the second half only applies to naming Z with a value that could be wrong.
+        ///
+        /// What the firmware converts is the whole POSITION, machine to work and back - and a work position
+        /// differs from a machine one in Z by the coordinate system's Z offset, rotation or no rotation. So
+        /// half-repairing left the parser holding a work Z it believed was a machine Z, off by exactly that
+        /// offset, and the next move that computed a Z target from it was working from a number 100 mm out.
+        ///
+        /// Caught on hardware 2026-09-18, and the arithmetic matches to the millimetre. A height map probed
+        /// its first point at machine Z-88.729 with a G54 Z offset of -103.702; work Z was therefore +14.97,
+        /// and the parser believed that WAS machine Z. The next line - a G91 "G0Z10" retract - asked for
+        /// +24.97, above the machine's Z maximum of 0, and grblHAL refused it with ALARM:2 soft limit. The
+        /// run died on its first retract having captured one point of seventy-seven, and the message the
+        /// operator got said only that the map could not be built.
+        ///
+        /// Naming Z from #&lt;_abs_z&gt; is not a plunge: like X and Y it reads the STEPPER position, so the
+        /// move is to where the machine already is. It is the same self-correcting trick, applied to the
+        /// axis that was left out of it.
         ///
         /// The real fix belongs in the firmware (pair the guards) and is tracked separately.
         /// </remarks>
         public static void EmitWcsWrite(System.Action<string> L, string g10Line)
         {
             L(g10Line);
-            L("G4 P0");                                    // drain the queue - #<_abs_*> are read at parse time
-            L("G53 G0 X[#<_abs_x>] Y[#<_abs_y>]");         // no-op move; resyncs the parser from the steppers
+            L("G4 P0");                                            // drain the queue - #<_abs_*> are read at parse time
+            L("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z[#<_abs_z>]");    // no-op move; resyncs the parser from the steppers
         }
 
         // ---- tool length offset for the tool ALREADY in the spindle ------------------------------------

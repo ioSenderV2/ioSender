@@ -1862,7 +1862,10 @@ namespace CNC.Controls
                 // two measured reproductions; this is the same repair, inline because the compiler builds a
                 // plain line list rather than going through that emitter.
                 lines.Add("G4 P0");                              // drain: #<_abs_*> are read at PARSE time
-                lines.Add("G53 G0 X[#<_abs_x>] Y[#<_abs_y>]");   // no-op move; resyncs from the steppers
+                // Z named as well, for the reason MacroProcessor.EmitWcsWrite now records: the conversion
+                // that gets left half-done is a whole-frame one, so Z comes back holding a work coordinate
+                // believed to be a machine one - off by the coordinate system's Z offset.
+                lines.Add("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z[#<_abs_z>]");   // no-op move; resyncs from the steppers
             }
             lines.Add(ScratchWcs());
             lines.Add("G0 Z" + F(SafeZ()));
