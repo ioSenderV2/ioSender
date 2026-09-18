@@ -505,6 +505,26 @@ namespace CNC.Controls
         private void ApplyGrouping(bool grouped)
         {
             var view = CollectionViewSource.GetDefaultView(grdGCode.DataContext);
+
+            // Durable instrumentation, because "the outline was there and then it wasn't" is otherwise
+            // unanswerable from the outside: there is more than one GCodeListControl over the SAME loaded
+            // job (the Job tab's docked ProgramPanel and MainWindow's jobProgramView), they share one
+            // collection view, and they are kicked by DIFFERENT triggers - SetProgram for one, the
+            // HasOutline notification for both. Say which instance ran, what it decided, and whether the
+            // blocks it is grouping actually carry a Section yet: a grouped view over Section==null blocks
+            // is what "the outline disappeared" looked like on 2026-09-18.
+            if (DebugLog.Enabled)
+            {
+                int blocks = 0, sectioned = 0;
+                if (grdGCode.DataContext is System.Collections.IEnumerable items)
+                    foreach (var o in items)
+                        if (o is GCodeBlock b) { blocks++; if (b.Section != null) sectioned++; }
+                DebugLog.Write("gcode", string.Format(
+                    "ApplyGrouping({0}) on list #{1} (shows the loaded job={2}): {3} block(s), {4} with a Section, view={5}",
+                    grouped, GetHashCode(), _program == null, blocks, sectioned,
+                    view == null ? "NONE" : view.GetType().Name));
+            }
+
             if (view == null)
                 return;
 

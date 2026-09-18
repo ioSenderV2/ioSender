@@ -679,6 +679,22 @@ namespace CNC.Core
         // (--- seq: name (Tn) ---) section markers (GCodeJob.HasSections) - the Program list then renders as
         // a grouped outline.
         public bool HasOutline { get { return _hasOutline; } set { if (_hasOutline != value) { _hasOutline = value; OnPropertyChanged(); } } }
+
+        /// <summary>
+        /// Re-raise HasOutline even when its VALUE has not changed, because a program whose blocks have all
+        /// been REPLACED is not the same state even when the answer is still "yes, it has sections".
+        /// </summary>
+        /// <remarks>
+        /// The program list rebuilds its grouping only on this notification (GCodeListControl's
+        /// HasOutline-changed handler) or on SetProgram, and the Job tab's docked list (ProgramPanel) is
+        /// never handed a SetProgram at all - so a rebuild that leaves the value alone left that list
+        /// showing whatever grouping it last computed. Observed 2026-09-18 on real hardware: a work order
+        /// generated a five-section outline, the height-map transform then rebuilt the program - same five
+        /// sections, HasOutline still true, no notification - and the outline vanished, because the
+        /// collection Reset the rebuild raised regrouped the list while every new block's Section was still
+        /// null (the sections are derived afterwards, at Action.End).
+        /// </remarks>
+        public void RefreshOutline() { OnPropertyChanged(nameof(HasOutline)); }
         // True while a file is being read+parsed on the background loader. The program view(s) show a
         // Wait cursor while it is set; the rest of the UI stays responsive. See GCode.BackgroundLoad.
         public bool IsLoading { get { return _isLoading; } set { if (_isLoading != value) { _isLoading = value; OnPropertyChanged(); } } }

@@ -305,7 +305,13 @@ namespace CNC.Core
                 // because HasSections is not known until the parse it performs has finished. FileChanged has
                 // therefore already fired by now; the grouping is applied by GCodeListControl's own
                 // HasOutline-changed handler instead, against blocks that are final by this point.
-                Model.HasOutline = Program.HasSections;
+                // Forced when the value is unchanged: "still true" over a program whose every block has been
+                // replaced still has to rebuild the grouping - see GrblViewModel.RefreshOutline. This is the
+                // height-map transform's case, and the outline vanished without it.
+                if (Model.HasOutline == Program.HasSections)
+                    Model.RefreshOutline();
+                else
+                    Model.HasOutline = Program.HasSections;
             }
         }
 
