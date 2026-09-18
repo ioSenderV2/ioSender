@@ -549,7 +549,7 @@
       <tr><th>Menu</th><th>What's in it</th></tr>
       <tr><td><strong>Connect…</strong></td><td>Not a menu but a command — opens the <a href="#connect">connection dialog</a>. Reads <em>Reconnect…</em> once you're connected.</td></tr>
       <tr><td><strong>File</strong></td><td>Load Program, Load / New Work Order — and any view you have moved off the tab strip.</td></tr>
-      <tr><td><strong>Tools</strong></td><td>Camera, Machine mirror, <strong>Calibration</strong>, Probing, Height Map — plus the <a href="#tools">hardware-gated</a> Tool table, Trinamic tuner and PID Tuner when your controller has them.</td></tr>
+      <tr><td><strong>Tools</strong></td><td>Camera, Machine mirror, <strong>Calibration</strong>, Probing, <a href="#heightmap">Height Map</a> — plus the <a href="#tools">hardware-gated</a> Tool table, Trinamic tuner and PID Tuner when your controller has them.</td></tr>
       <tr><td><strong>Help</strong></td><td>Wiki, usage tips, a brief tour, video tutorials, error &amp; alarm codes, and <strong>Support</strong> (restart ioSender, check for updates, roll back a version, open the app data folder, apply or export a configuration overlay).</td></tr>
     </table>
     <div class="callout note"><span class="k">Menu views open in a window — with four exceptions</span><br>
@@ -1006,7 +1006,7 @@
       <li><strong>Actions</strong> — <strong>Set origin or offset</strong> picks the destination: any
       work-coordinate slot G54–G59, or G92 for a temporary offset; <strong>Set tool-length reference</strong>
       also probes the current tool's length at the same time; <strong>Measure stock size</strong> probes all
-      four corners; <strong>Probe height map</strong> (once stock is measured) probes a grid over the stock
+      four corners; <a href="#heightmap"><strong>Probe height map</strong></a> (once stock is measured) probes a grid over the stock
       and applies the resulting surface compensation to the run; <strong>Set work rotation from skew</strong>
       applies the measured skew as a work-coordinate rotation.</li>
       <li><strong>Measured stock / Flatness / Squareness</strong> — filled in once you've run a probe: the
@@ -1221,12 +1221,12 @@
       so establishing that temporary origin never steps on your real one.<br>
       There is one case where that is actively wrong, and a checkbox for it: <strong>Use the work origin
       already set</strong>, nested under <em>Entire spoilboard</em> and only available while that is ticked.
-      After a <em>Full work surface</em> height-map run, Z0 is the highest of sixteen probed points — and the
+      After a <a href="#heightmap"><em>Full work surface</em></a> height-map run, Z0 is the highest of sixteen probed points — and the
       self-touch-off would throw that away and replace it with one eyeballed touch at one spot, which cannot
       tell you whether you touched a high spot or a low one. Off by default; tick it when an origin you trust
       more already exists.</div>
     <div class="callout note"><span class="k">"Entire spoilboard" means the board, not the travel</span><br>
-      Both this and the height map's <em>Full work surface</em> used to take the machine's travel limits
+      Both this and the <a href="#heightmap">height map</a>'s <em>Full work surface</em> used to take the machine's travel limits
       (<code>$130</code>/<code>$131</code>) as the extent of the board. That is only true where the board
       fills the table — on a machine with the toolsetter mounted off the front edge, the last stretch of Y
       travel is air, and a raster across it runs the cutter through nothing at best. If your board is smaller
@@ -1646,6 +1646,131 @@
     </ul>
 
     <div class="xref">Related: <a href="#carving">Engraving &amp; carving</a> &middot; <a href="#job">The Job screen</a> &middot; <a href="#settings">Settings</a> &middot; <a href="#gcode-viewer">3D viewer</a></div>
+  </section>
+
+  <!-- ===================== HEIGHT MAP ===================== -->
+  <section class="topic" id="heightmap" data-title="Height Map — cutting a surface that isn't flat" data-level="int"
+           data-track="novice:0,intermediate:8,machinist:5">
+    <h2>Height Map &mdash; cutting a surface that isn't flat <a class="anchor" href="#heightmap">#</a></h2>
+    <div class="tags"><span class="tag int">Intermediate</span><span class="tag mac">Machinist</span></div>
+    <p>Nothing is flat. A spoilboard dishes, a sheet of plywood bows, a workpiece clamped at its corners lifts
+    in the middle &mdash; and a cut that is only a few tenths deep simply disappears where the surface falls
+    away, then bites where it rises. <strong>Tools &rarr; Height&nbsp;Map</strong> probes a grid over the
+    area, builds a surface from what it finds, and then <strong>rewrites the loaded program to follow
+    it</strong>: every Z in the job is shifted by the local height, so a 0.3&nbsp;mm engrave stays
+    0.3&nbsp;mm deep everywhere.</p>
+    <p>It is also how you resurface a spoilboard, which is a different job with a different shape &mdash; and
+    that is the first choice on the panel.</p>
+
+    <h3>The two modes</h3>
+    <table class="reftab">
+      <tr><th>Area to probe</th><th>What it is for</th><th>What it needs first</th></tr>
+      <tr><td><strong>From program</strong></td><td>Compensating a job. It probes the loaded program's
+      footprint, in the <em>current work coordinates</em>, so the map lines up with the job you are about to
+      cut. <strong>Set from program limits</strong> fills the area from the loaded file; X/Y/W/H are editable
+      afterwards.</td><td>A work origin already set on the stock &mdash; see <a href="#setup">Setup</a> &mdash;
+      and, for Apply, a loaded program.</td></tr>
+      <tr><td><strong>Full work surface</strong></td><td>Resurfacing the spoilboard. It maps the whole board
+      and <strong>sets the work origin itself</strong>.</td><td>Nothing. No Setup pass, no corner to probe.
+      X0&nbsp;Y0 is placed at the board's corner before probing and Z0 on the highest point found once it
+      finishes.</td></tr>
+    </table>
+    <p>The panel changes with the mode, which is deliberate: <em>From program</em> gives you an area and a
+    <strong>grid size in millimetres</strong> (with a <em>Lock</em> to keep X and Y equal), while <em>Full work
+    surface</em> gives you <strong>divisions per axis</strong> instead and tells you how many probes that is.
+    A gently dished board needs far less than people expect &mdash; 4&nbsp;&times;&nbsp;4 is sixteen points and
+    usually plenty.</p>
+    <div class="callout note"><span class="k">"The whole board" means the board, not the travel</span><br>
+      Full work surface takes its extent from the <strong>Work surface (spoilboard)</strong> section of
+      <a href="#machine-setup">Machine&nbsp;Setup</a> step&nbsp;3. Leave that undefined and it assumes the
+      board fills the table &mdash; which on a machine with the toolsetter mounted off the front edge means
+      probing thin air at one end. The same field feeds Work Order's <em>Entire spoilboard</em>.</div>
+
+    <h3>The probe, and the numbers that are not on this panel</h3>
+    <p>The <strong>Probe</strong> dropdown picks which of your probes does the work, and that probe's own
+    <strong>search distance and approach feed</strong> come from its definition in
+    <a href="#machine-setup">Machine&nbsp;Setup</a> step&nbsp;5 rather than being retyped here &mdash; which
+    is why this panel has no depth or feed field. The search distance has to cover how much the surface
+    actually varies. With no probe defined at all the panel says so, instead of offering a Start that cannot
+    work.</p>
+    <p>Two controls on the panel are about how the head moves between points:</p>
+    <ul>
+      <li><strong>Hold at each point (move the touch plate).</strong> A spoilboard will not close a circuit,
+      so on anything non-conductive the plate has to travel with the probe. Ticked, the machine positions over
+      each point and <em>waits</em>: put the plate under the bit and press <strong>Continue</strong> (Cycle
+      Start does the same). It holds before every point except the first, where you are already standing at the
+      machine. Untick it only where the probe reaches the surface on its own.</li>
+      <li><strong>Drop allowance.</strong> Between points the tool lifts clear of the surface and then
+      searches that lift <em>plus</em> this allowance, so a point up to the allowance lower than the one
+      before it is still found. The note under the field spells out all three distances in millimetres as you
+      change it. Raise it for a board that steps or dishes sharply; the cost is a longer search at every
+      point.</li>
+    </ul>
+
+    <h3>Running it</h3>
+    <p>The right-hand pane follows the run rather than making you choose a view: <strong>Steps</strong> while
+    you are setting up (and the steps themselves change with the mode), <strong>Program</strong> when you press
+    Start &mdash; the actual probing program, listed before anything moves, rebuilt on every Start &mdash; and
+    <strong>Surface&nbsp;Map</strong> when the run finishes.</p>
+    <table class="reftab">
+      <tr><th>Button</th><th>What it does</th></tr>
+      <tr><td><strong>Start</strong></td><td>Probes the grid a point at a time. The blue button is always the
+      one to press next, so it moves to Continue while the run is holding for you.</td></tr>
+      <tr><td><strong>Continue</strong></td><td>Releases a hold &mdash; you have moved the plate. Cycle Start
+      is the same thing.</td></tr>
+      <tr><td><strong>Retry</strong></td><td>Clears the alarm and carries on <em>from the point that
+      failed</em>, keeping every reading already taken. See the warning below for when it is not
+      offered.</td></tr>
+      <tr><td><strong>Stop</strong></td><td>Cancels the run in progress. What was gathered is kept, so a Retry
+      can still pick it up.</td></tr>
+      <tr><td><strong>Apply</strong></td><td>Rewrites the loaded program to follow the probed surface. It needs
+      a program loaded; with none it says so rather than doing nothing.</td></tr>
+      <tr><td><strong>Save</strong> / <strong>Load</strong></td><td>Stores the map as a <code>.map</code> file
+      and reads one back, so a board you mapped last week does not have to be probed again.</td></tr>
+    </table>
+    <div class="callout warn"><span class="k">Retry is refused when the machine lost its position</span><br>
+      An alarm that <em>retains</em> machine position can be resumed from; one that recommends re-homing
+      cannot, and Retry stays greyed out. That is not caution for its own sake: the readings already taken are
+      referenced to an origin the machine can no longer find, so continuing would build one map out of two
+      different coordinate systems &mdash; and the result would look entirely plausible. Changing the grid
+      after a failure also ends the resume, because those readings belong to a different map.</div>
+
+    <h3>Reading the surface</h3>
+    <p>The <strong>Surface&nbsp;Map</strong> tab draws the probed surface in 3D &mdash; drag to rotate, scroll
+    to zoom &mdash; with the probed points marked and the area's boundary outlined. Colour runs from blue at
+    the lowest point through green and yellow to red and purple at the highest, and the <strong>legend states
+    the actual numbers in millimetres</strong>: the high point is the 0 reference, the low point is quoted as a
+    negative, and the range between them is the figure that matters. That range is how much the surface moves
+    under your job &mdash; and, on a spoilboard, how deep a surfacing pass must go to clean up the whole board
+    rather than just the high spots.</p>
+
+    <h3>Resurfacing a spoilboard, end to end</h3>
+    <p>Full work surface is the one mode where you are part of the loop at every point, and its own Steps pane
+    walks it. The parts worth knowing before you start:</p>
+    <ul>
+      <li><strong>Fit the cutter you are going to surface with.</strong> The map is measured through whatever
+      is in the spindle, so measuring with one tool and cutting with another throws the reference out by the
+      difference between them.</li>
+      <li><strong>The first point is a search</strong> &mdash; it goes to the top of travel and probes all the
+      way down, because nothing yet knows where the board is. After that the bit stays just above the plate
+      between points, so each remaining probe is short. That also means a point where you forget the plate
+      stops almost immediately rather than diving.</li>
+      <li><strong>The plate's thickness is taken off automatically.</strong> A 3D probe has nothing taken off,
+      because it touches the surface itself.</li>
+      <li><strong>Then surface.</strong> It reports the highest and lowest points and sets Z0 to the highest.
+      In <a href="#work-order">Work Order</a>, a <strong>Surface</strong> toolpath with <em>Entire
+      spoilboard</em> and <em>Use the work origin already set</em> cuts to the origin this just measured
+      &mdash; without that second tick it would touch off a fresh Z0 at one eyeballed spot and throw sixteen
+      probed points away.</li>
+    </ul>
+
+    <div class="callout tip"><span class="k">Setup can do the whole thing for you</span><br>
+      <a href="#setup">Setup</a>'s <strong>Probe height map</strong> action runs this same engine over the
+      stock area it has just established and applies the result to the loaded job, without a visit to this
+      window. Use the window when you want to choose the area yourself, save a map for re-use, or resurface
+      the board.</div>
+
+    <div class="xref">Related: <a href="#setup">Setup</a> &middot; <a href="#work-order">Work Order</a> &middot; <a href="#machine-setup">Machine&nbsp;Setup</a> &middot; <a href="#accuracy-calibration">Accuracy &amp; calibration</a> &middot; <a href="#errors-alarms">Errors &amp; alarms</a></div>
   </section>
 
   <!-- ===================== MACHINE SETUP ===================== -->
