@@ -238,13 +238,30 @@ namespace CNC.Controls
             }
         }
 
+        // Set position used to read GrblViewModel.MachinePosition directly - whatever the last status report
+        // happened to leave there. Reported from the machine 2026-09-18: it captured 20,-20,-6 with the
+        // spindle nowhere near that. A capture must ASK the controller, not remember, and that distinction
+        // now belongs to the accessor rather than to this dialog - see Fixtures.RequestCoordsCsv.
+        private bool _capturing;
+
         private void btnSetPosition_Click(object sender, RoutedEventArgs e)
         {
             var fx = DataContext as Fixture;
-            if (fx == null)
+            if (fx == null || model == null || _capturing)
                 return;
 
-            string coords = Fixtures.CurrentCoordsCsv(model);
+            // Guarded rather than disabled: the reply normally lands within a poll interval, and a button
+            // that greys out for 30 ms only flickers.
+            _capturing = true;
+            Fixtures.RequestCoordsCsv(model, coords =>
+            {
+                _capturing = false;
+                ApplyCapturedPosition(fx, coords);
+            });
+        }
+
+        private void ApplyCapturedPosition(Fixture fx, string coords)
+        {
             if (coords == null)
             {
                 // model.Message only reaches MainWindow's own status label, which sits BEHIND this modal
@@ -270,17 +287,11 @@ namespace CNC.Controls
                 return;
             }
 
-            // What was captured, and what the machine said at the moment of the click. A fixture position
-            // that turns out to be somewhere the head merely PASSED THROUGH is indistinguishable afterwards
-            // from one captured correctly - the value is a real machine position either way, and nothing on
-            // the wire records a capture. Asked on real hardware 2026-09-18 and could not be answered.
-            // Position has no ToString worth printing - the first cut of this line logged the TYPE NAME,
-            // which is exactly the half that mattered (was the capture the live position, or a stale one?).
+            // The value actually stored, beside the machine state it was taken in. RequestFreshPosition has
+            // already logged where it came from and whether the cache disagreed with the controller.
             CNC.Core.DebugLog.Write("fixture", string.Format(
-                "Set position: {0} captured '{1}' | live MPos {2:F3},{3:F3},{4:F3} | state {5}",
-                fx.Name, coords,
-                model.MachinePosition.X, model.MachinePosition.Y, model.MachinePosition.Z,
-                model.GrblState.State));
+                "Set position: {0} <- '{1}' | state {2} | homed {3}",
+                fx.Name, coords, model.GrblState.State, model.HomedState));
 
             fx.Coords = coords;
             // A stale CornerOffsetX/Y is meaningless once the reference it was measured from moves - clear it

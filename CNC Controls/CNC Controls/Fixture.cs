@@ -307,6 +307,11 @@ namespace CNC.Controls
 
         // The enabled axes' current machine position as an invariant CSV (the stored-coords format), or null
         // when the position is unknown (disconnected / not homed).
+        //
+        // CACHED. GrblViewModel.MachinePosition holds whatever the last status report left there, which is
+        // fine for a readout that is about to be refreshed anyway and NOT fine for a capture - the value
+        // becomes a saved fixture that the machine will later rapid to. Callers that are recording a position
+        // should use RequestCoordsCsv below, which asks the controller instead of remembering.
         public static string CurrentCoordsCsv(GrblViewModel grbl)
         {
             if (grbl == null)
@@ -315,6 +320,85 @@ namespace CNC.Controls
             if (idx.Any(i => double.IsNaN(grbl.MachinePosition.Values[i])))
                 return null;
             return string.Join(",", idx.Select(i => grbl.MachinePosition.Values[i].ToInvariantString("F3")));
+        }
+
+        /// <summary>
+        /// The machine position as the CONTROLLER reports it right now: requests a status report and calls
+        /// back with the position from the reply.
+        /// </summary>
+        /// <remarks>
+        /// The distinction lives here, in the accessor, rather than being hand-rolled per caller - there are
+        /// already two hand-rolled versions in the app (OffsetView's "get machine position" button pumps its
+        /// own wait; the fixture dialog grew another), which is two chances to get it subtly different and no
+        /// single place to fix it.
+        ///
+        /// Why it exists at all: a fixture Set position captured 20,-20,-6 on real hardware 2026-09-18 with
+        /// the spindle nowhere near there - a position the head had been at earlier in the session. A stale
+        /// cached read is indistinguishable from a good one afterwards, because both are plausible machine
+        /// coordinates, and nothing on the wire records a capture.
+        ///
+        /// Asynchronous, and deliberately not a pumped wait: DoEvents spins have hung this app before (39
+        /// removed in 570fe017, two of them unconditionally). If no report arrives within the timeout the
+        /// cached value is handed back anyway - a fixture position set from a stale reading the log can
+        /// explain beats a button that silently does nothing - and <paramref name="done"/> is always called
+        /// exactly once, on the UI thread.
+        /// </remarks>
+        public static void RequestCoordsCsv(GrblViewModel grbl, System.Action<string> done)
+        {
+            if (grbl == null || done == null)
+            {
+                done?.Invoke(null);
+                return;
+            }
+
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher == null)
+            {
+                done(CurrentCoordsCsv(grbl));
+                return;
+            }
+
+            string cached = CurrentCoordsCsv(grbl);
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            bool finished = false;
+
+            System.Windows.Threading.DispatcherTimer timeout = null;
+            System.Action<string> onStatus = null;
+
+            System.Action<string> complete = why =>
+            {
+                if (finished)
+                    return;
+                finished = true;
+                if (onStatus != null)
+                    grbl.OnRealtimeStatusProcessed -= onStatus;
+                timeout?.Stop();
+
+                string fresh = CurrentCoordsCsv(grbl);
+                DebugLog.Write("fixture", string.Format(
+                    "position request: {0} after {1:0} ms - cached '{2}' fresh '{3}'{4}",
+                    why, clock.Elapsed.TotalMilliseconds, cached ?? "(none)", fresh ?? "(none)",
+                    cached != fresh ? "  *** THE CACHED POSITION WAS STALE ***" : string.Empty));
+
+                done(fresh);
+            };
+
+            // Raised on the comms thread immediately after ParseStatus has written the new position.
+            onStatus = data => dispatcher.BeginInvoke(new System.Action(() => complete("status report")));
+            grbl.OnRealtimeStatusProcessed += onStatus;
+
+            timeout = new System.Windows.Threading.DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(500) };
+            timeout.Tick += (s, e) => { timeout.Stop(); complete("NO REPORT - using the cached position"); };
+            timeout.Start();
+
+            try
+            {
+                Comms.com.WriteByte(GrblLegacy.ConvertRTCommand(GrblConstants.CMD_STATUS_REPORT));
+            }
+            catch
+            {
+                complete("could not request a report");
+            }
         }
     }
 }
