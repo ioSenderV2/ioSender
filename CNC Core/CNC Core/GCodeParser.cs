@@ -2218,6 +2218,24 @@ namespace CNC.GCode
                         block += (token as GCComment).ToString();
                         break;
 
+                    // EVERY token type in this switch is cast to its own class before ToString, and that is
+                    // not stylistic: these ToString overloads are declared "new", not "override", so they
+                    // HIDE the base rather than replacing it. A token reached through the GCodeToken-typed
+                    // variable in the default case below therefore calls GCodeToken.ToString, which returns
+                    // the COMMAND NAME. Any type missing a case here is silently rewritten to a word.
+                    //
+                    // Parameter and G68 were both missing. Found on real hardware 2026-09-18: a work order
+                    // put through the height-map transform came back with its "#<name>=value" setup lines
+                    // replaced by the literal text "Parameter" - a program that had quietly lost the values
+                    // every later line depends on. G68 is the same trap holding a rotation write.
+                    case Commands.Parameter:
+                        block += (token as GCParameter).ToString();
+                        break;
+
+                    case Commands.G68:
+                        block += (token as GCRotate).ToString();
+                        break;
+
                     case Commands.M62:
                     case Commands.M63:
                     case Commands.M64:
