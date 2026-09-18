@@ -363,7 +363,18 @@ assert something false. That is a stopgap, not a fix:
         button reads "Generate (mark only)" while this is set. **No such string exists in the repo** —
         the comment is aspirational, and it is the justification given for persisting the flag. Either
         build it or correct the comment; the manual does not claim it.
-  - [ ] **M4 (Height Map)** — a whole topic this file had never listed; needs the app driven.
+  - [x] **M4 (Height Map) — DONE 2026-09-17** (`0ddc3062`). Topic **`#heightmap`**, anchored on that
+        name deliberately: `ManualHelp.cs` maps `ViewType.HeightMap` to it, so F1 from the view lands
+        there. Covers the two modes as different jobs, the extent coming from Machine Setup step 3's
+        **Work surface** rather than the travel, why the panel has no depth/feed field (they live in
+        the probe definition), the drop allowance in terms of what it buys, **Retry refused on an
+        alarm that lost position**, the legend's numbers, and the Entire-spoilboard + *Use the work
+        origin already set* pairing. Four cross-links restored now the topic exists again.
+        🔴 **`img/heightmap.png` is NOT current** — the audit's §6 said to check before
+        deleting, and the answer is no: it shows the pre-#332 tab bar, the old run bar with Rewind,
+        the bottom status bar, a *Full table* radio, Probe depth/feed fields that have since moved
+        into the probe definition, and a single *Surface* pane instead of Steps/Program/Surface Map.
+        A fresh shot is owed; nothing references the old one.
   - [ ] **M6–M21** — the rest, in §2 of the audit.
 
 ### Process note — why this got to 156

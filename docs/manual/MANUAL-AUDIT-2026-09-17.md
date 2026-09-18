@@ -28,7 +28,7 @@ fixed their neighbours.
 
 | Bucket | Count |
 |---|---|
-| **MISSING** — shipped functionality with no usable manual coverage | **21** (M1–M21) — ✅ **M1, M2, M3 done 2026-09-17** (new `#carving` and `#laser` topics); 18 left |
+| **MISSING** — shipped functionality with no usable manual coverage | **21** (M1–M21) — ✅ **M1–M5 done 2026-09-17** (`#carving`, `#laser`, `#heightmap`, Mark only in `#work-order`); 16 left |
 | **OBSOLETE** — manual asserts something that is no longer true | **16** (O1–O16) — ✅ **all applied 2026-09-17**, plus 2 uncatalogued siblings |
 | **NEEDS UPDATING** — still-correct topics now incomplete | **13** (U1–U13) |
 | **Screenshots** — all 19 referenced figures predate #216 | 19 (+ 4 orphans) |
@@ -36,9 +36,9 @@ fixed their neighbours.
 
 **Running order.** §3 (the OBSOLETE pass) was taken first and is **done** — it was the cheap half
 and it carried the wrong facts. The two demo-able features are **done** too: M1/M2 (`#carving`) and
-M3 (`#laser`), and so is the **M5 remainder** (Mark only, in `#work-order`). What remains, in order:
-**M4 (Height Map)**, which needs the app driven; then §4's thirteen, which can ride along with
-whichever topic they touch; then the rest of §2 and the reshoots.
+M3 (`#laser`), the **M5 remainder** (Mark only, in `#work-order`) and **M4** (`#heightmap`). What
+remains: **M6–M21**, none of which needs the app driven to write; §4's thirteen, which can ride along
+with whichever topic they touch; and the reshoots, which do.
 
 ---
 
@@ -86,6 +86,19 @@ whichever topic they touch; then the rest of §2 and the reshoots.
 > "Generate (mark only)" while the flag is set — **that string is nowhere in the repo**, and it is
 > the reason the comment gives for persisting the flag at all. A comment-only guarantee; the topic
 > does not repeat it.
+
+> ✅ **M4 is DONE 2026-09-17** (`0ddc3062`) — topic **`#heightmap`**. The anchor is not a style
+> choice: `ManualHelp.cs:41` maps `ViewType.HeightMap` to `"heightmap"`, so F1 from the view lands on
+> it. Written from `HeightMapView.xaml` and its code-behind. Beyond this table's list, it states the
+> extent question (Machine Setup step 3's **Work surface**, not `$130`/`$131`), why the panel carries
+> no depth or feed field — they come from the probe's own definition — and the reason **Retry** is
+> refused after an alarm that lost position.
+>
+> 🔴 **The `heightmap.png` question in §6 is answered: it is NOT current.** It predates the
+> rebuild by a wide margin — old tab bar, the run bar with Rewind, the bottom status bar, a *Full
+> table* radio where the app now says *Full work surface*, Probe depth/feed fields that have moved
+> into the probe definition, and one *Surface* pane where there are now three. The new topic
+> references no figure; a fresh shot of the Surface Map with its legend is owed.
 
 "Usable" is doing work in that heading. Several of these are *named* somewhere — in a menu table or
 a one-line parenthetical — without anything that would let an operator use them. Those are marked
@@ -229,8 +242,10 @@ Surface Map with its legend (M4), a Save Drawing PDF page (M8), the Calibration 
 
 **Four orphans** — referenced by nothing in `index.html`:
 
-- `heightmap.png` — **do not delete.** M4 needs a Height Map figure; check whether this one is still
-  representative before shooting a new one.
+- `heightmap.png` — **checked 2026-09-17: not representative, and safe to delete.** It predates the
+  rebuild (old tab bar, run bar with Rewind, bottom status bar, *Full table*, Probe depth/feed on the
+  panel, one *Surface* pane). The new `#heightmap` topic references no figure; a fresh Surface Map
+  shot with its legend is owed instead.
 - `odd-jobs-work-order.png`, `probing-tabs.png`, `tools-tab.png` — all depict retired arrangements.
   Delete.
 
