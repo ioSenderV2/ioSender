@@ -865,12 +865,28 @@ namespace CNC.Core
         {
             BoundingBox.Reset();
 
+            // Which program line pushed each extreme of the box. "The 3D view is wonky - the toolpath is
+            // nowhere near the stock" is a recurring report, and the box alone cannot say why: one G53 park,
+            // one move the rotation never reached, one parameter that resolved to the wrong number is enough
+            // to stretch it, and on a 43,000-block program there is no finding that line by eye. Debug-log
+            // only, and the cost is three array reads per token.
+            bool trace = DebugLog.Enabled;
+            var extreme = new uint[6];    // minX maxX minY maxY minZ maxZ - the line that set it
+            var before = new double[6];
+
             try
             {
                 GCodeEmulator emu = new GCodeEmulator(true);
 
                 foreach (var cmd in emu.Execute(Tokens))
                 {
+                    if (trace)
+                        for (int i = 0; i < 3; i++)
+                        {
+                            before[i * 2] = BoundingBox.Min[i];
+                            before[i * 2 + 1] = BoundingBox.Max[i];
+                        }
+
                     if (cmd.Token is GCArc)
                         BoundingBox.AddBoundingBox((cmd.Token as GCArc).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
                     else if (cmd.Token is GCCubicSpline)
@@ -884,11 +900,27 @@ namespace CNC.Core
                         else
                             BoundingBox.AddPoint(cmd.End, (cmd.Token as GCAxisCommand9).AxisFlags);
                     }
+
+                    if (trace)
+                        for (int i = 0; i < 3; i++)
+                        {
+                            if (BoundingBox.Min[i] != before[i * 2])
+                                extreme[i * 2] = cmd.Token.LineNumber;
+                            if (BoundingBox.Max[i] != before[i * 2 + 1])
+                                extreme[i * 2 + 1] = cmd.Token.LineNumber;
+                        }
                 }
             }
             catch { /* unparseable expression program - leave whatever box was accumulated */ }
 
             BoundingBox.Conclude();
+
+            if (trace)
+                DebugLog.Write("gcode", string.Format(
+                    "ComputeLimits: X {0:0.###}..{1:0.###} (set at lines {2}/{3})  Y {4:0.###}..{5:0.###} ({6}/{7})  Z {8:0.###}..{9:0.###} ({10}/{11})",
+                    BoundingBox.Min[0], BoundingBox.Max[0], extreme[0], extreme[1],
+                    BoundingBox.Min[1], BoundingBox.Max[1], extreme[2], extreme[3],
+                    BoundingBox.Min[2], BoundingBox.Max[2], extreme[4], extreme[5]));
         }
 
         // Fire FileChanged on demand - used by the background loader to raise it on the UI thread, after the
