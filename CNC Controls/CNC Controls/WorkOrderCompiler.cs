@@ -1522,15 +1522,71 @@ namespace CNC.Controls
         private static List<string> BuildChamfer(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
         {
             var lines = new List<string>();
-            var edge = OrderForDirection(Outline(tp, cx, cy, 0d), tp, op);
 
-            lines.Add("G0 " + XY(edge[0]));
-            lines.Add("G0 Z" + F(SafeZ()));
-            lines.Add("G1 Z" + F(-op.ChamferDepth) + " F" + F(op.Feed));
-            for (int i = 1; i < edge.Count; i++)
-                lines.Add("G1 " + XY(edge[i]) + " F" + F(op.Feed));
+            foreach (var edge in ChamferEdges(tp, op, cx, cy))
+            {
+                if (edge.Count < 2)
+                    continue;
+
+                // Lift BEFORE the XY rapid, not after it. With two edges to trace the second rapid would
+                // otherwise cross the work at chamfer depth; it was only ever safe on one pass because the
+                // previous operation happened to leave the tool high.
+                lines.Add("G0 Z" + F(SafeZ()));
+                lines.Add("G0 " + XY(edge[0]));
+                lines.Add("G1 Z" + F(-op.ChamferDepth) + " F" + F(op.Feed));
+                for (int i = 1; i < edge.Count; i++)
+                    lines.Add("G1 " + XY(edge[i]) + " F" + F(op.Feed));
+            }
+
             lines.Add("G0 Z" + F(SafeZ()));
             return lines;
+        }
+
+        /// <summary>
+        /// The edge (or edges) a chamfer traces: one for a closed shape, TWO for an open path.
+        /// </summary>
+        /// <remarks>
+        /// A closed shape has one true top edge and the outline IS it. An open path does not: it has no
+        /// interior, so the Contour that cut it straddles the line (see BuildContour's inset) and the line
+        /// itself ends up down the MIDDLE of the groove, where a chamfer pass meets nothing but air. The two
+        /// edges worth breaking are one ROUGHING-bit radius to either side - the chamfer bit's own diameter
+        /// is irrelevant here, exactly as it is on a closed shape, because the cone does the work.
+        ///
+        /// Reported 2026-09-18: a 100 mm line contoured 10 mm deep with a 1/4" end mill, chamfered
+        /// afterwards, broke only one of the groove's two long edges.
+        ///
+        /// With no roughing operation on the toolpath there is no groove and so no pair of edges - trace the
+        /// path itself, which is what this always did.
+        /// </remarks>
+        private static IEnumerable<List<double[]>> ChamferEdges(WorkOrderToolpath tp, WorkOrderOperation op, double cx, double cy)
+        {
+            var path = Outline(tp, cx, cy, 0d);
+
+            var rough = tp.IsClosed ? null : WorkOrderRules.RoughingOp(tp);
+            double r = rough == null ? 0d : EffectiveBitDiameter(tp, rough) / 2d;
+
+            if (r <= 0d || path.Count < 2)
+            {
+                yield return OrderForDirection(path, tp, op);
+                yield break;
+            }
+
+            // Perpendicular to the line's own angle, so the offset is exact rather than a mitred
+            // approximation - the only open geometry that reaches here is a straight Line (Text returns no
+            // outline at all, and artwork has its own builders).
+            double a = tp.Angle * Math.PI / 180d;
+            double nx = -Math.Sin(a) * r, ny = Math.Cos(a) * r;
+
+            yield return OrderForDirection(Offset(path, nx, ny), tp, op);
+            yield return OrderForDirection(Offset(path, -nx, -ny), tp, op);
+        }
+
+        private static List<double[]> Offset(List<double[]> path, double dx, double dy)
+        {
+            var moved = new List<double[]>(path.Count);
+            foreach (var p in path)
+                moved.Add(new[] { p[0] + dx, p[1] + dy });
+            return moved;
         }
 
         // A V-bit's tip along the geometry's own outline - no offset - as deep as the requested groove
