@@ -1030,9 +1030,32 @@
     the same live per-line status as it executes. The program-view header's title names what's loaded (a
     filename, or "Work Order" for a generated run).</p>
 
+    <h4 class="subh">Programs that ask you a question</h4>
+    <p>A file can carry its own fields. Any comment of the form
+    <code>(PROMPT&nbsp;name,&nbsp;default[,&nbsp;label])</code> becomes a box in a small form that ioSender
+    shows <strong>as the file loads</strong>, and the answers are installed before a single line is parsed.
+    One <code>square.nc</code> then covers every size of square you will ever cut.</p>
+    <ul>
+      <li><strong>Asked at load, not at Cycle Start</strong>, so the answers are in place for the 3D preview
+      too &mdash; what you see drawn is the geometry you are about to cut, not the defaults.</li>
+      <li><strong>Cancel keeps the defaults and still loads.</strong> "The defaults are fine" is the common
+      case and a refused load would punish it.</li>
+      <li>Every field is asked once, in one form, however many times the file references it. On a controller
+      with no expression support the references are folded to the answers as the file loads, so the
+      arithmetic never reaches the wire &mdash; which is what makes a parametric program work on plain
+      Grbl.</li>
+    </ul>
+
     <h3>The g-code list &amp; the 3D view</h3>
     <p>The loaded program appears as a scrolling line list beside the live <a href="#gcode-viewer">3D
     viewer</a>, which draws the whole toolpath and highlights progress as it runs.</p>
+    <p>By default a tab strip at the bottom switches between the list, the viewer and the console. Tick
+    <strong>Show 3D view in split screen on Job tab</strong> in <a href="#settings">Settings &rarr; User
+    Interface</a> and the list and the viewer sit <em>side by side</em> with a draggable splitter instead
+    &mdash; code and toolpath at once. The space comes from the jog pad and the Feed/Spindle/Outline columns,
+    which give it up; the left panel column stays, and the splitter's position is remembered. The console
+    goes with the tab strip, and loses nothing by it: the run strip's <strong>MDI</strong> button opens the
+    real console in its own window.</p>
 
     <h3>The run strip's run controls</h3>
     <p>The main button is labelled <strong>Run</strong>, with a small dropdown beside it that picks which
@@ -1081,6 +1104,27 @@
     chosen point rather than the top, with a safe Z-up move first. Pick the point in the
     <a href="#gcode-viewer">3D viewer</a>.</p>
 
+    <h3>What actually happened &mdash; the status line and the log</h3>
+    <p>ioSender narrates itself. Loading a file, a connection and how many settings it read, a run starting
+    and ending, a Generate, a setting change, a dialog and the answer you gave it &mdash; each lands on the
+    <strong>status line</strong> as it happens. That line only ever shows the latest one, so there are two
+    other ways to it:</p>
+    <ul>
+      <li><strong>The Status window</strong> holds every message since launch. The run strip's
+      <strong>Status</strong> button opens it, and it also <em>opens itself</em> &mdash; but only for an
+      error or an alarm, and it dismisses itself again after a few seconds so a routine message never takes
+      the screen. How long it lingers is a slider in <a href="#settings">Settings &rarr; User
+      Interface</a>; shortening it loses nothing, because nothing is ever dropped from the log behind the
+      button. A window <em>you</em> opened does not close itself.</li>
+      <li><strong>The status log on disk</strong> &mdash; <code>%AppData%\ioSender\logs\status_&lt;timestamp&gt;.log</code>,
+      with <code>latest_status.log</code> pointing at the current run. Every message is written there as it
+      happens, tagged with whether it was an error and whether it came from ioSender or from the controller
+      as an <code>[MSG:]</code>. That last distinction is the one this log gets opened to answer: <em>which
+      of these did the machine actually say?</em></li>
+    </ul>
+    <p>The window's own list is capped and drops its oldest lines on a long session; the file does not. When
+    something went wrong an hour ago, the file is the one to open.</p>
+
     <div class="callout tip"><span class="k">Transforms</span><br>
       <strong>Right-click → Transform</strong> in the program list can rotate the program, convert arcs to
       lines, add drag-knife moves and more before you run — handy for fitting a job to your stock
@@ -1092,7 +1136,13 @@
       caret already in the input box, ready to type, and <kbd>Esc</kbd> closes it — the same key that dismisses
       every other floating window here. The run strip's <strong>MDI</strong> button does the same thing.
       Rebind it, or give <strong>Status</strong> a key too, under
-      <strong>Settings → Keyboard &amp; Controller → Program</strong>.</div>
+      <strong>Settings → Keyboard &amp; Controller → Program</strong>.<br>
+      It has a <strong>Search</strong> box: every match in the log is highlighted at once, not just the one
+      you are on, with a count beside the box &mdash; <kbd>Enter</kbd> or <kbd>F3</kbd> steps to the next
+      match and <kbd>F4</kbd> to the previous. The <strong>A&minus;/A+</strong> steppers set the log's text
+      size and the MDI input's <em>separately</em>, which matters when the log is across the room and the
+      line you are typing is under your nose. Right-click the log for <em>Clear all</em>, <em>Clear up to
+      here</em> and <em>Save</em>.</div>
 
     <div class="xref">Related: <a href="#setup">Setup</a> · <a href="#gcode-viewer">3D viewer</a> · <a href="#clean-results">Clean results</a> · <a href="#sdcard">SD card</a> · <a href="#errors-alarms">Errors &amp; alarms</a></div>
   </section>
