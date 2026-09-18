@@ -425,6 +425,11 @@ namespace CNC.Controls
             FeedHoldVisibility = canMove ? Visibility.Visible
                                          : (peeking ? Visibility.Hidden : Visibility.Collapsed);
             StopVisibility = IsStopEnabled ? Visibility.Visible : Visibility.Collapsed;
+
+            // Shown whenever a peek is in progress, so the way out is never merely absent. Whether it is
+            // ENABLED is the runner's call alone (JobRunner.UpdatePeekGate) - this used to OR in "peeking",
+            // which made the button appear while CanPeek was still false, i.e. visible and dead, which is how
+            // a job ended up parked at G30 with no route back.
             PeekVisibility = (IsPeekEnabled || peeking) ? Visibility.Visible : Visibility.Collapsed;
         }
 

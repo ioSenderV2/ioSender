@@ -843,6 +843,25 @@ namespace CNC.Core
             DebugLog.Write("run", string.Format("JobRunner.Run: fromBlock={0} honorActive={1} macroRun={2} unattended={3} state={4} loaded='{5}'",
                 fromBlock, honorActiveProgram, macroRun, unattendedRun, grblState.State, model.FileName));
 
+            // 🔴 FIRST, before anything else can look at the machine state. A parked peek leaves the
+            // controller IDLE with a program still loaded, which every branch below reads as "start the
+            // loaded job" - from block 0, with the tool sitting at G30. Cycle Start while parked means
+            // RESUME, and nothing else, so it is intercepted here rather than anywhere further down where a
+            // later edit could slip a branch in front of it.
+            if (peekState == PeekState.Parked)
+            {
+                DebugLog.Write("run", "JobRunner.Run: parked peek - resuming rather than starting");
+                ResumePeek();
+                return;
+            }
+
+            // A peek mid-transition is moving the machine. Refuse rather than stack a second sequence on it.
+            if (peekState != PeekState.None)
+            {
+                DebugLog.Write("run", "JobRunner.Run: STOPPED - a peek is in progress (" + peekState + ")");
+                return;
+            }
+
             // Host work first - switching the connection to the simulator when "Simulate" was armed. That
             // whole step is client business (it launches the simulator and repaints the run button), so it
             // lives in RegisterActiveProgramPolicy below; false means it could not prepare and the run is off.
@@ -1338,7 +1357,7 @@ namespace CNC.Core
             peekLine = pumpActive ? pump.PendingLine : job.PendingLine;
             peekState = PeekState.Requested;
             IsPeeking = true;
-            CanPeek = false;
+            UpdatePeekGate();
 
             // Stop feeding. The controller keeps running what it already has - that is the "slight delay",
             // and it is what makes this safe: nothing is cut short.
@@ -1462,7 +1481,8 @@ namespace CNC.Core
                 case PeekState.Parking:
                     peekState = PeekState.Parked;
                     model.LogDetail(string.Format("Peek - parked at G30, spindle off (line {0})", peekLine));
-                    model.Message = "Peeking - press Resume to go back and carry on";
+                    model.Message = "Peeking - press Resume (or Cycle Start) to go back and carry on";
+                    UpdatePeekGate();
                     break;
 
                 case PeekState.Returning:
@@ -1473,7 +1493,43 @@ namespace CNC.Core
                     model.Message = string.Empty;
                     if (pumpActive)
                         pump.Suspended = false;
+                    UpdatePeekGate();
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// The single authority on whether the Peek/Resume button does anything, and on whether Cycle Start
+        /// is live while parked.
+        ///
+        /// 🔴 This exists because getting it wrong STRANDED A JOB ON HARDWARE. Peek() cleared CanPeek to stop
+        /// a double-press, and the only place that set it back was the Returning state - which is reached by
+        /// pressing the very button that was now disabled. The machine sat parked at G30 mid-carve with the
+        /// button visible, greyed, and no way through it; Run was disabled too, because as far as the runner
+        /// was concerned a job was still streaming. Two flags, each correct alone, with no state in which the
+        /// operator could act.
+        ///
+        /// So the gate is derived in ONE place from the peek state, rather than assigned at each transition:
+        ///   Parked                        -> both live. This is the way out and it must never not be.
+        ///   Requested/Parking/Returning   -> both dead. Transient; a press here would race the motion.
+        ///   None                          -> Peek offered while a program streams; Run left to its own rules.
+        /// </summary>
+        private void UpdatePeekGate()
+        {
+            switch (peekState)
+            {
+                case PeekState.Parked:
                     CanPeek = true;
+                    CanRun = true;      // Cycle Start resumes too - see the guard at the top of Run()
+                    break;
+
+                case PeekState.None:
+                    CanPeek = pumpActive || JobTimer.IsRunning;
+                    break;
+
+                default:                // Requested / Parking / Returning - motion is in flight
+                    CanPeek = false;
+                    CanRun = false;
                     break;
             }
         }
@@ -1535,7 +1591,9 @@ namespace CNC.Core
 
             peekState = PeekState.None;
             IsPeeking = false;
-            CanPeek = false;
+            CanPeek = false;    // explicitly, NOT through UpdatePeekGate: the run is ending, so "is a program
+                                // streaming" is about to become false anyway and the gate would briefly say yes.
+                                // CanRun is left to the Stop path, which sets it from FeedHoldArmed/IsLoaded.
             model.Message = string.Empty;
 
             // Un-suspend so the pump is not left half-held for whatever comes next; it is being aborted
@@ -1780,10 +1838,10 @@ namespace CNC.Core
                         CanFeedHold = (FeedHoldArmed = true) && !model.FeedHoldDisabled;
                         CanStop = true;
                         CanRewind = false;
-                        // Peek rides with Stop: both mean "a program is streaming". It clears itself while a
-                        // peek is in progress (Peek() sets it false, ServicePeek restores it on resume) so the
-                        // button cannot be pressed twice.
-                        CanPeek = peekState == PeekState.None;
+                        // Peek rides with Stop: both mean "a program is streaming". Routed through the one
+                        // gate so this cannot disagree with ServicePeek about whether the button is live -
+                        // two places deciding that is what stranded a job at G30 (see UpdatePeekGate).
+                        UpdatePeekGate();
                         break;
 
                     case StreamingState.Error:
