@@ -9,9 +9,9 @@ spindle off, resumed — the groove carries on from where it stopped with **no w
 the test that matters for this feature: a Mark is one shallow pass, so any error in the captured
 position, the motion mode or the spindle restore would have shown in the cut.
 
-**Still NOT verified:** the parked soak (§7.1). Nothing has yet sat parked for minutes to prove the
-idle-kick watchdog stays suppressed. The guard is in and reasoned, and it is the one remaining
-untested safety claim in this document.
+**Parked soak verified too:** left parked for over five minutes and the idle-kick watchdog never
+fired — nothing went out on the wire, and the resume afterwards was clean. That was the last
+untested safety claim in this document; there are now none.
 
 Everything marked **VERIFIED** was read out of the source named beside it — grblHAL core at
 `c:\github\iMXRT1062\grblHAL_Teensy4\src\grbl`, or this repo. Everything else is design. The
@@ -207,6 +207,11 @@ does not inherit it.
 Local, and at the one place that decides. Do **not** "fix" it by adding a `Suspended` check to
 `WirePacer.Post` — that path also carries abort and barrier signals, and suppressing those is how a
 stop gets swallowed.
+
+**HARDWARE-VERIFIED 2026-09-17:** parked for over five minutes with a live job, and the watchdog
+stayed silent throughout. Worth stating plainly because the failure mode here is not a wrong number
+on a screen — it is a machine resuming a cut while someone is leaning into it, and "the guard looks
+right" is not the same evidence as "it sat there for five minutes and nothing happened".
 
 ### 7.2 🔴 A `G53` Z-only lift is not a safe lift
 
