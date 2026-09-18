@@ -76,12 +76,6 @@
                                     <cnccontrols:NumericField x:Uid="hm_divY" Label="Y:" ColonAt="20" Format="##0" Margin="8,0,0,0"
                                         Value="{Binding DivisionsY, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                                 </StackPanel>
-                                <CheckBox x:Uid="hm_pauseEachPoint" x:Name="chkPauseEachPoint" Content="Hold at each point (move the touch plate)" Margin="0,6,0,0"
-                                          IsChecked="{Binding HeightMap.AddPause, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"
-                                          ToolTip="Hold at every point, including the first, so the touch plate can be placed. The machine positions over the point and waits; press Continue, Cycle Start - or the shutter remote, if you have ticked that below. Untick only if the probe reaches the surface on its own - a spoilboard is not conductive, so a plate normally has to travel with the probe."/>
-                                <CheckBox x:Uid="hm_remote" x:Name="chkRemote" Content="A shutter remote continues (volume key)" Margin="18,4,0,0"
-                                          IsChecked="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.HeightMapRemote, Mode=TwoWay}"
-                                          ToolTip="Let a Bluetooth camera shutter remote press Continue for you, so the touch plate can be moved without walking back to the keyboard. These remotes send a volume key, so while the run is holding ioSender listens for one and swallows it - your volume does not change. Only while a hold is waiting; at any other time the volume keys are Windows' own."/>
                                 <TextBlock x:Name="txtDivisionsNote" Foreground="#586069" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
                             </StackPanel>
                             <StackPanel x:Name="pnlGridMm" Orientation="Horizontal">
@@ -92,6 +86,20 @@
                                 <CheckBox x:Uid="hm_lock" Content="Lock" Margin="12,0,0,0" VerticalAlignment="Center"
                                     IsChecked="{Binding HeightMap.GridSizeLockXY, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
                             </StackPanel>
+
+                            <!-- OUTSIDE pnlDivisions/pnlGridMm on purpose: both of these apply whichever area
+                                 mode is selected, and they used to live inside the divisions panel - which is
+                                 shown only for Full work surface. In From setup mode the Hold option was
+                                 therefore invisible and unsettable while still governing the run, which is
+                                 exactly how a height map came to be probed with no holds and no plate
+                                 (2026-09-18). A setting that acts in a mode must be visible in that mode. -->
+                            <CheckBox x:Uid="hm_pauseEachPoint" x:Name="chkPauseEachPoint" Content="Hold at each point (move the touch plate)" Margin="0,8,0,0"
+                                      IsChecked="{Binding HeightMap.AddPause, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"
+                                      ToolTip="Hold at every point, including the first, so the touch plate can be placed. The machine positions over the point and waits; press Continue, Cycle Start - or the shutter remote, if you have ticked that below. Untick only if the probe reaches the surface on its own - a spoilboard is not conductive, so a plate normally has to travel with the probe."/>
+                            <CheckBox x:Uid="hm_remote" x:Name="chkRemote" Content="A shutter remote continues (volume key)" Margin="18,4,0,0"
+                                      IsEnabled="{Binding ElementName=chkPauseEachPoint, Path=IsChecked}"
+                                      IsChecked="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.HeightMapRemote, Mode=TwoWay}"
+                                      ToolTip="Let a Bluetooth camera shutter remote press Continue for you, so the touch plate can be moved without walking back to the keyboard. These remotes send a volume key, so while the run is holding ioSender listens for one and swallows it - your volume does not change. Only while a hold is waiting; at any other time the volume keys are Windows' own."/>
 
                             <cnccontrols:NumericField x:Uid="hm_allowance" Label="Drop allowance:" ColonAt="100" Unit="mm" Format="##0.0##" Margin="0,6,0,0"
                                 Value="{Binding DropAllowance, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
