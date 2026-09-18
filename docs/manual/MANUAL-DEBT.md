@@ -219,6 +219,32 @@ box's saved layout; the script files the capture when you quit the app.
 
 ---
 
+## Debt from Peek (shipped 2026-09-17) — RECORDED AS IT SHIPPED
+
+Logged the same day, which is the whole point of this file and is what did not happen for the six
+weeks the audit below had to reconstruct.
+
+**Peek** is a new run-strip button: pause a running job at the next block boundary, park at `G30`
+with the spindle off, look at the work, then Resume (or Cycle Start) to go back and carry on.
+Hardware-verified 2026-09-17 — see `docs/Architecture-Peek.md`.
+
+- [ ] **`#job` — the run strip.** The control list and the run-control table both need Peek adding.
+      It sits to the right of Stop and is **collapsed when it would do nothing**, like Feed Hold and
+      Stop (#355), so "I don't see it" is expected rather than a fault.
+- [ ] **`#job` — a short sub-section on what Peek actually does**, because two things surprise:
+      it takes effect at the **end of the current block**, not instantly (Feed Hold remains the
+      immediate stop), and it parks at **G30**, not at machine home.
+- [ ] **`#settings` — the Keyboard table.** The **Program** group gains a third row,
+      *Peek / Resume*, beside MDI and Status. Unbound by default.
+- [ ] **Refusals worth documenting**: Peek is not offered for an **SD card job** (the controller
+      streams those itself, so the sender cannot starve it) or on a controller without expression
+      support (the park reads the stored `G30` parameters).
+- [ ] **Screenshot**: `job-runscreen.png` is already owed a reshoot as priority 1 of the audit's §6.
+      Whoever takes it should have a job running so the strip shows Feed Hold, Stop **and** Peek
+      together — one shot pays off both items.
+
+---
+
 ## Debt from #216–#371 (shipped 2026-08-04 to 2026-09-17) — AUDIT WRITTEN 2026-09-17
 
 👉 **The item list is `docs/manual/MANUAL-AUDIT-2026-09-17.md`.** All 156 entries were read and

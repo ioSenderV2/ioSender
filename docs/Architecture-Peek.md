@@ -1,7 +1,17 @@
 # Peek — step away from a paused job and come back
 
-**Status: SPEC. Nothing built yet.** Written 2026-09-17, **revised the same day** after the operator
-settled the three open questions. Code references are at `91312a8b`.
+**Status: BUILT and HARDWARE-VERIFIED 2026-09-17.** Written, revised and implemented the same day.
+Code references are at `91312a8b`; the implementation is `2b0dbfc7` (core), `bfa61eef` (UI) and
+`e5fe1147` (the stranding fix).
+
+**Verified on the mill:** peeked mid-cut while marking a 120 mm square, parked at G30 with the
+spindle off, resumed — the groove carries on from where it stopped with **no witness mark**. That is
+the test that matters for this feature: a Mark is one shallow pass, so any error in the captured
+position, the motion mode or the spindle restore would have shown in the cut.
+
+**Still NOT verified:** the parked soak (§7.1). Nothing has yet sat parked for minutes to prove the
+idle-kick watchdog stays suppressed. The guard is in and reasoned, and it is the one remaining
+untested safety claim in this document.
 
 Everything marked **VERIFIED** was read out of the source named beside it — grblHAL core at
 `c:\github\iMXRT1062\grblHAL_Teensy4\src\grbl`, or this repo. Everything else is design. The
