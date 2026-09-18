@@ -241,12 +241,18 @@ namespace GCode_Sender
 
         #endregion
 
-        // Public entry point for Start Job's "Probe height map" checkbox (Dynamic mode, see StartJobView) -
-        // reuses THIS tab's own probing engine + Apply logic rather than re-deriving them, per the "reuse
-        // existing engines" convention. Blocking: StartProbing's Program.Execute pumps synchronously, the
-        // same as every other Probing-engine caller in this codebase (CenterFinderControl etc.) - fine to
-        // call from Start Job's own post-run continuation. area is in the WORK coordinates Start Job just set.
-        public void RunHeightMapAndApply(GrblViewModel m, double minX, double minY, double maxX, double maxY, double gridX, double gridY)
+        // Public entry point for Setup's "Probe height map" checkbox (see StartJobView) - reuses THIS tab's
+        // own probing engine rather than re-deriving it, per the "reuse existing engines" convention.
+        // Blocking: StartProbing's Program.Execute pumps synchronously, the same as every other
+        // Probing-engine caller in this codebase (CenterFinderControl etc.) - fine to call from Setup's own
+        // post-run continuation. area is in the WORK coordinates Setup just set.
+        //
+        // It PROBES AND STORES. It used to probe and immediately Apply to whatever program was loaded, and
+        // that one line dictated the whole workflow: a work order had to be generated BEFORE running Setup,
+        // so there was something to apply to - backwards, since Work Order composes against the stock size
+        // Setup measures. Now the map goes to SetupHeightMap and Work Order's Generate is the only thing
+        // that applies one. One application path, so nothing can double-compensate a program either.
+        public void RunHeightMapAndStore(GrblViewModel m, double minX, double minY, double maxX, double maxY, double gridX, double gridY)
         {
             model = m;
             RefreshProbes();
@@ -255,8 +261,15 @@ namespace GCode_Sender
             HeightMap.GridSizeX = Math.Max(gridX, 1d);
             HeightMap.GridSizeY = Math.Max(gridY, 1d);
             StartProbing();
-            if (HeightMap.HasHeightMap)
-                Apply_Click(null, null);
+
+            if (!HeightMap.HasHeightMap)
+                return;
+
+            // Work zero in MACHINE coordinates, which is what the stored map is stamped against - see
+            // SetupHeightMap for why a map without the setup it belongs to is a hazard rather than a
+            // convenience. WorkPositionOffset is exactly that: machine position minus work position.
+            SetupHeightMap.Store(HeightMap.Map, model.WorkPositionOffset, maxX - minX, maxY - minY);
+            model.Message = "Height map probed and kept for this setup - tick 'Apply height map' on the work order to use it.";
         }
 
         // Create (once) the Probing engine view model bound to the live controller model.

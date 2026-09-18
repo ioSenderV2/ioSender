@@ -2388,8 +2388,8 @@ namespace GCode_Sender
         }
 
         // Continuation after a Start Job run whose "Probe height map" checkbox was on: probe a grid over the
-        // just-established stock area and apply it to the loaded job (GCode_Sender.HeightMapView.
-        // RunHeightMapAndApply - the Height Map tab's own engine, not re-derived here). Area is the WCS Start
+        // just-established stock area and KEEP it for the work order to apply (GCode_Sender.HeightMapView.
+        // RunHeightMapAndStore - the Height Map tab's own engine, not re-derived here). Area is the WCS Start
         // Job just set: (0,0) to the measured size (all 4 corners probed) or the estimated width/height
         // otherwise - both are already in the work coordinates the origin block above established.
         private void RunHeightMapPass()
@@ -2398,7 +2398,7 @@ namespace GCode_Sender
             if (w <= 0d || h <= 0d)
                 return;
             var hm = new HeightMapView();
-            hm.RunHeightMapAndApply(model, 0d, 0d, w, h, fldHeightMapGridX.Value, fldHeightMapGridY.Value);
+            hm.RunHeightMapAndStore(model, 0d, 0d, w, h, fldHeightMapGridX.Value, fldHeightMapGridY.Value);
         }
 
         // Verify skew: after a measure run, re-establish the WCS (origin + measured rotation) from the retained

@@ -82,6 +82,7 @@
     </Compile>
     <Compile Include="GCodeTransform.cs" />
     <Compile Include="HeightMap.cs" />
+    <Compile Include="SetupHeightMap.cs" />
     <Compile Include="HeightMapControl.xaml.cs">
       <DependentUpon>HeightMapControl.xaml</DependentUpon>
     </Compile>
