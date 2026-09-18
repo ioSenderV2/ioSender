@@ -375,7 +375,29 @@ assert something false. That is a stopgap, not a fix:
         the bottom status bar, a *Full table* radio, Probe depth/feed fields that have since moved
         into the probe definition, and a single *Surface* pane instead of Steps/Program/Surface Map.
         A fresh shot is owed; nothing references the old one.
-  - [ ] **M6–M21** — the rest, in §2 of the audit.
+  - [x] **M6–M21 — DONE 2026-09-17.** §2 of the audit is now fully paid.
+        - `1b0c1541` — **M6** corner reliefs, **M7** Indirect + groups, **M8** Save Drawing, all in
+          `#work-order`.
+        - `c14983d6` — **M10** squareness by probe and the reversal test, **M11** scratch stepper
+          calibration, as a **new `#calibration` topic** (machinist:3) covering all four wizards.
+          **M9** (Scribe square) turned out to be already covered by the O4 rewrite in `234cb927`;
+          extended with its two prerequisites.
+        - `f6318339` — **M12** `(PROMPT)` programs, **M13** split screen, **M15** the status line /
+          Status window / status log, **M18** console search, all in `#job`.
+        - `585a521c` — **M14** configuration overlays, **M16** restore points, **M19** on-page search
+          marking, **M20** Machine mirror, **M21** Restart ioSender, all in `#settings`.
+        - `85fef283` — **M17** Work surface, in `#machine-setup` step 3.
+        ⚠️ **The audit had M15 slightly wrong**: it lists an "errors-only setting". There is no such
+        setting — errors-only is the behaviour and the setting is the pop-up's dwell time. Written
+        from source, which is why it was caught.
+
+### 🔴 Two F1 anchors point at topics that no longer exist — APP FIX, not a manual fix
+`ManualHelp.cs`'s `Topics` map still says `ViewType.StartJob → "start-job"` and
+`ViewType.Probing → "probing"`. **Neither anchor exists**: `#start-job` was renamed `#setup` on
+2026-07-31 and `#probing` was deleted on 2026-08-01. F1 from Setup therefore lands on the manual with
+nothing to scroll to. Two other views are simply absent from the map and open the home page:
+**WorkOrder** and **Calibration** — and `#calibration` now exists to point at, as does `#work-order`.
+One dictionary, four lines.
 
 ### Process note — why this got to 156
 The rule at the top of this file ("when shipping a UI change, add the impact here") did not run once in

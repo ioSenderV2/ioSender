@@ -28,7 +28,7 @@ fixed their neighbours.
 
 | Bucket | Count |
 |---|---|
-| **MISSING** — shipped functionality with no usable manual coverage | **21** (M1–M21) — ✅ **M1–M5 done 2026-09-17** (`#carving`, `#laser`, `#heightmap`, Mark only in `#work-order`); 16 left |
+| **MISSING** — shipped functionality with no usable manual coverage | **21** (M1–M21) — ✅ **ALL 21 done 2026-09-17**. New topics: `#carving`, `#laser`, `#heightmap`, `#calibration`. |
 | **OBSOLETE** — manual asserts something that is no longer true | **16** (O1–O16) — ✅ **all applied 2026-09-17**, plus 2 uncatalogued siblings |
 | **NEEDS UPDATING** — still-correct topics now incomplete | **13** (U1–U13) |
 | **Screenshots** — all 19 referenced figures predate #216 | 19 (+ 4 orphans) |
@@ -36,9 +36,9 @@ fixed their neighbours.
 
 **Running order.** §3 (the OBSOLETE pass) was taken first and is **done** — it was the cheap half
 and it carried the wrong facts. The two demo-able features are **done** too: M1/M2 (`#carving`) and
-M3 (`#laser`), the **M5 remainder** (Mark only, in `#work-order`) and **M4** (`#heightmap`). What
-remains: **M6–M21**, none of which needs the app driven to write; §4's thirteen, which can ride along
-with whichever topic they touch; and the reshoots, which do.
+**every one of §2's 21 items** (2026-09-17). What remains: **§4's thirteen**, which can ride along
+with whichever topic they touch, and **the reshoots**, which need the app driven. Also outstanding and
+not a manual fix: the four stale/missing F1 anchors in `ManualHelp.cs` — see MANUAL-DEBT.md.
 
 ---
 
@@ -99,6 +99,21 @@ with whichever topic they touch; and the reshoots, which do.
 > table* radio where the app now says *Full work surface*, Probe depth/feed fields that have moved
 > into the probe definition, and one *Surface* pane where there are now three. The new topic
 > references no figure; a fresh shot of the Surface Map with its legend is owed.
+
+> ✅ **M6–M21 are DONE 2026-09-17**, closing §2 entirely. `1b0c1541` (M6 corner reliefs, M7
+> Indirect + groups, M8 Save Drawing → `#work-order`), `c14983d6` (M10 + M11 → a new `#calibration`
+> topic; **M9 was already covered** by the O4 rewrite in `234cb927`), `f6318339` (M12, M13, M15, M18
+> → `#job`), `585a521c` (M14, M16, M19, M20, M21 → `#settings`), `85fef283` (M17 → step 3).
+>
+> ⚠️ **One correction to this table.** M15 claims an "errors-only setting" for the status pop-up.
+> There is none: errors-only is the behaviour (`MainWindow.xaml.cs` pops the window on `isError`
+> alone) and the only setting is the dwell. Caught by writing from source rather than from this row —
+> which is the method §5 recommends, working.
+>
+> 🔴 **Found while writing: four broken F1 anchors**, an app fix. `ManualHelp.cs` maps
+> `ViewType.StartJob` to `"start-job"` and `ViewType.Probing` to `"probing"`, and **neither anchor has
+> existed since July**; `WorkOrder` and `Calibration` are absent from the map altogether, though both
+> now have topics to point at.
 
 "Usable" is doing work in that heading. Several of these are *named* somewhere — in a menu table or
 a one-line parenthetical — without anything that would let an operator use them. Those are marked
