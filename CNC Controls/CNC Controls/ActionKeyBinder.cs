@@ -84,6 +84,14 @@ namespace CNC.Controls
             new ActionInfo { Id = "Menu.NewWorkOrder",   Label = "File > New Work Order...",  Group = KeyMapEditor.MenuGroup, Description = "Start a new work order." },
             new ActionInfo { Id = "Menu.LoadSvgLaser",   Label = "File > Load SVG Laser Job...", Group = KeyMapEditor.MenuGroup, Description = "Burn an SVG with the laser." },
             new ActionInfo { Id = "Menu.Camera",         Label = "Tools > Camera",            Group = KeyMapEditor.MenuGroup, Description = "Open the camera window." },
+            // The ONE menu command that ships bound, and the exception the rule above is worth stating for.
+            // Context help is F1 everywhere else in Windows, but ioSender's F1 is not free: original
+            // ioSender reserved F1-F9 for the first nine macros, JobControl still registers them that way,
+            // and the macro handler runs BEFORE the shortcut dispatcher - so on a machine that uses that
+            // convention, F1 help simply never fires and there was no other way in. Shift+F1 sits outside
+            // the macro convention (macros bind unmodified F-keys only), so it collides with nothing, and
+            // unlike the hard-coded F1 branch in MainWindow this row can be rebound or cleared.
+            new ActionInfo { Id = "Menu.Manual",         Label = "Help > User manual",        DefaultKey = Key.F1, DefaultModifiers = ModifierKeys.Shift, Group = KeyMapEditor.MenuGroup, Description = "Open the user manual at the page for the current view - the same thing F1 does, on a key a macro cannot take." },
             new ActionInfo { Id = "Menu.Wiki",           Label = "Help > Wiki",               Group = KeyMapEditor.MenuGroup, Description = "Open the online wiki in a browser." },
             new ActionInfo { Id = "Menu.UsageTips",      Label = "Help > Usage tips",         Group = KeyMapEditor.MenuGroup, Description = "Open the usage tips page in a browser." },
             new ActionInfo { Id = "Menu.BriefTour",      Label = "Help > A brief tour",       Group = KeyMapEditor.MenuGroup, Description = "Open the brief tour." },
@@ -174,8 +182,15 @@ namespace CNC.Controls
             // a focused text box - bind "L" to Load Program and you would otherwise never type an L into the
             // MDI again. Same guard, same reason, as MainWindow.dispatchTabShortcut. It never bit the original
             // zoom/OBS entries because those all ship on Ctrl+Alt, but the menu commands are bound by hand.
-            if ((mods == ModifierKeys.None || mods == ModifierKeys.Shift)
-                 && Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase)
+            // A FUNCTION key is exempt: F1-F24 produce no text, so nothing is stolen from the box by
+            // dispatching one. Without the exemption Shift+F1 (Help > User manual's default) would do
+            // nothing whenever the caret sat in the MDI or a settings field - which is a fair share of the
+            // moments someone reaches for help.
+            bool textProducing = mods == ModifierKeys.None || mods == ModifierKeys.Shift;
+            if (key >= Key.F1 && key <= Key.F24)
+                textProducing = false;
+
+            if (textProducing && Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase)
                 return false;
 
             foreach (var row in list)

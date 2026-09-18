@@ -80,6 +80,16 @@
                 <!-- x:Name on each: registerMenuActions pairs the item with its bindable "Menu.*" action id,
                      both to gate the shortcut on the item's own IsEnabled and to write the bound key back
                      into InputGestureText so the menu advertises it (refreshMenuShortcutText). -->
+                <!-- First, because it is the one that answers "what does this screen do": it opens the
+                     manual at the topic for whatever view is current, exactly as F1 does. It is here at all
+                     because F1 was the ONLY way in, and a macro assigned to F1 takes that key (the macro
+                     handler runs before the shortcut dispatcher - see GlobalKeys.OnPreviewKeyDown), which
+                     left the manual unreachable with no way to notice. Being a registered menu action it
+                     also becomes bindable under Settings > Keyboard > Top Level Menu Items, which is where
+                     a second help key can be assigned - F1 itself is hard-coded and is not in that list. -->
+                <MenuItem x:Uid="mnu_manual" x:Name="menuManual" Header="_User manual" Click="userManual_Click"
+                          ToolTip="Open the user manual at the page for whatever you are looking at - the same thing F1 does. Assign a key to it under Settings &gt; Keyboard &gt; Top Level Menu Items."/>
+                <Separator/>
                 <MenuItem x:Uid="mnu_wiki" x:Name="menuWiki" Header="_Wiki" Click="aboutWikiItem_Click"/>
                 <MenuItem x:Uid="mnu_usageTips" x:Name="menuUsageTips" Header="Usage _tips" Click="tipsWikiItem_Click"/>
                 <MenuItem x:Uid="mnu_briefTour" x:Name="menuBriefTour" Header="A _brief tour" Click="briefTour_Click"/>

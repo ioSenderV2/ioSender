@@ -1778,6 +1778,20 @@ namespace GCode_Sender
             }
         }
 
+        /// <summary>
+        /// Open the manual at the topic for whatever view is current - the one implementation behind both
+        /// F1 and Help &gt; User manual, so the menu item and the key can never drift apart.
+        /// </summary>
+        private void OpenContextHelp()
+        {
+            ManualHelp.Open(UIViewModel?.CurrentView?.ViewType ?? ViewType.Startup);
+        }
+
+        void userManual_Click(object sender, RoutedEventArgs e)
+        {
+            OpenContextHelp();
+        }
+
         void aboutWikiItem_Click(object sender, EventArgs e)
         {
             System.Diagnostics.Process.Start("https://github.com/terjeio/ioSender/wiki");
@@ -3793,6 +3807,7 @@ namespace GCode_Sender
 
             // Help entries are always available, so the per-item enable gate is a formality - but they are
             // passed anyway so each one can show its bound key in the menu (see trackMenuShortcut).
+            registerMenuAction("Menu.Manual", menuManual, () => userManual_Click(null, null));
             registerMenuAction("Menu.Wiki", menuWiki, () => aboutWikiItem_Click(null, null));
             registerMenuAction("Menu.UsageTips", menuUsageTips, () => tipsWikiItem_Click(null, null));
             registerMenuAction("Menu.BriefTour", menuBriefTour, () => briefTour_Click(null, null));
@@ -4085,9 +4100,15 @@ namespace GCode_Sender
         private bool dispatchGlobalShortcut(KeyEventArgs e)
         {
             // F1 - context help: open the user manual at the page for whatever view is current.
+            //
+            // Reached only if the macro handler did not take F1 first (GlobalKeys.OnPreviewKeyDown runs
+            // ProcessKeypress before this), and in original ioSender F1-F9 were the first nine macro keys -
+            // so an operator who uses that convention has no F1 help at all. That is why Help > User manual
+            // exists and why its action ships on Shift+F1: a modified key is outside the macro convention,
+            // and unlike this branch it is rebindable.
             if (e.Key == Key.F1 && Keyboard.Modifiers == ModifierKeys.None)
             {
-                ManualHelp.Open(UIViewModel?.CurrentView?.ViewType ?? ViewType.Startup);
+                OpenContextHelp();
                 return true;
             }
 
