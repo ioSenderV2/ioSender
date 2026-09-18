@@ -639,6 +639,20 @@ namespace CNC.Core
         // One-shot end-bound for a run: block index to stop after; -1 = run to program end.
         // Consumed (and reset) by CycleStart. Used by "Run just this toolpath".
         public int RunToBlock { get; set; } = -1;
+
+        // One-shot BLOCK FILTER for a run, same lifetime and the same consumed-by-CycleStart contract as
+        // RunToBlock above: given a block index, false means "send it as an empty comment instead".
+        //
+        // This is what lets "Run just this toolpath" run the program's own preamble and wind-down around the
+        // chosen section instead of the section alone - the real G54/G21/G90 the author wrote, and a genuine
+        // M5 and park at the end, rather than inheriting whatever modal state happened to be live and
+        // finishing with the spindle still turning.
+        //
+        // A filter rather than a range list because the pump only ever asks about one block at a time, and
+        // because neutralising a line is not the same as not sending it: the line still goes out (as "()"),
+        // so ack accounting and the per-line status column stay exactly aligned with the displayed program.
+        // That is the same mechanism dry run uses to skip M6.
+        public System.Func<int, bool> RunBlockFilter { get; set; } = null;
         public int BlockExecuting { get { return _executingBlock; } set { _executingBlock = value; OnPropertyChanged(); } }
         // True when the loaded program has an outline to show - Load File recognizing the Fusion add-in's
         // (--- seq: name (Tn) ---) section markers (GCodeJob.HasSections) - the Program list then renders as

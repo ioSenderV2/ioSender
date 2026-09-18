@@ -101,6 +101,11 @@ namespace CNC.Core
         private bool continueOnError;
         private System.Action onCheckError;
 
+        // Per-run block filter: false means "send this block as an empty comment instead". Set by
+        // "Run just this toolpath" so the program's own preamble and wind-down run around the chosen
+        // section while the other sections are passed over. Null = send everything, the normal case.
+        private System.Func<int, bool> blockFilter;
+
         // ---- pump-thread-owned state (no locking; single-thread access after Start) ----
         // What is outstanding and how much RX buffer it occupies lives in the pacer, which owns that
         // accounting for both clients; everything here is about which block comes next.
@@ -184,8 +189,10 @@ namespace CNC.Core
         public void Start(IProgramSource source, int fromBlock, int pgmEndLine, int serialSize, bool useBuffering,
                           bool sendComments, bool startSimulator, System.Action onJobFinished, System.Action<string> onError,
                           bool continueOnError = false, System.Action onCheckError = null, System.Action onOperatorCancel = null,
-                          List<MacroRunner.PromptField> promptFields = null, bool unattended = false)
+                          List<MacroRunner.PromptField> promptFields = null, bool unattended = false,
+                          System.Func<int, bool> blockFilter = null)
         {
+            this.blockFilter = blockFilter;
             this.promptFields = (promptFields != null && promptFields.Count > 0) ? promptFields : null;
             this.unattended = unattended;
             this.source = source;
@@ -431,6 +438,18 @@ namespace CNC.Core
                 // case above); HasSpindleOrCoolantOn is precomputed at load time from the real G-code
                 // parser's tokens (GCodeJob.ParseFileLines/AddBlock), not a fragile regex re-check here.
                 else if (model.IsDryRunMode && block.HasSpindleOrCoolantOn)
+                {
+                    line = "()";
+                    len = line.Length + 1;
+                }
+
+                // Outside the sections this run was asked to cut ("Run just this toolpath"): neutralised the
+                // same way, and deliberately SENT rather than skipped - the empty comment keeps the ack
+                // accounting and the per-line status column aligned with the displayed program, so the list
+                // still marks progress through the whole file and the operator can see what was passed over.
+                // The cost is that the entire program streams; for a very large file that is real wire time
+                // spent doing nothing, which is the trade this mechanism makes knowingly.
+                else if (blockFilter != null && !blockFilter(sendIdx))
                 {
                     line = "()";
                     len = line.Length + 1;

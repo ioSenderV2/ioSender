@@ -382,6 +382,10 @@ namespace CNC.Core
         // FlushPendingOffsetClear and ResetRunModeAfterJob's own note about the realtime-byte race.
         private bool pendingOffsetClear = false;
 
+        // Consumed from model.RunBlockFilter at Run and handed to the pump: false for a block means
+        // "send it as an empty comment". Null for an ordinary run.
+        private System.Func<int, bool> runBlockFilter = null;
+
         // ---- Peek (docs/Architecture-Peek.md) ------------------------------------------------------
         //
         // Peek STARVES the stream rather than interrupting it: dispatch stops, the controller drains its
@@ -1049,6 +1053,10 @@ namespace CNC.Core
                     // otherwise run to program end. One-shot - consumed here.
                     job.PgmEndLine = model.RunToBlock >= 0 ? model.RunToBlock : Source.Blocks - 1;
                     model.RunToBlock = -1;
+                    // Same one-shot contract as RunToBlock above, consumed in the same breath so a filter can
+                    // never outlive the run it was set for and silently gut the next one.
+                    runBlockFilter = model.RunBlockFilter;
+                    model.RunBlockFilter = null;
                     job.serialUsed = missed = 0;
                     probePending = jobHasProbe = false;
                     job.Started = job.Transferred = job.HasError = job.ToolChanged = false;
@@ -1174,7 +1182,8 @@ namespace CNC.Core
                                // 5mm move after Cancel. Abort() is what btnStop_Click actually calls;
                                // it leaves job.Stopped false and the CMD_STOP goes out.
                                onOperatorCancel: Abort,
-                               promptFields: promptFields, unattended: unattendedRun);
+                               promptFields: promptFields, unattended: unattendedRun,
+                               blockFilter: runBlockFilter);
                 }
             }
         }

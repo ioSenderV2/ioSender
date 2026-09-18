@@ -571,12 +571,48 @@ namespace CNC.Controls
             if (startIndex < 0 || endIndex < 0 || !model.StartFromBlock.CanExecute(startIndex))
                 return;
 
+            // Whether the program has a lead-in to run decides both what the prompt promises and which branch
+            // below runs, so it is settled before the operator is asked rather than after.
+            int firstSectionStart = GCode.File.Data.IndexOf(GCode.File.Data.FirstOrDefault(b => b.IsSectionStart));
+            bool haveLeadIn = firstSectionStart > 0;
+
             string prompt = runOnlyThisToolpath
-                ? string.Format("Run only toolpath \"{0}\"?\r\rThe program will stop at the end of this toolpath.", group.Name)
+                ? (haveLeadIn
+                    ? string.Format("Run only toolpath \"{0}\"?\r\rThe program's own start-up and wind-down run around it, and every other toolpath is passed over. The whole file is streamed to keep the line numbering honest, so a very large program takes a while even though only this toolpath cuts.", group.Name)
+                    : string.Format("Run only toolpath \"{0}\"?\r\rThe program will stop at the end of this toolpath. It has no start-up section, so units, plane and work offset will be whatever the machine currently holds.", group.Name))
                 : string.Format("Start the run from toolpath \"{0}\" and continue to the end?", group.Name);
 
             if (AppDialogs.Show(prompt, "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
                 return;
+
+            // "Run just this toolpath" now runs the program's OWN preamble and wind-down around the chosen
+            // section, rather than the section alone. That is a correctness change, not a convenience: on its
+            // own, a section sets no units, plane or work offset - it inherited whatever happened to be live -
+            // and it ended with the spindle still turning and the tool wherever the cut stopped.
+            //
+            // The run therefore covers the whole file, and everything outside {Program start, this section,
+            // Program end} is neutralised to an empty comment by the pump. Sent rather than skipped so the
+            // per-line status and the ack accounting stay aligned with the list on screen; the cost is that a
+            // very large program streams in full while cutting only part of itself.
+            //
+            // Falls back to the old behaviour - bound the run to the section, queue the synthetic prolog -
+            // when the outline has no Program start to run, which is any file whose very first block is
+            // already inside a section.
+            if (runOnlyThisToolpath && haveLeadIn)
+            {
+                string chosen = first.Section;
+                model.RunBlockFilter = i =>
+                {
+                    if (i < firstSectionStart)
+                        return true;                                    // Program start
+                    var b = i >= 0 && i < GCode.File.Data.Count ? GCode.File.Data[i] : null;
+                    return b != null && (b.Section == chosen || b.Section == GCodeJob.EpilogueSectionName);
+                };
+                // The program's own preamble replaces the synthetic prolog - it is the real thing the author
+                // wrote, so nothing needs re-establishing by hand.
+                model.StartFromBlock.Execute(0);
+                return;
+            }
 
             // Bound the run to this section only, when requested.
             if (runOnlyThisToolpath)
