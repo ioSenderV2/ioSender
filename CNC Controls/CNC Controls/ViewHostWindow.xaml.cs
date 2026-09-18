@@ -34,6 +34,10 @@ namespace CNC.Controls
         private ViewType _viewType;
         private ICNCView _view;
 
+        /// <summary>The view this window hosts. Read by context help, which has to answer for the window
+        /// the operator is actually looking at rather than for the tab behind it.</summary>
+        public ViewType HostedViewType { get { return _viewType; } }
+
         public ViewHostWindow()
         {
             InitializeComponent();

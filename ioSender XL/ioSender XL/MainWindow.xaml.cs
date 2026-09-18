@@ -1784,7 +1784,39 @@ namespace GCode_Sender
         /// </summary>
         private void OpenContextHelp()
         {
-            ManualHelp.Open(UIViewModel?.CurrentView?.ViewType ?? ViewType.Startup);
+            ManualHelp.Open(CurrentHelpViewType());
+        }
+
+        /// <summary>
+        /// Which view context help should answer for.
+        /// </summary>
+        /// <remarks>
+        /// This deliberately does NOT read UIViewModel.CurrentView first, which is what it used to do and
+        /// why help opened the manual's front page instead of a topic. That property is only reassigned in
+        /// tabMode_SelectionChanged, and that assignment sits behind an <c>IsReady</c> gate - so with no
+        /// controller ready it keeps whatever it was given at startup for the whole session, however many
+        /// tabs you visit. "Which view is current" then stops being a question about the screen.
+        ///
+        /// The window is the authority instead: the focused view host if one is up (a menu-hosted view owns
+        /// the screen while it is), otherwise the SELECTED TAB, which is what the operator is looking at by
+        /// definition and needs no gate to stay true. CurrentView remains the last resort so nothing is
+        /// worse off than before.
+        /// </remarks>
+        private ViewType CurrentHelpViewType()
+        {
+            // A menu-hosted view in its own window - help there is about that window, not the tab behind it.
+            foreach (Window w in Application.Current.Windows)
+            {
+                if (w is CNC.Controls.ViewHostWindow host && w.IsActive && host.HostedViewType != ViewType.Startup)
+                    return host.HostedViewType;
+            }
+
+            var tab = tabMode?.SelectedItem as TabItem;
+            var tabView = tab != null ? getView(tab) : null;
+            if (tabView != null)
+                return tabView.ViewType;
+
+            return UIViewModel?.CurrentView?.ViewType ?? ViewType.Startup;
         }
 
         void userManual_Click(object sender, RoutedEventArgs e)

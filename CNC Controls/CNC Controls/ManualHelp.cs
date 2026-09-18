@@ -71,7 +71,15 @@ namespace CNC.Controls
 
         public static void Open(ViewType view)
         {
-            Open(TopicFor(view));
+            string anchor = TopicFor(view);
+
+            // Logged because the two ways this goes wrong are indistinguishable on screen: an anchor that
+            // does not exist and no anchor at all both land the reader on the front page, looking exactly
+            // like help that "just opens the manual". Both have happened. This says which.
+            CNC.Core.DebugLog.Write("help", string.Format("F1/manual: view={0} anchor={1}",
+                view, string.IsNullOrEmpty(anchor) ? "(none - view not in the map)" : anchor));
+
+            Open(anchor);
         }
 
         public static void Open(string anchor)
