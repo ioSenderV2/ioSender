@@ -74,9 +74,25 @@ namespace CNC.Controls.Probing
         /// surface for the next. G92 stays IN, because a G92 shift genuinely does move the origin out from
         /// under the map, as does re-zeroing Z, and both must still refuse.
         /// </remarks>
-        private static bool WorkOrigin(GrblViewModel model, out double x, out double y, out double z)
+        /// <param name="fresh">
+        /// Ask the controller for its offsets first. Not optional politeness: WCO arrives with EVERY status
+        /// report and the tool length offset ONLY in a $# report, so the two are read from sources that
+        /// update at wildly different rates, and subtracting one from the other is only meaningful when
+        /// both are current. Measured 2026-09-18: a map was stamped with a TEN-MINUTE-OLD tool offset
+        /// (-19.902) against a WCO that already carried the new one (-22.227), putting the stamp 2.325 mm
+        /// out and refusing the map on the app's own arithmetic, with nothing having moved.
+        ///
+        /// True at the two points that DECIDE something - storing a map, and the check before applying one.
+        /// False on a UI refresh, where a blocking round trip to the controller does not belong, and the
+        /// answer only colours a summary line. Skipped anyway while a job is streaming: $# in the middle of
+        /// a run is the collision this codebase has been bitten by before.
+        /// </param>
+        private static bool WorkOrigin(GrblViewModel model, bool fresh, out double x, out double y, out double z)
         {
             x = y = z = double.NaN;
+
+            if (fresh && model != null && !model.IsJobRunning && model.GrblState.State != GrblStates.Unknown)
+                GrblWorkParameters.Get(model);   // ends by writing the freshly-read TLO into model.ToolOffset
 
             var wco = model?.WorkPositionOffset;
             if (wco == null || double.IsNaN(wco.X) || double.IsNaN(wco.Y) || double.IsNaN(wco.Z))
@@ -133,7 +149,7 @@ namespace CNC.Controls.Probing
         {
             Map = map;
             ProbedUtc = DateTime.UtcNow;
-            WorkOrigin(model, out double ox, out double oy, out double oz);
+            WorkOrigin(model, true, out double ox, out double oy, out double oz);
             OriginX = ox;
             OriginY = oy;
             OriginZ = oz;
@@ -167,13 +183,13 @@ namespace CNC.Controls.Probing
         /// probed a grid and ticked a box, is the kind of refusal that gets worked around rather than
         /// understood. The caller puts this text in front of them.
         /// </remarks>
-        public static string WhyNotApplicable(GrblViewModel model, double width, double height)
+        public static string WhyNotApplicable(GrblViewModel model, double width, double height, bool fresh)
         {
             EnsureLoaded();
             if (Map == null)
                 return "No height map has been probed. Run Setup with 'Probe height map' ticked first.";
 
-            if (!WorkOrigin(model, out double lx, out double ly, out double lz) || double.IsNaN(OriginX))
+            if (!WorkOrigin(model, fresh, out double lx, out double ly, out double lz) || double.IsNaN(OriginX))
                 return "The work origin is unknown, so there is no way to tell whether the stored map belongs to this setup.";
 
             if (Math.Abs(lx - OriginX) > Tolerance ||
@@ -240,7 +256,7 @@ namespace CNC.Controls.Probing
             // relabel a map with wherever the machine happens to be standing now. Only a map with no stamp
             // of its own falls back to the live position.
             bool known = Map == map && !double.IsNaN(OriginX);
-            WorkOrigin(model, out double lx, out double ly, out double lz);
+            WorkOrigin(model, true, out double lx, out double ly, out double lz);
             double ox = known ? OriginX : lx;
             double oy = known ? OriginY : ly;
             double oz = known ? OriginZ : lz;

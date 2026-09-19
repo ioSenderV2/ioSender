@@ -3726,7 +3726,8 @@ namespace CNC.Controls
         // machine is about to do.
         private void ApplyHeightMapToGeneratedProgram()
         {
-            string why = HeightMapCompensation.Refusal();
+            // fresh: this is the decision, so the machine's offsets are re-read rather than remembered.
+            string why = HeightMapCompensation.Refusal(true);
 
             // Say what is happening BEFORE it happens, and hold the wait cursor for the duration. Applying a
             // map rewrites every cutting move in the program, so it is the one step here that takes long

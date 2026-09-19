@@ -30,9 +30,10 @@ namespace CNC.Controls
 
         /// <summary>
         /// Why the stored map must NOT be applied to the setup as it stands, or null when it may be.
-        /// Returns operator-facing text - see SetupHeightMap.WhyNotApplicable.
+        /// Returns operator-facing text - see SetupHeightMap.WhyNotApplicable. The argument asks for the
+        /// machine's offsets to be RE-READ first rather than taken from the last report; see Refusal.
         /// </summary>
-        public static Func<string> WhyNotApplicable;
+        public static Func<bool, string> WhyNotApplicable;
 
         /// <summary>
         /// Apply the stored map to the loaded program. Returns null on success, or operator-facing text
@@ -59,11 +60,17 @@ namespace CNC.Controls
         /// order explicitly asked for would leave the operator cutting an uncompensated job believing
         /// otherwise, which is the one outcome worse than refusing.
         /// </summary>
-        public static string Refusal()
+        /// <param name="fresh">
+        /// True when this answer DECIDES something - the check Generate makes before applying the map - so
+        /// the machine's own offsets are re-read first instead of trusted from whenever they last happened
+        /// to arrive. False for a summary line on a UI refresh, which must not make a blocking round trip
+        /// to the controller. See SetupHeightMap.WorkOrigin for what went wrong without the distinction.
+        /// </param>
+        public static string Refusal(bool fresh = false)
         {
             if (WhyNotApplicable == null)
                 return "Height map compensation is not available in this build.";
-            return WhyNotApplicable();
+            return WhyNotApplicable(fresh);
         }
     }
 }

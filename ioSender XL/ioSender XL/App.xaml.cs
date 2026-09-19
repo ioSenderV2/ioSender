@@ -513,11 +513,12 @@ namespace GCode_Sender
         {
             CNC.Controls.HeightMapCompensation.HasMap = () => CNC.Controls.Probing.SetupHeightMap.HasMap;
             CNC.Controls.HeightMapCompensation.Describe = () => CNC.Controls.Probing.SetupHeightMap.Describe();
-            CNC.Controls.HeightMapCompensation.WhyNotApplicable = () =>
+            CNC.Controls.HeightMapCompensation.WhyNotApplicable = fresh =>
                 CNC.Controls.Probing.SetupHeightMap.WhyNotApplicable(
                     CNC.Core.Grbl.GrblViewModel,
                     CNC.Controls.Probing.SetupHeightMap.Width,
-                    CNC.Controls.Probing.SetupHeightMap.Height);
+                    CNC.Controls.Probing.SetupHeightMap.Height,
+                    fresh);
 
             CNC.Controls.HeightMapCompensation.LoadFromFile =
                 path => CNC.Controls.Probing.SetupHeightMap.LoadMapWithStamp(path);
