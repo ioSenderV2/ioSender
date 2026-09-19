@@ -98,10 +98,9 @@
                             <CheckBox x:Uid="hm_pauseEachPoint" x:Name="chkPauseEachPoint" Content="Hold at each point (move the touch plate)" Margin="0,8,0,0"
                                       IsChecked="{Binding HeightMap.AddPause, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"
                                       ToolTip="Hold at every point, including the first, so the touch plate can be placed. The machine positions over the point and waits; press Continue, Cycle Start - or the shutter remote, if you have ticked that below. Untick only if the probe reaches the surface on its own - a spoilboard is not conductive, so a plate normally has to travel with the probe."/>
-                            <CheckBox x:Uid="hm_remote" x:Name="chkRemote" Content="A shutter remote continues (volume key)" Margin="18,4,0,0"
-                                      IsEnabled="{Binding ElementName=chkPauseEachPoint, Path=IsChecked}"
-                                      IsChecked="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.HeightMapRemote, Mode=TwoWay}"
-                                      ToolTip="Let a Bluetooth camera shutter remote press Continue for you, so the touch plate can be moved without walking back to the keyboard. These remotes send a volume key, so while the run is holding ioSender listens for one and swallows it - your volume does not change. Only while a hold is waiting; at any other time the volume keys are Windows' own."/>
+                            <CheckBox x:Uid="hm_remote" x:Name="chkRemote" Content="A shutter remote drives the machine (volume keys)" Margin="18,4,0,0"
+                                      IsChecked="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.ShutterRemoteEnabled, Mode=TwoWay}"
+                                      ToolTip="Let a Bluetooth camera shutter remote work the machine from arm's length. Here it presses Continue at each probe point, so the touch plate can be moved without walking back to the keyboard. It works everywhere else too: a prompt on screen takes volume up for OK and volume down for Cancel; a RUNNING job takes either key as Feed Hold; a HELD one takes volume up to resume and volume down to Stop. These remotes send a volume key, so ioSender swallows the key when it means one of those things - and only then: with nothing waiting, the volume keys are Windows' own."/>
 
                             <cnccontrols:NumericField x:Uid="hm_allowance" Label="Drop allowance:" ColonAt="100" Unit="mm" Format="##0.0##" Margin="0,6,0,0"
                                 Value="{Binding DropAllowance, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>

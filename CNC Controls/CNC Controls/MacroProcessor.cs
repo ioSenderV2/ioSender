@@ -25,6 +25,7 @@ using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using CNC.Core;
 
 namespace CNC.Controls
@@ -704,7 +705,15 @@ namespace CNC.Controls
             }
 
             win.Show();
-            System.Windows.Threading.Dispatcher.PushFrame(frame);   // pumps the UI (jog/DRO live) until a button closes the frame
+
+            // This is the prompt an operator meets mid-job with their hands on the work - "jog to the
+            // corner, then click OK" - so it is the one the shutter remote most needs to reach. Registered
+            // rather than discovered; see RemoteActions.
+            using (RemoteActions.ShowingPrompt(
+                       () => okBtn.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)),
+                       cancellable ? (System.Action)(() => { result = false; frame.Continue = false; }) : null))
+                System.Windows.Threading.Dispatcher.PushFrame(frame);   // pumps the UI (jog/DRO live) until a button closes the frame
+
             if (forwardJog != null && mainForJog != null)
             {
                 mainForJog.PreviewKeyDown -= forwardJog;

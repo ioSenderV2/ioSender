@@ -439,6 +439,15 @@ namespace CNC.Controls
             {
                 AppConfig.Settings.Base.PropertyChanged += Base_PropertyChanged;
 
+                // Hand the shutter remote the REAL buttons, not copies of what they do - so a remote press
+                // inherits their enabled state and their meaning, including Start's "resume a held job".
+                // Same reasoning as PeekButton's, and the same reason this is a registration rather than a
+                // duplicate set of Comms.WriteByte calls over in RemoteActions.
+                RemoteActions.StartButton = btnStart;
+                RemoteActions.HoldButton = btnHold;
+                RemoteActions.StopButton = btnStop;
+                RemoteActions.Sync();
+
                 // Keyboard is the portable JogController unless the host registered the WPF handler
                 // (see KeypressHandler.Register) - no handler, no key bindings to register.
                 if (!keyboardMappingsOk && (DataContext as GrblViewModel)?.Keyboard is KeypressHandler keyboard)

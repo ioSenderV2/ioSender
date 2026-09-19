@@ -18,13 +18,16 @@
  *
  * ---- What keeps that honest ----
  *
- * A global keyboard hook is an intrusive thing for an app to own, so this one is not owned for long:
+ * A global keyboard hook is an intrusive thing for an app to own, so this one is kept honest:
  *
- *   - It is installed ONLY while something is actually waiting for the operator, and removed the moment
- *     that ends. Outside a hold, ioSender has no hook installed and the volume keys are Windows' again.
  *   - It is opt-in. Nobody who has never heard of this gets their volume keys quietly intercepted.
- *   - While installed it SWALLOWS the key, because the alternative is the system volume marching to
- *     maximum over the course of a height map.
+ *   - It swallows a key only when the press MEANT something (RemoteActions.Resolve answered). With the
+ *     machine idle and nothing waiting, the key goes straight on to Windows and the volume changes as it
+ *     always did - so "the hook is installed" and "the volume keys are taken" are no longer the same
+ *     thing. That is what lets it stay installed for a whole session now that a press means something in
+ *     several places (a prompt, a running job, a hold) rather than only during a height-map hold.
+ *   - When the press DOES mean something it is swallowed, because the alternative is the system volume
+ *     marching to maximum over the course of a height map.
  *   - It debounces. The same measurement showed a held button auto-repeating every ~30 ms after a ~500 ms
  *     delay; a single tap gives exactly one event. Without a debounce one press would release several
  *     holds in a row and the machine would move to the next point - and the one after - while a hand is
@@ -33,7 +36,9 @@
  *
  * Both volume keys are accepted rather than one: the two modes of the same remote send different ones,
  * and asking an operator which mode their remote is in - to answer a question they only care about
- * because of this file - is a worse design than accepting either.
+ * because of this file - is a worse design than accepting either. WHICH key was pressed is passed on
+ * rather than discarded, since once the machine is safely held the two can mean different things - see
+ * RemoteActions, which owns every decision about meaning. This file only hears.
  */
 
 using System;
@@ -70,21 +75,26 @@ namespace CNC.Controls
         // would be collected while the hook is still installed - a crash whose stack says nothing about
         // this file.
         private static HookProc _proc;
-        private static System.Action _onPress;
         private static Dispatcher _dispatcher;
         private static DateTime _last = DateTime.MinValue;
+
+        /// <summary>
+        /// What a press means right now: given true for VOLUME UP, returns what to do, or null when the
+        /// press means nothing here and the key should go on to Windows. Answered on the UI thread (a
+        /// low-level hook runs on the thread that installed it) and must be quick - it decides, the
+        /// action it returns is what actually runs. Set by RemoteActions.
+        /// </summary>
+        public static Func<bool, System.Action> Resolve;
 
         /// <summary>True while the hook is installed.</summary>
         public static bool Listening { get { return _hook != IntPtr.Zero; } }
 
         /// <summary>
-        /// Call <paramref name="onPress"/> on the UI thread when the remote's button is tapped. Safe to
-        /// call when already listening - the newest handler wins - so a caller can simply assert the state
-        /// it wants rather than tracking transitions.
+        /// Start listening. Idempotent, so a caller can simply assert the state it wants rather than
+        /// tracking transitions.
         /// </summary>
-        public static void Start(System.Action onPress)
+        public static void Start()
         {
-            _onPress = onPress;
             _dispatcher = Dispatcher.CurrentDispatcher;
 
             if (_hook != IntPtr.Zero)
@@ -107,7 +117,6 @@ namespace CNC.Controls
             UnhookWindowsHookEx(_hook);
             _hook = IntPtr.Zero;
             _proc = null;
-            _onPress = null;
             DebugLog.Write("remote", "shutter remote: stopped listening");
         }
 
@@ -124,16 +133,28 @@ namespace CNC.Controls
             if (vk != VK_VOLUME_UP && vk != VK_VOLUME_DOWN)
                 return CallNextHookEx(_hook, nCode, wParam, lParam);
 
+            // What it means is decided HERE, synchronously, because the answer also decides whether the key
+            // is swallowed - and that has to be settled before returning from the hook. Only the action it
+            // hands back is posted; nothing slow runs on the hook.
+            var resolve = Resolve;
+            System.Action action = resolve == null ? null : resolve(vk == VK_VOLUME_UP);
+
+            if (action == null)
+            {
+                // Nothing is waiting on it: this is just a volume key, and Windows should have it.
+                _last = DateTime.MinValue;   // a press that passed through must not debounce the next real one
+                return CallNextHookEx(_hook, nCode, wParam, lParam);
+            }
+
             var now = DateTime.UtcNow;
             bool act = now - _last >= Debounce;
             _last = now;
 
             if (act)
             {
-                var handler = _onPress;
                 var dispatcher = _dispatcher;
-                if (handler != null && dispatcher != null)
-                    dispatcher.BeginInvoke(handler);
+                if (dispatcher != null)
+                    dispatcher.BeginInvoke(action);
                 DebugLog.Write("remote", string.Format("shutter remote: press (vk 0x{0:X2})", vk));
             }
 

@@ -64,7 +64,12 @@ namespace CNC.Controls
                 box.Owner = owner;
             else
                 box.WindowStartupLocation = WindowStartupLocation.CenterScreen;
-            box.ShowDialog();
+
+            // An operator standing at the machine can answer this with the shutter remote - see
+            // RemoteActions, which asks the prompt rather than going looking for one.
+            using (RemoteActions.ShowingPrompt(() => box.Press(true), () => box.Press(false)))
+                box.ShowDialog();
+
             return box.result;
         }
 
@@ -123,6 +128,24 @@ namespace CNC.Controls
                 btn.IsDefault = r == defaultResult;
                 btn.IsCancel = r == MessageBoxResult.Cancel || (buttons == MessageBoxButton.YesNo && r == MessageBoxResult.No);
             }
+        }
+
+        /// <summary>
+        /// Click this box's affirmative (OK/Yes) or negative (Cancel/No) button, for a caller that is not
+        /// a mouse - the shutter remote. Does nothing when the box has no such button: a one-button box
+        /// asked to Cancel must not quietly answer OK instead.
+        /// </summary>
+        private void Press(bool affirmative)
+        {
+            var wanted = affirmative ? new[] { MessageBoxResult.OK, MessageBoxResult.Yes }
+                                     : new[] { MessageBoxResult.Cancel, MessageBoxResult.No };
+
+            foreach (var btn in new[] { btnOk, btnYes, btnCancel, btnNo })
+                if (btn.Visibility == Visibility.Visible && Array.IndexOf(wanted, (MessageBoxResult)btn.Tag) >= 0)
+                {
+                    btn.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+                    return;
+                }
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)

@@ -312,7 +312,7 @@ namespace CNC.Controls
         private bool _showJogTargetButtons = false;
         private bool _showJobJogPad = true;
         private bool _showJobSplitView = false;
-        private bool _heightMapRemote = false;
+        private bool _shutterRemote = false;
         private int _statusWindowAutoCloseSeconds = 10;
         private double _jobSplitRatio = 0.5d;
         // Serial is the default transport (2026-08-12). Off means a serial/USB link is left alone; a user
@@ -445,12 +445,16 @@ namespace CNC.Controls
         //
         // Notifies, so the checkbox takes effect immediately rather than on restart.
         public bool ShowJobSplitView { get { return _showJobSplitView; } set { if (_showJobSplitView != value) { _showJobSplitView = value; OnPropertyChanged(); } } }
-        // Let a Bluetooth camera shutter remote release a height-map hold, so the plate can be moved
-        // without walking back to the keyboard sixteen times. Off by default and deliberately so: making
-        // it work at all needs a low-level keyboard hook that swallows the volume keys (see ShutterRemote),
-        // and nobody who has not asked for that should get it. Persisted because an operator who owns such
-        // a remote owns it every session.
-        public bool HeightMapRemote { get { return _heightMapRemote; } set { if (_heightMapRemote != value) { _heightMapRemote = value; OnPropertyChanged(); } } }
+        // Let a Bluetooth camera shutter remote drive the machine from arm's length: answer a prompt, feed
+        // hold a running job, resume or stop a held one - see RemoteActions for exactly what a press means
+        // where. It began as "release a height-map hold" (hence the old HeightMapRemote name, renamed when
+        // it stopped being about the height map) so the plate could be moved without walking back to the
+        // keyboard sixteen times.
+        //
+        // Off by default and deliberately so: making it work at all needs a low-level keyboard hook (see
+        // ShutterRemote), and nobody who has not asked for that should get it. Persisted because an
+        // operator who owns such a remote owns it every session.
+        public bool ShutterRemoteEnabled { get { return _shutterRemote; } set { if (_shutterRemote != value) { _shutterRemote = value; OnPropertyChanged(); } } }
         // Where the splitter sits, as the program view's share of the split (0..1). Persisted so a layout
         // the operator has dragged to suit their screen survives a restart, like every other placement here.
         public double JobSplitRatio { get { return _jobSplitRatio < 0.1d || _jobSplitRatio > 0.9d ? 0.5d : _jobSplitRatio; } set { _jobSplitRatio = value; } }
