@@ -44,11 +44,13 @@ namespace CNC.Controls
         None = 0,
         Base,
         StepperCalibrationProbe,
+        StepperCalibrationScratch,
         Trinamic,
         PidTuning,
         MachineSetup,
         WorkOrder,
         AutoSquare,
+        AutoSquareProbe,
         Simulator
     }
     interface IGrblConfigTab

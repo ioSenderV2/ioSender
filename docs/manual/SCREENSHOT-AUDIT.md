@@ -1,5 +1,8 @@
 # Manual screenshot audit — 2026-07-16
 
+> **SUPERSEDED — historical.** Paid off 2026-07-17 (`d65c94a`). The live item list is
+> **`MANUAL-AUDIT-2026-09-17.md`**; its §6 covers every current figure.
+
 Comprehensive, read-only visual audit of every screenshot in `docs/manual/index.html`
 against the current shipped UI. Supersedes/confirms the screenshot items in
 `MANUAL-DEBT.md` (main-menu overhaul, #84, 2026-07-09) and adds two **new** content-drift

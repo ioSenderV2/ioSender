@@ -4,9 +4,13 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:CNC.Controls"
+             xmlns:core="clr-namespace:CNC.Core;assembly=CNC.Core"
              mc:Ignorable="d"
              d:DesignHeight="335" d:DesignWidth="400"
              Loaded="UserControl_Loaded">
+    <UserControl.Resources>
+        <local:SectionRunTimeConverter x:Key="SectionRunTime"/>
+    </UserControl.Resources>
     <!-- A light mint background marks the program view that is the streamer's configured input source - i.e.
          the program Cycle Start will run. Applied in code (RefreshSourceHighlight) only to that view, so when
          a wizard is the active source its program view is mint and the loaded-job view is not (and vice versa). -->
@@ -79,6 +83,19 @@
                                                 </DockPanel.ContextMenu>
                                                 <TextBlock Text="{Binding Name}" FontWeight="Bold" Margin="2,0,0,0"/>
                                                 <TextBlock Text="{Binding ItemCount, StringFormat=' ({0} lines)'}" Foreground="Gray" Margin="4,0,0,0"/>
+                                                <!-- This toolpath's own estimated run time. Empty until the
+                                                     estimate lands (computed off-thread after the load); the
+                                                     Version binding is what brings this back to re-read it -
+                                                     see SectionRunTimeConverter. -->
+                                                <TextBlock Foreground="Gray" Margin="8,0,0,0"
+                                                           ToolTip="Estimated run time for this toolpath at its programmed feed rates. No acceleration model, so many short moves will take longer than shown.">
+                                                    <TextBlock.Text>
+                                                        <MultiBinding Converter="{StaticResource SectionRunTime}">
+                                                            <Binding Path="Name"/>
+                                                            <Binding Path="Version" Source="{x:Static core:GCodeRunTimeIndex.Instance}"/>
+                                                        </MultiBinding>
+                                                    </TextBlock.Text>
+                                                </TextBlock>
                                             </DockPanel>
                                         </Expander.Header>
                                         <ItemsPresenter/>

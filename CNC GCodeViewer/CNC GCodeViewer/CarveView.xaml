@@ -18,6 +18,12 @@
                 <PerspectiveCamera LookDirection="-1,1,-1" UpDirection="0,0,1" FieldOfView="45"/>
             </helix:HelixViewport3D.Camera>
         </helix:HelixViewport3D>
+        <!-- Shown INSTEAD of a stock block when nothing says how big the board is. Drawing a stand-in
+             block there (the old 150x150x19 default) states a size nobody supplied, and an operator
+             reading a size off this view has no way to tell an invented one from a declared one. -->
+        <TextBlock x:Uid="txt_carveNoStock" x:Name="txtNoStock" Text="No stock size information"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"
+                   FontSize="16" Foreground="#FF8A7A4A" IsHitTestVisible="False"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6">
             <Button x:Uid="btn_carvePlay" Content="Play" MinWidth="54" Padding="6,2" Focusable="False" Click="Play_Click"
                     ToolTip="Simulate the loaded program in this view (does NOT move the machine)."/>

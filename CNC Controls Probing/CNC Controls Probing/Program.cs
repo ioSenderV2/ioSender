@@ -187,7 +187,7 @@ namespace CNC.Controls.Probing
                 probeAsserted = probeConnected = true;
 
                 // Timeout wait for skipping first report as this may have probe asserted true
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.SingleEvent<string>(
                     cancellationToken,
@@ -195,14 +195,11 @@ namespace CNC.Controls.Probing
                     a => Grbl.OnGrblReset += a,
                     a => Grbl.OnGrblReset -= a,
                     AppConfig.Settings.Base.PollInterval * 2 + 50);
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 res = null;
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.SingleEvent<string>(
                     cancellationToken,
@@ -210,10 +207,7 @@ namespace CNC.Controls.Probing
                     a => Grbl.OnResponseReceived += a,
                     a => Grbl.OnResponseReceived -= a,
                     AppConfig.Settings.Base.PollInterval * 5);
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
             }
             else
             {
@@ -248,7 +242,7 @@ namespace CNC.Controls.Probing
             // Clear error status if set
             if (Grbl.GrblError != 0)
             {
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -256,16 +250,13 @@ namespace CNC.Controls.Probing
                     a => Grbl.OnResponseReceived += a,
                     a => Grbl.OnResponseReceived -= a,
                     1000, () => Grbl.ExecuteCommand(""));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 res = null;
             }
 
             // Get a status report in order to establish current machine position
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.SingleEvent<string>(
                 cancellationToken,
@@ -273,10 +264,7 @@ namespace CNC.Controls.Probing
                 a => Grbl.OnResponseReceived += a,
                 a => Grbl.OnResponseReceived -= a,
                 AppConfig.Settings.Base.PollInterval * 5, () => Comms.com.WriteByte(GrblInfo.IsGrblHAL ? GrblConstants.CMD_STATUS_REPORT_ALL : GrblLegacy.ConvertRTCommand(GrblConstants.CMD_STATUS_REPORT)));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             Grbl.Poller.SetState(AppConfig.Settings.Base.PollInterval);
 
@@ -387,6 +375,13 @@ namespace CNC.Controls.Probing
                 if (hasPause)
                     probing.PropertyChanged -= Probing_PropertyChanged;
                 isRunning = Grbl.IsJobRunning = false;
+
+                // Through the same wait as every other dispatch. This restores the distance mode after
+                // probing has run in G91, and it was being dropped by the streamingState gate on exactly the
+                // paths that need it most - a cancelled or failed run - leaving the controller in RELATIVE
+                // mode with nothing on screen saying so, so the next hand-typed move went somewhere nobody
+                // intended (2026-08-19: SendCommand DROPPED "G90").
+                WaitForDispatchable();
                 Grbl.ExecuteCommand(probing.DistanceMode == DistanceMode.Absolute ? "G90" : "G91");
             }
             if (!_isComplete || probing.IsSuccess || force_message)
@@ -482,6 +477,7 @@ namespace CNC.Controls.Probing
                                     //if ((isProbing = _program[step].Contains("G38")) && !IsProbeReady())
                                     //    response = "probe!";
                                     //else
+                                        WaitForDispatchable();
                                         Grbl.ExecuteCommand(_program[step]);
                                 }
                             }
@@ -518,6 +514,35 @@ namespace CNC.Controls.Probing
             probing.Program.AddProbingAction(AxisFlags.Z, true);
 
             return probing.Program.Execute(true) && probing.Positions.Count == 1;
+        }
+
+        /// <summary>
+        /// Hold until the dispatcher will actually accept a command.
+        ///
+        /// JobRunner.SendCommand DROPS g-code, silently and without queueing, whenever streamingState is
+        /// Send - and this engine dispatches its next step the instant the previous "ok" arrives, which for
+        /// a long move is milliseconds before the streaming state has finished transitioning back. So the
+        /// step after a probe went nowhere: no wire traffic, no error, and a run that sat waiting for the
+        /// reply to a command that was never sent (2026-08-19, "SendCommand DROPPED G0Z2 -
+        /// streamingState=Send is not in the allowed set" - the retract after a successful probe).
+        ///
+        /// Waiting here rather than widening SendCommand's allowed set: the gate exists to keep typed
+        /// commands out of an active stream, which is right, and this engine is simply faster off the ack
+        /// than the state machine is. The race is ours, so the wait is ours.
+        ///
+        /// Bounded, and it pumps: a state that never clears must not become a frozen UI. Falling through on
+        /// timeout leaves the pre-existing behaviour (the command is dropped and the run stalls), which is no
+        /// worse than before and still visible in the log.
+        /// </summary>
+        private void WaitForDispatchable()
+        {
+            var until = DateTime.Now.AddMilliseconds(2000d);
+
+            while (Grbl.StreamingState == StreamingState.Send && DateTime.Now < until)
+                EventUtils.DoEvents();
+
+            if (Grbl.StreamingState == StreamingState.Send && Grbl.ResponseLogVerbose)
+                Grbl.ResponseLog.Add("PM: still streaming after 2s - the next command may be dropped");
         }
 
         private void ResponseReceived(string response)

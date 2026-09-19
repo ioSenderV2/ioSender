@@ -1,31 +1,55 @@
-<Window x:Class="CNC.Controls.RestorePointDialog"
+﻿<Window x:Class="CNC.Controls.RestorePointDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="clr-namespace:CNC.Controls"
         mc:Ignorable="d"
-        d:DesignHeight="380" d:DesignWidth="540"
-        x:Uid="wnd_restorePoint" Title="Restore settings" Height="380" Width="540" MinWidth="420" MinHeight="260"
+        d:DesignHeight="460" d:DesignWidth="620"
+        x:Uid="wnd_restorePoint" Title="Restore" Height="460" Width="620" MinWidth="480" MinHeight="320"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Icon="App.ico">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <TextBlock x:Uid="txt_restoreIntro" Grid.Row="0" Text="Select a restore point (most recent first), or browse for a backup file:" Margin="0,0,0,6" TextWrapping="Wrap"/>
+
+        <TextBlock x:Uid="txt_restoreIntro" Grid.Row="0" Margin="0,0,0,6" TextWrapping="Wrap"
+                   Text="Pick the moment you want to go back to. Each restore point holds the machine's settings, ioSender's own configuration, or both - what it holds is shown beside it."/>
+
         <DataGrid x:Uid="dgrSnapshots" x:Name="dgrSnapshots" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
                   SelectionMode="Single" SelectionUnit="FullRow" HeadersVisibility="Column"
                   CanUserReorderColumns="False" CanUserResizeRows="False" CanUserAddRows="False"
                   CanUserSortColumns="True" GridLinesVisibility="Horizontal"
+                  SelectionChanged="dgrSnapshots_SelectionChanged"
                   MouseDoubleClick="dgrSnapshots_MouseDoubleClick">
             <DataGrid.Columns>
-                <DataGridTextColumn x:Uid="col_rpSaved" Header="Saved" Binding="{Binding SavedText}" Width="*"/>
+                <DataGridTextColumn x:Uid="col_rpSaved" Header="Saved" Binding="{Binding SavedText}" Width="150"/>
+                <DataGridTextColumn x:Uid="col_rpAge" Header="When" Binding="{Binding AgeText}" Width="90"/>
+                <DataGridTextColumn x:Uid="col_rpContains" Header="Contains" Binding="{Binding ContainsText}" Width="*"/>
             </DataGrid.Columns>
         </DataGrid>
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <Button x:Name="btnBrowse" x:Uid="btn_rpBrowse" Content="Browse..." MinWidth="90" Margin="0,0,8,0" Click="btnBrowse_Click"/>
+
+        <!-- What to put back. Shown for every restore point rather than only the both-kinds ones, so the
+             choice is always in the same place and a point holding one kind visibly says so (the other
+             option disables) instead of the dialog silently changing shape. -->
+        <GroupBox x:Uid="grp_rpWhat" Grid.Row="2" Header="Restore" Margin="0,8,0,0">
+            <StackPanel Margin="6,4">
+                <RadioButton x:Uid="rb_rpBoth" x:Name="rbBoth" GroupName="rpwhat" Content="Both" IsChecked="True"
+                             ToolTip="Put back the machine's settings and ioSender's configuration as they were at this moment."/>
+                <RadioButton x:Uid="rb_rpGrbl" x:Name="rbGrbl" GroupName="rpwhat" Content="Machine settings only (the controller's $ values)" Margin="0,4,0,0"
+                             ToolTip="Homing, limits, travel, feeds - everything stored in the controller itself."/>
+                <RadioButton x:Uid="rb_rpConfig" x:Name="rbConfig" GroupName="rpwhat" Content="App configuration only (profiles, probes, fixtures, layout)" Margin="0,4,0,0"
+                             ToolTip="ioSender's own settings. Restoring these restarts ioSender, because the configuration is read once at startup."/>
+                <TextBlock x:Name="txtWhatNote" Foreground="#586069" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            </StackPanel>
+        </GroupBox>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button x:Name="btnBrowse" x:Uid="btn_rpBrowse" Content="Browse..." MinWidth="90" Margin="0,0,8,0" Click="btnBrowse_Click"
+                    ToolTip="Choose a controller settings file directly, if what you want is not listed above."/>
             <Button x:Name="btnRestore" x:Uid="btn_rpRestore" Content="Restore" MinWidth="90" Margin="0,0,8,0" IsDefault="True" Click="btnRestore_Click"/>
             <Button x:Name="btnCancel" x:Uid="btn_rpCancel" Content="Cancel" MinWidth="90" IsCancel="True"/>
         </StackPanel>

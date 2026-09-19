@@ -644,7 +644,10 @@ namespace CNC.Controls
         // prompts (see Activate) - they would otherwise pop up modal behind the new instance's topmost splash.
         private static bool _restarting;
 
-        private void DoRestart()
+        // public static: the settings footer's Restart button is no longer the only caller - applying or
+        // undoing a config overlay (Help > Support) relaunches through this same path, so the relaunch
+        // mechanics and the _restarting guard stay in one place.
+        public static void DoRestart()
         {
             if (_restarting)
                 return;

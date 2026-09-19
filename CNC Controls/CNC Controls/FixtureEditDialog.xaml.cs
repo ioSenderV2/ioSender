@@ -1,4 +1,4 @@
-/*
+﻿/*
  * FixtureEditDialog.xaml.cs - part of CNC Controls library
  *
  * Edits a single Fixture. The Kind dropdown drives which schematic is shown. The caller passes a clone and
@@ -238,13 +238,30 @@ namespace CNC.Controls
             }
         }
 
+        // Set position used to read GrblViewModel.MachinePosition directly - whatever the last status report
+        // happened to leave there. Reported from the machine 2026-09-18: it captured 20,-20,-6 with the
+        // spindle nowhere near that. A capture must ASK the controller, not remember, and that distinction
+        // now belongs to the accessor rather than to this dialog - see Fixtures.RequestCoordsCsv.
+        private bool _capturing;
+
         private void btnSetPosition_Click(object sender, RoutedEventArgs e)
         {
             var fx = DataContext as Fixture;
-            if (fx == null)
+            if (fx == null || model == null || _capturing)
                 return;
 
-            string coords = Fixtures.CurrentCoordsCsv(model);
+            // Guarded rather than disabled: the reply normally lands within a poll interval, and a button
+            // that greys out for 30 ms only flickers.
+            _capturing = true;
+            Fixtures.RequestCoordsCsv(model, coords =>
+            {
+                _capturing = false;
+                ApplyCapturedPosition(fx, coords);
+            });
+        }
+
+        private void ApplyCapturedPosition(Fixture fx, string coords)
+        {
             if (coords == null)
             {
                 // model.Message only reaches MainWindow's own status label, which sits BEHIND this modal
@@ -270,12 +287,19 @@ namespace CNC.Controls
                 return;
             }
 
+            // The value actually stored, beside the machine state it was taken in. RequestFreshPosition has
+            // already logged where it came from and whether the cache disagreed with the controller.
+            CNC.Core.DebugLog.Write("fixture", string.Format(
+                "Set position: {0} <- '{1}' | state {2} | homed {3}",
+                fx.Name, coords, model.GrblState.State, model.HomedState));
+
             fx.Coords = coords;
             // A stale CornerOffsetX/Y is meaningless once the reference it was measured from moves - clear it
             // here (the one place a re-jog genuinely happens), not in the Coords setter itself (see the
             // setter's own comment for why that broke on real hardware).
             fx.CornerOffsetX = 0d;
             fx.CornerOffsetY = 0d;
+            fx.CornerLocated = false;
             UpdatePositionDisplay();
             UpdateTestPositionEnabled();
         }
@@ -316,12 +340,10 @@ namespace CNC.Controls
         // pvisecorner.macro is a DEDICATED macro, not pcorner.macro - pcorner needs its reference OUTSIDE both
         // faces (over open spoilboard), the opposite of this dialog's "jog over the jaw" convention; forcing
         // pcorner to work from an inside reference sent the probe the wrong direction on real hardware.
-        // pvisecorner.macro contains an O-word CALL, so MacroProcessor.Flush must stream it through the
-        // flow-controlled job streamer (RunStreamedJobInPlace) - which is ASYNCHRONOUS (Cycle Start is
-        // deferred to a background dispatcher cycle, see MainWindow.RunStreamedJobInPlace) - so Run() returns
-        // long before the probe actually happens. The result can't be read back the instant Run() returns;
-        // instead watch StreamingState the same way MainWindow.RestoreSourceOnEnd does (arm on Send/SendMDI,
-        // fire on the next Idle/NoFile) and read the machine's position back only once the run has genuinely
+        // MacroProcessor.Run streams through the flow-controlled unified engine and is ASYNCHRONOUS - it
+        // returns once the run has STARTED, long before the probe actually happens. The result can't be
+        // read back the instant Run() returns; instead watch StreamingState (arm on start, fire on the
+        // next Idle/NoFile) and read the machine's position back only once the run has genuinely
         // finished - by which point the final G53 move below has physically parked it at the resolved corner.
         private void RunViseCornerProbe(Fixture fx, string joggedCoords)
         {
@@ -402,11 +424,10 @@ namespace CNC.Controls
         private class RunStarted { public bool Value; }
 
         // Watches a just-started macro run (MacroProcessor.Run, called by the caller right after this) to its
-        // TRUE completion and invokes onDone then - necessary whenever the code contains an O-word CALL or a
-        // G1/G2/G3 feed move, since MacroProcessor.Flush routes those through the async flow-controlled job
-        // streamer (RunStreamedJobInPlace): Cycle Start is deferred to a background dispatcher tick, so Run()
-        // returns as soon as the stream is KICKED OFF - well before the probe motion (and its result) actually
-        // happens. Reading GrblState/machine position immediately after Run() returns sees STALE values.
+        // TRUE completion and invokes onDone then - necessary because Run() is asynchronous (the unified
+        // engine streams the macro as a job): it returns as soon as the run has STARTED - well before the
+        // probe motion (and its result) actually happens. Reading GrblState/machine position immediately
+        // after Run() returns sees STALE values.
         // Confirmed on real hardware twice: RunViseCornerProbe's first attempt used a stale jogged position for
         // exactly this reason (fixed via confirm:false above), and - found while investigating that - Test
         // position's own snippet has the same bug (its G91 G1 retract lines force the same streamed path; its
@@ -533,6 +554,7 @@ namespace CNC.Controls
                 // meaningless once that reference moves, and this is a genuine re-jog.
                 fx.CornerOffsetX = 0d;
                 fx.CornerOffsetY = 0d;
+                fx.CornerLocated = false;
                 UpdatePositionDisplay();
                 UpdateTestPositionEnabled();
             }
@@ -587,7 +609,10 @@ namespace CNC.Controls
             b.AppendLine("(PREREQ, connected, homed, noalarm, EXPR)");
             b.AppendLine("G21 G90 G94 G17");
             b.AppendLine("G49");
-            b.AppendLine("G10 L2 P1 X0 Y0 Z0");   // clear G54 - absolute Z probe below runs in machine coords, same as pcorner.macro
+            // clear G54 - the absolute Z probe below runs in machine coords, same as pcorner.macro. Via
+            // EmitWcsWrite, never bare: with a rotation live on the active WCS this corrupts the parser
+            // position and the next move with an unnamed axis flies to it. See EmitWcsWrite.
+            MacroProcessor.EmitWcsWrite(l => b.AppendLine(l), "G10 L2 P1 X0 Y0 Z0");
             // Explicit main-probe-input select (Q0 - both 3D probe and Touch Plate use it, only Tool Setter
             // uses Q1, see GrblCommand.ProbeSelect's own callers) - not just relying on whatever was already
             // active. A prior interrupted tool-change leaves Q1 selected (tc.macro's own comment on this
@@ -647,8 +672,6 @@ namespace CNC.Controls
                 b.AppendLine(string.Format("#<_ls_plateoffset> = {0}", (touchPlate ? probe.PlateThickness : 0d).ToInvariantString("0.0##")));
                 b.AppendLine(string.Format("#<_ls_lipoffset> = {0}", (touchPlate ? probe.LipWidth : 0d).ToInvariantString("0.0##")));
                 b.AppendLine("#<_ls_edgemargin> = 10");   // see pcorner.macro's own comment - slop against an unconfirmed edge
-                b.AppendLine("#<_ls_spoilx> = 0");
-                b.AppendLine("#<_ls_spoily> = 0");
                 b.AppendLine(string.Format("#<_ls_topx> = {0}", topClearance.ToInvariantString("0.0##")));
                 b.AppendLine(string.Format("#<_ls_topy> = {0}", topClearance.ToInvariantString("0.0##")));
                 b.AppendLine(string.Format("#<_ls_searchf> = {0}", searchF));
@@ -719,6 +742,10 @@ namespace CNC.Controls
                 var refPos = new Position(fx.Coords);
                 fx.CornerOffsetX = model.MachinePosition.X - refPos.X;
                 fx.CornerOffsetY = model.MachinePosition.Y - refPos.Y;
+                // The measurement happened - say so explicitly. Either offset can legitimately be 0.000
+                // (the operator can set the reference right on the corner, and Test position parks there),
+                // so the values themselves cannot carry "was this measured?".
+                fx.CornerLocated = true;
             }
             UpdatePositionDisplay();
 

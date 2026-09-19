@@ -65,19 +65,26 @@
                     <StackPanel Orientation="Vertical" Margin="10" MaxWidth="780" HorizontalAlignment="Left">
                         <TextBlock x:Uid="txt_title" Text="Machine setup" FontSize="18" FontWeight="Bold"/>
                         <TextBlock x:Uid="txt_intro" TextWrapping="Wrap" Foreground="Gray" Margin="0,2,0,0"
-                                   Text="Work through the step tabs below. Nothing is sent to the controller until you press Apply."/>
+                                   Text="Work through the steps listed on the left. Nothing is sent to the controller until you press Apply."/>
                         <Separator Margin="0,8,0,4"/>
                         <TextBlock x:Uid="ov_head" Text="Setting up your machine" Style="{StaticResource SectionHeader}" FontSize="15"/>
                         <TextBlock x:Uid="ov_body" TextWrapping="Wrap" Margin="0,4,0,0"
-                                   Text="This guided setup describes your machine to ioSender. Work through the tabs left to right - each setup step is its own tab:"/>
+                                   Text="This guided setup describes your machine to ioSender. Work down the steps on the left - each one is a page of its own:"/>
+                        <!-- One entry per page returned by GetPages(), in the same order and with the same
+                             numbering as the step headers (hdrMachine ... hdrSimulator). This list stopped at
+                             six for a long time while the wizard had eight steps, and numbered "Controller
+                             macros" as 6 when it is 7 - so the app contradicted its own navigation tree and
+                             the manual. If a step is added, it needs a line here AND a locale row. -->
                         <TextBlock x:Uid="ov_s1" TextWrapping="Wrap" Margin="0,6,0,0" Text="1 · Machine - pick your make / product / model (or Custom) to pre-fill typical values."/>
                         <TextBlock x:Uid="ov_s2" TextWrapping="Wrap" Margin="0,2,0,0" Text="2 · Home position - the corner your machine homes to."/>
                         <TextBlock x:Uid="ov_s3" TextWrapping="Wrap" Margin="0,2,0,0" Text="3 · Axis information - travel, max rate and steps/mm for each axis."/>
                         <TextBlock x:Uid="ov_s4" TextWrapping="Wrap" Margin="0,2,0,0" Text="4 · Homing &amp; limits - limit switches, homing and soft limits."/>
                         <TextBlock x:Uid="ov_s5" TextWrapping="Wrap" Margin="0,2,0,0" Text="5 · Probe definitions - the probes fitted to this machine."/>
-                        <TextBlock x:Uid="ov_s6" TextWrapping="Wrap" Margin="0,2,0,0" Text="6 · Controller macros - install the controller-side macro set."/>
+                        <TextBlock x:Uid="ov_s6" TextWrapping="Wrap" Margin="0,2,0,0" Text="6 · Fixture definitions - named workholding that Setup can probe against."/>
+                        <TextBlock x:Uid="ov_s7" TextWrapping="Wrap" Margin="0,2,0,0" Text="7 · Controller macros - install the controller-side macro set."/>
+                        <TextBlock x:Uid="ov_s8" TextWrapping="Wrap" Margin="0,2,0,0" Text="8 · Build simulator - an offline grblHAL simulator matching this machine's own options. Not shown while the active connection is that simulator."/>
                         <TextBlock x:Uid="ov_foot" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="Gray"
-                                   Text="Nothing is sent to the controller until you press Apply. On a connected machine ioSender pre-fills what the controller already reports ($$), so often you just confirm each tab and Apply."/>
+                                   Text="Nothing is sent to the controller until you press Apply. On a connected machine ioSender pre-fills what the controller already reports ($$), so often you just confirm each step and Apply."/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
@@ -211,6 +218,36 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </StackPanel>
+
+                        <!-- The board is not the gantry. Travel above says how far the machine can reach;
+                             this says how much of that is spoilboard. They differ whenever anything (a
+                             toolsetter) is mounted off the edge of the board - see WorkSurface.cs. -->
+                        <GroupBox x:Uid="grp_worksurface" Header="Work surface (spoilboard)" Margin="0,10,0,0">
+                            <StackPanel Margin="6">
+                                <CheckBox x:Uid="chk_wsDefined" x:Name="chkWorkSurfaceDefined" Content="The spoilboard is smaller than the machine's travel" Click="WorkSurface_Changed"
+                                          ToolTip="Tick when the machine can reach past the board - typically to a toolsetter mounted off the front. Left unticked, the whole travel envelope is treated as board, which is what surfacing and height mapping assumed before this existed."/>
+                                <StackPanel x:Name="pnlWorkSurface" Margin="18,6,0,0" IsEnabled="{Binding IsChecked, ElementName=chkWorkSurfaceDefined}">
+                                    <TextBlock x:Uid="txt_wsHelp" TextWrapping="Wrap" FontSize="11" Foreground="#586069" Margin="0,0,0,6"
+                                               Text="The board's edges in MACHINE coordinates - the same numbers the DRO shows when the spindle is over each corner. Jog to a corner and read them off."/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock x:Uid="lbl_wsMinX" Text="X from:" Width="60" VerticalAlignment="Center"/>
+                                        <TextBox x:Uid="txt_wsMinX" x:Name="txtWsMinX" Width="80" LostFocus="WorkSurface_Changed" VerticalContentAlignment="Center" HorizontalContentAlignment="Right"/>
+                                        <TextBlock x:Uid="lbl_wsMaxX" Text="to:" Width="26" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                        <TextBox x:Uid="txt_wsMaxX" x:Name="txtWsMaxX" Width="80" LostFocus="WorkSurface_Changed" VerticalContentAlignment="Center" HorizontalContentAlignment="Right"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                        <TextBlock x:Uid="lbl_wsMinY" Text="Y from:" Width="60" VerticalAlignment="Center"/>
+                                        <TextBox x:Uid="txt_wsMinY" x:Name="txtWsMinY" Width="80" LostFocus="WorkSurface_Changed" VerticalContentAlignment="Center" HorizontalContentAlignment="Right"/>
+                                        <TextBlock x:Uid="lbl_wsMaxY" Text="to:" Width="26" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                        <TextBox x:Uid="txt_wsMaxY" x:Name="txtWsMaxY" Width="80" LostFocus="WorkSurface_Changed" VerticalContentAlignment="Center" HorizontalContentAlignment="Right"/>
+                                    </StackPanel>
+                                    <Button x:Uid="btn_wsHere" x:Name="btnWorkSurfaceHere" Content="Set the near corner from where the spindle is now" Margin="0,8,0,0" Padding="6,2"
+                                            HorizontalAlignment="Left" Click="WorkSurfaceHere_Click"
+                                            ToolTip="Jog the spindle over the corner of the board nearest the machine origin, then click this to fill X from / Y from with the current machine position."/>
+                                </StackPanel>
+                                <TextBlock x:Name="txtWorkSurfaceSummary" TextWrapping="Wrap" FontSize="11" Foreground="#586069" Margin="0,8,0,0"/>
+                            </StackPanel>
+                        </GroupBox>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
@@ -301,7 +338,7 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Row="0" Grid.ColumnSpan="2" x:Uid="txt_probesDesc" TextWrapping="Wrap" Margin="0,0,0,6"
-                               Text="Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Start Job and the probing tabs."/>
+                               Text="Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Setup and the probing tabs."/>
                     <DataGrid x:Uid="grdProbes" x:Name="grdProbes" Grid.Row="1" Grid.Column="0" AutoGenerateColumns="False"
                               CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True" SelectionMode="Single"
                               HeadersVisibility="Column" GridLinesVisibility="All"
@@ -342,8 +379,8 @@
                 </Grid>
             </TabItem>
 
-            <!-- 6. Fixture definitions (the user's own named workholding fixtures - Start Job selects from these) -->
-            <TabItem x:Uid="tabstep_fixtures" x:Name="tabStepFixtures" ToolTip="Define named workholding fixtures (vise, fence, etc.) used by Start Job.">
+            <!-- 6. Fixture definitions (the user's own named workholding fixtures - Setup selects from these) -->
+            <TabItem x:Uid="tabstep_fixtures" x:Name="tabStepFixtures" ToolTip="Define named workholding fixtures (vise, fence, etc.) used by Setup.">
                 <TabItem.Header><TextBlock x:Uid="step_fixtures" x:Name="hdrFixtures" Text="6 · Fixture definitions"/></TabItem.Header>
                 <Grid Margin="10">
                     <Grid.RowDefinitions>
@@ -421,39 +458,11 @@
                 </Grid>
             </TabItem>
 
-            <!-- 8. Calibration (optional, non-gating - like Fixtures/Build simulator). Stepper calibration
-                 (probe method - the only method kept; the manual and scratch methods were dropped as not
-                 worth supporting once probing against a known reference block proved out) and squareness,
-                 folded in from the retired Tools tab. -->
-            <TabItem x:Uid="tabstep_calibration" x:Name="tabStepCalibration" ToolTip="Stepper calibration and frame squareness.">
-                <TabItem.Header><TextBlock x:Uid="step_calibration" x:Name="hdrCalibration" Text="8 · Calibration"/></TabItem.Header>
-                <local:StretchTabControl x:Name="tabCalibration" Background="Transparent" SelectionChanged="Calibration_SelectionChanged" ItemContainerStyle="{StaticResource SubNavTabItemStyle}">
-                <!-- Tab strip templated away: the steps are nodes in the Machine Setup navigation tree now.
-                     The TabControl stays as the switcher so every existing selection hook still fires
-                     (Steps_SelectionChanged refreshes macro/simulator state and activates the calibration
-                     sub-wizards) and every x:Name in the code-behind still resolves. -->
-                <TabControl.Template>
-                    <ControlTemplate TargetType="TabControl">
-                        <ContentPresenter ContentSource="SelectedContent"/>
-                    </ControlTemplate>
-                </TabControl.Template>
-
-                    <TabItem x:Uid="tabstep_calStepper" x:Name="tabCalStepper" ToolTip="Correct steps/mm by probing a reference block of known size against a validated Corner Fence.">
-                        <TabItem.Header><TextBlock x:Uid="step_calStepper" Text="Stepper calibration"/></TabItem.Header>
-                        <local:StepperCalibrationProbeWizard x:Name="calStepperWizard"/>
-                    </TabItem>
-                    <TabItem x:Uid="tabstep_calSquareness" x:Name="tabCalSquareness" ToolTip="Check and correct gantry squareness.">
-                        <TabItem.Header><TextBlock x:Uid="step_calSquareness" Text="Squareness"/></TabItem.Header>
-                        <local:AutoSquareWizard x:Name="calSquarenessWizard"/>
-                    </TabItem>
-                </local:StretchTabControl>
-            </TabItem>
-
-            <!-- 9. Build a simulator matching this machine (optional, non-gating - like Fixtures). One button:
+            <!-- 8. Build a simulator matching this machine (optional, non-gating - like Fixtures). One button:
                  by now every option a simulator build needs is already known from this machine's own $I/$$,
                  so there's nothing left to pick. -->
             <TabItem x:Uid="tabstep_simulator" x:Name="tabStepSimulator" ToolTip="Build a grblHAL simulator matching this machine's configuration.">
-                <TabItem.Header><TextBlock x:Uid="step_simulator" x:Name="hdrSimulator" Text="9 · Build simulator"/></TabItem.Header>
+                <TabItem.Header><TextBlock x:Uid="step_simulator" x:Name="hdrSimulator" Text="8 · Build simulator"/></TabItem.Header>
                 <Grid Margin="10">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>

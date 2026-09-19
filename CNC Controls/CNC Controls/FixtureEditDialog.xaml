@@ -35,7 +35,7 @@
         <!-- Text is set from code (UpdateProbeNote) per the Probe: selection - the 3D-probe wording below is
              just the XAML-time default before the constructor runs. -->
         <TextBlock x:Uid="fxd_probeNote" x:Name="txtProbeNote" DockPanel.Dock="Bottom" TextWrapping="Wrap" Foreground="#C0392B" FontSize="16.5" Margin="0,10,0,0"
-                   Text="The 3D probe must be installed before Set/Test position - and the saved position must be within ~10 mm above the spoilboard (the probe search is capped to 12 mm below it)."/>
+                   Text="The 3D probe must be installed before Test position. Set position itself is a raw jog-capture and needs no probe."/>
 
         <!-- Fields (incl. Name/Type - moved INTO this column 2026-07-18, they used to span the whole
              dialog in their own top-docked StackPanel, at odds with "left column" framing) on the
@@ -65,7 +65,7 @@
                     </ComboBox>
                 </StackPanel>
                 <TextBlock x:Name="txtNotImplemented" Foreground="#C0392B" TextWrapping="Wrap" Margin="120,4,0,0" FontSize="11" Visibility="Collapsed"
-                           Text="This fixture type isn't wired to a working probe macro yet - it can be defined, but Start Job will block Generate for it."/>
+                           Text="This fixture type isn't wired to a working probe macro yet - it can be defined, but Setup will block Generate for it."/>
                 <Separator Margin="0,7"/>
 
                 <!-- Position: label + Set/Test inline, checkmark trailing (2026-07-19 - replaced the old
@@ -75,9 +75,9 @@
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                     <Label x:Uid="fxd_position" Content="Position:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
                     <Button x:Uid="btnFxDlgSetPos" x:Name="btnSetPosition" Content="Set" Padding="12,0" MinHeight="22" MinWidth="60" Margin="8,0,0,0" Click="btnSetPosition_Click"
-                            ToolTip="Store the current machine position as this fixture's reference start point. For a corner-probing kind, jog here first: clear of both faces (within the schematic's circle) AND within ~10 mm above the spoilboard - the spoilboard probe searches only 12 mm down from here. Not written to firmware G28 - kept only in this fixture's own definition."/>
+                            ToolTip="Store the current machine position as this fixture's reference start point. For a corner-probing kind, jog here first: OVER THE STOCK, near its corner - within ~5 mm of each face, and within ~10 mm above the STOCK TOP (the probe searches only 12 mm down from here). Do NOT position out over the spoilboard: the probe would take the spoilboard as the top surface and then drive down 5 mm below it looking for the faces. Not written to firmware G28 - kept only in this fixture's own definition."/>
                     <Button x:Uid="btnFxTestPos" x:Name="btnTestPosition" Content="Test" Padding="12,0" MinHeight="22" MinWidth="60" Margin="12,0,0,0" Click="btnTestPosition_Click"
-                            ToolTip="Run the real spoilboard probe search (the same 12 mm-capped G38.2 pcorner.macro uses) from the saved position, right now - confirms it will actually work before you trust it to Start Job."/>
+                            ToolTip="Probe down from the saved position for real, right now (the same 12 mm-capped G38.2 pcorner.macro uses), then locate the corner from both faces - confirms it will actually work before you trust it to Setup. Whatever is directly below the saved point becomes the top surface, so the position must be over the stock."/>
                     <!-- Checkmark (Segoe MDL2 Assets E73E) - bright green + bold when fx.PositionValidated, gray
                          otherwise; Collapsed entirely when there's no position yet. Set in UpdatePositionDisplay.
                          Sized well above the buttons (was FontSize=14, same as body text - green #2E7D32 vs
@@ -116,15 +116,15 @@
                                  ToolTip="Probes by electrical continuity instead of mechanical deflection, same physical probe input as the 3D probe. For a vise the bare jaw is the conductor; for any other fixture, stage a conductive object at the saved position first - there is nothing there to sense otherwise."/>
                 </WrapPanel>
 
-                <!-- Vise-only: drawing-only dimensions (Start Job's stock drawing + this dialog's own schematic
+                <!-- Vise-only: drawing-only dimensions (Setup's stock drawing + this dialog's own schematic
                      could use them too) - pvisecorner.macro doesn't read either, it finds the jaw corner by
                      probing, not by knowing the jaw's extent. -->
                 <local:NumericField x:Name="fldJawWidth" x:Uid="fxd_jawWidth" Label="Jaw width:" ColonAt="120" Unit="mm" Format="####0.0##" Value="{Binding JawWidth, Mode=TwoWay}" Margin="0,8,0,2"
                                      Visibility="Collapsed"
-                                     ToolTip="Physical width of the jaw along its own length (X, from the probed corner rightward) - used only to draw an accurate schematic (here and in Start Job). 0 = not set."/>
+                                     ToolTip="Physical width of the jaw along its own length (X, from the probed corner rightward) - used only to draw an accurate schematic (here and in Setup). 0 = not set."/>
                 <local:NumericField x:Name="fldMaxOpening" x:Uid="fxd_maxOpening" Label="Max opening:" ColonAt="120" Unit="mm" Format="####0.0##" Value="{Binding MaxOpening, Mode=TwoWay}" Margin="0,2"
                                      Visibility="Collapsed"
-                                     ToolTip="Maximum distance the moving jaw can travel from the fixed jaw - used only to draw the vise's true throat in Start Job. 0 = not set."/>
+                                     ToolTip="Maximum distance the moving jaw can travel from the fixed jaw - used only to draw the vise's true throat in Setup. 0 = not set."/>
             </StackPanel>
 
             <!-- Per-kind schematic: shows where each offset is measured from/to. One Canvas per shape (the

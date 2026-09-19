@@ -61,6 +61,43 @@ namespace CNC.Controls
         // radius compensation applied to face touches.
         public double ProbeDiameter { get { return _diameter; } set { _diameter = value; OnChanged(); } }
 
+        /// <summary>
+        /// The tip as the operator would go and pick one up: "6.354 mm (1/4")" when the diameter really is
+        /// a standard imperial size, plain "6 mm" when it is not. For the install prompt, where the number
+        /// on file has to be matched against a physical object - a mismatch there shifts the work origin by
+        /// half the diameter difference and shows no symptom until a finished part is measured.
+        /// </summary>
+        public string TipDescription { get { return DescribeTip(ProbeDiameter); } }
+
+        public static string DescribeTip(double mm)
+        {
+            string frac = ImperialFraction(mm);
+            return mm.ToString("0.0##", System.Globalization.CultureInfo.InvariantCulture)
+                   + " mm" + (frac == null ? string.Empty : " (" + frac + ")");
+        }
+
+        /// <summary>
+        /// Nearest imperial fraction, or null when the diameter is not really an imperial size. Two guards,
+        /// because a bare "nearest 64th" will happily label a 2 mm metric stylus "5/64"" and a 6 mm one
+        /// "15/64"" - true to the arithmetic, useless to the operator, and actively misleading next to a
+        /// prompt telling them to match it: the reduced denominator must be 16 or coarser (real gauge-pin
+        /// and dowel sizes are), AND the fraction must land within 0.03 mm of the stored diameter.
+        /// </summary>
+        private static string ImperialFraction(double mm)
+        {
+            if (mm <= 0d)
+                return null;
+
+            int sixtyfourths = (int)System.Math.Round(mm / 25.4d * 64d);
+            if (sixtyfourths <= 0 || System.Math.Abs(sixtyfourths / 64d * 25.4d - mm) > 0.03d)
+                return null;
+
+            int num = sixtyfourths, den = 64;
+            while (num % 2 == 0 && den > 1) { num /= 2; den /= 2; }
+
+            return den > 16 ? null : (den == 1 ? num + "\"" : num + "/" + den + "\"");
+        }
+
         // 3D-probe body diameter - the large part that must clear the work; its radius is the
         // minimum standoff held during G28 / rapid clearance moves so the body never strikes the stock.
         public double BodyDiameter { get { return _bodyDiameter; } set { _bodyDiameter = value; OnChanged(); OnChanged(nameof(MinStandoff)); } }

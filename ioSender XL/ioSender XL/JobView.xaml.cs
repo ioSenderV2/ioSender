@@ -1,4 +1,4 @@
-/*
+﻿/*
  * JobView.xaml.cs - part of ioSender
  *
  * v0.47 / 2026-04-29 / Io Engineering (Terje Io)
@@ -58,6 +58,12 @@ namespace GCode_Sender
     {
         private bool? initOK = null;
         private bool isBooted = false, isCameraClaimed = false, holdActivated = false;
+
+        // Set when the operator chooses to stay on a connection whose capabilities ($I) never loaded.
+        // While true the controller is held in check mode - parsed, acknowledged, never executed - so a
+        // connection ioSender cannot reason about can still be inspected but can never move the machine.
+        // Cleared only by a connect that actually reads $I.
+        private bool lockedInCheckMode = false;
         private GrblViewModel model;
         private bool jogConfigHooked = false;
 
@@ -70,11 +76,11 @@ namespace GCode_Sender
                 return;
             var jog = AppConfig.Settings.Jog;
             model.Keyboard.JogStepDistance = jog.StepDistance;
-            model.Keyboard.JogDistances[(int)KeypressHandler.JogMode.Slow] = jog.SlowDistance;
-            model.Keyboard.JogDistances[(int)KeypressHandler.JogMode.Fast] = jog.FastDistance;
-            model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Step] = jog.StepFeedrate;
-            model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Slow] = jog.SlowFeedrate;
-            model.Keyboard.JogFeedrates[(int)KeypressHandler.JogMode.Fast] = jog.FastFeedrate;
+            model.Keyboard.JogDistances[(int)JogMode.Slow] = jog.SlowDistance;
+            model.Keyboard.JogDistances[(int)JogMode.Fast] = jog.FastDistance;
+            model.Keyboard.JogFeedrates[(int)JogMode.Step] = jog.StepFeedrate;
+            model.Keyboard.JogFeedrates[(int)JogMode.Slow] = jog.SlowFeedrate;
+            model.Keyboard.JogFeedrates[(int)JogMode.Fast] = jog.FastFeedrate;
             model.Keyboard.DefaultSpeedFast = jog.DefaultSpeedFast;
             model.Keyboard.IsJoggingEnabled = jog.KeyboardEnable;
         }
@@ -411,6 +417,21 @@ namespace GCode_Sender
             if (sender is GrblViewModel) switch (e.PropertyName)
                 {
                 case nameof(GrblViewModel.GrblState):
+                    // Enforce the check-mode lock taken when the operator chose to stay on a connection
+                    // whose capabilities never loaded. Entering check mode once is not a safety guarantee -
+                    // a soft reset, a stray $C, or the controller's own restart all clear it, and the
+                    // machine would then be free to move on a connection ioSender cannot reason about.
+                    // Re-assert it whenever the controller settles anywhere else. Cleared only by a
+                    // reconnect that actually reads $I (see InitSystem / PrepareForReconnect).
+                    if (lockedInCheckMode && Controller != null && !Controller.ResetPending &&
+                        sender is GrblViewModel cm && !cm.IsCheckMode &&
+                        cm.GrblState.State != GrblStates.Unknown && cm.GrblState.State != GrblStates.Alarm)
+                    {
+                        if (DebugLog.Enabled)
+                            DebugLog.Write("connect", string.Format("check-mode lock: state went to {0}, re-asserting $C", cm.GrblState.State));
+                        Comms.com.WriteCommand(GrblConstants.CMD_CHECK);
+                    }
+
                     if (Controller != null && !Controller.ResetPending)
                     {
                         if (isBooted && initOK == false && (sender as GrblViewModel).GrblState.State != GrblStates.Alarm)
@@ -550,12 +571,19 @@ namespace GCode_Sender
                 {
                     focusedControl = this;
 
-                    switch (Controller.Restart())
+                    Controller.RestartResult restartResult = Controller.Restart();
+
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("connect", string.Format("Restart() -> {0}  (isBooted={1})", restartResult, isBooted));
+
+                    switch (restartResult)
                     {
                         case Controller.RestartResult.Ok:
                             if (!isBooted)
                                 Dispatcher.BeginInvoke(new System.Action(() => OnBooted()), DispatcherPriority.ApplicationIdle);
                             initOK = InitSystem();
+                            if (DebugLog.Enabled)
+                                DebugLog.Write("connect", string.Format("InitSystem() -> {0}, GrblInfo.IsLoaded={1}", initOK, GrblInfo.IsLoaded));
                             break;
 
                         case Controller.RestartResult.Close:
@@ -567,7 +595,130 @@ namespace GCode_Sender
                             break;
                     }
 
-                    model.Message = Controller.Message;
+                    // Close the loop opened by "Waiting for controller (...)". That notice pops the status log,
+                    // so without a definite outcome the last thing on screen still reads as "waiting" long after
+                    // the connect settled - which is exactly how a connect that worked and one that quietly
+                    // didn't became indistinguishable.
+                    //
+                    // Precedence: a message Restart() set for itself wins (MsgHome on a homing-required boot says
+                    // something actionable, a generic "Connected" does not). Success needs BOTH Ok and a good
+                    // InitSystem() - Ok alone only means the controller answered. NoResponse used to fall through
+                    // this switch unannounced (the GrblInfo.IsLoaded reconnect branches all blank the response
+                    // rather than raising a dialog), and silence there is the worst of the three outcomes.
+                    // A connection whose capabilities were never read is worse than no connection. GrblInfo
+                    // empty does not read as "unknown" anywhere downstream - it reads as every capability
+                    // ABSENT, so expressions, ATC, probing and the filesystem all quietly refuse, each with
+                    // its own confident message about what this controller does not support. Observed
+                    // 2026-08-12 on both hardware and the simulator: "$I" was never sent, and the Setup tab
+                    // insisted the firmware lacked NGC expressions while that same firmware reported EXPR.
+                    //
+                    // So refuse the connection outright rather than carrying on blind, and deliberately
+                    // WITHOUT a "continue anyway" button: there is nothing useful to continue into, and the
+                    // alternative to guessing capabilities is not guessing them optimistically - assuming
+                    // EXPR is present would stream o-word flow control to a controller that may not take it,
+                    // which wedges grblHAL outright. Reconnecting is the recovery, and it works.
+                    // Deliberately NOT gated on RestartResult.Ok. The condition that matters is "the link is
+                    // open but the capabilities were never read", and NoResponse reaches that state too -
+                    // it reports "did not complete the handshake" and then leaves the connection up anyway,
+                    // which is the state observed 2026-08-12 at 01:12: jogging refused with "enable soft
+                    // limits ($20=1) first" because every setting read as zero out of an empty GrblInfo,
+                    // while the status line claimed not connected. Guarding only the Ok branch missed the
+                    // very path that produced the report.
+                    if ((restartResult == Controller.RestartResult.Ok || restartResult == Controller.RestartResult.NoResponse) &&
+                        Comms.com != null && Comms.com.IsOpen && !GrblInfo.IsLoaded)
+                    {
+                        if (DebugLog.Enabled)
+                            DebugLog.Write("connect", "connected but $I never loaded - offering disconnect or check-mode");
+
+                        // A controller ALREADY in check mode is not a mystery to be reported - it is the
+                        // whole explanation. Grbl answers every '$' query with error:8 while in check mode,
+                        // so $I cannot possibly succeed, and neither can the reconnect the dialog offers:
+                        // check mode survives it. Observed 2026-08-21 on a diode laser left in check mode by
+                        // an earlier session - connect, fail, reconnect, fail, indefinitely.
+                        //
+                        // So leave check mode and try again, rather than asking a question whose answers
+                        // both lead back here.
+                        if (model.IsCheckMode)
+                        {
+                            if (DebugLog.Enabled)
+                                DebugLog.Write("connect", "controller was ALREADY in check mode - $ queries return error:8 there; leaving it and reconnecting");
+
+                            model.Message = "Controller was in check mode, which blocks $I - leaving check mode and reconnecting...";
+                            Comms.com.WriteCommand(GrblConstants.CMD_CHECK);    // toggle: this LEAVES check mode
+
+                            Dispatcher.BeginInvoke(new System.Action(() => MainWindow.ui.ReconnectAfterFailedHandshake()),
+                                                   DispatcherPriority.ApplicationIdle);
+                            return;
+                        }
+
+                        // OWNED, not the ownerless overload. An unowned MessageBox still disables every
+                        // window in the app, but nothing keeps it in front - so it can fall BEHIND the main
+                        // window, leaving an app that beeps at every click, refuses to close, and needs Task
+                        // Manager to kill. Observed 2026-08-31 during repeated reconnect attempts. This
+                        // prompt is the one a failing connect shows over and over, so it is the likeliest
+                        // of all of them to land behind something.
+                        bool disconnect = AppDialogs.Show(
+                            Window.GetWindow(this),
+                            "Could not read this controller's capabilities ($I).\r\n\r\n" +
+                            "Nothing is wrong with the controller - the query went unanswered during connect, and " +
+                            "connecting again normally fixes it. Until then ioSender cannot tell what this " +
+                            "controller supports, so every capability reads as absent.\r\n\r\n" +
+                            "Reconnect now, or stay connected in CHECK MODE to look around? In check mode g-code is " +
+                            "parsed but never executed - the machine cannot move until you reconnect.",
+                            "ioSender - capabilities not read", MessageBoxButton.YesNo, MessageBoxImage.Exclamation) == MessageBoxResult.Yes;
+
+                        if (disconnect)
+                        {
+                            if (DebugLog.Enabled)
+                                DebugLog.Write("connect", "reconnecting at operator's choice");
+                            model.Message = "Capabilities ($I) could not be read - reconnecting...";
+                            // Actually reconnect, because that is what the prompt offers. Dropping the link
+                            // and leaving the operator at "not connected" is not what "Reconnect now" says,
+                            // and it was not what happened when they picked it.
+                            //
+                            // Deferred rather than called here: this runs inside the connect attempt that
+                            // just failed, and re-entering the connect path from within it would nest the
+                            // handshake inside itself. ApplicationIdle lets this one finish unwinding first -
+                            // the same reason InitSystem is re-invoked that way above.
+                            Dispatcher.BeginInvoke(new System.Action(() => MainWindow.ui.ReconnectAfterFailedHandshake()),
+                                                   DispatcherPriority.ApplicationIdle);
+                        }
+                        else
+                        {
+                            // Staying connected is only safe if nothing can MOVE. Check mode is the
+                            // controller's own guarantee of that - it parses and acknowledges but never
+                            // executes motion - and it is enforced below rather than merely entered, because
+                            // an unenforced safety mode is one stray toggle away from not being one.
+                            // $C TOGGLES check mode; it does not set it. Sending it while the controller is
+                            // already in check mode LEAVES check mode - and the enforcement below then sees
+                            // that and sends $C again, putting it back. That oscillation is visible in the
+                            // wire log as two $C a couple of seconds apart with nothing achieved between
+                            // them (2026-08-21).
+                            if (!model.IsCheckMode)
+                                Comms.com.WriteCommand(GrblConstants.CMD_CHECK);
+
+                            lockedInCheckMode = true;
+                            if (DebugLog.Enabled)
+                                DebugLog.Write("connect", "DEGRADED - staying connected, locking check mode until reconnect");
+                            model.Message = "Capabilities ($I) unread - LOCKED IN CHECK MODE, no motion. Reconnect to restore normal operation.";
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(Controller.Message))
+                        model.Message = Controller.Message;
+                    else if (restartResult == Controller.RestartResult.Ok && initOK == true)
+                    {
+                        model.Message = string.Format((string)FindResource("MsgConnected"), AppConfig.Settings.Base.PortParams);
+                        LogConnectionDetail();
+                    }
+                    else if (restartResult == Controller.RestartResult.NoResponse)
+                        model.Message = string.Format((string)FindResource("MsgNotConnected"), AppConfig.Settings.Base.PortParams);
+                    else
+                        // Controller.Message is empty unless Restart had something specific to say, so
+                        // state the outcome rather than assigning nothing - silence here is precisely the
+                        // "connected or not?" ambiguity the block above exists to close.
+                        model.Message = string.IsNullOrEmpty(Controller.Message)
+                            ? string.Format("Connect to {0} did not complete ({1})", AppConfig.Settings.Base.PortParams, restartResult)
+                            : Controller.Message;
                 }
                 
                 if (initOK == null)
@@ -627,7 +778,19 @@ namespace GCode_Sender
                 Task.Delay(500).ContinueWith(t => _dro?.EnableFocus());
                 Application.Current.Dispatcher.BeginInvoke(new System.Action(() =>
                 {
-                    focusedControl.Focus();
+                    // focusedControl is only ever assigned on the DEACTIVATE path above, where it records
+                    // what had focus so it can be given back. On the activate path - including the very
+                    // first activation, from CompleteStartup - nothing has assigned it and the field is
+                    // still its null initialiser.
+                    //
+                    // It normally survives because RunControl.Activate returns false on that first call and
+                    // this block is skipped; when it returns true instead, startup dies with a
+                    // NullReferenceException before the window is usable (crash logs 2026-08-21, and the
+                    // same method on 2026-07-14).
+                    //
+                    // Falling back to the view is what the deactivate path already does when there is no MDI
+                    // box to restore - focus belongs somewhere, and here is the sensible somewhere.
+                    (focusedControl ?? this).Focus();
                 }), DispatcherPriority.Render);
             }
         }
@@ -702,10 +865,54 @@ namespace GCode_Sender
 
             // Key mappings now live in the App.config "KeyMap" section (loaded at config-load); apply them now
             // that the handlers are registered.
-            model.Keyboard.LoadMappings();
+            (model.Keyboard as KeypressHandler)?.LoadMappings();
 
             if (GrblInfo.NumAxes > 3)
                 GCode.File.AddTransformer(typeof(GCodeWrapViewModel), "Wrap to rotary (WIP)", MainWindow.UIViewModel.TransformMenuItems);
+
+            // Work Order compile cache, restore half (a 4-minute script-font compile per restart was the
+            // motivating case): now that the controller is booted and its settings are loaded (the cache
+            // fingerprint folds them in - this is the earliest moment it CAN be computed), reload the
+            // cached compiled program as the job if it still matches the persisted work order. OnBooted
+            // runs once per session (isBooted gate at the call site), never over an already-loaded job
+            // (a file-open argument wins), and never in an automation instance.
+            if (App.TestServerPort < 0)
+                CNC.Controls.WorkOrderView.TryAutoRestoreCachedProgram(model);
+        }
+
+        /// <summary>
+        /// What the connect actually established, written under the "Connected: ..." headline.
+        ///
+        /// status.log is the only log an operator sees, and it recorded a connect as a single line that
+        /// looked identical whether the handshake had read everything or nothing. On 2026-08-24 a
+        /// GrblSettings collection that came back EMPTY (see GrblHandshake) sat behind an ordinary-looking
+        /// "Connected:" for hours - GrblInfo.MaxTravel derived as 0, the sender emitted a -9999 probe floor,
+        /// and the machine alarmed. Finding it needed debug-only instrumentation the operator cannot see.
+        ///
+        /// So state the facts that decide whether this connection is usable: how many settings were read
+        /// (0 is the failure, and it says so), what the firmware says it is and supports, and whether the
+        /// controller is already sitting in an alarm that has to be cleared before anything will run.
+        /// </summary>
+        private void LogConnectionDetail()
+        {
+            int settings = GrblSettings.Settings.Count;
+            model.LogDetail(settings > 0
+                ? string.Format("- {0} controller settings read", settings)
+                : "- NO controller settings were read - travel limits and soft-limit checks are unavailable. Reconnect.",
+                settings == 0);
+
+            var caps = string.IsNullOrWhiteSpace(GrblInfo.NewOptions) ? "(none reported)" : GrblInfo.NewOptions;
+            model.LogDetail(string.Format("- {0} {1}{2} - options: {3}",
+                string.IsNullOrWhiteSpace(GrblInfo.Identity) ? "controller" : GrblInfo.Identity,
+                GrblInfo.Version,
+                GrblInfo.Build > 0 ? " build " + GrblInfo.Build : string.Empty,
+                caps));
+
+            // An alarm latched before we connected is not reported anywhere else at connect time, and it
+            // blocks g-code AND filesystem access ($F answers error:79) until it is cleared - which reads
+            // as "the ATC macros are missing" rather than "the machine is in alarm".
+            if (model.GrblState.State == GrblStates.Alarm)
+                model.LogDetail("- Controller is in ALARM - <Reset> then <Unlock> before running anything", true);
         }
 
         private bool InitSystem()
@@ -713,8 +920,17 @@ namespace GCode_Sender
             initOK = true;
             int timeout = 5;
 
-            if (isBooted && model.GrblState.State == GrblStates.Home)
+            // The shortcut for "already up, controller is mid-homing" must not also skip the one thing
+            // this method exists for. Without the IsLoaded test it returns SUCCESS having never sent $I,
+            // leaving GrblInfo empty - and an empty GrblInfo does not read as "unknown", it reads as
+            // every capability ABSENT: no expressions, no ATC, no probes, no filesystem. That is how a
+            // controller which reports EXPR perfectly well was told it lacks expression support.
+            if (isBooted && model.GrblState.State == GrblStates.Home && GrblInfo.IsLoaded)
                 return true;
+
+            if (DebugLog.Enabled)
+                DebugLog.Write("connect", string.Format("InitSystem: enter - isBooted={0} state={1} GrblInfo.IsLoaded={2}",
+                    isBooted, model.GrblState.State, GrblInfo.IsLoaded));
 
             using (new UIUtils.WaitCursor())
             {
@@ -723,11 +939,26 @@ namespace GCode_Sender
                 {
                     if(--timeout == 0)
                     {
+                        if (DebugLog.Enabled)
+                            DebugLog.Write("connect", "InitSystem: FAILED - $I went unanswered after 5 attempts");
                         model.Message = (string)FindResource("MsgNoResponse");
                         return false;
                     }
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("connect", string.Format("InitSystem: $I unanswered, retrying ({0} left)", timeout));
                     Thread.Sleep(500);
                 }
+                // $I answered, so this connection can be reasoned about again - release any check-mode
+                // lock a previous degraded connect took. This is the ONLY thing that clears it.
+                if (lockedInCheckMode)
+                {
+                    lockedInCheckMode = false;
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("connect", "check-mode lock RELEASED - $I loaded on this connect");
+                    if (model.IsCheckMode)
+                        Comms.com.WriteCommand(GrblConstants.CMD_CHECK);   // toggle back out
+                }
+
                 GrblAlarms.Get();
                 GrblErrors.Get();
                 GrblSettings.Load();
@@ -751,6 +982,12 @@ namespace GCode_Sender
             // to the network when the controller's telnet port answers.
             AppConfig.Settings.CaptureConnectedIp();
             MainWindow.ui.TryMigrateToNetwork();
+
+            // The real machine is the truth: snapshot its reference points while they are in front of us,
+            // and stamp the captured ones onto a simulator every time we connect to one. Exactly one of
+            // these does anything per connection - see MachineOffsets.
+            MachineOffsets.CaptureFromMachine(model);
+            MachineOffsets.ApplyToSimulator(model);
 
             GrblCommand.ToolChange = GrblInfo.ManualToolChange ? "M61Q{0}" : (GrblInfo.HasATC ? "T{0}M6" : "T{0}");
 
@@ -882,8 +1119,15 @@ namespace GCode_Sender
                 Focus();
         }
 
+        // GlobalKeys (a class handler on Window) sees every key before this does and dispatches jog keys
+        // for the whole application. Both overrides below used to assign e.Handled unconditionally, which
+        // would hand the SAME key to ProcessKeypress a second time - a double jog command. Bail out when it
+        // has already been dealt with.
         protected override void OnPreviewKeyDown(KeyEventArgs e)
         {
+            if (e.Handled)
+                return;
+
             if (!(e.Handled = ProcessKeyPreview(e)))
             {
                 if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
@@ -894,6 +1138,9 @@ namespace GCode_Sender
         }
         protected override void OnPreviewKeyUp(KeyEventArgs e)
         {
+            if (e.Handled)
+                return;
+
             if (!(e.Handled = ProcessKeyPreview(e)))
                 base.OnPreviewKeyDown(e);
         }
@@ -905,7 +1152,11 @@ namespace GCode_Sender
         {
             // MDI now lives in the fixed bottom run-control bar (Phase 2c) - check its focus there.
             bool mdiFocused = MainWindow.ui.MdiControl?.IsFocused ?? false;
-            return model.Keyboard.ProcessKeypress(e, !(mdiFocused || (_dro?.IsFocused ?? false) || (spindleControl?.IsFocused ?? false) || (workParametersControl?.IsFocused ?? false)), this);
+
+            if (!(model.Keyboard is KeypressHandler keyboard))
+                return false;
+
+            return keyboard.ProcessKeypress(e, !(mdiFocused || (_dro?.IsFocused ?? false) || (spindleControl?.IsFocused ?? false) || (workParametersControl?.IsFocused ?? false)), this);
         }
 
 #endregion

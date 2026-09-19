@@ -55,8 +55,8 @@ ioSender.g.zh-CN.resources:mainwindow.baml,mnu_loadFolder:System.Windows.Control
 ioSender.g.en-US.resources:heightmapview.baml,hm_grpProbe:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Probe
 ioSender.g.en-US.resources:heightmapview.baml,hm_lblProbe:System.Windows.Controls.ContentControl.Content,Label,True,True,,Probe:
 ioSender.g.en-US.resources:heightmapview.baml,hm_grpArea:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Area to probe
-ioSender.g.en-US.resources:heightmapview.baml,hm_areaProgram:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,From program
-ioSender.g.en-US.resources:heightmapview.baml,hm_areaProgram:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Probe over the loaded job's XY extent, in the current work coordinates."
+ioSender.g.en-US.resources:heightmapview.baml,hm_areaProgram:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,From setup
+ioSender.g.en-US.resources:heightmapview.baml,hm_areaProgram:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Probe over the stock Setup measured, in its work coordinates - the same size the work order is built against. Falls back to the loaded program's extent if Setup has no stock size yet."
 ioSender.g.en-US.resources:heightmapview.baml,hm_areaTable:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Full table
 ioSender.g.en-US.resources:heightmapview.baml,hm_areaTable:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Probe the whole in-bounds machine travel envelope (referenced to the homed corner, like Surface spoilboard)."
 ioSender.g.en-US.resources:heightmapview.baml,hm_width:CNC.Controls.NumericField.Label,None,False,True,,W:
@@ -109,7 +109,7 @@ ioSender.g.en-US.resources:startjobview.baml,ls_rotate:System.Windows.FrameworkE
 ioSender.g.en-US.resources:startjobview.baml,ls_tloref:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Set tool-length reference
 ioSender.g.en-US.resources:startjobview.baml,ls_tloref:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Reference the tool length at the toolsetter puck (M6 T8, probe already in the spindle) after the origin is set - the core of a one-button job start. Requires ATC and a toolsetter at G59.3."
 ioSender.g.en-US.resources:startjobview.baml,ls_verifyskew:System.Windows.Controls.ContentControl.Content,Button,True,True,,Verify skew
-ioSender.g.en-US.resources:startjobview.baml,ls_verifyskew:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"After a measure run: re-apply the measured origin + skew rotation, then touch each corner in the rotated work frame. If the skew is right (and the stock square) the probe lands right at every corner."
+ioSender.g.en-US.resources:startjobview.baml,ls_verifyskew:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"After a measure run: re-apply the measured origin + skew rotation, then visit each corner in the rotated work frame. If the skew is right (and the stock square) every corner lines up."
 ioSender.g.en-US.resources:mainwindow.baml,mnu_openConfigFolder:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Open the per-user folder where ioSender keeps its settings (App.config), key mappings, grbl backups and restore points."
 ioSender.g.en-US.resources:mainwindow.baml,btn_copyMessage:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Copy the full status message to the clipboard
 ioSender.g.en-US.resources:programpanel.baml,btn_loadFolderHdr:System.Windows.Controls.ContentControl.Content,Button,True,True,,Load Folder...
@@ -181,7 +181,7 @@ ioSender.g.en-US.resources:startjobview.baml,ls_geomIsCircle:System.Windows.Cont
 ioSender.g.en-US.resources:startjobview.baml,ls_centerPasses:CNC.Controls.NumericField.Label,None,False,True,,Passes:
 ioSender.g.en-US.resources:startjobview.baml,ls_centerPasses:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Number of times to re-probe the center, each pass re-centering on the previous result. More than one pass is usually needed for accurate dimensions - matches the old Center Finder tab's own Passes field."
 ioSender.g.en-US.resources:startjobview.baml,ls_heightmap:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Probe height map
-ioSender.g.en-US.resources:startjobview.baml,ls_heightmap:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"After the origin/size are set, probe a grid over the measured stock area and apply the resulting height map to the loaded job - folds the Height Map tab's own probing into this run. Requires Measure (needs the stock area)."
+ioSender.g.en-US.resources:startjobview.baml,ls_heightmap:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"After the origin/size are set, open the Height Map view filled in for the measured stock, ready to probe. You press Start there, and the map is kept for a work order to apply - tick 'Apply height map' on the work order. Requires Measure (needs the stock area). You can also skip this and run Tools > Height Map yourself at any time."
 ioSender.g.en-US.resources:startjobview.baml,ls_hmGridX:CNC.Controls.NumericField.Label,None,False,True,,Grid X:
 ioSender.g.en-US.resources:startjobview.baml,ls_hmGridX:CNC.Controls.NumericField.Unit,None,False,True,,mm
 ioSender.g.en-US.resources:startjobview.baml,ls_hmGridX:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Grid spacing along X for the height-map probe (mm between probed points).
@@ -205,3 +205,68 @@ ioSender.g.en-US.resources:mainwindow.baml,mnu_loadWorkOrder:System.Windows.Cont
 ioSender.g.en-US.resources:mainwindow.baml,mnu_loadWorkOrder:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Switch to the Work Order tab and open a saved .workorder file.
 ioSender.g.en-US.resources:mainwindow.baml,txt_runFeedTip:System.Windows.Documents.Run.Text,Text,True,True,,Current feed rate
 ioSender.g.en-US.resources:mainwindow.baml,mnu_tools:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Tools
+ioSender.g.en-US.resources:mainwindow.baml,lbl_copied:System.Windows.Controls.TextBlock.Text,Text,True,True,,Copied
+ioSender.g.en-US.resources:mainwindow.baml,lbl_messageHistoryHint:System.Windows.Controls.TextBlock.Text,Text,True,True,,Click for the full message history since launch.
+ioSender.g.en-US.resources:programpanel.baml,txt_estRunTime:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Estimated run time at the programmed feed rates. No acceleration model, so a program of many short moves will take longer than this."
+ioSender.g.en-US.resources:mainwindow.baml,mnu_machineMirror:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Machine _mirror
+ioSender.g.en-US.resources:mainwindow.baml,mnu_machineMirror:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Read-only live view of the machine state as seen through the client/server wire protocol - a diagnostic for the split. Any disagreement with the main window is a protocol bug.
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirfootnote:System.Windows.Controls.TextBlock.Text,Text,True,True,,Read-only view fed solely by the MachineDelta stream - the same data a remote client would see. Any disagreement with the main window is a wire-protocol bug.
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirstate:System.Windows.Controls.TextBlock.Text,Text,True,True,,State
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirhomed:System.Windows.Controls.TextBlock.Text,Text,True,True,,Homed
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirmpos:System.Windows.Controls.TextBlock.Text,Text,True,True,,Machine position
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirwpos:System.Windows.Controls.TextBlock.Text,Text,True,True,,Work position
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirwco:System.Windows.Controls.TextBlock.Text,Text,True,True,,Work offset
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirwcs:System.Windows.Controls.TextBlock.Text,Text,True,True,,WCS / Tool
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirtlo:System.Windows.Controls.TextBlock.Text,Text,True,True,,TLO reference
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirfeed:System.Windows.Controls.TextBlock.Text,Text,True,True,,Feed
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirspindle:System.Windows.Controls.TextBlock.Text,Text,True,True,,Spindle
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirsignals:System.Windows.Controls.TextBlock.Text,Text,True,True,,Signals
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirprobe:System.Windows.Controls.TextBlock.Text,Text,True,True,,Probe
+ioSender.g.en-US.resources:mirrorwindow.baml,lbl_mirreporting:System.Windows.Controls.TextBlock.Text,Text,True,True,,Reporting
+ioSender.g.en-US.resources:mainwindow.baml,chk_jogContinuous:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Continuous
+ioSender.g.en-US.resources:mainwindow.baml,chk_jogContinuous:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Hold a jog button to move continuously; release to stop.
+ioSender.g.en-US.resources:mainwindow.baml,btn_mdiConsole:System.Windows.Controls.ContentControl.Content,Button,True,True,,MDI Console
+ioSender.g.en-US.resources:mainwindow.baml,btn_mdiConsole:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Open the console with the caret in its input box. Esc closes it.
+ioSender.g.en-US.resources:mainwindow.baml,btn_viewStatus:System.Windows.Controls.ContentControl.Content,Button,True,True,,Status
+ioSender.g.en-US.resources:mainwindow.baml,btn_viewStatus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show the status message history since launch.
+ioSender.g.en-US.resources:mainwindow.baml,lbl_coolant:System.Windows.Controls.TextBlock.Text,Text,True,True,,Coolant:
+ioSender.g.en-US.resources:mainwindow.baml,lbl_stripFlood:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Turn flood coolant on or off.
+ioSender.g.en-US.resources:mainwindow.baml,lbl_stripMist:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Turn mist coolant on or off.
+ioSender.g.en-US.resources:jobview.baml,str_msgConnected:System.String.$Content,None,True,True,,Connected: {0}
+ioSender.g.en-US.resources:jobview.baml,str_msgNotConnected:System.String.$Content,None,True,True,,Not connected: {0} did not complete the handshake.
+ioSender.g.en-US.resources:jobworkspace.baml,spl_jobSplit:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Drag to divide the space between the program view and the 3D view.
+ioSender.g.en-US.resources:mainwindow.baml,mnu_applyConfigOverlay:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Apply configuration _overlay...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_applyConfigOverlay:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Layer a configuration fragment (.ioconfig) onto this profile - for example to adopt a new screen layout - without disturbing your machine settings, profiles or macros. ioSender restarts to apply it, and it can be undone."
+ioSender.g.en-US.resources:mainwindow.baml,mnu_exportConfigOverlay:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,E_xport configuration overlay...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_exportConfigOverlay:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Save this profile's screen layout as a .ioconfig fragment that someone else can apply to their own installation. Machine identity (port, network host, machine) is never included."
+ioSender.g.en-US.resources:mainwindow.baml,mnu_undoConfigOverlay:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Undo configuration overlay
+ioSender.g.en-US.resources:mainwindow.baml,mnu_undoConfigOverlay:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Restore the configuration as it was immediately before the last overlay was applied. ioSender restarts.
+ioSender.g.en-US.resources:mainwindow.baml,mnu_loadSvgLaser:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Load SVG Laser _Job...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_loadSvgLaser:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Burn an SVG with the laser: pick the artwork, then set width, power, feed and shading. Settings are remembered between jobs."
+ioSender.g.en-US.resources:heightmapview.baml,hm_divX:CNC.Controls.NumericField.Label,None,False,True,,Divisions X:
+ioSender.g.en-US.resources:heightmapview.baml,hm_divY:CNC.Controls.NumericField.Label,None,False,True,,Y:
+ioSender.g.en-US.resources:heightmapview.baml,hm_pauseEachPoint:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Hold at each point (move the touch plate)
+ioSender.g.en-US.resources:heightmapview.baml,hm_pauseEachPoint:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Hold at every point, including the first, so the touch plate can be placed. The machine positions over the point and waits; press Continue, Cycle Start - or the shutter remote, if you have ticked that below. Untick only if the probe reaches the surface on its own - a spoilboard is not conductive, so a plate normally has to travel with the probe."
+ioSender.g.en-US.resources:heightmapview.baml,hm_continue:System.Windows.Controls.ContentControl.Content,Button,True,True,,Continue
+ioSender.g.en-US.resources:heightmapview.baml,hm_continue:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Resume a run that is holding for the touch plate to be moved. Cycle Start does the same thing.
+ioSender.g.en-US.resources:heightmapview.baml,hm_tabSurface:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Surface
+ioSender.g.en-US.resources:heightmapview.baml,hm_tabProgram:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Program
+ioSender.g.en-US.resources:heightmapview.baml,hm_tabProgram:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The probing program this run will send, listed before it moves anything. Rebuilt each time Start is pressed."
+ioSender.g.en-US.resources:heightmapview.baml,hm_tabSteps:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,Steps
+ioSender.g.en-US.resources:heightmapview.baml,hm_retry:System.Windows.Controls.ContentControl.Content,Button,True,True,,Retry
+ioSender.g.en-US.resources:heightmapview.baml,hm_retry:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Clear the alarm and carry on from the point that failed, keeping the readings already taken. Only offered when the controller reports the alarm as recoverable."
+ioSender.g.en-US.resources:heightmapview.baml,hm_allowance:CNC.Controls.NumericField.Label,None,False,True,,Drop allowance:
+ioSender.g.en-US.resources:heightmapview.baml,hm_allowance:CNC.Controls.NumericField.Unit,None,False,True,,mm
+ioSender.g.en-US.resources:heightmapview.baml,hm_legendTitle:System.Windows.Controls.TextBlock.Text,Text,True,True,,Height
+ioSender.g.en-US.resources:mainwindow.baml,mnu_restartIoSender:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Restart ioSender...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_restartIoSender:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Close and reopen ioSender. Settings are saved first. Clears anything held only in memory for this session - a stuck connection state, for example. Asks first."
+ioSender.g.en-US.resources:startjobview.baml,ls_verifytouch:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Touch corners
+ioSender.g.en-US.resources:startjobview.baml,ls_verifytouch:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Ticked: probe down at each corner - needs a 3D probe defined and fitted. Unticked: fly over the six points at machine top so you can sight the tool tip against each corner - no probe needed. Disabled when no 3D probe is defined.
+ioSender.g.en-US.resources:startjobview.baml,lbl_verifytool:System.Windows.Controls.TextBlock.Text,Text,True,True,,V-bit:
+ioSender.g.en-US.resources:startjobview.baml,cbx_verifytool:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Fly-over only: change to this V-bit before visiting the corners. Its point sights each corner exactly, and the tool change re-references the tool length so the 2mm sight gap is real rather than assumed. Leave at (none) to use whatever is already in the spindle. Only V-bit / chamfer tools are listed."
+ioSender.g.en-US.resources:startjobview.baml,ls_scribesquare:System.Windows.Controls.ContentControl.Content,Button,True,True,,Scribe square
+ioSender.g.en-US.resources:startjobview.baml,ls_scribesquare:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"CUTS a shallow square into the stock with the selected V-bit, inset 10mm from every edge of the measured frame, following the probed surface. Measure the scribed line against each stock edge afterwards: if the rotation is right the gap to the front edge is a constant 10mm end to end. Needs four probed corners and a V-bit selected."
+ioSender.g.en-US.resources:mainwindow.baml,mnu_manual:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_User manual
+ioSender.g.en-US.resources:mainwindow.baml,mnu_manual:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Open the user manual at the page for whatever you are looking at - the same thing F1 does. Assign a key to it under Settings &gt; Keyboard &gt; Top Level Menu Items.
+ioSender.g.en-US.resources:heightmapview.baml,hm_remote:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,A shutter remote drives the machine (volume keys)
+ioSender.g.en-US.resources:heightmapview.baml,hm_remote:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Let a Bluetooth camera shutter remote work the machine from arm's length. Here it presses Continue at each probe point, so the touch plate can be moved without walking back to the keyboard. It works everywhere else too: a prompt on screen takes volume up for OK and volume down for Cancel; a RUNNING job takes either key as Feed Hold; a HELD one takes volume up to resume and volume down to Stop. These remotes send a volume key, so ioSender swallows the key when it means one of those things - and only then: with nothing waiting, the volume keys are Windows' own."

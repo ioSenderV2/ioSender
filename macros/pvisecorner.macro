@@ -42,6 +42,8 @@ O<pvisecorner> SUB
   G10 L2 P1 X0 Y0 Z0
   G90
   (PRINT, PV ENTER rx=#<rx> ry=#<ry> rz=#<rz> rad=#<rad> clear=#<_lv_clear>)
+  ; The rest of the inputs, before the first motion - same reasoning as pcorner.macro's IN2..IN7 block.
+  (PRINT, PV IN2 searchf=#<_lv_searchf> latchf=#<_lv_latchf> zfloor=#<_lv_zfloor>)
 
   ; ================= jaw top Z, probed directly at the reference (already over the jaw) =================
   G53 G0 Z0                    ; rapid - Z0 is the machine top, always clear

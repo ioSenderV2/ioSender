@@ -130,13 +130,16 @@ namespace CNC.Controls.Probing
 
             if (!keyboardMappingsOk)
             {
-                KeypressHandler keyboard = grbl.Keyboard;
-
                 keyboardMappingsOk = true;
 
-                keyboard.AddHandler(Key.R, ModifierKeys.Alt, StartProbe, this);
-                keyboard.AddHandler(Key.S, ModifierKeys.Alt, StopProbe, this);
-                keyboard.AddHandler(Key.C, ModifierKeys.Alt, ProbeConnectedToggle, this);
+                // Keyboard is the portable JogController unless the host registered the WPF handler
+                // (see KeypressHandler.Register); everything below this block runs either way.
+                if (grbl.Keyboard is KeypressHandler keyboard)
+                {
+                    keyboard.AddHandler(Key.R, ModifierKeys.Alt, StartProbe, this);
+                    keyboard.AddHandler(Key.S, ModifierKeys.Alt, StopProbe, this);
+                    keyboard.AddHandler(Key.C, ModifierKeys.Alt, ProbeConnectedToggle, this);
+                }
             }
 
             // Probing parameters come from the shared probe library (Settings: App > Edit Probe
@@ -158,7 +161,12 @@ namespace CNC.Controls.Probing
             probeView.Filter += ProbeView_Filter;
             cbxProbe.ItemsSource = probeView.View;
 
-            grbl.OnCameraProbe += addCameraPosition;
+            // The camera-probe hub moved to the client layer (contracts-only discipline): the camera
+            // view no longer sees CNC.Core, so it publishes through MachineClient. Adapt the client
+            // position (plain X/Y/Z) back to this view's Core Position at the boundary. Null model =
+            // headless/harness host with no client attached; no camera there either.
+            if (CNC.Client.MachineClient.Model != null)
+                CNC.Client.MachineClient.Model.OnCameraProbe += p => addCameraPosition(new Position(p.X, p.Y, p.Z));
 
             // The selection that fired before this ran got skipped, so apply it now that there IS a model -
             // otherwise the tab you are looking at is never told it is the active one.
@@ -201,7 +209,7 @@ namespace CNC.Controls.Probing
 
         private void addCameraPosition(Position position)
         {
-            if (grbl.IsProbing)
+            if (CNC.Client.MachineClient.Model?.IsProbing == true)
             {
                 if(model.CameraPositions == 0)
                 {
@@ -325,7 +333,10 @@ namespace CNC.Controls.Probing
 
         public void Activate(bool activate, ViewType chgMode)
         {
-            if ((grbl.IsProbing = activate))
+            // IsProbing lives on the client twin now (camera binds its button-enable to it).
+            if (CNC.Client.MachineClient.Model != null)
+                CNC.Client.MachineClient.Model.IsProbing = activate;
+            if (activate)
             {
                 if (model.CoordinateSystems.Count == 0)
                 {
@@ -355,7 +366,6 @@ namespace CNC.Controls.Probing
                 if (!(wasMetric = GrblParserState.IsMetric))
                     model.WaitForResponse("G21");
 
-                model.ProbeVerified = !AppConfig.Settings.Probing.ValidateProbeConnected;
                 model.DistanceMode = GrblParserState.DistanceMode;
                 model.Tool = model.Grbl.Tool == GrblConstants.NO_TOOL ? "0" : model.Grbl.Tool;
                 model.CanProbe = !model.Grbl.Signals.Value.HasFlag(Signals.Probe);
@@ -420,24 +430,32 @@ namespace CNC.Controls.Probing
 
         #endregion
 
+        // Bail when GlobalKeys (class handler on Window) has already dispatched this key - assigning
+        // e.Handled unconditionally here would hand the same key to ProcessKeypress twice.
         protected override void OnPreviewKeyDown(KeyEventArgs e)
         {
+            if (e.Handled)
+                return;
+
             if (!(e.Handled = ProcessKeyPreview(e)))
                 base.OnPreviewKeyDown(e);
         }
         protected override void OnPreviewKeyUp(KeyEventArgs e)
         {
+            if (e.Handled)
+                return;
+
             if (!(e.Handled = ProcessKeyPreview(e)))
                 base.OnPreviewKeyDown(e);
         }
         protected bool ProcessKeyPreview(KeyEventArgs e)
         {
-            if (grbl.Keyboard == null)
+            if (!(grbl?.Keyboard is KeypressHandler keyboard))
                 return false;
 
             // Keyboard jogging is always available here; ProcessKeypress only jogs when focus is not in a
             // text box (so typing a value never jogs) - so no "activate jogging" gate/button is needed.
-            return grbl.Keyboard.ProcessKeypress(e, true, this);
+            return keyboard.ProcessKeypress(e, true, this);
         }
 
         private void tab_SelectionChanged(object sender, SelectionChangedEventArgs e)

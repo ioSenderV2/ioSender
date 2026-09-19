@@ -45,3 +45,4 @@ CNC.Controls.Viewer.g.en-US.resources:carveview.baml,btn_carvePause:System.Windo
 CNC.Controls.Viewer.g.en-US.resources:carveview.baml,btn_carveStop:System.Windows.Controls.ContentControl.Content,Button,True,True,,Stop
 CNC.Controls.Viewer.g.en-US.resources:carveview.baml,btn_carveReset:System.Windows.Controls.ContentControl.Content,Button,True,True,,Reset view
 CNC.Controls.Viewer.g.en-US.resources:carveview.baml,cbxSpeed:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Playback speed
+CNC.Controls.Viewer.g.en-US.resources:carveview.baml,txt_carveNoStock:System.Windows.Controls.TextBlock.Text,Text,True,True,,No stock size information

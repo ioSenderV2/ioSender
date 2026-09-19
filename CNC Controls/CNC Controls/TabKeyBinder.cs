@@ -1,4 +1,4 @@
-/*
+﻿/*
  * TabKeyBinder.cs - part of CNC Controls library
  *
  * Right-click "Bind to Key" support for the bindable main-page tabs and Settings sub-tabs, plus the live
@@ -259,7 +259,11 @@ namespace CNC.Controls
 
         // label may be a plain string or an existing header element (e.g. a named, colour-coded TextBlock that
         // other code recolours by field reference) - the element is hosted as-is so those references keep working.
-        public TabHeaderControl(object label, string tabId)
+        //
+        // onClose, when given, adds a close button to the right of the label. Only a tab that can be
+        // RELAUNCHED gets one - see MainWindow.isClosableTab - so there is no way to close a view into
+        // unreachability.
+        public TabHeaderControl(object label, string tabId, System.Action onClose = null)
         {
             this.tabId = tabId;
 
@@ -274,6 +278,7 @@ namespace CNC.Controls
             var grid = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch, Background = Brushes.Transparent };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             FrameworkElement text;
             if (label is FrameworkElement fe)
@@ -302,6 +307,39 @@ namespace CNC.Controls
 
             grid.Children.Add(text);
             grid.Children.Add(shortcut);
+
+            if (onClose != null)
+            {
+                // A bare glyph in a borderless button rather than a styled Button: the tab header is small and
+                // already carries a shortcut badge, so anything with chrome fights the label for space. The
+                // hit area is padded well beyond the glyph, which is 8px of "x" and impossible to hit otherwise.
+                var close = new Button
+                {
+                    Content = "✕",                     // MULTIPLICATION X - reads as a close affordance at small sizes
+                    FontSize = 10,
+                    Padding = new Thickness(4, 0, 4, 0),
+                    Margin = new Thickness(6, -2, 0, 0),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Background = Brushes.Transparent,
+                    BorderThickness = new Thickness(0),
+                    Focusable = false,                       // never take focus from the view the tab hosts
+                    Cursor = System.Windows.Input.Cursors.Hand,
+                    Opacity = 0.55,
+                    ToolTip = "Close this tab. It stays in the menu it was opened from.",
+                    // Per-tab, not a bare "btn_closeTab": every tab would otherwise carry the SAME Uid and
+                    // the UI test server could not say which X it meant. tabId is null for the component
+                    // tabs (no ViewType), so fall back to the label, which is unique among them.
+                    Uid = "btn_closeTab_" + (string.IsNullOrEmpty(tabId) ? this.label : tabId).Replace(" ", string.Empty)
+                };
+                close.MouseEnter += (s2, e2) => close.Opacity = 1.0;
+                close.MouseLeave += (s2, e2) => close.Opacity = 0.55;
+                // Handled, so the click closes the tab WITHOUT also selecting it on the way past - clicking
+                // the X of a background tab should not first switch to it.
+                close.Click += (s2, e2) => { e2.Handled = true; onClose(); };
+                Grid.SetColumn(close, 2);
+                grid.Children.Add(close);
+            }
+
             Content = grid;
 
             Loaded += (s, e) => { AppConfig.TabShortcutsChanged += Refresh; Refresh(); };

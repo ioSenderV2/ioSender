@@ -16,6 +16,35 @@ namespace RenderHarness
     // loading AppConfig, rendering, and saving the PNG.
     static class Scenarios
     {
+        /// <summary>
+        /// Select a tab before rendering. A TabControl only realises the SELECTED tab, so with
+        /// SizeToContent the window measures to whichever tab is showing - and a scenario that only ever
+        /// renders tab 0 cannot tell you the dialog fits, only that its shortest page does.
+        /// </summary>
+        static Window Tab(Window w, int index)
+        {
+            var tc = FindTab(w.Content as DependencyObject);
+            if (tc == null)
+                throw new InvalidOperationException("no TabControl found - the scenario asked for a tab this window does not have");
+            tc.SelectedIndex = index;
+            return w;
+        }
+
+        static System.Windows.Controls.TabControl FindTab(DependencyObject node)
+        {
+            if (node == null)
+                return null;
+            if (node is System.Windows.Controls.TabControl found)
+                return found;
+            foreach (var child in LogicalTreeHelper.GetChildren(node))
+            {
+                var hit = FindTab(child as DependencyObject);
+                if (hit != null)
+                    return hit;
+            }
+            return null;
+        }
+
         public static readonly Dictionary<string, Func<Window>> All = new Dictionary<string, Func<Window>>(StringComparer.OrdinalIgnoreCase)
         {
             ["FixtureEditDialog"] = () =>
@@ -41,6 +70,35 @@ namespace RenderHarness
             ["AppMessageBox"] = () =>
                 new AppMessageBox("This is a test message to check whether DialogScaling.Apply is actually scaling this window.",
                     "Startup message", MessageBoxButton.OK, MessageBoxImage.Information, MessageBoxResult.None),
+
+            // Added after the single-column version grew taller than a screen and put OK/Cancel out of
+            // reach. The interesting measurement here is the window's total HEIGHT against the work
+            // area - so the scenario fills in the transient values the real import supplies, otherwise
+            // the summary lines render short and the dialog measures smaller than it ever will in use.
+            ["SvgLaserDialog"] = () =>
+            {
+                var settings = SvgLaserSettings.Current;
+                settings.FilePath = @"C:\Users\steve\OneDrive\CNC\Snorkel_large_stave.svg";
+                settings.Aspect = 0.649157d;
+                settings.MaxPower = 1000d;
+                settings.LaserModeOn = true;
+                return new CNC.Converters.SvgLaserDialog(settings);
+            },
+
+            // The same dialog with everything that expands: shading fields enabled, several copies, and
+            // the beam disabled so the extra pinned warning line is present. If THIS fits, the dialog fits.
+            ["SvgLaserDialog.Tall"] = () =>
+            {
+                var settings = SvgLaserSettings.Current;
+                settings.FilePath = @"C:\Users\steve\OneDrive\CNC\Snorkel_large_stave.svg";
+                settings.Aspect = 0.649157d;
+                settings.MaxPower = 1000d;
+                settings.LaserModeOn = false;
+                settings.BeamOn = false;
+                settings.Fill = true;
+                settings.Copies = 4;
+                return Tab(new CNC.Converters.SvgLaserDialog(settings), 2);   // Burn - the tallest page
+            },
         };
     }
 
@@ -63,6 +121,10 @@ namespace RenderHarness
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
 
             var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+
+            // CNC.Core marshals to the UI thread and pumps messages through this rather than through
+            // Application.Current.Dispatcher; AppConfig.LoadConfig below calls EventUtils.DoEvents.
+            UiPump.Register();
 
             // Real on-disk config (whatever profile "ioSender" resolves to on this machine) - read-only,
             // this harness never calls Save(). Must run before touching AppConfig.Settings.Base (it's

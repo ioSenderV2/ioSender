@@ -188,26 +188,14 @@ namespace CNC.Controls
 
         // If 'code' is a single "@<path>" line and <path> has no extension, appends the default
         // ".macro" extension to the path portion - so what's typed/stored/displayed is unambiguous
-        // rather than relying on resolve-time defaulting alone (MacroProcessor.ResolveFileReference
-        // does the same, as a safety net for references normalized before this existed).
+        // rather than relying on resolve-time defaulting alone.
+        // The implementation moved to CNC.Core.MacroRunner: the run-time resolver
+        // (MacroRunner.ResolveFileReference) applies the same rule as a safety net for references
+        // normalized before this existed, and it lives in Core now - so this is the one definition
+        // both use rather than two that can drift.
         internal static string NormalizeMacroReference(string code)
         {
-            if (string.IsNullOrEmpty(code))
-                return code;
-
-            string trimmed = code.TrimStart();
-            if (!trimmed.StartsWith("@"))
-                return code;
-
-            string rest = trimmed.Substring(1);
-            int nl = rest.IndexOfAny(new[] { '\r', '\n' });
-            string path = (nl >= 0 ? rest.Substring(0, nl) : rest).Trim();
-            string tail = nl >= 0 ? rest.Substring(nl) : string.Empty;
-
-            if (path.Length == 0 || Path.HasExtension(path))
-                return code;
-
-            return "@" + path + ".macro" + tail;
+            return MacroRunner.NormalizeMacroReference(code);
         }
 
         // If the macro is an "@<path>" reference, return the resolved file path (relative paths

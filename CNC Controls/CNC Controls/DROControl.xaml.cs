@@ -86,10 +86,8 @@ namespace CNC.Controls
             if (System.ComponentModel.DesignerProperties.GetIsInDesignMode(this))
                 return;
 
-            if (!keyboardMappingsOk && DataContext is GrblViewModel)
+            if (!keyboardMappingsOk && (DataContext as GrblViewModel)?.Keyboard is KeypressHandler keyboard)
             {
-                KeypressHandler keyboard = (DataContext as GrblViewModel).Keyboard;
-
                 keyboardMappingsOk = true;
 
                 keyboard.AddHandler(Key.X, ModifierKeys.Control | ModifierKeys.Shift, ZeroX);

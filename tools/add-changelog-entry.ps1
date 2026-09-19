@@ -34,6 +34,12 @@
 param(
     [Parameter(Mandatory = $true)][string]$Spec,
     [string]$Html = 'Overview.html',
+    # Label for the "not released yet" TOC header created above the first entry added after a
+    # release. Generic by default because this script runs locally and cannot derive the next
+    # version number (that comes from the releases API at release time, in cut-release.ps1) or a
+    # PR number. Pass something specific - e.g. -PendingLabel 'Pending 2.42 (PR 20)' - when the
+    # target version is actually known.
+    [string]$PendingLabel = 'Unreleased',
     [switch]$Pdf
 )
 
@@ -110,6 +116,28 @@ $tocRow = "<tr><td class=""n"">$N</td><td><a href=""#pr$N"">$tocTitle</a></td><t
 $totIdx = $content.IndexOf('<tr class="tot">')
 if ($totIdx -lt 0) { Fail "no <tr class=""tot""> totals row found" }
 $content = $content.Insert($totIdx, $tocRow)
+
+# --- 4b. "Pending" header, if this is the first entry since the last release ---
+# Without this, an entry added after a release falls under the PREVIOUS version's header and the
+# TOC silently claims it shipped in a release that predates it. That is not hypothetical: #218-#268
+# accumulated under "Version 2.41", a release that actually stopped at #217, so 51 unreleased
+# entries read as shipped until someone noticed.
+#
+# The rule is deliberately simple: an entry being added now is by definition unreleased, so if no
+# pending header exists, put one directly above this new row. If one already exists, this entry
+# just joins the group under it. cut-release.ps1 removes the row when the release is cut, which is
+# what makes "does a pending header exist?" a correct test for "have we released since the last
+# entry?" - the two halves only work as a pair.
+if ($content -notmatch '<tr class="ver-hdr pending"') {
+    $marker = "<tr><td class=""n"">$N</td>"
+    if ($content.Contains($marker)) {
+        $pendHdr = "<tr class=""ver-hdr pending"" id=""pending""><td colspan=""3"">$PendingLabel</td></tr>`n"
+        $content = $content.Replace($marker, $pendHdr + $marker)
+        Write-Host "Inserted pending header '$PendingLabel' above #$N (first entry since the last release)." -ForegroundColor Cyan
+    } else {
+        Write-Host "WARN: TOC row for #$N not found - pending header not inserted" -ForegroundColor Yellow
+    }
+}
 
 # --- 5. Totals row: add this entry's numbers to the existing totals --------
 $totRe = 'Totals \((\d+) changes\).*?<span class="chg">(\d+)</span> <span class="del">(\d+)</span> <span class="add">\+?(\d+)</span><br><span class="k">Lines:</span> <span class="add">\+(\d+)</span> <span class="del">-?(\d+)</span>'

@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:CNC.Controls"
-             xmlns:gcode="clr-namespace:CNC.GCode;assembly=CNC.Core"
+             xmlns:gcode="clr-namespace:CNC.GCode;assembly=CNC.Contracts"
              mc:Ignorable="d" 
              d:DesignHeight="216" d:DesignWidth="216"
              Loaded="DRO_Loaded">
@@ -48,6 +48,7 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="X">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.X" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.X" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>
@@ -59,6 +60,7 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="Y">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.Y" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.Y" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>
@@ -70,6 +72,7 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="Z">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.Z" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.Z" Mode="OneWay"/>
                         <Binding Path="ToolOffset.Z" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
@@ -82,6 +85,7 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="A">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.A" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.A" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>
@@ -93,6 +97,7 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="B">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.B" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.B" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>
@@ -104,6 +109,7 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="C">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.C" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.C" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>
@@ -115,6 +121,7 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="U">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.U" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.U" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>
@@ -126,6 +133,7 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="V">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.V" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.V" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>
@@ -137,11 +145,12 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="W">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.W" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.W" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>
             <Button x:Uid="btn_zeroAll" x:Name="btnZeroAll" Content="Zero all" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" Focusable="False" MinWidth="180" HorizontalAlignment="Center" Margin="2,3" Click="btnZeroAll_Click"
-                    ToolTip="Set the work coordinate to 0 on all axes at the current position."/>
+                    ToolTip="Make the current position the work origin on all axes: the DRO reads zero here afterwards (G10 L20). Any G92 or tool length offset in effect is accounted for."/>
         </StackPanel>
     </GroupBox>
 </UserControl>

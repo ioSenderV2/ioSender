@@ -52,9 +52,15 @@
                     ToolTip="Push the feed and plunge back up 10%."/>
         </StackPanel>
         <TextBlock x:Name="txtNudge" Foreground="#586069" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
-            <Button x:Uid="fs_ok" Content="OK" MinWidth="80" MinHeight="26" Margin="0,0,8,0" IsDefault="True" Click="btnOK_Click"/>
-            <Button x:Uid="fs_cancel" Content="Cancel" MinWidth="80" MinHeight="26" IsCancel="True"/>
-        </StackPanel>
+        <DockPanel Margin="0,14,0,0" LastChildFill="False">
+            <!-- This dialog owns the CUTTING NUMBERS; the tool's own geometry - diameter, flutes, V-bit
+                 included angle - belongs to its definition and is edited there, so there is one source of
+                 truth. It was only reachable by right-clicking the tool in the list, which is not a gesture
+                 anyone finds: you set a V-bit's angle when creating it and then cannot see it again. -->
+            <Button x:Uid="fs_edittool" x:Name="btnEditTool" DockPanel.Dock="Left" Content="Edit tool…" MinWidth="90" MinHeight="26" Click="btnEditTool_Click"
+                    ToolTip="Edit this tool's own definition - name, type, diameter, flute count, and the included angle for a V-bit or countersink. Those describe the cutter itself, so they live with the tool rather than with these cutting numbers."/>
+            <Button x:Uid="fs_cancel" DockPanel.Dock="Right" Content="Cancel" MinWidth="80" MinHeight="26" IsCancel="True"/>
+            <Button x:Uid="fs_ok" DockPanel.Dock="Right" Content="OK" MinWidth="80" MinHeight="26" Margin="0,0,8,0" IsDefault="True" Click="btnOK_Click"/>
+        </DockPanel>
     </StackPanel>
 </Window>

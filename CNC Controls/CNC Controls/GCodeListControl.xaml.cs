@@ -144,6 +144,9 @@ namespace CNC.Controls
         // hover timers: show ~450 ms after the pointer settles on a row; close ~250 ms after it leaves the row
         // AND the balloon (the gap lets the pointer travel onto the balloon to click it).
         private System.Windows.Threading.DispatcherTimer _explainShow, _explainClose;
+        // Watchdog for a balloon that was opened and then never told to close. See EnsureExplainTimers.
+        private System.Windows.Threading.DispatcherTimer _explainWatch;
+        private int _explainIdleTicks;
         private DataGridRow _hoverRow;
         // Captured at MouseEnter, not re-read from _hoverRow.Item when the (450ms-delayed) show-timer fires -
         // EnableRowVirtualization means the SAME DataGridRow container can be recycled onto a DIFFERENT
@@ -163,6 +166,36 @@ namespace CNC.Controls
             _explainShow.Tick += (s, e) => { _explainShow.Stop(); ShowExplain(); };
             _explainClose = new System.Windows.Threading.DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(250) };
             _explainClose.Tick += (s, e) => { _explainClose.Stop(); explainPopup.IsOpen = false; };
+
+            // The only close path above is the anchor row's OWN MouseLeave, so an event that never arrives
+            // strands a StaysOpen popup permanently - anchored to a DataGridRow that may not even exist any
+            // more, which leaves no way to dismiss it short of restarting. That is not hypothetical here:
+            // _hoverBlock's note directly above already records that virtualization recycles a container onto
+            // a different block WITHOUT a matching MouseLeave/MouseEnter pair, and the end of a job
+            // re-templates every row at once as Sent flips to "ok". Seen 2026-08-06 - a work order finished
+            // and left the balloon on screen, undismissable.
+            //
+            // Rather than chase each way an event can go missing, watch the thing that actually matters: is
+            // anyone using this balloon? Closing only after NEITHER the anchor row NOR the balloon has been
+            // under the pointer for two consecutive ticks means it cannot fire while the balloon is genuinely
+            // being read, nor during the 250ms grace the pointer gets to travel onto it.
+            _explainWatch = new System.Windows.Threading.DispatcherTimer { Interval = System.TimeSpan.FromSeconds(1) };
+            _explainWatch.Tick += (s, e) =>
+            {
+                if (!explainPopup.IsOpen)
+                {
+                    _explainWatch.Stop();
+                    return;
+                }
+
+                bool inUse = (_hoverRow != null && _hoverRow.IsMouseOver) || explainPopup.IsMouseOver;
+                _explainIdleTicks = inUse ? 0 : _explainIdleTicks + 1;
+                if (_explainIdleTicks >= 2)
+                {
+                    _explainWatch.Stop();
+                    explainPopup.IsOpen = false;
+                }
+            };
         }
 
         private void Row_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
@@ -194,6 +227,8 @@ namespace CNC.Controls
             explainPopup.PlacementTarget = _hoverRow;
             explainPopup.IsOpen = false;   // force a reposition when moving between rows
             explainPopup.IsOpen = true;
+            _explainIdleTicks = 0;
+            _explainWatch.Start();
         }
 
         private void ExplainPopup_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
@@ -269,7 +304,12 @@ namespace CNC.Controls
             // nudged a column splitter. ItemContainerGenerator raises this however the items change and
             // whichever collection is bound, so this one hook covers the file load, the Work Order handoff,
             // SetProgram, and the empty-at-startup case that the Loaded call alone could never fix.
-            grdGCode.ItemContainerGenerator.ItemsChanged += (s, ea) => RefreshDataColumnWidth();
+            // The source highlight rides the same hook, for the same reason. It is derived from
+            // GCode.File.IsLoaded - which is simply "are there any blocks" - so it becomes wrong the moment
+            // rows appear and nothing recomputes it. Loading a file did exactly that: the list rendered
+            // white, and only a tab switch (which pokes MacroProcessor and raises ActiveProgramChanged) put
+            // it right. Assigning the same frozen brush again is a no-op, so this is safe to run per batch.
+            grdGCode.ItemContainerGenerator.ItemsChanged += (s, ea) => { RefreshDataColumnWidth(); RefreshSourceHighlight(); };
 
             // While the grid is empty the Data column carries an explicit pixel width (see
             // RefreshDataColumnWidth), and a pixel width does not follow a resize the way Star would - so
@@ -465,6 +505,26 @@ namespace CNC.Controls
         private void ApplyGrouping(bool grouped)
         {
             var view = CollectionViewSource.GetDefaultView(grdGCode.DataContext);
+
+            // Durable instrumentation, because "the outline was there and then it wasn't" is otherwise
+            // unanswerable from the outside: there is more than one GCodeListControl over the SAME loaded
+            // job (the Job tab's docked ProgramPanel and MainWindow's jobProgramView), they share one
+            // collection view, and they are kicked by DIFFERENT triggers - SetProgram for one, the
+            // HasOutline notification for both. Say which instance ran, what it decided, and whether the
+            // blocks it is grouping actually carry a Section yet: a grouped view over Section==null blocks
+            // is what "the outline disappeared" looked like on 2026-09-18.
+            if (DebugLog.Enabled)
+            {
+                int blocks = 0, sectioned = 0;
+                if (grdGCode.DataContext is System.Collections.IEnumerable items)
+                    foreach (var o in items)
+                        if (o is GCodeBlock b) { blocks++; if (b.Section != null) sectioned++; }
+                DebugLog.Write("gcode", string.Format(
+                    "ApplyGrouping({0}) on list #{1} (shows the loaded job={2}): {3} block(s), {4} with a Section, view={5}",
+                    grouped, GetHashCode(), _program == null, blocks, sectioned,
+                    view == null ? "NONE" : view.GetType().Name));
+            }
+
             if (view == null)
                 return;
 
@@ -531,12 +591,71 @@ namespace CNC.Controls
             if (startIndex < 0 || endIndex < 0 || !model.StartFromBlock.CanExecute(startIndex))
                 return;
 
+            // Whether the program has a lead-in to run decides both what the prompt promises and which branch
+            // below runs, so it is settled before the operator is asked rather than after.
+            //
+            // Asked by NAME, not by "where is the first section start". The lead-in's own first block IS
+            // marked as a section start - it has to be, or the group would not render - so a "first section
+            // start > 0" test could never be true and this always took the no-lead-in branch. The symptom was
+            // a prompt confidently telling the operator the program had no start-up section when it did.
+            bool haveLeadIn = GCode.File.Data.Count > 0 && GCode.File.Data[0].Section == GCodeJob.LeadInSectionName;
+
+            // Says what HAPPENS, and nothing else. Two earlier drafts said more and both were worse: one
+            // explained the neutralise-and-stream mechanism and warned about the cost on a large file, the
+            // next still claimed it "runs the entire file", which stopped being true once skipped toolpaths
+            // were genuinely skipped rather than sent as empty comments. Three sections named, in the order
+            // they run, is the whole truth.
             string prompt = runOnlyThisToolpath
-                ? string.Format("Run only toolpath \"{0}\"?\r\rThe program will stop at the end of this toolpath.", group.Name)
-                : string.Format("Start the run from toolpath \"{0}\" and continue to the end?", group.Name);
+                ? (haveLeadIn
+                    ? string.Format("Run only toolpath \"{0}\"?\r\rThis will run Program start, this toolpath, and Program end. In that order.", group.Name)
+                    : string.Format("Run only toolpath \"{0}\"?\r\rThe program stops at the end of this toolpath. There is no Program start section to run, so units, plane and work offset will be whatever the machine currently holds.", group.Name))
+                : (haveLeadIn
+                    ? string.Format("Start the run from toolpath \"{0}\"?\r\rThis will run Program start, then from this toolpath to the end of the program.", group.Name)
+                    : string.Format("Start the run from toolpath \"{0}\" and continue to the end?\r\rThere is no Program start section to run, so units, plane and work offset will be whatever the machine currently holds.", group.Name));
 
             if (AppDialogs.Show(prompt, "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
                 return;
+
+            // BOTH commands run the program's OWN preamble rather than a synthetic prolog, whenever there is
+            // one to run. That is a correctness change, not a convenience: started mid-program, a section
+            // sets no units, no plane and no work offset - it inherited whatever happened to be live. The
+            // three-word prolog only ever covered the first two of those.
+            //
+            // Expressed as a filter over the whole program rather than a block range, because neither
+            // command's real extent is contiguous: both begin with Program start and then jump. The pump
+            // advances past a filtered-out block without sending anything.
+            //
+            // Falls back to the old behaviour - bound the run, queue the synthetic prolog - for a program
+            // with no Program start section, which is any file whose very first block is already inside a
+            // section.
+            if (haveLeadIn)
+            {
+                string chosen = first.Section;
+                int from = startIndex;
+
+                model.RunBlockFilter = runOnlyThisToolpath
+                    // Program start, this toolpath, Program end. In that order.
+                    ? (System.Func<int, bool>)(i =>
+                    {
+                        var b = i >= 0 && i < GCode.File.Data.Count ? GCode.File.Data[i] : null;
+                        return b != null && (b.Section == GCodeJob.LeadInSectionName ||
+                                             b.Section == chosen ||
+                                             b.Section == GCodeJob.EpilogueSectionName);
+                    })
+                    // Program start, then from this toolpath to the end - so everything after the chosen
+                    // section runs too, Program end included, by virtue of being after it.
+                    : (i =>
+                    {
+                        if (i >= from)
+                            return true;
+                        var b = i >= 0 && i < GCode.File.Data.Count ? GCode.File.Data[i] : null;
+                        return b != null && b.Section == GCodeJob.LeadInSectionName;
+                    });
+                // The program's own preamble replaces the synthetic prolog - it is the real thing the author
+                // wrote, so nothing needs re-establishing by hand.
+                model.StartFromBlock.Execute(0);
+                return;
+            }
 
             // Bound the run to this section only, when requested.
             if (runOnlyThisToolpath)
@@ -565,10 +684,30 @@ namespace CNC.Controls
 
         private void StartHere_Click(object sender, RoutedEventArgs e)
         {
+            // Warning, not a question. The prompt now NAMES what is and is not re-established and points at
+            // Start from toolpath as the supported route (see the VerifyStartFrom resource) - the old wording
+            // asked "are you sure the controller is in the correct state" without ever saying which parts of
+            // that state the app was about to leave alone. OKCancel rather than YesNo because the operator is
+            // acknowledging a limitation rather than answering a question, and it defaults to Cancel.
             if (grdGCode.SelectedItems.Count == 1 &&
                  AppDialogs.Show(string.Format(LibStrings.FindResource("VerifyStartFrom"), ((GCodeBlock)(grdGCode.SelectedItems[0])).LineNum),
-                                  "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes)
+                                  "ioSender", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) == MessageBoxResult.OK)
             {
+                // The SAME modal-reset prolog StartSection queues. Starting from a selected LINE skips
+                // whatever set the distance/feed mode, plane and units earlier in the program for exactly
+                // the same reason starting from a toolpath does - but only StartSection ever sent it, so
+                // this path resumed on whatever modal state happened to be live from the last thing the
+                // machine did. Two routes into one operation, one of them arbitrarily unprotected.
+                //
+                // Deliberately NOT widened while fixing the inconsistency: the prolog restores units,
+                // plane and distance/feed mode, and it does NOT restore the WCS, the tool-length offset,
+                // the feed rate or the spindle. Adding those is a real gap (see docs/Architecture-Peek.md
+                // section 10) but it is a DESIGN change, not a bug fix - a blind M3 in a prolog would start
+                // a spindle on a resume the operator may not be standing at. Making the two paths agree is
+                // the defect; what they agree ON is a separate decision.
+                foreach (var line in GCodeJob.DefaultProlog)
+                    GCode.File.Commands.Enqueue(line);
+
                 (DataContext as GrblViewModel).StartFromBlock.Execute(grdGCode.SelectedIndex);
             }
         }
