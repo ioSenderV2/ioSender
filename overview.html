@@ -160,7 +160,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>376 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>390 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -283,6 +283,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>The acknowledgement wait raced the status poller; and the dialog asserted a cause it had never established</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr370">370</a></td></tr>
 <tr><td>Non-focusable buttons raise no focus-lost, so a length field's pending edit never reached the value the handler read</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr371">371</a></td></tr>
 <tr><td>The Overview page contradicted the navigation tree three inches to its left, and the manual</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr373">373</a></td></tr>
+<tr><td>A fixture&rsquo;s Set button asks the controller where it is, instead of trusting the last status report.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr380">380</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -407,6 +408,11 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>WPF resolves properties, not fields, so every row rendered empty and the selection never matched</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr366">366</a></td></tr>
 <tr><td>A scribed rectangle inset 10 mm from the measured frame turns an angular error into a taper read with calipers</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr367">367</a></td></tr>
 <tr><td>A measurement describes one piece of stock - saying the stock is a different size says the measurement is of something else</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr374">374</a></td></tr>
+<tr><td>Probe a map during setup, then tick Apply height map on the work order &mdash; with a refusal when the map no longer matches the setup.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr381">381</a></td></tr>
+<tr><td>A tool change no longer looks like a moved work origin, and the origin is stamped with a tool offset that is actually current.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr382">382</a></td></tr>
+<tr><td>Setup hands off to Tools &gt; Height map, which takes its area From setup and remembers how it was set up.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr383">383</a></td></tr>
+<tr><td>Absolute traverses, a safe lift that names Z, and a hold before EVERY point including the first.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr384">384</a></td></tr>
+<tr><td>An open path&rsquo;s chamfer traces BOTH top edges of the groove, offset by the roughing bit&rsquo;s radius.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr389">389</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -471,6 +477,10 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Generate makes the program the loaded job on the Job tab; the run's end gives the previous one back, and Esc discards it</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr343">343</a></td></tr>
 <tr><td>A tool-length offset was reported as absent exactly when it was present, and one of two start-from paths restored no modal state</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr375">375</a></td></tr>
 <tr><td>The program list groups into collapsible toolpaths on any file with M6, and either one of them or everything from one onward can be run on its own</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr376">376</a></td></tr>
+<tr><td>One collection notification for a 43,000-block rebuild instead of 43,000, with a wait cursor and an elapsed time.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr386">386</a></td></tr>
+<tr><td>Two token types were missing from the g-code writer&rsquo;s switch and were rewritten to their command name.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr387">387</a></td></tr>
+<tr><td>&ldquo;T1 - 1/4&Prime; 2 flute end mill&rdquo; rather than the name of the first of its five operations.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr388">388</a></td></tr>
+<tr><td>The g-code emulator yields ONE frame &mdash; work coordinates &mdash; so the 3D view and the stock finally agree.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr390">390</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -506,6 +516,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Directive lines skipped the paren sanitiser, so an inner ')' ran the rest of the sentence together</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr345">345</a></td></tr>
 <tr><td>Setup's rotation line assigned a leading zero and left the rest of the expression in the block</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr351">351</a></td></tr>
 <tr><td>Reading back through the log was impossible with a connected machine; the view is now held on the same TEXT</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr360">360</a></td></tr>
+<tr><td>A few-pound camera remote answers prompts, feed-holds a running job and resumes a held one.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr385">385</a></td></tr>
 </table>
 
 <h3>Polish, onboarding &amp; docs</h3>
@@ -571,6 +582,9 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Load SVG Laser Job is off by default again and enabled per launch with -enableSVGLaserJob, so nothing has to be remembered and reverted before a push.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr315">315</a></td></tr>
 <tr><td>The skew readout showed mojibake where the degree and delta signs should have been</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr361">361</a></td></tr>
 <tr><td>The default category filter subtracted twenty channels instead of adding one</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr364">364</a></td></tr>
+<tr><td>Every topic the 2026-09-17 audit listed as MISSING is now written, including the laser path, height maps and calibration.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr377">377</a></td></tr>
+<tr><td>A menu item and a bindable key for the manual, opening at the topic for the screen you are on.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr378">378</a></td></tr>
+<tr><td>Modal prompts now own the ACTIVE window, so one raised over a Topmost dialog cannot hide behind it.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr379">379</a></td></tr>
 </table>
 </div>
 
@@ -989,7 +1003,21 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">374</td><td><a href="#pr374">Entering a new stock size discards a measurement carried over from a previous session</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+41</span> <span class="del">-2</span></td></tr>
 <tr><td class="n">375</td><td><a href="#pr375">FIX: an offset test that answered backwards, and a start-from-line that skipped its prolog</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+27</span> <span class="del">-1</span></td></tr>
 <tr><td class="n">376</td><td><a href="#pr376">Toolpath outline on any program with tool changes, and run one toolpath from it</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">6</span> <span class="del">0</span> <span class="add">+1</span><br><span class="k">Lines:</span> <span class="add">+403</span> <span class="del">-7</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (376 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">3083</span> <span class="del">32</span> <span class="add">+289</span><br><span class="k">Lines:</span> <span class="add">+129165</span> <span class="del">-29019</span></td></tr>
+<tr><td class="n">377</td><td><a href="#pr377">Manual: the 21 missing topics from the audit</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">3</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+888</span> <span class="del">-72</span></td></tr>
+<tr><td class="n">378</td><td><a href="#pr378">Help &gt; User manual on Shift+F1, landing on the right topic</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">14</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+258</span> <span class="del">-44</span></td></tr>
+<tr><td class="n">379</td><td><a href="#pr379">FIX: a message box could open BEHIND the window that raised it, which reads as a hang</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+26</span> <span class="del">-0</span></td></tr>
+<tr><td class="n">380</td><td><a href="#pr380">FIX: Set position captured the CACHED machine position, and could capture a stale one</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+113</span> <span class="del">-14</span></td></tr>
+<tr><td class="n">381</td><td><a href="#pr381">Height map: kept by Setup, applied by the Work Order at Generate</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">13</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+676</span> <span class="del">-27</span></td></tr>
+<tr><td class="n">382</td><td><a href="#pr382">FIX: the height map refused a map that matched the setup in front of it</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+99</span> <span class="del">-33</span></td></tr>
+<tr><td class="n">383</td><td><a href="#pr383">CHG: the height map is probed in its own tab, as a step you can see</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">14</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+336</span> <span class="del">-99</span></td></tr>
+<tr><td class="n">384</td><td><a href="#pr384">FIX: four faults in how the height map moves between points</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">11</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+97</span> <span class="del">-24</span></td></tr>
+<tr><td class="n">385</td><td><a href="#pr385">A Bluetooth shutter remote drives the machine from arm&rsquo;s length</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">13</span> <span class="del">0</span> <span class="add">+2</span><br><span class="k">Lines:</span> <span class="add">+479</span> <span class="del">-55</span></td></tr>
+<tr><td class="n">386</td><td><a href="#pr386">FIX: applying a height map took thirty seconds and showed an empty program list while it worked</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+108</span> <span class="del">-8</span></td></tr>
+<tr><td class="n">387</td><td><a href="#pr387">FIX: a transformed program lost its parameter lines to the word &ldquo;Parameter&rdquo;</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+18</span> <span class="del">-0</span></td></tr>
+<tr><td class="n">388</td><td><a href="#pr388">The toolpath outline names each section after the TOOL, and survives a transform</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">5</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+85</span> <span class="del">-5</span></td></tr>
+<tr><td class="n">389</td><td><a href="#pr389">FIX: a chamfer on a Line ran down the middle of the groove instead of along its edges</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+62</span> <span class="del">-6</span></td></tr>
+<tr><td class="n">390</td><td><a href="#pr390">FIX: a rotated WCS drew the toolpath outside the machine and tilted</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">4</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+88</span> <span class="del">-31</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (390 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">3176</span> <span class="del">32</span> <span class="add">+293</span><br><span class="k">Lines:</span> <span class="add">+132498</span> <span class="del">-29437</span></td></tr>
 </table>
 </div>
 
@@ -6794,6 +6822,185 @@ G92.1</pre><ul><li><strong>It is a rapid, not <code>G92 X#&lt;x_org&gt; Y#&lt;y_
 <tr><td class="mono">macros/sample_toolchange_outline.nc</td><td class="num add">40</td><td class="num">0</td></tr>
 </table>
 <div class="desc"><p>The program list could already collapse into a toolpath outline, but only for files carrying the ioSenderV2 Fusion add-in's own section-marker comments. Every other post - stock Fusion, Vectric, Carbide Create, hand-written, and the app's own Work Order output - got a flat list, with nothing on screen hinting an outline was possible however many tool changes the file had. That also meant "Start from this toolpath" and "Run just this toolpath" were unreachable on ordinary files.</p><ul><li><strong>Sections are derived from the program's TOOL CHANGES</strong> when a file carries no markers. Applied after the parse rather than during it, so a marker-bearing file is untouched - sectioning on both interleaved would have split every operation in two, once at the marker and again at the M6 a line later.</li><li><strong>Naming is a convention anyone can opt into</strong>: a comment immediately above the tool change becomes the toolpath's name, so "(Finish contour)" above "T2 M6" reads as "T2 - Finish contour", and a tool change with nothing above it reads as "T2". The search stops at the first line that DOES anything - a comment separated from the tool change by g-code belongs to that g-code - which is what keeps it from wandering up into the file header. The T-number is always the identity and the comment only a suffix, so a bad guess is noise rather than a wrong answer.</li><li><strong>Program start and Program end</strong> bracket the toolpaths: everything before the first tool change, and the wind-down from the last spindle stop after the last tool change. The epilogue is anchored after that last tool change deliberately - programs routinely stop the spindle between toolpaths, so an unanchored search would have swallowed a real cutting section.</li><li><strong>Run just this toolpath</strong> now runs Program start, the chosen toolpath, and Program end - in that order. Previously it ran the section alone, which set no units, no plane and no work offset, and finished with the spindle still turning and the tool wherever the cut stopped. <strong>Start from this toolpath</strong> likewise runs the real preamble first instead of a three-word synthetic prolog that never covered the work offset at all.</li><li><strong>Skipped toolpaths are not sent.</strong> The first attempt neutralised them to empty comments so the per-line status column would still mark them; on a 31,000-line V-carve that meant streaming and acknowledging tens of thousands of no-ops before the machine cut anything, and it was reported as unusable within minutes of shipping. The controller never knew those lines existed - it sees only what is written to it - so there is nothing to keep in step and nothing to skip past. The status column simply does not mark rows that did not run.</li></ul><p class="foot">Both commands hardware-verified end to end on a three-toolpath work order. macros/sample_toolchange_outline.nc exercises the naming in three comment styles; it is air only, with nothing below Z0.</p></div>
+</div>
+<!-- ===== #377 ===== -->
+<div class="pr">
+<h2 id="pr377"><span class="badge">#377</span>The manual&rsquo;s twenty-one missing topics &mdash; section 2 of the audit, paid in full</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">docs/manual/index.html</td><td class="num add">727</td><td class="num del">18</td></tr>
+<tr><td class="mono">docs/manual/MANUAL-AUDIT-2026-09-17.md</td><td class="num add">86</td><td class="num del">32</td></tr>
+<tr><td class="mono">docs/manual/MANUAL-DEBT.md</td><td class="num add">75</td><td class="num del">22</td></tr>
+</table>
+<div class="desc"><p>The audit of 2026-09-17 listed twenty-one features that shipped without a word in the manual. All twenty-one are now written, with the links that make them reachable from the topics an operator is already reading.</p><ul><li><strong>Four new topics.</strong> The diode-laser path end to end; the Height Map &mdash; what a map is, how to probe one and what applying it does; Calibration, including the reversal test that separates the square&rsquo;s own error from the gantry&rsquo;s; and carving.</li><li><strong>Sub-sections filled in</strong> across Work Order (corner reliefs, Indirect and groups, Save Drawing, Mark only), Job, Settings, Machine Setup and Setup.</li><li><strong>Work surface</strong> is described as the board it is, rather than as the machine&rsquo;s travel &mdash; the confusion that made the whole section read wrongly.</li></ul><p class="foot">Published to gh-pages 2026-09-19. Section 4 of the audit (thirteen topics that NEED UPDATING) and the screenshot reshoots remain.</p></div>
+</div>
+<!-- ===== #378 ===== -->
+<div class="pr">
+<h2 id="pr378"><span class="badge">#378</span>Help &gt; User manual on Shift+F1 &mdash; and context help that lands on the topic</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ManualHelp.cs</td><td class="num add">118</td><td class="num del">15</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml.cs</td><td class="num add">55</td><td class="num del">2</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/MainWindow.xaml</td><td class="num add">10</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ActionKeyBinder.cs</td><td class="num add">17</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderModel.cs</td><td class="num add">11</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ViewHostWindow.xaml.cs</td><td class="num add">4</td><td class="num">0</td></tr>
+<tr><td class="mono">docs/manual/README.md</td><td class="num add">29</td><td class="num del">22</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">14</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The manual had exactly one way in: F1. On this machine F1 is the first macro &mdash; F1 to F9 were reserved for macros in the original ioSender and still are &mdash; so the manual was unreachable from the keyboard. It now has a <strong>Help &gt; User manual</strong> menu item, bindable like any other menu action and bound to <strong>Shift+F1</strong> by default.</p><ul><li><strong>It opens at the topic for the screen you are on</strong>, not the front page. &ldquo;Current view&rdquo; was answering with the view the app STARTED on, so it was right once per session and wrong after that.</li><li><strong>ShellExecute strips the #anchor off a file: URL.</strong> Proven directly after two fixes on the wrong suspect: the browser was being handed the anchor and never saw it. The default browser is now resolved from the shell&rsquo;s own UrlAssociations and launched with the full URL, so the fragment survives.</li><li><strong>Four anchors did not resolve at all</strong> &mdash; F1 from those screens landed on the front page whatever else was fixed.</li></ul><p class="foot">Hardware-verified: Shift+F1 from Setup and from Work Order both land on their own topic.</p></div>
+</div>
+<!-- ===== #379 ===== -->
+<div class="pr">
+<h2 id="pr379"><span class="badge">#379</span>FIX: a message box could open BEHIND the window that raised it, which reads as a hang</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppDialogs.cs</td><td class="num add">18</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FixtureEditDialog.xaml.cs</td><td class="num add">8</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>A prompt raised while another dialog is up was owned by the MAIN window, so it opened behind that dialog. The app then sat there blocked on an answer to a box nobody could see &mdash; indistinguishable from a hang, and diagnosed as one: the fixture dialog&rsquo;s OK button &ldquo;stopped working&rdquo; when in fact a hidden probe-failed box was waiting behind it.</p><ul><li><strong>The owner is now the ACTIVE window</strong>, then a visible Topmost one, then the main window &mdash; so a prompt is always above whatever raised it.</li></ul><p class="foot">Found on real hardware by the operator, who worked out the hidden dialog before I did.</p></div>
+</div>
+<!-- ===== #380 ===== -->
+<div class="pr">
+<h2 id="pr380"><span class="badge">#380</span>FIX: Set position captured the CACHED machine position, and could capture a stale one</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/Fixture.cs</td><td class="num add">84</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/FixtureEditDialog.xaml.cs</td><td class="num add">29</td><td class="num del">14</td></tr>
+</table>
+<div class="desc"><p>Defining a corner-fence fixture captured 20, &minus;20, &minus;6 with the spindle nowhere near it: the Set button read the cached position from the last status report, which can be arbitrarily old when the machine has been sitting idle or the poll has been suspended.</p><ul><li><strong>The choice belongs to the accessor</strong>, as the operator put it: rather than a second capture path, the position accessor now takes a request for a FRESH read &mdash; an explicit status request with a 500 ms fallback to the cache.</li><li><strong>The log says which it used</strong>, cached or fresh, and says loudly when the cached one turned out to be stale.</li></ul><p class="foot">Hardware-verified: the capture matches the DRO, and Test drives back to the captured point.</p></div>
+</div>
+<!-- ===== #381 ===== -->
+<div class="pr">
+<h2 id="pr381"><span class="badge">#381</span>Setup&rsquo;s height map is KEPT, and the Work Order applies it at Generate</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls Probing/CNC Controls Probing/SetupHeightMap.cs</td><td class="num add">340</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/HeightMapCompensation.cs</td><td class="num add">70</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml.cs</td><td class="num add">143</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/HeightMapView.xaml.cs</td><td class="num add">49</td><td class="num del">18</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/App.xaml.cs</td><td class="num add">42</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderModel.cs</td><td class="num add">12</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml</td><td class="num add">3</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">3</td><td class="num del">3</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">14</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Setup used to probe a height map and IMMEDIATELY apply it to whatever program happened to be loaded. That forced the workflow backwards &mdash; generate first so there is something to apply to, then go back to Setup &mdash; when the order has always been Setup first, then Work Order. So Setup no longer applies anything: it probes, and the map is kept. <strong>Generate is now the one and only place a map is applied</strong>, which also means there is no second, hidden path that could double-compensate a program.</p><ul><li><strong>Apply height map</strong> is a tick box on the work order, with a summary line saying which map and how old it is. An age is the one thing that makes &ldquo;is this still my setup?&rdquo; answerable at a glance.</li><li><strong>A staleness REFUSAL, not a warning</strong> (the operator&rsquo;s explicit choice). The map is stored stamped with the setup it belongs to &mdash; where work zero sat in machine coordinates and what stock extent was mapped &mdash; and Generate refuses, with the reason, when the live machine no longer agrees. A map applied to the wrong setup shifts every Z by a surface that is not under the cutter, and the program still looks like the program.</li><li><strong>A .map saved beside a work order is picked up with it</strong>, and a saved .map now carries its own stamp, so a job reopened next week either finds its map or is told plainly why it cannot have it.</li><li><strong>The work order could never see a map at all</strong> before this, for three separate silent reasons &mdash; including a lazy load that ran before the config path was resolved and looked for the file beside the executable.</li></ul><p class="foot">The seam between the two assemblies is a set of null-by-default hooks wired at startup; unwired, it refuses rather than silently skipping compensation the operator asked for.</p></div>
+</div>
+<!-- ===== #382 ===== -->
+<div class="pr">
+<h2 id="pr382"><span class="badge">#382</span>FIX: two false refusals from the height map&rsquo;s staleness check &mdash; both the app&rsquo;s own arithmetic</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls Probing/CNC Controls Probing/SetupHeightMap.cs</td><td class="num add">80</td><td class="num del">22</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/HeightMapCompensation.cs</td><td class="num add">11</td><td class="num del">4</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/App.xaml.cs</td><td class="num add">4</td><td class="num del">3</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/HeightMapView.xaml.cs</td><td class="num add">2</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml.cs</td><td class="num add">2</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>The refusal that guards a stale map fired twice on setups nothing had touched. Both were measured on hardware and both were arithmetic, not movement.</p><ul><li><strong>A tool change is not a moved origin.</strong> The check compared the work position offset, and grblHAL&rsquo;s WCO is the WCS offset plus G92 <em>plus the tool length offset</em> &mdash; so fitting a different tool moved it. G54 read the same before and after; the TLO went from &minus;25.766 to &minus;16.540 and the map was refused for a 9.226 mm move that never happened. The comparison now takes the tool out: work Z0 means the same physical plane whatever is in the spindle, which is what a tool length offset IS. G92 stays in, because that genuinely does move the origin.</li><li><strong>Then the stamp was written with a ten-minute-old tool offset.</strong> WCO rides every status report; the TLO arrives only in a $# report, which nothing had asked for since 20:30. The subtraction mixed a live value with a stale one and put the stamp 2.325 mm out. The offsets are now re-read from the controller at the two points that DECIDE something &mdash; storing a map and the check before applying one &mdash; and never on a UI refresh or mid-stream, where a blocking round trip does not belong.</li></ul><p class="foot">The refusal text now also says outright that a tool change does not move the work origin.</p></div>
+</div>
+<!-- ===== #383 ===== -->
+<div class="pr">
+<h2 id="pr383"><span class="badge">#383</span>CHG: probing the height map is an explicit step in the Height Map tab, not a hidden pass in Setup</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/HeightMapView.xaml.cs</td><td class="num add">156</td><td class="num del">35</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">72</td><td class="num del">18</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/HeightMapView.xaml</td><td class="num add">38</td><td class="num del">21</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">22</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/HeightMapConfig.cs</td><td class="num add">14</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">12</td><td class="num del">2</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml</td><td class="num add">1</td><td class="num del">1</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">21</td><td class="num del">21</td></tr>
+</table>
+<div class="desc"><p>Ticking &ldquo;Probe height map&rdquo; in Setup was supposed to run a probing pass at the end of the run. It silently did not &mdash; and a hidden pass is the wrong shape anyway. Setup now finishes, and the height map is <strong>an extra step you take in Tools &gt; Height map</strong>, where you can see the grid, the area and the probe before anything moves. Measure does not have to be re-run to get there.</p><ul><li><strong>&ldquo;From setup&rdquo;, not &ldquo;From program&rdquo;</strong> &mdash; the area comes from the authoritative source, the stock Setup measured, rather than from whatever program happens to be loaded.</li><li><strong>The tab remembers its settings</strong> &mdash; grid size, probe selection and the hold tick box &mdash; instead of resetting every visit.</li><li><strong>&ldquo;Cancelled&rdquo; now says what happened</strong>: a probe that never made contact says so, rather than reporting the same word as a deliberate stop. (The real cause on the day was a disconnected magnetic probe lead.)</li><li><strong>The run buttons stay on screen</strong> at the default window width, where Save and Load used to sit off the edge.</li><li><strong>A modal popup mid-run cost the run its JobFinished edge</strong>, so Setup&rsquo;s continuation never fired. The finish is now a counter rather than an edge, and Setup&rsquo;s stock-mismatch warning waits until the end instead of interrupting the sequence.</li><li><strong>The mismatch threshold is 1 mm</strong>, not 0.5 mm &mdash; 0.5 was calling for a calibration that was not needed.</li></ul><p class="foot">Hardware-verified: a 4x5 map at 100 mm grid completed and was kept.</p></div>
+</div>
+<!-- ===== #384 ===== -->
+<div class="pr">
+<h2 id="pr384"><span class="badge">#384</span>FIX: the height map&rsquo;s own motion &mdash; a G91 traverse on a rotated WCS, and a first point probed with no plate under it</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/HeightMapView.xaml.cs</td><td class="num add">63</td><td class="num del">10</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">21</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderCompiler.cs</td><td class="num add">4</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/HeightMapView.xaml</td><td class="num add">2</td><td class="num del">2</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">7</td><td class="num del">7</td></tr>
+</table>
+<div class="desc"><p>Four faults in how the probing run moves, three of them found as soft-limit alarms on the real machine.</p><ul><li><strong>It traversed in G91.</strong> grblHAL&rsquo;s incremental branch lacks the rotation awareness its absolute branch has, so on a rotated WCS every relative move computed from the wrong frame &mdash; ALARM:2 on the second point. The traverse is absolute now. (The firmware side is filed separately; the app must not depend on it.)</li><li><strong>It assumed it started at machine top.</strong> It did not lift first, so it crossed the work at whatever height it happened to be at. It now lifts to a machine-referenced safe height before the first traverse.</li><li><strong>The rotation-corruption repair left Z out.</strong> Clearing a rotation corrupts grblHAL&rsquo;s parser position; the repair re-syncs from the steppers, but naming only X and Y left Z holding a work coordinate believed to be a machine one &mdash; the next Z move computed from a number 100 mm wrong. All three axes are named.</li><li><strong>The first point was probed without waiting.</strong> Hold-at-each-point held before points two onward, so the operator had no chance to place the plate for point one &mdash; the head is wherever it was parked, not where you left it. It holds before every point now, the first included.</li><li><strong>&ldquo;Hold at each point&rdquo; was invisible</strong> in the mode most people use, while still governing the run &mdash; which is exactly how a map came to be probed with no holds and no plate.</li></ul><p class="foot">A setting that governs a mode must be visible in that mode.</p></div>
+</div>
+<!-- ===== #385 ===== -->
+<div class="pr">
+<h2 id="pr385"><span class="badge">#385</span>A Bluetooth shutter remote drives the machine from arm&rsquo;s length</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/ShutterRemote.cs</td><td class="num add">181</td><td class="num del">16</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/RemoteActions.cs</td><td class="num add">178</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppMessageBox.xaml.cs</td><td class="num add">24</td><td class="num del">1</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/HeightMapView.xaml.cs</td><td class="num add">25</td><td class="num del">12</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/AppConfig.cs</td><td class="num add">18</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/MacroProcessor.cs</td><td class="num add">10</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/JobControl.xaml.cs</td><td class="num add">9</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/ioSender XL/HeightMapView.xaml</td><td class="num add">6</td><td class="num del">4</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">28</td><td class="num del">14</td></tr>
+</table>
+<div class="desc"><p>Probing a height map with a touch plate means: place the plate, press Continue, walk back, place the plate, press Continue &mdash; sixteen times for a 4x4 grid with the laptop across the shop. A Bluetooth camera shutter remote solves that for a few pounds, but only if the app can hear it. These remotes are HID keyboards that send a MEDIA key, and Windows routes media keys to the shell and the audio endpoint &mdash; they never reach a WPF window at all, so no key binding can see one. A low-level keyboard hook is the only thing that does.</p><ul><li><strong>What a press means depends on what is happening</strong>: a prompt on screen takes volume up for OK and volume down for Cancel; a RUNNING job takes either key as Feed Hold; a HELD one takes volume up to resume and volume down to Stop; a height-map hold takes either key as Continue.</li><li><strong>Either key, where it matters.</strong> The two modes of the same remote send different keys, and an operator reaching for it mid-cut wants the machine to stop cutting &mdash; a press that does nothing because the remote is in the other mode is the worst outcome of that reach. The same reasoning keeps both keys meaning Continue at a probe point, where one of them meaning Stop would throw away twenty minutes of probing.</li><li><strong>It presses the real buttons.</strong> Start, Feed Hold and Stop are the Job control&rsquo;s own buttons and only fire when they are enabled, so the remote inherits every gate the app already applies and cannot start a job the app would refuse to start.</li><li><strong>The key is swallowed only when the press MEANT something</strong>, so with nothing waiting the volume keys are still Windows&rsquo;. It debounces, because a held button auto-repeats every ~30 ms and one press must not release several holds in a row while a hand is on the plate.</li><li><strong>Opt-in and off by default</strong> &mdash; nobody who has not asked for it gets a global keyboard hook.</li></ul><p class="foot">Measured on the operator&rsquo;s own PICO remote: iOS mode sends VOLUME UP, Android mode VOLUME DOWN, and it has no mode that sends Enter.</p></div>
+</div>
+<!-- ===== #386 ===== -->
+<div class="pr">
+<h2 id="pr386"><span class="badge">#386</span>FIX: applying a height map took thirty seconds and showed an empty program list while it worked</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/BulkObservableCollection.cs</td><td class="num add">43</td><td class="num del">1</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderView.xaml.cs</td><td class="num add">23</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeJob.cs</td><td class="num add">18</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls Probing/CNC Controls Probing/GCodeTransform.cs</td><td class="num add">17</td><td class="num del">3</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeProgram.cs</td><td class="num add">7</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>The transform hands every rebuilt line through AddBlock, which appends to the live DataGrid-bound collection &mdash; so a 43,000-block program spent thirty seconds notifying the grid once per block, showing an empty list throughout. A height map that had applied perfectly was indistinguishable from one that had silently failed.</p><ul><li><strong>Notifications are held back for the rebuild</strong> and raised once at the end. The same shape froze the app outright on a 220k-line file in August, which is why the bulk collection exists at all; this path simply never used it.</li><li><strong>The operator is told what is happening</strong> &mdash; a message before, a wait cursor during, and the elapsed time and the map&rsquo;s identity after. A step that takes seconds should say it finished.</li></ul><p class="foot">The log also states the block count after the transform, which tells three otherwise identical-looking failures apart.</p></div>
+</div>
+<!-- ===== #387 ===== -->
+<div class="pr">
+<h2 id="pr387"><span class="badge">#387</span>FIX: a transformed program had its <code>#&lt;var&gt;=value</code> lines replaced by the word &ldquo;Parameter&rdquo;</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeParser.cs</td><td class="num add">18</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Every case in the token-to-g-code writer casts the token to its own class before calling ToString, and that is not stylistic: those overloads are declared <code>new</code>, not <code>override</code>, so they HIDE the base. A token reached through the base-typed loop variable therefore calls the base ToString, which returns the COMMAND NAME &mdash; so any type missing a case is silently rewritten to a single word.</p><ul><li><strong>Two were missing.</strong> A work order put through the height-map transform came back with the literal text &ldquo;Parameter&rdquo; where its <code>#&lt;name&gt;=value</code> setup lines had been &mdash; a program that had quietly lost the values every later line reads. The other was the token carrying a rotation write.</li><li><strong>Swept:</strong> every token class with a hidden ToString was checked, and those two were the only ones lacking a case.</li></ul><p class="foot">Seen on hardware at blocks 120 and 130 of a compensated work order.</p></div>
+</div>
+<!-- ===== #388 ===== -->
+<div class="pr">
+<h2 id="pr388"><span class="badge">#388</span>The toolpath outline names each section after the TOOL, and survives a transform</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeJob.cs</td><td class="num add">26</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/GCodeListControl.xaml.cs</td><td class="num add">20</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeProgramComments.cs</td><td class="num add">16</td><td class="num del">2</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GrblViewModel.cs</td><td class="num add">16</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeProgram.cs</td><td class="num add">7</td><td class="num del">1</td></tr>
+</table>
+<div class="desc"><p>A section of the outline is one tool&rsquo;s worth of the program, and with Group by tool it holds every operation that shares the bit &mdash; so naming it after the first of them described a fraction of what was in it and hid the one thing an operator wants at a tool change: which bit to fit.</p><ul><li><strong>The program already said so.</strong> The Work Order writes one <code>(TOOL T=n D=.. TYPE=.. - name)</code> declaration per distinct tool into its header, and the shared comment parser was discarding the description. The outline reads them from the header &mdash; everything above the first tool change &mdash; rather than from the global map, which is refreshed too late to describe the right program.</li><li><strong>A program that declares no tool</strong> falls back to the nearest-comment name, unchanged.</li><li><strong>The outline stopped vanishing.</strong> A rebuilt program answers the same &ldquo;yes, it has sections&rdquo; as the one it replaced, so no notification was raised and the Job tab&rsquo;s docked list &mdash; whose only trigger that is &mdash; was left grouped by the null section every new block carried while it was refilled.</li></ul><p class="foot">Hardware-verified on a five-tool work order.</p></div>
+</div>
+<!-- ===== #389 ===== -->
+<div class="pr">
+<h2 id="pr389"><span class="badge">#389</span>FIX: a chamfer on a Line ran down the middle of the groove instead of along its edges</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/CNC Controls/WorkOrderCompiler.cs</td><td class="num add">62</td><td class="num del">6</td></tr>
+</table>
+<div class="desc"><p>A Line has no interior, so the Contour that cuts it straddles it: a 100 mm line cut 10 mm deep with a 1/4&Prime; end mill leaves a 6.35 mm wide groove with the line down its MIDDLE and its two long top edges 3.175 mm to either side. The chamfer traced that centreline &mdash; the one place in the groove where a chamfer pass meets nothing.</p><ul><li><strong>Both edges now get a pass</strong>, offset perpendicular by the ROUGHING op&rsquo;s bit radius. The chamfer bit&rsquo;s own diameter stays out of it, exactly as on a closed shape, because the cone does the work.</li><li><strong>A toolpath with no roughing operation</strong> has no groove and no pair of edges, and still traces the path itself.</li><li><strong>The pass lifts to safe Z BEFORE its XY rapid</strong>, not after &mdash; with two passes the second rapid would otherwise cross the work at chamfer depth.</li></ul><p class="foot">The offset is taken from the line&rsquo;s own angle rather than mitred, which is exact: the only open geometry that reaches here is a straight Line.</p></div>
+</div>
+<!-- ===== #390 ===== -->
+<div class="pr">
+<h2 id="pr390"><span class="badge">#390</span>FIX: a rotated WCS drew the whole toolpath outside the machine, in front of the stock and tilted</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeEmulator.cs</td><td class="num add">43</td><td class="num del">31</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/GCodeJob.cs</td><td class="num add">32</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Grbl.cs</td><td class="num add">8</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/CNC Core/Machine.cs</td><td class="num add">5</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>With a rotation set on the active WCS, the 3D view drew the stock correctly inside the machine envelope and the entire job floating 600 mm in front of it, below the table and visibly turned. Two faults in one branch, both measurable.</p><ul><li><strong>Frame.</strong> For a rotated WCS the emulator added the WCS origin to every point, rotated it about (0,0) &mdash; MACHINE zero &mdash; and left it there. So a rotated program&rsquo;s every point came out in the machine frame while the stock, the envelope and every unrotated point stayed in the work frame. That is the 600 mm: the G54 origin.</li><li><strong>Unit.</strong> The same code read the rotation as radians. It is degrees &mdash; that is how $# reports it, how the R word writes it, and how the Work Order&rsquo;s own advisory prints it. A 0.09 degree rotation was drawn as 5.16 degrees, 57x too much.</li><li><strong>The rule, now written into the class:</strong> the emulator yields work coordinates, always. In work coordinates a rotated WCS is square &mdash; the rotation says how the work frame sits on the table, which matters only converting work to machine, which the controller does and this does not. The stock is drawn square for the same reason, so the two agree by construction.</li><li><strong>The bounding box gets it too</strong>, and needed it: the same rotation inflated a 224 mm Y span to 417 mm, and the does-it-fit check reads that box &mdash; a big enough job would have been refused for not fitting a machine it fits. The box now also logs which program line set each edge.</li></ul><p class="foot">Hardware-verified by the operator: &ldquo;3D View looks perfect now.&rdquo; The dead Rotation field on the emulator&rsquo;s action struct is removed rather than left as a slot for someone to refill.</p></div>
 </div>
 </section>
 
