@@ -661,6 +661,14 @@ namespace CNC.Core
         }
 
         public int Id { get; private set; }
+
+        /// <summary>
+        /// This coordinate system's rotation, in DEGREES - as the controller reports it in $# and as the R
+        /// word writes it. Stated because it was not: one writer (GCodeEmulator's G10 handler) stored
+        /// radians into this same field, and the reader that mattered treated every value as radians, so a
+        /// 0.09 deg rotation drew the whole toolpath tilted by 5.16 deg. A reader that needs radians
+        /// converts at the point of use.
+        /// </summary>
         public double Rotation { get; set; }
 
         public string Code { get { return _code; } set { _code = value; OnPropertyChanged(); } }

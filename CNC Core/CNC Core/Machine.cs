@@ -258,6 +258,11 @@ namespace CNC.Core
             G92Active = false;
         }
 
+        /// <summary>
+        /// The active coordinate system's rotation in DEGREES (see CoordinateSystem.Rotation), or 0 when
+        /// there is none or the plane is not XY. Nothing calls this today - it is here as the one right way
+        /// to ask, so the next consumer does not go reading the field and guessing at its unit.
+        /// </summary>
         public double GetRotation()
         {
             return coordinateSystem != null && Plane.Plane == GCode.Plane.XY && !double.IsNaN(coordinateSystem.Rotation) ? coordinateSystem.Rotation : 0d;

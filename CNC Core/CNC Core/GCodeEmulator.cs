@@ -50,7 +50,9 @@ namespace CNC.Core
         public Point3D Start;
         public Point3D End;
         public GCodeToken Token;
-        public double Rotation;
+        // No Rotation here. There was one, never written and never read, left over from when the emulator
+        // rotated its output into the machine frame - an empty slot on a struct is an invitation to fill it
+        // and re-create exactly the bug the class comment describes.
         public bool IsRetract;
         public bool IsSpindleSynced;
         // This action started life as a G38.x PROBE. It is reported as a Commands.G1 linear move (see the
@@ -96,6 +98,35 @@ namespace CNC.Core
         public bool Brk;
     }
 
+    /// <summary>
+    /// Walks a program's tokens and yields the move each one makes, with its start and end point.
+    /// </summary>
+    /// <remarks>
+    /// ---- One frame: WORK coordinates, always ----
+    ///
+    /// Every point this yields is in the program's own work frame. There is exactly one conversion in
+    /// here - a G53 move, whose machine coordinates are converted INTO the work frame by subtracting the
+    /// active WCS offset - and it exists to preserve that rule, not to break it. Consumers depend on it
+    /// absolutely: the bounding box is measured across these points (a box spanning two frames measures the
+    /// distance between two origins - a 32 mm program once reported an 858 mm Y span), the 3D view draws
+    /// them against a stock at 0..W and an envelope shifted by the work offset, and JobRunner's
+    /// does-it-fit check reads that box.
+    ///
+    /// A WCS ROTATION therefore changes nothing here, and this is the part that looks wrong until it
+    /// doesn't: in work coordinates a rotated WCS is still square - the rotation describes how the work
+    /// frame sits on the TABLE, which only matters converting work -> machine, which is the controller's
+    /// job and not done here at all. The stock is drawn square for the same reason.
+    ///
+    /// This used to rotate: for a rotated WCS, G0/G1/G2/G3 added the WCS origin, rotated about (0,0) -
+    /// MACHINE zero - and left the point there. So a rotated program's every point came out in the machine
+    /// frame while everything around it stayed work-frame. Measured 2026-09-18 with a 0.09 deg rotation on
+    /// G54: the toolpath was drawn 600 mm in front of the stock, outside the machine envelope, and tilted
+    /// by 5.16 deg - because the same code also read that 0.09 as RADIANS (see CoordinateSystem.Rotation,
+    /// which is degrees). The Y span of a 224 mm job came out as 417 mm, which the fit check believed.
+    ///
+    /// If a machine-space view is ever wanted, convert at the point of drawing, where the WCS origin and
+    /// the rotation can be applied to the stock and the envelope too. Do not reintroduce it here.
+    /// </remarks>
     public class GCodeEmulator : Machine
     {
         private bool translate;
@@ -239,18 +270,9 @@ namespace CNC.Core
                     case Commands.G0:
                     case Commands.G1:
                         {
+                            // No rotation transform here, and that is the point - see "One frame" above.
                             var motion = token as GCLinearMotion;
-                            if (coordinateSystem.Rotation != 0d)
-                            {
-                                var move = new GCLinearMotion(motion.Command, motion.LineNumber, motion.Values.ToArray(), motion.AxisFlags, motion.BlockDelete);
-                                var target = new Point3D(move.X + coordinateSystem.X, move.Y + coordinateSystem.Y, 0d).RotateZ(0d, 0d, coordinateSystem.Rotation);
-                                move.X = target.X;
-                                move.Y = target.Y;
-                                move.AxisFlags |= AxisFlags.XY;
-                                setEndP(move.Values, move.AxisFlags);
-                            }
-                            else
-                                setEndP(motion.Values, motion.AxisFlags);
+                            setEndP(motion.Values, motion.AxisFlags);
                         }
                         break;
 
@@ -258,25 +280,10 @@ namespace CNC.Core
                     case Commands.G2:
                     case Commands.G3:
                         {
+                            // As G0/G1: the arc and its centre offsets stay in the frame the program wrote
+                            // them in - see "One frame" above.
                             var arc = token as GCArc;
-                            if (coordinateSystem.Rotation != 0d)
-                            {
-                                var move = arc.Values.ToArray();
-                                var ijk = arc.IJKvalues.ToArray();
-                                var target = new Point3D(move[0] + coordinateSystem.X, move[1] + coordinateSystem.Y, 0d).RotateZ(0d, 0d, coordinateSystem.Rotation);
-                                move[0] = target.X;
-                                move[1] = target.Y;
-                                if (arc.IjkFlags != IJKFlags.None)
-                                {
-                                    target = new Point3D(ijk[0], ijk[1], 0d).RotateZ(0d, 0d, coordinateSystem.Rotation);
-                                    ijk[0] = target.X;
-                                    ijk[1] = target.Y;
-                                }
-                                action.Token = new GCArc(token.Command, token.LineNumber, move, AxisFlags.XY, ijk, arc.IjkFlags, arc.R, arc.P, arc.IJKMode, arc.BlockDelete);
-                                setEndP((action.Token as GCArc).Values, (action.Token as GCArc).AxisFlags);
-                            }
-                            else
-                                setEndP(arc.Values, arc.AxisFlags);
+                            setEndP(arc.Values, arc.AxisFlags);
                         }
                         break;
 
@@ -322,7 +329,12 @@ namespace CNC.Core
                                 if (gcsys.P == 0)
                                     offsets[i] = csys.Values[i];
                             }
-                            csys.Rotation = gcsys.L == 2 && Plane.Plane == GCode.Plane.XY ? gcsys.R * Math.PI / 180d : 0d;
+                            // DEGREES, as the R word is written and as every other writer and reader of
+                            // this field uses it (Machine.AddOrUpdateCS from $#, the Work Order's rotation
+                            // advisory). This line alone used to store RADIANS into the same field, which
+                            // is half of how a 0.09 deg rotation drew a 5.16 deg tilt - a field with two
+                            // units is a trap whoever reads it next walks into.
+                            csys.Rotation = gcsys.L == 2 && Plane.Plane == GCode.Plane.XY ? gcsys.R : 0d;
                         }
                         break;
 
