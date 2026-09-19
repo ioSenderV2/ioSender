@@ -133,6 +133,7 @@ namespace CNC.Controls
         // ---- the hook's lifetime ------------------------------------------------------------------------
 
         private static bool wired;
+        private static bool? lastLogged;
 
         /// <summary>
         /// Install or remove the keyboard hook to match the setting. Safe to call repeatedly; called at
@@ -151,6 +152,19 @@ namespace CNC.Controls
             }
 
             bool on = AppConfig.Settings?.Base != null && AppConfig.Settings.Base.ShutterRemoteEnabled;
+
+            // Say which way it went, always. Turned OFF, this used to produce no log line whatsoever -
+            // ShutterRemote.Stop returns silently when no hook is installed - so "the remote does nothing"
+            // and "the remote is switched off" were the same silence, and the first thing to check was the
+            // last thing anyone would think to look at (2026-09-18: the setting had been quietly reset when
+            // it was renamed, and the log had not one word to say about it).
+            if (on != lastLogged)
+            {
+                lastLogged = on;
+                DebugLog.Write("remote", on
+                    ? "shutter remote: ENABLED - the volume keys will act where a press means something"
+                    : "shutter remote: disabled - tick 'A shutter remote drives the machine' on the Height map tab");
+            }
 
             if (on)
             {
