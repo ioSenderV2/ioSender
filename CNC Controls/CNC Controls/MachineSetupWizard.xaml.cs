@@ -1360,6 +1360,15 @@ namespace CNC.Controls
             lblTloSurface.Visibility = txtTloSurfaceDesc.Visibility = txtTloSurfaceValue.Visibility =
                 btnSetTloSurface.Visibility = surfaceVis;
 
+            // Number what is actually on screen. With a toolsetter the surface row is gone, so the two
+            // that remain are steps 1 and 2 - a list that starts at 2 reads as though something has been
+            // missed rather than as though it never applied.
+            int step = 1;
+            if (needSurface)
+                lblTloSurface.Text = (step++) + ". Target surface:";
+            lblG593.Text = (step++) + ". G59.3 - tool length:";
+            lblG30.Text = step + ". G30 - tool swap:";
+
             double surface = AppConfig.Settings.Base.TloSurfaceZ;
             txtTloSurfaceValue.Text = surface == 0d ? "not set" : "Z" + surface.ToString("0.0", CultureInfo.CurrentCulture);
 
@@ -1659,6 +1668,10 @@ namespace CNC.Controls
             AppConfig.Settings.Base.TloProbeName = (cbxTloProbe.SelectedValue as string) ?? string.Empty;
             UpdateTloTargetAdvice();
             UpdateTloRefControls();
+            // The rows below depend on this answer too - whether the surface row applies at all, and how
+            // the remaining steps are numbered. Without this they were only re-evaluated on tab
+            // activation, so choosing a plate left the surface row hidden until you left and came back.
+            UpdateReferencePositions();
         }
 
         // ---- $65 bit 3, "Auto select toolsetter" -------------------------------------------------------
