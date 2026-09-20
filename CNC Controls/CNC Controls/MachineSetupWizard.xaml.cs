@@ -1585,6 +1585,138 @@ namespace CNC.Controls
             UpdateTloRefControls();
         }
 
+        // ---- $65 bit 3, "Auto select toolsetter" -------------------------------------------------------
+        //
+        // grblHAL re-routes any G38.2 starting within TOOLSETTER_RADIUS (5 mm) of G59.3 to the toolsetter
+        // INPUT when this bit is set - whatever input the program just selected with G65 P5. That is a
+        // convenience for a dedicated toolsetter and a guaranteed crash for a touch plate, which sits at
+        // that very position and is wired to the MAIN input along with every other plate and the 3D probe.
+        // The probe then cannot trigger, so the tool does not stop at the plate, it is driven into it.
+        //
+        // Which means the setting is not an independent preference: it follows from what the operator has
+        // said is at G59.3, and step 5 is where they say it. It is an OUTPUT of this page.
+        private const int ToolsetterAutoSelectBit = 8;
+
+        /// <summary>
+        /// What $65 bit 3 SHOULD be, given the chosen tool-length probe - or null when there is nothing to
+        /// say (no probe chosen). True for a toolsetter, false for a touch plate.
+        /// </summary>
+        private static bool? WantToolsetterAutoSelect()
+        {
+            var p = ProbeDefinitions.TloTarget;
+            if (p == null)
+                return null;
+            if (p.ProbeType == ProbeType.ToolSetter)
+                return true;
+            if (p.ProbeType == ProbeType.TouchPlate)
+                return false;
+            return null;
+        }
+
+        /// <summary>
+        /// The current $65, or -1 when it could not be read. -1 is NOT "the bit is clear": firmware that
+        /// predates this setting has no auto-select behaviour at all, and a lookup can also simply miss on
+        /// a live machine. Either way the honest answer is "unknown", and callers must not turn that into
+        /// a reassurance - the one thing a guard like this must never do is fail open while looking green.
+        /// </summary>
+        private static int ReadProbingFlags()
+        {
+            return GrblSettings.GetInteger(grblHALSetting.ProbingFlags);
+        }
+
+        /// <summary>
+        /// True when the setting actively contradicts the chosen probe - a touch plate at G59.3 with
+        /// auto-select ON, which is the combination that crashes. Unknown ($65 unreadable) is not a
+        /// conflict: there is nothing to act on and refusing would block a machine whose firmware has no
+        /// such feature.
+        /// </summary>
+        private static bool ToolsetterAutoSelectConflicts()
+        {
+            bool? want = WantToolsetterAutoSelect();
+            int flags = ReadProbingFlags();
+            if (want == null || flags < 0)
+                return false;
+            bool isSet = (flags & ToolsetterAutoSelectBit) != 0;
+            return isSet && want == false;
+        }
+
+        /// <summary>Write $65 with bit 3 forced to <paramref name="on"/>, leaving every other bit alone.</summary>
+        private bool ApplyToolsetterAutoSelect(bool on)
+        {
+            int flags = ReadProbingFlags();
+            if (flags < 0)
+                return false;
+
+            int wanted = on ? (flags | ToolsetterAutoSelectBit) : (flags & ~ToolsetterAutoSelectBit);
+            if (wanted == flags)
+                return true;
+
+            // Read-modify-write on the whole bitfield: the other bits are the operator's (feed override,
+            // soft limits during probing, probe protection) and none of them are ours to change.
+            Comms.com.WriteCommand(string.Format(CultureInfo.InvariantCulture, "${0}={1}", (int)grblHALSetting.ProbingFlags, wanted));
+            // Re-read so the row below reflects what the controller now holds rather than what we asked for.
+            GrblSettings.Load();
+            UpdateTloRefControls();
+            return true;
+        }
+
+        /// <summary>
+        /// Say what $65 bit 3 is and what the chosen probe needs it to be. Visible rather than silent,
+        /// because this is a controller setting the operator may well have set deliberately - the page
+        /// states the consequence and offers the change; it does not reach in behind them.
+        /// </summary>
+        private void UpdateProbingFlagsRow()
+        {
+            if (txtProbingFlags == null)
+                return;
+
+            bool? want = WantToolsetterAutoSelect();
+            int flags = ReadProbingFlags();
+
+            if (want == null)
+            {
+                txtProbingFlags.Text = string.Empty;
+                btnFixProbingFlags.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            if (flags < 0)
+            {
+                // Unknown, said as unknown. See ReadProbingFlags.
+                txtProbingFlags.Text = "Probe input: could not read $65, so whether the controller auto-selects the toolsetter is unknown.";
+                btnFixProbingFlags.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            bool isSet = (flags & ToolsetterAutoSelectBit) != 0;
+            if (isSet == want.Value)
+            {
+                txtProbingFlags.Text = want.Value
+                    ? "Probe input: $65 auto-selects the toolsetter near G59.3, which is right for a toolsetter."
+                    : "Probe input: $65 leaves the probe input alone, which is right for a touch plate.";
+                btnFixProbingFlags.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            txtProbingFlags.Text = want.Value
+                ? "Probe input: $65 does NOT auto-select the toolsetter near G59.3. With a dedicated toolsetter that is usually wanted."
+                : "Probe input: $65 auto-selects the TOOLSETTER input near G59.3 - but a touch plate is on the main input, so the probe would never trigger and the tool would be driven into the plate.";
+            btnFixProbingFlags.Content = want.Value ? "Turn it on" : "Turn it off";
+            btnFixProbingFlags.Visibility = Visibility.Visible;
+        }
+
+        private void FixToolsetterAutoSelect_Click(object sender, RoutedEventArgs e)
+        {
+            bool? want = WantToolsetterAutoSelect();
+            if (want == null)
+                return;
+
+            if (!ApplyToolsetterAutoSelect(want.Value))
+                AppDialogs.Show(Window.GetWindow(this),
+                    "Could not read $65 from the controller, so it was not changed.",
+                    "Probing options", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+
         /// <summary>The probe definition chosen for tool length, or null if the choice no longer resolves.</summary>
         private static ProbeDefinition SelectedTloProbe()
         {
@@ -1607,8 +1739,11 @@ namespace CNC.Controls
             if (p == null || p.ProbeType != ProbeType.TouchPlate)
             {
                 brdTloFixedWarn.Visibility = Visibility.Collapsed;
+                UpdateProbingFlagsRow();
                 return;
             }
+
+            UpdateProbingFlagsRow();
 
             brdTloFixedWarn.Visibility = Visibility.Visible;
             txtTloFixedWarn.Text =
@@ -1874,6 +2009,30 @@ namespace CNC.Controls
             }
 
             bool usingPlate = p.ProbeType == ProbeType.TouchPlate;
+
+            // The firmware has the last word on which probe input is used, and with $65 bit 3 set it will
+            // overrule the G65 P5 Q0 below: any G38.2 starting within 5 mm of G59.3 is re-routed to the
+            // TOOLSETTER input. The plate is not on that input, so the probe cannot trigger and the tool is
+            // driven into it. Refuse rather than start - and offer the one-line fix, since the correct value
+            // is not a matter of opinion once the operator has said a plate is what is at G59.3.
+            if (ToolsetterAutoSelectConflicts())
+            {
+                if (AppDialogs.Show(Window.GetWindow(this),
+                        "This would drive the tool into the plate.\r\n\r\n" +
+                        "$65 has \"Auto select toolsetter\" switched on, so the controller re-routes any probe starting near G59.3 to the toolsetter input - whatever this program asks for. " +
+                        "Your touch plate is wired to the main probe input, so it would never trigger and the probe would not stop at it.\r\n\r\n" +
+                        "Turn that option off now and carry on?",
+                        "Reference TLO", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.OK) != MessageBoxResult.OK)
+                    return;
+
+                if (!ApplyToolsetterAutoSelect(false) || ToolsetterAutoSelectConflicts())
+                {
+                    AppDialogs.Show(Window.GetWindow(this),
+                        "$65 could not be changed, so nothing has been run. Clear bit 3 (value 8) of $65 by hand and try again.",
+                        "Reference TLO", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+            }
 
             // Where G59.3 actually is, in machine coordinates, read fresh - the program below drives to it
             // with G53 rather than selecting it, so these numbers ARE the move. Refuse rather than move if

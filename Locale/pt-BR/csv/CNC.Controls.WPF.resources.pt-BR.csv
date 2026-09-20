@@ -2028,3 +2028,5 @@ CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_setTloSurface:Sys
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_targetHeight:CNC.Controls.NumericField.Label,None,False,True,,Height on table:
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_targetHeight:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_targetHeight:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"How tall this stands above the surface it sits on - about 50 mm for a typical toolsetter, 15 mm for a touch plate. Only needed if this is what measures tool length at G59.3: it lets the probe work out how far to search instead of using a fixed 90 mm. Leave at 0 if unsure."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_fixProbingFlags:System.Windows.Controls.ContentControl.Content,Button,True,True,,Turn it off
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_fixProbingFlags:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Change bit 3 of $65 on the controller, leaving its other bits alone."

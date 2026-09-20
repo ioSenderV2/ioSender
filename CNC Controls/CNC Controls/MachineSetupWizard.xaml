@@ -369,6 +369,18 @@
                             <TextBlock x:Uid="txt_tloFixedWarn" x:Name="txtTloFixedWarn" TextWrapping="Wrap" FontSize="11"/>
                         </Border>
 
+                        <!-- $65 bit 3 follows from the answer above rather than being an independent
+                             preference, so the page states what it is, what it should be, and offers the
+                             change. It does not write it silently: this is a controller setting the
+                             operator may have chosen deliberately. -->
+                        <StackPanel Orientation="Horizontal" Margin="10,6,0,0">
+                            <TextBlock x:Uid="txt_probingFlags" x:Name="txtProbingFlags" TextWrapping="Wrap" FontSize="11"
+                                       Foreground="#FF5A5A5A" MaxWidth="640" VerticalAlignment="Center"/>
+                            <Button x:Uid="btn_fixProbingFlags" x:Name="btnFixProbingFlags" Content="Turn it off" Margin="10,0,0,0"
+                                    Padding="8,1" MinHeight="22" Visibility="Collapsed" Click="FixToolsetterAutoSelect_Click"
+                                    ToolTip="Change bit 3 of $65 on the controller, leaving its other bits alone."/>
+                        </StackPanel>
+
                         <!-- ===== Reference positions =====
                              The two stored positions the tool-change flow bounces between. Explained here
                              rather than assumed, because nothing else in the app ever says what they are

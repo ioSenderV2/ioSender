@@ -149,6 +149,16 @@ namespace CNC.Core
         JogStepDistance = 53,
         JogSlowDistance = 54,
         JogFastDistance = 55,
+        /// <summary>
+        /// "Probing options", a bitfield. Bit 3 (value 8) is "Auto select toolsetter", and it is the one
+        /// that matters to a sender: with it set, grblHAL re-routes ANY G38.2 that starts within
+        /// TOOLSETTER_RADIUS (5 mm) of G59.3 to the toolsetter input, whatever probe input the program
+        /// just selected. A touch plate used for tool length lives at G59.3 and is wired to the MAIN
+        /// input, so the probe can never trigger and the tool is driven into the plate.
+        /// Bits: 0 allow feed override, 1 apply soft limits, 2 n/a, 3 auto select toolsetter,
+        /// 4 auto select probe 2, 5 probe protection.
+        /// </summary>
+        ProbingFlags = 65,
         // Per axis settings
         TravelResolutionBase = 100,
         MaxFeedRateBase = 110,
