@@ -393,6 +393,46 @@ assert something false. That is a stopgap, not a fix:
         setting — errors-only is the behaviour and the setting is the pop-up's dwell time. Written
         from source, which is why it was caught.
 
+### ✅ §4 IS PAID — all thirteen NEEDS-UPDATING topics, 2026-09-20
+
+U1–U13 of `MANUAL-AUDIT-2026-09-17.md` §4, written from source rather than from the changelog
+entries the audit cites. Landed with the `#376` outline and Peek sections in the same pass.
+
+- **U1 / U2** `#job` — the run strip (State's colour and its right-click recovery menu, the elapsed
+  job time, the Signals lamps and the P/T probe-input double-click, the overrides' fill bars,
+  double-click to reset feed/spindle and a SINGLE click for rapids, which is 100/50/25 only); loading
+  ("Loaded <name> — N lines in T s", the Data column, the oversized-program question, the verbatim
+  pass-through). Plus a warning the manual did not carry at all: `!` `~` `?` act wherever they appear
+  in a line, so an exclamation mark inside a COMMENT is a feed hold mid-cut.
+- **U3** `#connect` — what the handshake reports, and the three ways a connect goes wrong.
+- **U4** `#setup` — Generate → loaded job → Job tab; Esc discards a handoff; the measurement
+  persists and names its date.
+- **U5** `#work-order` — the Generate report and its estimate's limits, the reason on a disabled
+  Generate, the recorded blank, and the two upgrade notes (V-carve step, Bore feed) as a warning.
+- **U6** `#machine-setup` — a "Controller macros (step 7)" section; `tlo.macro` and `error:81`.
+- **U7** `#settings` — three settings were missing from the UI→General row; four given their own
+  section.
+- **U8** `#offsets` — the reachability guard, with the real refusal text.
+- **U9** `#gcode-viewer` — the stock block, and `G53` drawn in the right frame.
+- **U10** `#accuracy-calibration` — clear the offset first, and do the reversal test.
+- **U11** `#errors-alarms` — the two pre-run `ALARM:2` catches, and where a message that has gone
+  can be found.
+- **U12** `#sdcard` — per-file hash-compared macro upload, the poll-rate fix, and unknown ≠ empty.
+- **U13** `#tools` — a note placing Height Map and Probing.
+
+🔴 **Three OBSOLETE sites the audit did not catch**, all found by checking a claim in source
+before writing near it:
+1. **"Pick the point in the 3D viewer"** to start a job partway through — in BOTH `#job` and
+   `#gcode-viewer`. `StartFromBlock` has exactly one caller, the program list. Corrected in both.
+2. **The "status line"** — the manual described a permanent status line showing the latest message.
+   The run strip lost its message line on 2026-08-10 and only a FLAGGED message is displayed at all
+   (`GrblViewModel.SetErrorMessage`'s own comment says so). Six sites reworded; `#job`'s M15 section,
+   written on 2026-09-17, was one of them.
+3. **#292 as the audit summarised it** — "settings that have not arrived no longer display as 0".
+   What the code does is leave the field AS IT WAS and reschedule a re-read. Written from the source.
+
+**Still owed from this wave: the screenshots only** — §6 of the audit, `job-runscreen.png` first.
+
 ### ✅ The F1 anchors are FIXED (`2e26663b`, 2026-09-18)
 `ManualHelp.cs`'s map had drifted from the manual and the failure is silent — a dead anchor still
 opens the manual, the browser just does not scroll, so F1 looks like it worked. `StartJob` pointed at

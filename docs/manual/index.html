@@ -630,7 +630,7 @@
     only the views that controller actually supports — a tab or a menu entry for something your board can't
     do simply isn't there. This is also when the
     <a href="#getting-started">option-matched simulator</a> is selected, if you're running one.</p>
-    <p>It also <strong>says what it found</strong>, on the <a href="#job">status line</a> and in the log:
+    <p>It also <strong>says what it found</strong>, in the <a href="#job">status log</a>:
     how many controller settings were read, the controller's identity, version, build and its reported
     options, and — if the board was already latched in <a href="#errors-alarms">alarm</a> before you
     connected — that, in as many words. That last one is worth the line it takes: an alarm blocks g-code
@@ -648,14 +648,14 @@
       <li><strong>A controller left in check mode.</strong> Grbl answers every <code>$</code> query with
       <code>error:8</code> in check mode, so the capability query cannot succeed there — and neither could a
       reconnect, because check mode survives one. That used to loop for ever. ioSender now recognises it,
-      <strong>leaves check mode and reconnects by itself</strong>, and says so on the status line.</li>
+      <strong>leaves check mode and reconnects by itself</strong>, and says so in the log.</li>
       <li><strong>Capabilities that could not be read.</strong> If the link is open but the controller's
       capabilities never arrived, ioSender does <em>not</em> carry on as if everything were absent — which
       is what an empty capability set reads as, and is how a board that supports expressions perfectly well
       once got told it doesn't. It stops and offers two choices: <strong>reconnect</strong> (which normally
       fixes it), or <strong>stay connected in check mode</strong> to look around. Staying is safe only
       because check mode is then <em>enforced</em>, not merely entered: the machine cannot move until you
-      reconnect, and the status line says so.</li>
+      reconnect, and the log says so.</li>
     </ul>
     <div class="callout note"><span class="k">Serial is the default tab</span><br>
       A first connect opens on <strong>Serial</strong>. A first-time connect is far more likely to be a USB
@@ -854,7 +854,14 @@
       (<a href="#calibration"><strong>Tools → Calibration → Squareness</strong></a> uses a
       Phil&nbsp;Barrett offset on the ganged axis, <code>$170+</code>),
       the spindle perpendicular to the bed (surface a test patch, read the scallops), and the frame square
-      (measure the diagonals of a big rectangle).</li>
+      (measure the diagonals of a big rectangle).<br>
+      Two things about the <strong>(probe)</strong> version are worth knowing before you start.
+      <strong>Clear the existing offset first</strong>: the number it proposes is the current offset
+      <em>plus</em> the correction your measurement implies, so measuring on top of an old correction
+      measures the sum of two things. And a single reading cannot tell your square's error from the
+      machine's — <strong>do the reversal test</strong>, flipping the square and measuring again, or you will
+      square the gantry to your square rather than to a right angle. Both are covered in
+      <a href="#calibration">Calibration</a>.</li>
       <li><strong>Backlash</strong> — put a dial indicator on each axis, reverse direction, read the lost
       motion. Fix it mechanically (belt tension, anti-backlash nuts) — that beats software compensation.</li>
       <li><strong>Homing repeatability</strong> — home several times and confirm it returns to the same machine
@@ -1080,7 +1087,7 @@
     <a href="#work-order">Work Order</a>, it shows in the same g-code list, runs the same way, and updates
     the same live per-line status as it executes. The program-view header's title names what's loaded (a
     filename, or "Work Order" for a generated run).</p>
-    <p>The load <strong>says what it is doing</strong> — "Loading <em>name</em>…" on the status line while it
+    <p>The load <strong>says what it is doing</strong> — "Loading <em>name</em>…" while it
     reads, then "Loaded <em>name</em> — 220,144 lines in 3.1 s" when the list is bound. A file that big used
     to sit behind a wait cursor long enough to read as a hang; now it reports, and the number it reports is
     the one you actually waited, bind and all. The <strong>Data</strong> column shows the g-code from the
@@ -1268,18 +1275,20 @@
       the confirmation says as much. Where the program has an outline, <em>Start from this toolpath</em> is
       the supported route and the safer one.</div>
 
-    <h3>What actually happened &mdash; the status line and the log</h3>
+    <h3>What actually happened &mdash; the Status window and the log</h3>
     <p>ioSender narrates itself. Loading a file, a connection and how many settings it read, a run starting
-    and ending, a Generate, a setting change, a dialog and the answer you gave it &mdash; each lands on the
-    <strong>status line</strong> as it happens. That line only ever shows the latest one, so there are two
-    other ways to it:</p>
+    and ending, a Generate, a setting change, a dialog and the answer you gave it &mdash; each is recorded as
+    it happens. There is deliberately <strong>no permanent status line</strong> spending a strip of screen on
+    the latest message; instead, only a message that <em>matters</em> puts itself in front of you, and
+    everything is kept. Two ways to it:</p>
     <ul>
       <li><strong>The Status window</strong> holds every message since launch. The run strip's
       <strong>Status</strong> button opens it, and it also <em>opens itself</em> &mdash; but only for an
       error or an alarm, and it dismisses itself again after a few seconds so a routine message never takes
       the screen. How long it lingers is a slider in <a href="#settings">Settings &rarr; User
       Interface</a>; shortening it loses nothing, because nothing is ever dropped from the log behind the
-      button. A window <em>you</em> opened does not close itself.</li>
+      button. A window <em>you</em> opened does not close itself, and an arriving message refreshes it
+      without starting a countdown on it.</li>
       <li><strong>The status log on disk</strong> &mdash; <code>%AppData%\ioSender\logs\status_&lt;timestamp&gt;.log</code>,
       with <code>latest_status.log</code> pointing at the current run. Every message is written there as it
       happens, tagged with whether it was an error and whether it came from ioSender or from the controller
@@ -2439,6 +2448,13 @@
       <tr><td><strong>Auto Square</strong></td><td><strong>Tools → Calibration → Squareness (pins)</strong>, beside a newer <strong>Squareness (probe)</strong> that measures the gantry against a reference square instead of sighting drilled pins.</td></tr>
     </table>
 
+    <div class="callout note"><span class="k">Two more Tools entries, documented elsewhere</span><br>
+      <strong>Height Map</strong> has a topic of its own — see <a href="#heightmap">Height Map</a>.
+      <strong>Probing</strong> does not: the standalone probing tab left the recommended workflow when
+      <a href="#setup">Setup</a> absorbed what it did, so that is where to read about probing, and where
+      <kbd>F1</kbd> from the Probing view takes you. The tab is still there for anyone who prefers the
+      individual probe routines.</div>
+
     <div class="xref">Related: <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#work-order">Work Order</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a> · <a href="#settings">Settings</a></div>
   </section>
 
@@ -2845,7 +2861,15 @@
     </ul>
     <div class="callout tip"><span class="k">Also the home of controller macros</span><br>
       The controller-side macro set (e.g. <em>Install ATC macros</em>) lives on this storage too — the same
-      set <a href="#machine-setup">Machine Setup</a> step 7 installs.</div>
+      set <a href="#machine-setup">Machine Setup</a> step 7 installs. Installing is now
+      <strong>per file and hash-compared</strong>: only the macros that actually differ are sent, so editing
+      one costs seconds rather than the whole set. And the upload no longer crawls — it used to run at one
+      packet per status poll, turning a six-second transfer into fifty-six.</div>
+    <div class="callout warn"><span class="k">An empty list may mean "not answered", and says so</span><br>
+      A listing the controller never answered — because it was busy homing, say — used to come back
+      <em>empty</em>, and empty was then reported as fact: <em>no macros found</em>, on a controller that had
+      them. <strong>Unknown is now distinct from empty</strong> and is reported as unknown. If you see that,
+      the answer is to ask again once the machine is idle, not to reinstall anything.</div>
     <div class="xref">Related: <a href="#job">The Job screen</a> · <a href="#machine-setup">Machine&nbsp;Setup</a></div>
   </section>
 
@@ -2960,7 +2984,7 @@
     <p><strong>What you're looking at:</strong></p>
     <ul>
       <li>Two tabs — <strong>Error codes</strong> and <strong>Alarm codes</strong> — each a plain-English lookup table for every numbered code the controller can report.</li>
-      <li>Find the code shown on your Job screen's status line in this list to see exactly what it means (and, for alarms, what usually causes it).</li>
+      <li>Find the code the machine reported — from the pop-up Status window, or the <a href="#job">status log</a> — in this list to see exactly what it means (and, for alarms, what usually causes it).</li>
       <li>This reference opens from the <strong>Help</strong> menu any time, even without a job running — handy to have open the first few times you hit an alarm.</li>
     </ul>
     <p>Sooner or later the machine stops and shows a code. Don't panic — grbl is just telling you what
@@ -2984,7 +3008,7 @@
     <table class="reftab">
       <tr><th>Alarm</th><th>Meaning &amp; usual cause</th></tr>
       <tr><td><strong>1</strong></td><td>Hard limit tripped — a limit switch was hit. Re-home.</td></tr>
-      <tr><td><strong>2</strong></td><td>Soft limit — a commanded move would exceed machine travel. Usually a bad work origin or a program too big for the stock position.</td></tr>
+      <tr><td><strong>2</strong></td><td>Soft limit — a commanded move would exceed machine travel. Usually a bad work origin or a program too big for the stock position. Two specific causes ioSender now catches <em>before</em> the run: a stored <a href="#offsets">WCS origin sitting outside the travel envelope</a>, and a <a href="#job">program whose footprint is bigger than the machine</a>. If one of those is your cause, you get a dialog at the start instead of an alarm halfway through.</td></tr>
       <tr><td><strong>3</strong></td><td>Reset while in motion — position lost. Re-home.</td></tr>
       <tr><td><strong>4 / 5</strong></td><td>Probe failed — didn't start where expected (4) or didn't make contact within travel (5). Check wiring and the probe.</td></tr>
       <tr><td><strong>6–9</strong></td><td>Homing failed — reset during homing, or a switch wasn't found. Check switch wiring and pull-off.</td></tr>
@@ -3003,6 +3027,15 @@
     <div class="callout tip"><span class="k">The full list is built in</span><br>
       <strong>Help → Error and alarm codes</strong> opens a searchable dialog with every code your controller
       defines — the authoritative reference for anything not in the short lists above.</div>
+
+    <div class="callout tip"><span class="k">The message has already gone — where did it go?</span><br>
+      The window that popped up to show an error dismisses itself after a few seconds, and an error is often
+      followed by three more before you look up. The run strip's <strong>Status</strong> button reopens it
+      with the full history since launch. Nothing is ever dropped from it, and
+      every message is also written to <code>%AppData%\ioSender\logs\latest_status.log</code> as it happens,
+      tagged with whether it came from ioSender or from the controller itself as an <code>[MSG:]</code> —
+      which is the question this log gets opened to answer. See
+      <a href="#job">the Status window and the log</a>.</div>
 
     <div class="callout warn"><span class="k">Don't just clear and re-run</span><br>
       A <em>soft-limit</em> alarm (2) or a <em>jog-travel</em> error (15) usually means your work origin or
