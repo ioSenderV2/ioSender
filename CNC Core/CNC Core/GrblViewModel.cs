@@ -633,6 +633,96 @@ namespace CNC.Core
 
         public Position WorkPositionOffset { get { return State.WorkPositionOffset; } }
         public Position ToolOffset { get { return State.ToolOffset; } }
+
+        #region Work frame under a rotated WCS
+
+        // grblHAL maps work to machine as (gcode.c, the ROTATION_ENABLE block):
+        //
+        //     machine = R(rot) * (work + g5x) + g92 + TLO
+        //
+        // It rotates the SUM, so the pivot is MACHINE zero, not the WCS origin - which is also why the
+        // stored origin has to be written counter-rotated (see StartJobView / the measure macro). The
+        // inverse, and what this does:
+        //
+        //     work = R(-rot) * (machine - g92 - TLO) - g5x
+        //
+        // THE CONTROLLER DOES NOT DO THIS FOR US. report.c:1314 computes the WCO it reports as
+        // wco[idx] = gc_get_offset(idx, true), and gc_get_offset (gcode.c:299) returns
+        // g5x + g92 + TLO as a plain per-axis sum with no rotation anywhere; the WPos branch above it
+        // subtracts that same plain sum. Read in the firmware source 2026-09-19 against the build
+        // actually flashed - the two fixes in it (paired G10 L2 guards, G91 delta rotation) are both in
+        // gcode.c and neither touches report.c. So the drive side is correct and the REPORT is not, and
+        // the sender has to undo it.
+        //
+        // Measured, not inferred: with G54 rotated 0.10 deg and WCO 151.704,-631.263,-88.322, standing
+        // at MPos 153.318,-632.743 the DRO read X1.614 Y-1.480 - exactly MPos - WCO - where the true
+        // work position is X0.509 Y-1.747. The error is (-rot * MPos_Y, +rot * MPos_X), so it grows with
+        // distance from MACHINE zero and cancels nowhere.
+        //
+        // Since WCO is the summed offset, g5x = WCO - (g92 + TLO). With rot == 0 every expression here
+        // collapses to the plain machine - WCO it replaces, which is why this was invisible until WCS
+        // rotation shipped.
+
+        /// <summary>
+        /// The active coordinate system's rotation in DEGREES, or 0 when there is none.
+        /// </summary>
+        /// <remarks>
+        /// Read from the $# cache (GrblWorkParameters), which is refreshed at job start, before every
+        /// macro run, by the probing views and by the validator - so it is current everywhere a rotation
+        /// is written. It is NOT re-read on a bare WCS switch, so a G55 selected by hand from the MDI
+        /// after connect could be one $# behind. That is a smaller wrong than the status quo, never a
+        /// larger one: a stale rotation is at worst the unrotated answer this code replaces.
+        /// </remarks>
+        private double ActiveRotation
+        {
+            get
+            {
+                if (!GrblInfo.RotationSupported || string.IsNullOrEmpty(WorkCoordinateSystem))
+                    return 0d;
+                var cs = GrblWorkParameters.GetCoordinateSystem(WorkCoordinateSystem);
+                return cs == null || double.IsNaN(cs.Rotation) ? 0d : cs.Rotation;
+            }
+        }
+
+        // The part of WCO the rotation does NOT act on: g92 + TLO. Missing entries count as zero rather
+        // than NaN - an unread $# must not turn the whole DRO into blanks.
+        private static void AddPlaneOffset(Position p, ref double x, ref double y)
+        {
+            if (p == null)
+                return;
+            if (!double.IsNaN(p.X))
+                x += p.X;
+            if (!double.IsNaN(p.Y))
+                y += p.Y;
+        }
+
+        /// <summary>
+        /// Convert a machine position into the work frame, undoing the active WCS rotation.
+        /// </summary>
+        private Position ToWorkFrame(Position machine)
+        {
+            var work = machine - WorkPositionOffset;   // the unrotated answer - exact whenever rot == 0
+            double rot = ActiveRotation;
+
+            if (rot == 0d || double.IsNaN(rot) || double.IsNaN(machine.X) || double.IsNaN(machine.Y))
+                return work;
+
+            // Only the plane pair rotates: the rotation is about Z, so Z and the rotary axes are already
+            // right in the subtraction above and must be left alone.
+            double ux = 0d, uy = 0d;
+            AddPlaneOffset(GrblWorkParameters.GetCoordinateSystem("G92"), ref ux, ref uy);
+            AddPlaneOffset(GrblWorkParameters.ToolLengtOffset, ref ux, ref uy);
+
+            double mx = machine.X - ux, my = machine.Y - uy;
+            double c = Math.Cos(-rot * Math.PI / 180d), s = Math.Sin(-rot * Math.PI / 180d);
+
+            work.X = (mx * c - my * s) - (WorkPositionOffset.X - ux);
+            work.Y = (mx * s + my * c) - (WorkPositionOffset.Y - uy);
+
+            return work;
+        }
+
+        #endregion
         public Position ProbePosition { get { return State.ProbePosition; } }
         public bool IsProbeSuccess { get { return State.IsProbeSuccess; } private set { State.IsProbeSuccess = value; OnPropertyChanged(); } }
         public EnumFlags<Signals> Signals { get { return State.Signals; } }
@@ -737,7 +827,7 @@ namespace CNC.Core
                 if (State.IsMachinePosition)
                 {
                     if (has_wco)
-                        Position.Set(MachinePosition - WorkPositionOffset);
+                        Position.Set(ToWorkFrame(MachinePosition));   // undoes the WCS rotation - see ToWorkFrame
                     else
                         Position.Set(MachinePosition);
                 }
@@ -1212,15 +1302,24 @@ namespace CNC.Core
                         if(State.IsMachinePosition)
                         {
                             if (has_wco)
-                                Position.Set(MachinePosition - WorkPositionOffset);
+                                Position.Set(ToWorkFrame(MachinePosition));   // undoes the WCS rotation - see ToWorkFrame
                             else
                                 Position.Set(MachinePosition);
                         }
                         else
                         {
+                            // The controller reported WPos, which it derived as print_position - WCO with the
+                            // same plain per-axis subtraction (report.c:1311). Inverting that recovers the true
+                            // machine position exactly, and the work frame is then computed from it as above -
+                            // taking WPos at face value would carry the controller's missing rotation straight
+                            // through. Without a WCO there is nothing to invert and WPos is all there is.
                             if (has_wco)
+                            {
                                 MachinePosition.Set(WorkPosition + WorkPositionOffset);
-                            Position.Set(WorkPosition);
+                                Position.Set(ToWorkFrame(MachinePosition));
+                            }
+                            else
+                                Position.Set(WorkPosition);
                         }
                     }
                 }
