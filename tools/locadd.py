@@ -86,6 +86,7 @@ TARGETS = [
     ('CNC Controls/CNC Controls/ProbeMotionParamsDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/SignalsControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/RestorePointDialog.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/OffsetRestoreDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/ResetReproDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/DROControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/DROBaseControl.xaml', 'CNC.Controls.WPF'),

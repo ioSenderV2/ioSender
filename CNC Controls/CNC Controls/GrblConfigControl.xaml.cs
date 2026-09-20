@@ -542,41 +542,10 @@ namespace CNC.Controls
         /// </remarks>
         private void RestoreWorkOffsets(string path, bool includePositions)
         {
-            if (includePositions)
-            {
-                // The whole file, as a program. It opens with the warning and the M0, so nothing moves until
-                // the operator reads it and presses Start - which is the point of loading it rather than
-                // running it. The G10 writes at the top of the file go in on the same run, so this covers
-                // the offsets too and there is nothing to do here beyond handing it over.
-                GCode.File.Load(path);
-                AppDialogs.Show("The snapshot has been opened as a program in the Job tab.\n\n" +
-                                "It restores the work offsets and then drives to each stored G28 / G30 position to teach it. " +
-                                "Read the warning at the top, make sure the machine is homed and the path is clear, then press Start.",
-                                "Restore work offsets", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            string code;
+            List<OffsetRestoreRow> rows;
             try
             {
-                // Keep only what writes: G10 L1 (tool table) and G10 L2 (coordinate systems). Everything else
-                // in the file is a comment, the M0 guard, a G0 G53 rapid or a G28.1/G30.1 teach - none of
-                // which belongs in a no-motion restore. Matching on the emitted prefix rather than parsing:
-                // Export() writes these lines and this reads them, and a line it does not recognise is left
-                // out rather than guessed at.
-                var lines = System.IO.File.ReadAllLines(path)
-                                          .Select(l => l.Trim())
-                                          .Where(l => l.StartsWith("G90G10L2") || l.StartsWith("G90G10L1"))
-                                          .ToList();
-
-                if (lines.Count == 0)
-                {
-                    AppDialogs.Show("That snapshot holds no work offsets to restore.", "Restore work offsets",
-                                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-
-                code = string.Join("\n", lines);
+                rows = OffsetRestoreDialog.Parse(System.IO.File.ReadAllLines(path));
             }
             catch (Exception ex)
             {
@@ -585,7 +554,54 @@ namespace CNC.Controls
                 return;
             }
 
-            MacroProcessor.Run(model, "Restore work offsets", code);
+            if (rows.Count == 0)
+            {
+                AppDialogs.Show("That snapshot holds no work offsets to restore.", "Restore work offsets",
+                                MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // The G28/G30 rows are always SHOWN - what a snapshot holds is worth seeing even when you did not
+            // ask for it - but they start ticked only if the operator did ask. Present and unticked is
+            // information; present and ticked without being asked for would be a machine move nobody chose.
+            foreach (var r in rows.Where(r => r.MovesMachine))
+                r.Restore = includePositions;
+
+            var dlg = new OffsetRestoreDialog(rows) { Owner = Window.GetWindow(this) };
+            if (dlg.ShowDialog() != true)
+                return;
+
+            // The writes first: G10 L1/L2 move nothing, so they can just go in.
+            string writes = OffsetRestoreDialog.BuildWrites(dlg.Selected);
+            if (!string.IsNullOrEmpty(writes))
+                MacroProcessor.Run(model, "Restore work offsets", writes);
+
+            // Then the half that moves, as a program the operator starts - never run from here. It carries
+            // the same warning and M0 the snapshot does, now listing the actual positions it will drive to,
+            // because those are the numbers the table just let them change.
+            string program = OffsetRestoreDialog.BuildPositionProgram(dlg.Selected);
+            if (string.IsNullOrEmpty(program))
+                return;
+
+            try
+            {
+                // A named file rather than a temp one: it is inspectable afterwards, and overwritten next
+                // time rather than accumulating.
+                string file = System.IO.Path.Combine(Core.Resources.ConfigPath, "restore-positions.nc");
+                System.IO.File.WriteAllText(file, program);
+                GCode.File.Load(file);
+
+                AppDialogs.Show("The G28 / G30 positions have been opened as a program in the Job tab.\n\n" +
+                                "They cannot be written - the controller only learns them from where the machine is " +
+                                "standing - so this drives to each one and teaches it. Read it, make sure the machine " +
+                                "is homed and the path is clear, then press Start.",
+                                "Restore work offsets", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show("The positions could not be opened as a program: " + ex.Message,
+                                "Restore work offsets", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void dgrSettings_SelectionChanged(object sender, SelectionChangedEventArgs e)

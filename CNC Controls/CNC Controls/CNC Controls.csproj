@@ -180,6 +180,9 @@
     <Compile Include="RestorePointDialog.xaml.cs">
       <DependentUpon>RestorePointDialog.xaml</DependentUpon>
     </Compile>
+    <Compile Include="OffsetRestoreDialog.xaml.cs">
+      <DependentUpon>OffsetRestoreDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="ProbeDefinition.cs" />
     <Compile Include="ProbeDefinitionEditDialog.xaml.cs">
       <DependentUpon>ProbeDefinitionEditDialog.xaml</DependentUpon>
@@ -591,6 +594,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="RestorePointDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="OffsetRestoreDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
