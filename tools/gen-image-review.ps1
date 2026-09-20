@@ -29,9 +29,12 @@
     filesystem and index.html. Note-only entries are fine in any of them; the note is what a reader
     needs to know, the status is what colours the entry.
 
-    A note may end with "SHOOT: <instruction>". That part is split off, shown on its own line, and is
-    what goes into the -message build.ps1 puts in front of the operator - so the app says which screen
-    to shoot rather than repeating the paragraph explaining why it is owed.
+    A note may end with "SHOOT: <instruction>". That part is split off and shown on its own line - what
+    to point the camera at, as opposed to why the shot is owed.
+
+    The -Pages view has a working "update from newest capture" button, but only when it is being served
+    by tools\serve-image-review.ps1 - a page opened straight off disk cannot write to the filesystem.
+    Open it that way and the buttons say so rather than failing silently.
 
 .PARAMETER Pages
     Write the one-shot-per-screen worklist instead of the contact sheet.
@@ -88,6 +91,24 @@ $Reshoot = [ordered]@{
     'work-order-composition.png' = 'The tree now carries Text, SVG and Indirect geometries plus group headers, and the operations list grew five kinds. SHOOT: A work order whose tree has a Text and an SVG toolpath plus a group header.'
     'machine-setup-calibration.png'= 'Depicts Calibration as Machine Setup step 8, which it is not (#332). This should become a CALIBRATION VIEW shot instead - retire the filename rather than re-file the same name, and repoint the figure in #machine-setup. SHOOT: Tools > Calibration, Stepper (probe) page, saved under a NEW name.'
 }
+
+# Shots that must be taken on a DEFAULT CONFIG - they show what a fresh install looks like, and none of
+# them needs data a fresh install would not have. Everything else is shot from your own config, because
+# it needs a fixture, a declared probe, a real work order, a Fusion export, controller settings or a
+# probed map - things a default config has none of. Orphans are a delete decision and take no shot.
+#
+# A judgement call per shot, not a derivable fact, which is why it is a list to correct rather than a
+# rule to trust.
+$DefaultConfigShots = @(
+    'main-window-tools-menu.png'    # the tab bar and the Tools menu AS SHIPPED - the whole point of it
+    'machine-setup-overview.png'    # the eight-step tree; its dots are allowed to read "not done yet"
+    'settings-top-level-tabs.png'   # must show the nine-tab default, which only a fresh config has
+    'settings-search.png'           # searching the pages needs no machine
+    'connect-dialog.png'            # a dialog, and the first one a new user meets
+    'errors-dialog.png'             # a Help-menu reference dialog
+    'gcode-viewer.png'              # needs a loaded file (macros/sample_stock_40x400.nc), not a config
+    'job-runscreen.png'             # also needs the SIMULATOR and a file with three tool changes
+)
 
 # Orphans: referenced by nothing. The default note says only that; anything here replaces it, which is
 # where a "checked, and here is the verdict" goes. Source: audit section 6, "Four orphans".
@@ -174,6 +195,7 @@ foreach ($f in $files) {
         Note     = $note
         Topic    = $topic
         Caption  = $caption
+        Config   = if ($status -eq 'orphaned') { '' } elseif ($DefaultConfigShots -contains $f.Name) { 'default' } else { 'yours' }
         Mtime    = $f.LastWriteTime.ToString('yyyy-MM-dd HH:mm')
         Pixels   = Get-PixelSize $f.FullName
         Priority = [math]::Max(0, $reshootOrder.IndexOf($f.Name) + 1)
@@ -189,6 +211,7 @@ foreach ($name in $Wanted.Keys) {
         Note     = $Wanted[$name]
         Topic    = ''
         Caption  = ''
+        Config   = if ($DefaultConfigShots -contains $name) { 'default' } else { 'yours' }
         Mtime    = ''
         Pixels   = ''
         Priority = 0
@@ -275,41 +298,36 @@ function Build-Pages {
             $shoot = $r.Note.Substring($split + 6).Trim()
         }
 
-        # A figure nobody has flagged still gets a command, so a ride-along reshoot needs no typing.
-        # Its own caption is the instruction: it already describes what the figure shows. Command only -
-        # NOT shown as a "Shoot:" line, since the caption is printed a few pixels below it anyway.
-        $shootCmd = $shoot
-        if (-not $shootCmd -and $r.Status -eq 'current' -and $r.Caption) {
-            $shootCmd = ($r.Caption -split '(?<=\.)\s' | Select-Object -First 1).Trim()
-            if ($shootCmd.Length -gt 110) { $shootCmd = $shootCmd.Substring(0, 107).TrimEnd() + '...' }
-        }
-
-        # The command that files the capture. Only meaningful for a shot that has (or wants) a home in
-        # img/ - an orphan is a delete decision, not a reshoot.
-        $cmd = ''
-        if ($r.Status -ne 'orphaned' -and $shootCmd) {
-            $base = $r.Name -replace '\.png$', ''
-            $cmd = ".\build.ps1 -default-config -Shot $base -message=`"$($shootCmd -replace '"', "'")`""
+        $cfgHtml = switch ($r.Config) {
+            'default' { '<span class="cfg default" title="Shoot this one on a default config - it shows what a fresh install looks like">default config</span>' }
+            'yours'   { '<span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>' }
+            default   { '' }
         }
 
         $meta = @()
         if ($r.Topic) { $meta += "<a href=`"index.html#$($r.Topic)`" target=`"_blank`">#$($r.Topic)</a>" }
-        if ($r.Pixels) { $meta += (Enc $r.Pixels) }
-        if ($r.Mtime) { $meta += "captured $($r.Mtime)" }
-        if (-not $r.Exists) { $meta += 'no file yet' }
-        $metaHtml = $meta -join ' &middot; '
+        $meta += "<span class=`"px`">$(Enc $r.Pixels)</span>"
+        $meta += "<span class=`"mt`">$(if ($r.Mtime) { "captured $($r.Mtime)" } else { 'no file yet' })</span>"
+        $metaHtml = ($meta | Where-Object { $_ -ne '<span class="px"></span>' }) -join ' &middot; '
 
         $noteHtml = if ($why) { "<p class=`"why`">$(Enc $why)</p>" } else { '' }
         if ($shoot) { $noteHtml += "<p class=`"shoot`"><b>Shoot:</b> $(Enc $shoot)</p>" }
         $capHtml = if ($r.Caption) { "<p class=`"cap`"><b>Caption today:</b> $(Enc $r.Caption)</p>" } else { '' }
-        $cmdHtml = if ($cmd) {
-            "<div class=`"cmd`"><code>$(Enc $cmd)</code><button class=`"copy`" data-cmd=`"$(Enc $cmd)`">copy</button></div>"
-        } else { '' }
+
+        # An orphan is a delete decision, not a reshoot - it gets no update button, because filing a
+        # fresh capture as a filename nothing references would just make a newer orphan.
+        $actions = if ($r.Status -eq 'orphaned') {
+            '<span class="noact">orphan &mdash; decide delete or reuse; nothing to update</span>'
+        } else {
+            '<button class="update">update from newest capture</button>' +
+            '<button class="reload">reload</button>' +
+            '<span class="result"></span>'
+        }
 
         $frame = if ($r.Exists) {
             "<div class=`"frame`"><img src=`"img/$($r.Name)`" data-base=`"img/$($r.Name)`" loading=`"lazy`" alt=`"$(Enc $r.Name)`"></div>"
         } else {
-            "<div class=`"frame empty`"><div class=`"ph`">no file yet &mdash; this shot is owed</div></div>"
+            "<div class=`"frame empty`"><div class=`"ph`">no file yet &mdash; shoot it, then press <b>update from newest capture</b></div></div>"
         }
 
         @"
@@ -318,10 +336,11 @@ function Build-Pages {
     <span class="idx">$n / $total</span>
     <span class="pill $($r.Status)">$badge</span>
     <span class="fname">$($r.Name)</span>
+    $cfgHtml
     <span class="meta">$metaHtml</span>
-    <button class="reload">reload this shot</button>
+    <span class="acts">$actions</span>
   </header>
-  <div class="brief">$noteHtml$capHtml$cmdHtml</div>
+  <div class="brief">$noteHtml$capHtml</div>
   $frame
 </section>
 "@
@@ -343,6 +362,15 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
               font-size:11px; cursor:pointer; }
 #bar button:hover { background:#383838; }
 #bar button.on { background:#c0392b; border-color:#c0392b; color:#fff; }
+#bar #latest { color:#9fd28a; }
+#bar #latest.stale { color:#777; }
+
+#offline { display:none; position:fixed; top:30px; left:0; right:0; z-index:19; padding:4px 12px;
+           background:#3a2a10; border-bottom:1px solid #6b5310; color:#e8c877; font-size:12px; }
+#offline code { color:#f0e6c0; }
+body.offline #offline { display:block; }
+body.offline .shot { padding-top:60px; }
+body.offline .shot .acts button.update { display:none; }
 
 .shot { height:100vh; scroll-snap-align:start; display:flex; flex-direction:column;
         padding:34px 14px 10px; }
@@ -353,9 +381,20 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
 .shot .fname { font-weight:600; font-size:15px; }
 .shot .meta { color:#888; font-size:12px; }
 .shot .meta a { color:#5aa9e6; text-decoration:none; }
-.shot header button.reload { margin-left:auto; background:#2a2a2a; color:#ddd; border:1px solid #444;
-                             border-radius:4px; padding:3px 10px; font-size:11px; cursor:pointer; }
-.shot header button.reload:hover { background:#383838; }
+.cfg { font-size:10.5px; padding:1px 7px; border-radius:3px; border:1px solid; }
+.cfg.default { color:#7fc4e8; border-color:#2f5d75; background:#132430; }
+.cfg.yours { color:#c9b6e0; border-color:#5a4a72; background:#221c2c; }
+
+.shot .acts { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.shot .acts button { background:#2a2a2a; color:#ddd; border:1px solid #444; border-radius:4px;
+                     padding:3px 10px; font-size:11px; cursor:pointer; }
+.shot .acts button:hover:not(:disabled) { background:#383838; }
+.shot .acts button.update { background:#2f5d40; border-color:#3e7a55; color:#e6f5ea; }
+.shot .acts button.update:hover:not(:disabled) { background:#3e7a55; }
+.shot .acts button:disabled { opacity:.4; cursor:default; }
+.shot .acts .result { font-size:11px; color:#9fd28a; min-width:0; }
+.shot .acts .result.bad { color:#e8a09a; }
+.shot .acts .noact { font-size:11px; color:#777; font-style:italic; }
 
 .brief { margin:6px 0 8px; max-width:1100px; }
 .brief p { margin:3px 0; font-size:12.5px; line-height:1.45; }
@@ -364,11 +403,6 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
 .brief .shoot { color:#f0e6c0; }
 .brief .shoot b { color:#d4a017; }
 .brief .cap { color:#888; }
-.cmd { display:flex; align-items:center; gap:8px; margin-top:6px; }
-.cmd code { background:#0d0d0d; border:1px solid #303030; border-radius:4px; padding:3px 8px;
-            font-family:Consolas, monospace; font-size:11.5px; color:#9fd28a; }
-.cmd button { background:#2a2a2a; color:#ddd; border:1px solid #444; border-radius:4px; padding:2px 8px;
-              font-size:11px; cursor:pointer; }
 
 .frame { flex:1; min-height:0; display:flex; align-items:center; justify-content:center;
          background:#0d0d0d; border:1px solid #303030; border-radius:6px; overflow:hidden; }
@@ -386,12 +420,16 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
 <body>
 '@
 
-    $bar = "<div id=`"bar`"><b>Screenshot worklist</b><span>$summary</span><span class=`"spacer`"></span>" +
+    $bar = "<div id=`"bar`"><b>Screenshot worklist</b><span>$summary</span>" +
+           "<span id=`"latest`" title=`"Newest capture in the Snipping Tool folder - this is what 'update' would file`"></span>" +
+           "<span class=`"spacer`"></span>" +
            "<span id=`"pos`"></span>" +
            "<button id=`"filter`">owed only (F)</button>" +
            "<button id=`"prev`">&uarr;</button><button id=`"next`">&darr;</button>" +
            "<button id=`"reloadall`">reload all (A)</button>" +
-           "<span>generated $stamp</span></div>"
+           "<span title=`"arrows or j/k step &middot; U updates this shot &middot; R reloads it &middot; A reloads all &middot; F filters`">keys: &darr;&uarr; U R A F</span>" +
+           "<span>generated $stamp</span></div>" +
+           "<div id=`"offline`">Opened as a file, so <b>update</b> cannot write to disk. Serve it instead: <code>tools\serve-image-review.ps1</code></div>"
 
     $tail = @'
 <script>
@@ -458,13 +496,71 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     b.onclick = function () { reload(b.closest('section.shot')); };
   });
 
-  document.querySelectorAll('button.copy').forEach(function (b) {
-    b.onclick = function () {
-      navigator.clipboard.writeText(b.dataset.cmd).then(function () {
-        var t = b.textContent; b.textContent = 'copied';
-        setTimeout(function () { b.textContent = t; }, 1200);
+  // --- filing a capture -------------------------------------------------------------------------
+  // Only possible when this page is being SERVED: a page opened off disk has no way to write a file,
+  // so say so once, up front, rather than letting every button fail on click.
+  var served = location.protocol === 'http:' || location.protocol === 'https:';
+  if (!served) document.body.classList.add('offline');
+
+  function ago(iso) {
+    var s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 90) return Math.round(s) + 's ago';
+    if (s < 5400) return Math.round(s / 60) + 'm ago';
+    return Math.round(s / 3600) + 'h ago';
+  }
+
+  // What 'update' would file, and how old it is. Shown because the failure mode this page has to
+  // prevent is filing the WRONG capture - you shot one, got distracted, shot another. A timestamp in
+  // the bar makes that visible before the click rather than after it.
+  function pollLatest() {
+    if (!served) return;
+    fetch('api/recent').then(function (r) { return r.json(); }).then(function (j) {
+      var el = document.getElementById('latest');
+      if (!j.ok || !j.newest) { el.textContent = 'no captures found'; el.className = 'stale'; return; }
+      el.textContent = 'newest capture ' + ago(j.newest.time);
+      el.className = (Date.now() - new Date(j.newest.time).getTime() > 600000) ? 'stale' : '';
+    }).catch(function () { });
+  }
+
+  function update(sec) {
+    var btn = sec.querySelector('button.update');
+    var out = sec.querySelector('.result');
+    if (!btn) return;
+    btn.disabled = true;
+    out.className = 'result';
+    out.textContent = 'filing...';
+    fetch('api/update?name=' + encodeURIComponent(sec.dataset.name))
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        btn.disabled = false;
+        if (!j.ok) { out.className = 'result bad'; out.textContent = j.error; return; }
+        out.textContent = 'filed ' + j.from + ' (' + j.pixels + ')';
+        // Swap the image and its stamps in place. The whole reason for the button is not having to
+        // refresh, so nothing here may depend on a reload happening afterwards.
+        var frame = sec.querySelector('.frame');
+        var img = sec.querySelector('img[data-base]');
+        if (!img) {
+          frame.classList.remove('empty');
+          frame.innerHTML = '';
+          img = document.createElement('img');
+          img.setAttribute('data-base', 'img/' + sec.dataset.name);
+          frame.appendChild(img);
+        }
+        img.src = img.getAttribute('data-base') + '?t=' + Date.now();
+        var px = sec.querySelector('.px'), mt = sec.querySelector('.mt');
+        if (px) px.textContent = j.pixels;
+        if (mt) mt.textContent = 'captured ' + j.mtime;
+        pollLatest();
+      })
+      .catch(function (e) {
+        btn.disabled = false;
+        out.className = 'result bad';
+        out.textContent = 'failed: ' + e.message;
       });
-    };
+  }
+
+  document.querySelectorAll('button.update').forEach(function (b) {
+    b.onclick = function () { update(b.closest('section.shot')); };
   });
 
   document.addEventListener('keydown', function (e) {
@@ -475,7 +571,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     else if (k === 'r' || k === 'R') { reload(current()); }
     else if (k === 'a' || k === 'A') { all.forEach(reload); }
     else if (k === 'f' || k === 'F') { document.getElementById('filter').click(); }
+    else if (k === 'u' || k === 'U') { e.preventDefault(); update(current()); }
   });
+
+  pollLatest();
+  setInterval(pollLatest, 5000);
 
   var t = null;
   window.addEventListener('scroll', function () { clearTimeout(t); t = setTimeout(mark, 80); });

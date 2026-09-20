@@ -13,6 +13,15 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
               font-size:11px; cursor:pointer; }
 #bar button:hover { background:#383838; }
 #bar button.on { background:#c0392b; border-color:#c0392b; color:#fff; }
+#bar #latest { color:#9fd28a; }
+#bar #latest.stale { color:#777; }
+
+#offline { display:none; position:fixed; top:30px; left:0; right:0; z-index:19; padding:4px 12px;
+           background:#3a2a10; border-bottom:1px solid #6b5310; color:#e8c877; font-size:12px; }
+#offline code { color:#f0e6c0; }
+body.offline #offline { display:block; }
+body.offline .shot { padding-top:60px; }
+body.offline .shot .acts button.update { display:none; }
 
 .shot { height:100vh; scroll-snap-align:start; display:flex; flex-direction:column;
         padding:34px 14px 10px; }
@@ -23,9 +32,20 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
 .shot .fname { font-weight:600; font-size:15px; }
 .shot .meta { color:#888; font-size:12px; }
 .shot .meta a { color:#5aa9e6; text-decoration:none; }
-.shot header button.reload { margin-left:auto; background:#2a2a2a; color:#ddd; border:1px solid #444;
-                             border-radius:4px; padding:3px 10px; font-size:11px; cursor:pointer; }
-.shot header button.reload:hover { background:#383838; }
+.cfg { font-size:10.5px; padding:1px 7px; border-radius:3px; border:1px solid; }
+.cfg.default { color:#7fc4e8; border-color:#2f5d75; background:#132430; }
+.cfg.yours { color:#c9b6e0; border-color:#5a4a72; background:#221c2c; }
+
+.shot .acts { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.shot .acts button { background:#2a2a2a; color:#ddd; border:1px solid #444; border-radius:4px;
+                     padding:3px 10px; font-size:11px; cursor:pointer; }
+.shot .acts button:hover:not(:disabled) { background:#383838; }
+.shot .acts button.update { background:#2f5d40; border-color:#3e7a55; color:#e6f5ea; }
+.shot .acts button.update:hover:not(:disabled) { background:#3e7a55; }
+.shot .acts button:disabled { opacity:.4; cursor:default; }
+.shot .acts .result { font-size:11px; color:#9fd28a; min-width:0; }
+.shot .acts .result.bad { color:#e8a09a; }
+.shot .acts .noact { font-size:11px; color:#777; font-style:italic; }
 
 .brief { margin:6px 0 8px; max-width:1100px; }
 .brief p { margin:3px 0; font-size:12.5px; line-height:1.45; }
@@ -34,11 +54,6 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
 .brief .shoot { color:#f0e6c0; }
 .brief .shoot b { color:#d4a017; }
 .brief .cap { color:#888; }
-.cmd { display:flex; align-items:center; gap:8px; margin-top:6px; }
-.cmd code { background:#0d0d0d; border:1px solid #303030; border-radius:4px; padding:3px 8px;
-            font-family:Consolas, monospace; font-size:11.5px; color:#9fd28a; }
-.cmd button { background:#2a2a2a; color:#ddd; border:1px solid #444; border-radius:4px; padding:2px 8px;
-              font-size:11px; cursor:pointer; }
 
 .frame { flex:1; min-height:0; display:flex; align-items:center; justify-content:center;
          background:#0d0d0d; border:1px solid #303030; border-radius:6px; overflow:hidden; }
@@ -53,16 +68,17 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
 .pill.orphaned { background:#7f8c8d; color:#fff; }
 .pill.current { background:#2ecc71; color:#132; }
 </style></head>
-<body><div id="bar"><b>Screenshot worklist</b><span>12 current &middot; 4 orphaned &middot; 7 reshoot &middot; 6 wanted</span><span class="spacer"></span><span id="pos"></span><button id="filter">owed only (F)</button><button id="prev">&uarr;</button><button id="next">&darr;</button><button id="reloadall">reload all (A)</button><span>generated 2026-09-20 10:42</span></div>
+<body><div id="bar"><b>Screenshot worklist</b><span>12 current &middot; 4 orphaned &middot; 7 reshoot &middot; 6 wanted</span><span id="latest" title="Newest capture in the Snipping Tool folder - this is what 'update' would file"></span><span class="spacer"></span><span id="pos"></span><button id="filter">owed only (F)</button><button id="prev">&uarr;</button><button id="next">&darr;</button><button id="reloadall">reload all (A)</button><span title="arrows or j/k step &middot; U updates this shot &middot; R reloads it &middot; A reloads all &middot; F filters">keys: &darr;&uarr; U R A F</span><span>generated 2026-09-20 10:56</span></div><div id="offline">Opened as a file, so <b>update</b> cannot write to disk. Serve it instead: <code>tools\serve-image-review.ps1</code></div>
 <section class="shot reshoot" id="s1" data-status="reshoot" data-name="job-runscreen.png">
   <header>
     <span class="idx">1 / 29</span>
     <span class="pill reshoot">reshoot &middot; priority 1</span>
     <span class="fname">job-runscreen.png</span>
-    <span class="meta"><a href="index.html#job" target="_blank">#job</a> &middot; 3840x2400 &middot; captured 2026-08-04 01:33</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg default" title="Shoot this one on a default config - it shows what a fresh install looks like">default config</span>
+    <span class="meta"><a href="index.html#job" target="_blank">#job</a> &middot; <span class="px">3840x2400</span> &middot; <span class="mt">captured 2026-08-04 01:33</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="why">The run strip replaced the run bar, and the bottom status bar is gone (#220) - the largest single visual change in the wave, on the manual&#39;s most-visited topic. One shot can also pay off the toolpath outline and Peek, both of which the manual now describes with no figure. Its caption currently admits it is out of date.</p><p class="shoot"><b>Shoot:</b> A job with three tool changes, RUNNING, one outline section expanded - so Feed Hold, Stop and Peek are all on the strip.</p><p class="cap"><b>Caption today:</b> The Job screen with a program loaded: g-code list, live 3D view and the run strip. This shot predates the run strip described below — it shows the older run bar and a status bar along the bottom of the window, which has since been retired.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot job-runscreen -message=&quot;A job with three tool changes, RUNNING, one outline section expanded - so Feed Hold, Stop and Peek are all on the strip.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot job-runscreen -message=&quot;A job with three tool changes, RUNNING, one outline section expanded - so Feed Hold, Stop and Peek are all on the strip.&quot;">copy</button></div></div>
+  <div class="brief"><p class="why">The run strip replaced the run bar, and the bottom status bar is gone (#220) - the largest single visual change in the wave, on the manual&#39;s most-visited topic. One shot can also pay off the toolpath outline and Peek, both of which the manual now describes with no figure. Its caption currently admits it is out of date.</p><p class="shoot"><b>Shoot:</b> A job with three tool changes, RUNNING, one outline section expanded - so Feed Hold, Stop and Peek are all on the strip.</p><p class="cap"><b>Caption today:</b> The Job screen with a program loaded: g-code list, live 3D view and the run strip. This shot predates the run strip described below — it shows the older run bar and a status bar along the bottom of the window, which has since been retired.</p></div>
   <div class="frame"><img src="img/job-runscreen.png" data-base="img/job-runscreen.png" loading="lazy" alt="job-runscreen.png"></div>
 </section>
 <section class="shot reshoot" id="s2" data-status="reshoot" data-name="main-window-tools-menu.png">
@@ -70,10 +86,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">2 / 29</span>
     <span class="pill reshoot">reshoot &middot; priority 2</span>
     <span class="fname">main-window-tools-menu.png</span>
-    <span class="meta"><a href="index.html#getting-started" target="_blank">#getting-started</a> &middot; 3840x2400 &middot; captured 2026-08-04 01:33</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg default" title="Shoot this one on a default config - it shows what a fresh install looks like">default config</span>
+    <span class="meta"><a href="index.html#getting-started" target="_blank">#getting-started</a> &middot; <span class="px">3840x2400</span> &middot; <span class="mt">captured 2026-08-04 01:33</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="why">Shows the old four-tab bar and a Tools menu with no Calibration. Caption already admits it.</p><p class="shoot"><b>Shoot:</b> Default config, main window, Tools menu open.</p><p class="cap"><b>Caption today:</b> The Tools menu open. What it holds depends on your hardware: no Camera entry until you bind a device, and no Tool table / Trinamic / PID on a controller that doesn&#39;t have them — which is why a real menu is usually shorter than the list above. This shot predates the restored full tab strip, so the bar behind it shows the older four-tab default and no Calibration entry in the menu; the tables above describe what you will actually see.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot main-window-tools-menu -message=&quot;Default config, main window, Tools menu open.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot main-window-tools-menu -message=&quot;Default config, main window, Tools menu open.&quot;">copy</button></div></div>
+  <div class="brief"><p class="why">Shows the old four-tab bar and a Tools menu with no Calibration. Caption already admits it.</p><p class="shoot"><b>Shoot:</b> Default config, main window, Tools menu open.</p><p class="cap"><b>Caption today:</b> The Tools menu open. What it holds depends on your hardware: no Camera entry until you bind a device, and no Tool table / Trinamic / PID on a controller that doesn&#39;t have them — which is why a real menu is usually shorter than the list above. This shot predates the restored full tab strip, so the bar behind it shows the older four-tab default and no Calibration entry in the menu; the tables above describe what you will actually see.</p></div>
   <div class="frame"><img src="img/main-window-tools-menu.png" data-base="img/main-window-tools-menu.png" loading="lazy" alt="main-window-tools-menu.png"></div>
 </section>
 <section class="shot reshoot" id="s3" data-status="reshoot" data-name="machine-setup-overview.png">
@@ -81,10 +98,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">3 / 29</span>
     <span class="pill reshoot">reshoot &middot; priority 3</span>
     <span class="fname">machine-setup-overview.png</span>
-    <span class="meta"><a href="index.html#machine-setup" target="_blank">#machine-setup</a> &middot; 3840x2400 &middot; captured 2026-08-04 01:33</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg default" title="Shoot this one on a default config - it shows what a fresh install looks like">default config</span>
+    <span class="meta"><a href="index.html#machine-setup" target="_blank">#machine-setup</a> &middot; <span class="px">3840x2400</span> &middot; <span class="mt">captured 2026-08-04 01:33</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="why">Shows NINE steps with Calibration expanded. Machine Setup is eight steps and Calibration left it in #332. Caption already admits it.</p><p class="shoot"><b>Shoot:</b> Machine Setup on STEP 1, not the Overview page - step 1 shows the whole eight-step tree and its status dots.</p><p class="cap"><b>Caption today:</b> Machine Setup on 1 &#183; Machine . All eight steps sit in the tree on the left, each with its status dot — green here, meaning this machine is fully commissioned. This shot predates the move of Calibration out to its own view, so it still shows a ninth step expanded to Stepper and Squareness pages; those now live under Tools → Calibration .</p><div class="cmd"><code>.\build.ps1 -default-config -Shot machine-setup-overview -message=&quot;Machine Setup on STEP 1, not the Overview page - step 1 shows the whole eight-step tree and its status dots.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot machine-setup-overview -message=&quot;Machine Setup on STEP 1, not the Overview page - step 1 shows the whole eight-step tree and its status dots.&quot;">copy</button></div></div>
+  <div class="brief"><p class="why">Shows NINE steps with Calibration expanded. Machine Setup is eight steps and Calibration left it in #332. Caption already admits it.</p><p class="shoot"><b>Shoot:</b> Machine Setup on STEP 1, not the Overview page - step 1 shows the whole eight-step tree and its status dots.</p><p class="cap"><b>Caption today:</b> Machine Setup on 1 &#183; Machine . All eight steps sit in the tree on the left, each with its status dot — green here, meaning this machine is fully commissioned. This shot predates the move of Calibration out to its own view, so it still shows a ninth step expanded to Stepper and Squareness pages; those now live under Tools → Calibration .</p></div>
   <div class="frame"><img src="img/machine-setup-overview.png" data-base="img/machine-setup-overview.png" loading="lazy" alt="machine-setup-overview.png"></div>
 </section>
 <section class="shot reshoot" id="s4" data-status="reshoot" data-name="settings-top-level-tabs.png">
@@ -92,10 +110,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">4 / 29</span>
     <span class="pill reshoot">reshoot &middot; priority 4</span>
     <span class="fname">settings-top-level-tabs.png</span>
-    <span class="meta"><a href="index.html#settings" target="_blank">#settings</a> &middot; 3840x2400 &middot; captured 2026-08-04 01:33</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg default" title="Shoot this one on a default config - it shows what a fresh install looks like">default config</span>
+    <span class="meta"><a href="index.html#settings" target="_blank">#settings</a> &middot; <span class="px">3840x2400</span> &middot; <span class="mt">captured 2026-08-04 01:33</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="why">Its caption describes the pre-#248 four-tab default; #248 restored the full nine-tab bar. Reshooting fixes the figure and the caption together.</p><p class="shoot"><b>Shoot:</b> Settings &gt; User Interface &gt; Top-level tabs, on a default config so the nine-tab default shows.</p><p class="cap"><b>Caption today:</b> The placement editor: one row per view, one destination each. The ▲▼ buttons order a view within whichever destination it&#39;s assigned to, and the change takes effect on the next restart. This shot predates the restored full tab strip, so it shows a cut-back arrangement with Machine Setup and Settings in the File menu; a fresh install now has all nine on the bar, and this editor is how you get back to something like the layout shown here.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot settings-top-level-tabs -message=&quot;Settings &gt; User Interface &gt; Top-level tabs, on a default config so the nine-tab default shows.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot settings-top-level-tabs -message=&quot;Settings &gt; User Interface &gt; Top-level tabs, on a default config so the nine-tab default shows.&quot;">copy</button></div></div>
+  <div class="brief"><p class="why">Its caption describes the pre-#248 four-tab default; #248 restored the full nine-tab bar. Reshooting fixes the figure and the caption together.</p><p class="shoot"><b>Shoot:</b> Settings &gt; User Interface &gt; Top-level tabs, on a default config so the nine-tab default shows.</p><p class="cap"><b>Caption today:</b> The placement editor: one row per view, one destination each. The ▲▼ buttons order a view within whichever destination it&#39;s assigned to, and the change takes effect on the next restart. This shot predates the restored full tab strip, so it shows a cut-back arrangement with Machine Setup and Settings in the File menu; a fresh install now has all nine on the bar, and this editor is how you get back to something like the layout shown here.</p></div>
   <div class="frame"><img src="img/settings-top-level-tabs.png" data-base="img/settings-top-level-tabs.png" loading="lazy" alt="settings-top-level-tabs.png"></div>
 </section>
 <section class="shot reshoot" id="s5" data-status="reshoot" data-name="start-job-panel.png">
@@ -103,10 +122,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">5 / 29</span>
     <span class="pill reshoot">reshoot &middot; priority 5</span>
     <span class="fname">start-job-panel.png</span>
-    <span class="meta"><a href="index.html#setup" target="_blank">#setup</a> &middot; 3840x2400 &middot; captured 2026-08-04 01:33</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>
+    <span class="meta"><a href="index.html#setup" target="_blank">#setup</a> &middot; <span class="px">3840x2400</span> &middot; <span class="mt">captured 2026-08-04 01:33</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="why">Setup grew a Verify skew / Touch corners / V-bit picker / Scribe square row (#362, #365, #367) - the row that had to be made to wrap. Needed by the Scribe square text anyway.</p><p class="shoot"><b>Shoot:</b> The Setup tab with the actions row visible, including Scribe square.</p><p class="cap"><b>Caption today:</b> The Setup panel.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot start-job-panel -message=&quot;The Setup tab with the actions row visible, including Scribe square.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot start-job-panel -message=&quot;The Setup tab with the actions row visible, including Scribe square.&quot;">copy</button></div></div>
+  <div class="brief"><p class="why">Setup grew a Verify skew / Touch corners / V-bit picker / Scribe square row (#362, #365, #367) - the row that had to be made to wrap. Needed by the Scribe square text anyway.</p><p class="shoot"><b>Shoot:</b> The Setup tab with the actions row visible, including Scribe square.</p><p class="cap"><b>Caption today:</b> The Setup panel.</p></div>
   <div class="frame"><img src="img/start-job-panel.png" data-base="img/start-job-panel.png" loading="lazy" alt="start-job-panel.png"></div>
 </section>
 <section class="shot reshoot" id="s6" data-status="reshoot" data-name="work-order-composition.png">
@@ -114,10 +134,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">6 / 29</span>
     <span class="pill reshoot">reshoot &middot; priority 6</span>
     <span class="fname">work-order-composition.png</span>
-    <span class="meta"><a href="index.html#work-order" target="_blank">#work-order</a> &middot; 3840x2400 &middot; captured 2026-08-04 01:33</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>
+    <span class="meta"><a href="index.html#work-order" target="_blank">#work-order</a> &middot; <span class="px">3840x2400</span> &middot; <span class="mt">captured 2026-08-04 01:33</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="why">The tree now carries Text, SVG and Indirect geometries plus group headers, and the operations list grew five kinds.</p><p class="shoot"><b>Shoot:</b> A work order whose tree has a Text and an SVG toolpath plus a group header.</p><p class="cap"><b>Caption today:</b> A real work order — five toolpaths, fifteen operations, one program. The tree (left) hangs operations under each toolpath: the contour is cut through, side-finished and chamfered; the counterbore is one circle carrying a bore, a through drill and a chamfer. Selecting an operation (here a side finishing pass) shows its own parameters and the tool it will use. The preview (right) places each toolpath on the stock by name, and the footer keeps count.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot work-order-composition -message=&quot;A work order whose tree has a Text and an SVG toolpath plus a group header.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot work-order-composition -message=&quot;A work order whose tree has a Text and an SVG toolpath plus a group header.&quot;">copy</button></div></div>
+  <div class="brief"><p class="why">The tree now carries Text, SVG and Indirect geometries plus group headers, and the operations list grew five kinds.</p><p class="shoot"><b>Shoot:</b> A work order whose tree has a Text and an SVG toolpath plus a group header.</p><p class="cap"><b>Caption today:</b> A real work order — five toolpaths, fifteen operations, one program. The tree (left) hangs operations under each toolpath: the contour is cut through, side-finished and chamfered; the counterbore is one circle carrying a bore, a through drill and a chamfer. Selecting an operation (here a side finishing pass) shows its own parameters and the tool it will use. The preview (right) places each toolpath on the stock by name, and the footer keeps count.</p></div>
   <div class="frame"><img src="img/work-order-composition.png" data-base="img/work-order-composition.png" loading="lazy" alt="work-order-composition.png"></div>
 </section>
 <section class="shot reshoot" id="s7" data-status="reshoot" data-name="machine-setup-calibration.png">
@@ -125,10 +146,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">7 / 29</span>
     <span class="pill reshoot">reshoot &middot; priority 7</span>
     <span class="fname">machine-setup-calibration.png</span>
-    <span class="meta"><a href="index.html#machine-setup" target="_blank">#machine-setup</a> &middot; 3840x2400 &middot; captured 2026-08-04 01:33</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>
+    <span class="meta"><a href="index.html#machine-setup" target="_blank">#machine-setup</a> &middot; <span class="px">3840x2400</span> &middot; <span class="mt">captured 2026-08-04 01:33</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="why">Depicts Calibration as Machine Setup step 8, which it is not (#332). This should become a CALIBRATION VIEW shot instead - retire the filename rather than re-file the same name, and repoint the figure in #machine-setup.</p><p class="shoot"><b>Shoot:</b> Tools &gt; Calibration, Stepper (probe) page, saved under a NEW name.</p><p class="cap"><b>Caption today:</b> The Calibration step — probing a reference block instead of measuring by hand. Z stepper works from a 1-2-3 block: enter its known true sizes, and the generated program probes the spoilboard once, then the block&#39;s top in each of its three orientations, and fits a new Z steps/mm from all three. Save steps/mm writes the correction. XY steppers is the other method on this page. This shot predates the move of Calibration out of Machine Setup, so it shows it as a ninth step with the steps numbered accordingly; the same two methods now live under Tools → Calibration , beside two more.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot machine-setup-calibration -message=&quot;Tools &gt; Calibration, Stepper (probe) page, saved under a NEW name.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot machine-setup-calibration -message=&quot;Tools &gt; Calibration, Stepper (probe) page, saved under a NEW name.&quot;">copy</button></div></div>
+  <div class="brief"><p class="why">Depicts Calibration as Machine Setup step 8, which it is not (#332). This should become a CALIBRATION VIEW shot instead - retire the filename rather than re-file the same name, and repoint the figure in #machine-setup.</p><p class="shoot"><b>Shoot:</b> Tools &gt; Calibration, Stepper (probe) page, saved under a NEW name.</p><p class="cap"><b>Caption today:</b> The Calibration step — probing a reference block instead of measuring by hand. Z stepper works from a 1-2-3 block: enter its known true sizes, and the generated program probes the spoilboard once, then the block&#39;s top in each of its three orientations, and fits a new Z steps/mm from all three. Save steps/mm writes the correction. XY steppers is the other method on this page. This shot predates the move of Calibration out of Machine Setup, so it shows it as a ninth step with the steps numbered accordingly; the same two methods now live under Tools → Calibration , beside two more.</p></div>
   <div class="frame"><img src="img/machine-setup-calibration.png" data-base="img/machine-setup-calibration.png" loading="lazy" alt="machine-setup-calibration.png"></div>
 </section>
 <section class="shot wanted" id="s8" data-status="wanted" data-name="calibration-tabs.png">
@@ -136,74 +158,81 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">8 / 29</span>
     <span class="pill wanted">wanted</span>
     <span class="fname">calibration-tabs.png</span>
-    <span class="meta">no file yet</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>
+    <span class="meta"><span class="mt">no file yet</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="why">The Calibration view&#39;s four sub-tabs: Stepper (probe), Stepper (scratch), Squareness (pins), Squareness (probe).</p><p class="shoot"><b>Shoot:</b> Tools &gt; Calibration, framed so all four sub-tabs are readable.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot calibration-tabs -message=&quot;Tools &gt; Calibration, framed so all four sub-tabs are readable.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot calibration-tabs -message=&quot;Tools &gt; Calibration, framed so all four sub-tabs are readable.&quot;">copy</button></div></div>
-  <div class="frame empty"><div class="ph">no file yet &mdash; this shot is owed</div></div>
+  <div class="brief"><p class="why">The Calibration view&#39;s four sub-tabs: Stepper (probe), Stepper (scratch), Squareness (pins), Squareness (probe).</p><p class="shoot"><b>Shoot:</b> Tools &gt; Calibration, framed so all four sub-tabs are readable.</p></div>
+  <div class="frame empty"><div class="ph">no file yet &mdash; shoot it, then press <b>update from newest capture</b></div></div>
 </section>
 <section class="shot wanted" id="s9" data-status="wanted" data-name="carving-negative.png">
   <header>
     <span class="idx">9 / 29</span>
     <span class="pill wanted">wanted</span>
     <span class="fname">carving-negative.png</span>
-    <span class="meta">no file yet</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>
+    <span class="meta"><span class="mt">no file yet</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="why">The same artwork with Negative on, so the badge stands proud of a cleared floor. The depth model is the hard part of #carving to picture; this is the shot that does it.</p><p class="shoot"><b>Shoot:</b> The same SVG toolpath with Negative ticked, preview showing the raised badge.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot carving-negative -message=&quot;The same SVG toolpath with Negative ticked, preview showing the raised badge.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot carving-negative -message=&quot;The same SVG toolpath with Negative ticked, preview showing the raised badge.&quot;">copy</button></div></div>
-  <div class="frame empty"><div class="ph">no file yet &mdash; this shot is owed</div></div>
+  <div class="brief"><p class="why">The same artwork with Negative on, so the badge stands proud of a cleared floor. The depth model is the hard part of #carving to picture; this is the shot that does it.</p><p class="shoot"><b>Shoot:</b> The same SVG toolpath with Negative ticked, preview showing the raised badge.</p></div>
+  <div class="frame empty"><div class="ph">no file yet &mdash; shoot it, then press <b>update from newest capture</b></div></div>
 </section>
 <section class="shot wanted" id="s10" data-status="wanted" data-name="carving-svg.png">
   <header>
     <span class="idx">10 / 29</span>
     <span class="pill wanted">wanted</span>
     <span class="fname">carving-svg.png</span>
-    <span class="meta">no file yet</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>
+    <span class="meta"><span class="mt">no file yet</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="why">An SVG carve in the Work Order tree with the stock preview. #carving shipped with NO figure at all - the only topic in the manual in that state, so this one is owed rather than speculative.</p><p class="shoot"><b>Shoot:</b> Work Order with an SVG artwork toolpath selected and the stock preview showing.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot carving-svg -message=&quot;Work Order with an SVG artwork toolpath selected and the stock preview showing.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot carving-svg -message=&quot;Work Order with an SVG artwork toolpath selected and the stock preview showing.&quot;">copy</button></div></div>
-  <div class="frame empty"><div class="ph">no file yet &mdash; this shot is owed</div></div>
+  <div class="brief"><p class="why">An SVG carve in the Work Order tree with the stock preview. #carving shipped with NO figure at all - the only topic in the manual in that state, so this one is owed rather than speculative.</p><p class="shoot"><b>Shoot:</b> Work Order with an SVG artwork toolpath selected and the stock preview showing.</p></div>
+  <div class="frame empty"><div class="ph">no file yet &mdash; shoot it, then press <b>update from newest capture</b></div></div>
 </section>
 <section class="shot wanted" id="s11" data-status="wanted" data-name="heightmap-surface.png">
   <header>
     <span class="idx">11 / 29</span>
     <span class="pill wanted">wanted</span>
     <span class="fname">heightmap-surface.png</span>
-    <span class="meta">no file yet</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>
+    <span class="meta"><span class="mt">no file yet</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="why">Height Map&#39;s Surface Map pane with its legend. Replaces the deleted heightmap.png, which showed the pre-rebuild panel.</p><p class="shoot"><b>Shoot:</b> Height Map, Surface Map pane, with a probed map loaded so the legend has numbers.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot heightmap-surface -message=&quot;Height Map, Surface Map pane, with a probed map loaded so the legend has numbers.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot heightmap-surface -message=&quot;Height Map, Surface Map pane, with a probed map loaded so the legend has numbers.&quot;">copy</button></div></div>
-  <div class="frame empty"><div class="ph">no file yet &mdash; this shot is owed</div></div>
+  <div class="brief"><p class="why">Height Map&#39;s Surface Map pane with its legend. Replaces the deleted heightmap.png, which showed the pre-rebuild panel.</p><p class="shoot"><b>Shoot:</b> Height Map, Surface Map pane, with a probed map loaded so the legend has numbers.</p></div>
+  <div class="frame empty"><div class="ph">no file yet &mdash; shoot it, then press <b>update from newest capture</b></div></div>
 </section>
 <section class="shot wanted" id="s12" data-status="wanted" data-name="laser-dialog.png">
   <header>
     <span class="idx">12 / 29</span>
     <span class="pill wanted">wanted</span>
     <span class="fname">laser-dialog.png</span>
-    <span class="meta">no file yet</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>
+    <span class="meta"><span class="mt">no file yet</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="why">The SVG laser dialog&#39;s three tabs. #laser describes controls no figure shows.</p><p class="shoot"><b>Shoot:</b> Open the SVG laser dialog (needs -enableSVGLaserJob) and frame all three tabs.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot laser-dialog -message=&quot;Open the SVG laser dialog (needs -enableSVGLaserJob) and frame all three tabs.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot laser-dialog -message=&quot;Open the SVG laser dialog (needs -enableSVGLaserJob) and frame all three tabs.&quot;">copy</button></div></div>
-  <div class="frame empty"><div class="ph">no file yet &mdash; this shot is owed</div></div>
+  <div class="brief"><p class="why">The SVG laser dialog&#39;s three tabs. #laser describes controls no figure shows.</p><p class="shoot"><b>Shoot:</b> Open the SVG laser dialog (needs -enableSVGLaserJob) and frame all three tabs.</p></div>
+  <div class="frame empty"><div class="ph">no file yet &mdash; shoot it, then press <b>update from newest capture</b></div></div>
 </section>
 <section class="shot wanted" id="s13" data-status="wanted" data-name="work-order-drawing.png">
   <header>
     <span class="idx">13 / 29</span>
     <span class="pill wanted">wanted</span>
     <span class="fname">work-order-drawing.png</span>
-    <span class="meta">no file yet</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>
+    <span class="meta"><span class="mt">no file yet</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="why">A Save Drawing PDF page - the dimensioned sheet a work order produces (M8).</p><p class="shoot"><b>Shoot:</b> Save Drawing from a work order, then shoot a page of the PDF.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot work-order-drawing -message=&quot;Save Drawing from a work order, then shoot a page of the PDF.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot work-order-drawing -message=&quot;Save Drawing from a work order, then shoot a page of the PDF.&quot;">copy</button></div></div>
-  <div class="frame empty"><div class="ph">no file yet &mdash; this shot is owed</div></div>
+  <div class="brief"><p class="why">A Save Drawing PDF page - the dimensioned sheet a work order produces (M8).</p><p class="shoot"><b>Shoot:</b> Save Drawing from a work order, then shoot a page of the PDF.</p></div>
+  <div class="frame empty"><div class="ph">no file yet &mdash; shoot it, then press <b>update from newest capture</b></div></div>
 </section>
 <section class="shot orphaned" id="s14" data-status="orphaned" data-name="heightmap.png">
   <header>
     <span class="idx">14 / 29</span>
     <span class="pill orphaned">orphaned</span>
     <span class="fname">heightmap.png</span>
-    <span class="meta">3868x2233 &middot; captured 2026-07-29 10:05</span>
-    <button class="reload">reload this shot</button>
+    
+    <span class="meta"><span class="px">3868x2233</span> &middot; <span class="mt">captured 2026-07-29 10:05</span></span>
+    <span class="acts"><span class="noact">orphan &mdash; decide delete or reuse; nothing to update</span></span>
   </header>
   <div class="brief"><p class="why">CHECKED 2026-09-17 and safe to DELETE: it predates the Height Map rebuild (old tab bar, run bar with Rewind, bottom status bar, a Full table radio, probe depth/feed on the panel, a single Surface pane). The new #heightmap topic wants heightmap-surface.png instead.</p></div>
   <div class="frame"><img src="img/heightmap.png" data-base="img/heightmap.png" loading="lazy" alt="heightmap.png"></div>
@@ -213,8 +242,9 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">15 / 29</span>
     <span class="pill orphaned">orphaned</span>
     <span class="fname">odd-jobs-work-order.png</span>
-    <span class="meta">1920x1200 &middot; captured 2026-08-04 01:33</span>
-    <button class="reload">reload this shot</button>
+    
+    <span class="meta"><span class="px">1920x1200</span> &middot; <span class="mt">captured 2026-08-04 01:33</span></span>
+    <span class="acts"><span class="noact">orphan &mdash; decide delete or reuse; nothing to update</span></span>
   </header>
   <div class="brief"><p class="why">Depicts the retired Odd Jobs arrangement. DELETE.</p></div>
   <div class="frame"><img src="img/odd-jobs-work-order.png" data-base="img/odd-jobs-work-order.png" loading="lazy" alt="odd-jobs-work-order.png"></div>
@@ -224,8 +254,9 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">16 / 29</span>
     <span class="pill orphaned">orphaned</span>
     <span class="fname">probing-tabs.png</span>
-    <span class="meta">3868x2233 &middot; captured 2026-07-29 10:05</span>
-    <button class="reload">reload this shot</button>
+    
+    <span class="meta"><span class="px">3868x2233</span> &middot; <span class="mt">captured 2026-07-29 10:05</span></span>
+    <span class="acts"><span class="noact">orphan &mdash; decide delete or reuse; nothing to update</span></span>
   </header>
   <div class="brief"><p class="why">Depicts the Probing tab as it was before Setup absorbed it. DELETE.</p></div>
   <div class="frame"><img src="img/probing-tabs.png" data-base="img/probing-tabs.png" loading="lazy" alt="probing-tabs.png"></div>
@@ -235,8 +266,9 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">17 / 29</span>
     <span class="pill orphaned">orphaned</span>
     <span class="fname">tools-tab.png</span>
-    <span class="meta">3840x2400 &middot; captured 2026-07-29 10:05</span>
-    <button class="reload">reload this shot</button>
+    
+    <span class="meta"><span class="px">3840x2400</span> &middot; <span class="mt">captured 2026-07-29 10:05</span></span>
+    <span class="acts"><span class="noact">orphan &mdash; decide delete or reuse; nothing to update</span></span>
   </header>
   <div class="brief"><p class="why">Depicts the retired Tools tab wrapper. DELETE.</p></div>
   <div class="frame"><img src="img/tools-tab.png" data-base="img/tools-tab.png" loading="lazy" alt="tools-tab.png"></div>
@@ -246,10 +278,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">18 / 29</span>
     <span class="pill current">current</span>
     <span class="fname">connect-dialog.png</span>
-    <span class="meta"><a href="index.html#connect" target="_blank">#connect</a> &middot; 436x261 &middot; captured 2026-07-29 10:05</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg default" title="Shoot this one on a default config - it shows what a fresh install looks like">default config</span>
+    <span class="meta"><a href="index.html#connect" target="_blank">#connect</a> &middot; <span class="px">436x261</span> &middot; <span class="mt">captured 2026-07-29 10:05</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="cap"><b>Caption today:</b> The connection dialog. Pick the transport that matches how your controller is wired.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot connect-dialog -message=&quot;The connection dialog.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot connect-dialog -message=&quot;The connection dialog.&quot;">copy</button></div></div>
+  <div class="brief"><p class="cap"><b>Caption today:</b> The connection dialog. Pick the transport that matches how your controller is wired.</p></div>
   <div class="frame"><img src="img/connect-dialog.png" data-base="img/connect-dialog.png" loading="lazy" alt="connect-dialog.png"></div>
 </section>
 <section class="shot current" id="s19" data-status="current" data-name="errors-dialog.png">
@@ -257,10 +290,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">19 / 29</span>
     <span class="pill current">current</span>
     <span class="fname">errors-dialog.png</span>
-    <span class="meta"><a href="index.html#errors-alarms" target="_blank">#errors-alarms</a> &middot; 1397x958 &middot; captured 2026-07-29 10:05</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg default" title="Shoot this one on a default config - it shows what a fresh install looks like">default config</span>
+    <span class="meta"><a href="index.html#errors-alarms" target="_blank">#errors-alarms</a> &middot; <span class="px">1397x958</span> &middot; <span class="mt">captured 2026-07-29 10:05</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="cap"><b>Caption today:</b> The built-in Error and alarm codes reference (Help menu).</p><div class="cmd"><code>.\build.ps1 -default-config -Shot errors-dialog -message=&quot;The built-in Error and alarm codes reference (Help menu).&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot errors-dialog -message=&quot;The built-in Error and alarm codes reference (Help menu).&quot;">copy</button></div></div>
+  <div class="brief"><p class="cap"><b>Caption today:</b> The built-in Error and alarm codes reference (Help menu).</p></div>
   <div class="frame"><img src="img/errors-dialog.png" data-base="img/errors-dialog.png" loading="lazy" alt="errors-dialog.png"></div>
 </section>
 <section class="shot current" id="s20" data-status="current" data-name="feeds-and-speeds.png">
@@ -268,10 +302,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">20 / 29</span>
     <span class="pill current">current</span>
     <span class="fname">feeds-and-speeds.png</span>
-    <span class="meta"><a href="index.html#feeds-and-speeds" target="_blank">#feeds-and-speeds</a> &middot; 3840x2400 &middot; captured 2026-07-29 10:05</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>
+    <span class="meta"><a href="index.html#feeds-and-speeds" target="_blank">#feeds-and-speeds</a> &middot; <span class="px">3840x2400</span> &middot; <span class="mt">captured 2026-07-29 10:05</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="cap"><b>Caption today:</b> The Feeds &amp;amp; Speeds tab&#39;s Results sub-tab — a chip-load table for a real job, with an AI review in progress.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot feeds-and-speeds -message=&quot;The Feeds &amp;amp; Speeds tab&#39;s Results sub-tab — a chip-load table for a real job, with an AI review in progr...&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot feeds-and-speeds -message=&quot;The Feeds &amp;amp; Speeds tab&#39;s Results sub-tab — a chip-load table for a real job, with an AI review in progr...&quot;">copy</button></div></div>
+  <div class="brief"><p class="cap"><b>Caption today:</b> The Feeds &amp;amp; Speeds tab&#39;s Results sub-tab — a chip-load table for a real job, with an AI review in progress.</p></div>
   <div class="frame"><img src="img/feeds-and-speeds.png" data-base="img/feeds-and-speeds.png" loading="lazy" alt="feeds-and-speeds.png"></div>
 </section>
 <section class="shot current" id="s21" data-status="current" data-name="gcode-viewer.png">
@@ -279,10 +314,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">21 / 29</span>
     <span class="pill current">current</span>
     <span class="fname">gcode-viewer.png</span>
-    <span class="meta"><a href="index.html#gcode-viewer" target="_blank">#gcode-viewer</a> &middot; 3868x2233 &middot; captured 2026-07-29 10:05</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg default" title="Shoot this one on a default config - it shows what a fresh install looks like">default config</span>
+    <span class="meta"><a href="index.html#gcode-viewer" target="_blank">#gcode-viewer</a> &middot; <span class="px">3868x2233</span> &middot; <span class="mt">captured 2026-07-29 10:05</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="cap"><b>Caption today:</b> The Job screen with the 3D View sub-tab open, mid-program.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot gcode-viewer -message=&quot;The Job screen with the 3D View sub-tab open, mid-program.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot gcode-viewer -message=&quot;The Job screen with the 3D View sub-tab open, mid-program.&quot;">copy</button></div></div>
+  <div class="brief"><p class="cap"><b>Caption today:</b> The Job screen with the 3D View sub-tab open, mid-program.</p></div>
   <div class="frame"><img src="img/gcode-viewer.png" data-base="img/gcode-viewer.png" loading="lazy" alt="gcode-viewer.png"></div>
 </section>
 <section class="shot current" id="s22" data-status="current" data-name="lathe-wizard.png">
@@ -290,10 +326,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">22 / 29</span>
     <span class="pill current">current</span>
     <span class="fname">lathe-wizard.png</span>
-    <span class="meta"><a href="index.html#lathe" target="_blank">#lathe</a> &middot; 1628x1128 &middot; captured 2026-07-29 10:05</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>
+    <span class="meta"><a href="index.html#lathe" target="_blank">#lathe</a> &middot; <span class="px">1628x1128</span> &middot; <span class="mt">captured 2026-07-29 10:05</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="cap"><b>Caption today:</b> A lathe turning wizard.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot lathe-wizard -message=&quot;A lathe turning wizard.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot lathe-wizard -message=&quot;A lathe turning wizard.&quot;">copy</button></div></div>
+  <div class="brief"><p class="cap"><b>Caption today:</b> A lathe turning wizard.</p></div>
   <div class="frame"><img src="img/lathe-wizard.png" data-base="img/lathe-wizard.png" loading="lazy" alt="lathe-wizard.png"></div>
 </section>
 <section class="shot current" id="s23" data-status="current" data-name="offsets-table.png">
@@ -301,10 +338,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">23 / 29</span>
     <span class="pill current">current</span>
     <span class="fname">offsets-table.png</span>
-    <span class="meta"><a href="index.html#offsets" target="_blank">#offsets</a> &middot; 3840x2400 &middot; captured 2026-08-04 01:33</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>
+    <span class="meta"><a href="index.html#offsets" target="_blank">#offsets</a> &middot; <span class="px">3840x2400</span> &middot; <span class="mt">captured 2026-08-04 01:33</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="cap"><b>Caption today:</b> The work-offset table (G54–G59.3).</p><div class="cmd"><code>.\build.ps1 -default-config -Shot offsets-table -message=&quot;The work-offset table (G54–G59.3).&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot offsets-table -message=&quot;The work-offset table (G54–G59.3).&quot;">copy</button></div></div>
+  <div class="brief"><p class="cap"><b>Caption today:</b> The work-offset table (G54–G59.3).</p></div>
   <div class="frame"><img src="img/offsets-table.png" data-base="img/offsets-table.png" loading="lazy" alt="offsets-table.png"></div>
 </section>
 <section class="shot current" id="s24" data-status="current" data-name="sdcard.png">
@@ -312,10 +350,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">24 / 29</span>
     <span class="pill current">current</span>
     <span class="fname">sdcard.png</span>
-    <span class="meta"><a href="index.html#sdcard" target="_blank">#sdcard</a> &middot; 3840x2400 &middot; captured 2026-08-04 01:33</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>
+    <span class="meta"><a href="index.html#sdcard" target="_blank">#sdcard</a> &middot; <span class="px">3840x2400</span> &middot; <span class="mt">captured 2026-08-04 01:33</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="cap"><b>Caption today:</b> Files stored on the controller&#39;s SD card.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot sdcard -message=&quot;Files stored on the controller&#39;s SD card.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot sdcard -message=&quot;Files stored on the controller&#39;s SD card.&quot;">copy</button></div></div>
+  <div class="brief"><p class="cap"><b>Caption today:</b> Files stored on the controller&#39;s SD card.</p></div>
   <div class="frame"><img src="img/sdcard.png" data-base="img/sdcard.png" loading="lazy" alt="sdcard.png"></div>
 </section>
 <section class="shot current" id="s25" data-status="current" data-name="settings-grbl.png">
@@ -323,10 +362,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">25 / 29</span>
     <span class="pill current">current</span>
     <span class="fname">settings-grbl.png</span>
-    <span class="meta"><a href="index.html#settings" target="_blank">#settings</a> &middot; 3840x2400 &middot; captured 2026-08-04 01:33</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>
+    <span class="meta"><a href="index.html#settings" target="_blank">#settings</a> &middot; <span class="px">3840x2400</span> &middot; <span class="mt">captured 2026-08-04 01:33</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="cap"><b>Caption today:</b> Settings — the searchable navigation tree (left) with the Grbl page selected.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot settings-grbl -message=&quot;Settings — the searchable navigation tree (left) with the Grbl page selected.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot settings-grbl -message=&quot;Settings — the searchable navigation tree (left) with the Grbl page selected.&quot;">copy</button></div></div>
+  <div class="brief"><p class="cap"><b>Caption today:</b> Settings — the searchable navigation tree (left) with the Grbl page selected.</p></div>
   <div class="frame"><img src="img/settings-grbl.png" data-base="img/settings-grbl.png" loading="lazy" alt="settings-grbl.png"></div>
 </section>
 <section class="shot current" id="s26" data-status="current" data-name="settings-search.png">
@@ -334,10 +374,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">26 / 29</span>
     <span class="pill current">current</span>
     <span class="fname">settings-search.png</span>
-    <span class="meta"><a href="index.html#settings" target="_blank">#settings</a> &middot; 3840x2400 &middot; captured 2026-08-04 01:33</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg default" title="Shoot this one on a default config - it shows what a fresh install looks like">default config</span>
+    <span class="meta"><a href="index.html#settings" target="_blank">#settings</a> &middot; <span class="px">3840x2400</span> &middot; <span class="mt">captured 2026-08-04 01:33</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="cap"><b>Caption today:</b> Searching the words on every page, not just page names — &quot;strip&quot; narrows twenty-odd pages to 2 matches . One is the obvious GCode command stripping ; the other is Main , where the word appears nowhere on the page. Hovering it names the control responsible: Matched tooltip: Send comments — Stream G-code comments (in parentheses) to the controller instead of stripping them…</p><div class="cmd"><code>.\build.ps1 -default-config -Shot settings-search -message=&quot;Searching the words on every page, not just page names — &#39;strip&#39; narrows twenty-odd pages to 2 matches .&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot settings-search -message=&quot;Searching the words on every page, not just page names — &#39;strip&#39; narrows twenty-odd pages to 2 matches .&quot;">copy</button></div></div>
+  <div class="brief"><p class="cap"><b>Caption today:</b> Searching the words on every page, not just page names — &quot;strip&quot; narrows twenty-odd pages to 2 matches . One is the obvious GCode command stripping ; the other is Main , where the word appears nowhere on the page. Hovering it names the control responsible: Matched tooltip: Send comments — Stream G-code comments (in parentheses) to the controller instead of stripping them…</p></div>
   <div class="frame"><img src="img/settings-search.png" data-base="img/settings-search.png" loading="lazy" alt="settings-search.png"></div>
 </section>
 <section class="shot current" id="s27" data-status="current" data-name="setup-dynamic-geometry.png">
@@ -345,10 +386,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">27 / 29</span>
     <span class="pill current">current</span>
     <span class="fname">setup-dynamic-geometry.png</span>
-    <span class="meta"><a href="index.html#setup" target="_blank">#setup</a> &middot; 3840x2400 &middot; captured 2026-08-04 01:33</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>
+    <span class="meta"><a href="index.html#setup" target="_blank">#setup</a> &middot; <span class="px">3840x2400</span> &middot; <span class="mt">captured 2026-08-04 01:33</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="cap"><b>Caption today:</b> The Dynamic fixture&#39;s Geometry panel, picking an Internal feature — the red text is the conductive-stock warning from a Touch Plate probe on non-conductive (MDF) stock.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot setup-dynamic-geometry -message=&quot;The Dynamic fixture&#39;s Geometry panel, picking an Internal feature — the red text is the conductive-stock wa...&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot setup-dynamic-geometry -message=&quot;The Dynamic fixture&#39;s Geometry panel, picking an Internal feature — the red text is the conductive-stock wa...&quot;">copy</button></div></div>
+  <div class="brief"><p class="cap"><b>Caption today:</b> The Dynamic fixture&#39;s Geometry panel, picking an Internal feature — the red text is the conductive-stock warning from a Touch Plate probe on non-conductive (MDF) stock.</p></div>
   <div class="frame"><img src="img/setup-dynamic-geometry.png" data-base="img/setup-dynamic-geometry.png" loading="lazy" alt="setup-dynamic-geometry.png"></div>
 </section>
 <section class="shot current" id="s28" data-status="current" data-name="work-order-surface.png">
@@ -356,10 +398,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">28 / 29</span>
     <span class="pill current">current</span>
     <span class="fname">work-order-surface.png</span>
-    <span class="meta"><a href="index.html#work-order" target="_blank">#work-order</a> &middot; 3840x2400 &middot; captured 2026-08-04 01:33</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>
+    <span class="meta"><a href="index.html#work-order" target="_blank">#work-order</a> &middot; <span class="px">3840x2400</span> &middot; <span class="mt">captured 2026-08-04 01:33</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="cap"><b>Caption today:</b> Surfacing as an ordinary Work Order toolpath: one Surface operation with a total depth and a stepover, and the same Feeds and speeds advisor every other operation gets. It takes the material from Setup (MDF here), proposes chip-load-derived numbers for the chosen bit — 0.350 mm/tooth, shown as 100% of the chart feed — and lets you nudge them &#177;10% or accept them outright. Entire Spoilboard is a checkbox on the toolpath itself, behind the dialog in this shot.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot work-order-surface -message=&quot;Surfacing as an ordinary Work Order toolpath: one Surface operation with a total depth and a stepover, and...&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot work-order-surface -message=&quot;Surfacing as an ordinary Work Order toolpath: one Surface operation with a total depth and a stepover, and...&quot;">copy</button></div></div>
+  <div class="brief"><p class="cap"><b>Caption today:</b> Surfacing as an ordinary Work Order toolpath: one Surface operation with a total depth and a stepover, and the same Feeds and speeds advisor every other operation gets. It takes the material from Setup (MDF here), proposes chip-load-derived numbers for the chosen bit — 0.350 mm/tooth, shown as 100% of the chart feed — and lets you nudge them &#177;10% or accept them outright. Entire Spoilboard is a checkbox on the toolpath itself, behind the dialog in this shot.</p></div>
   <div class="frame"><img src="img/work-order-surface.png" data-base="img/work-order-surface.png" loading="lazy" alt="work-order-surface.png"></div>
 </section>
 <section class="shot current" id="s29" data-status="current" data-name="work-order.png">
@@ -367,10 +410,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     <span class="idx">29 / 29</span>
     <span class="pill current">current</span>
     <span class="fname">work-order.png</span>
-    <span class="meta"><a href="index.html#work-order" target="_blank">#work-order</a> &middot; 3840x2400 &middot; captured 2026-08-04 01:33</span>
-    <button class="reload">reload this shot</button>
+    <span class="cfg yours" title="Shoot this one from your own config - it needs a fixture, a probe, a real work order or controller settings">your config</span>
+    <span class="meta"><a href="index.html#work-order" target="_blank">#work-order</a> &middot; <span class="px">3840x2400</span> &middot; <span class="mt">captured 2026-08-04 01:33</span></span>
+    <span class="acts"><button class="update">update from newest capture</button><button class="reload">reload</button><span class="result"></span></span>
   </header>
-  <div class="brief"><p class="cap"><b>Caption today:</b> After Generate: the compiled tool order and the g-code it produced, in the flyout.</p><div class="cmd"><code>.\build.ps1 -default-config -Shot work-order -message=&quot;After Generate: the compiled tool order and the g-code it produced, in the flyout.&quot;</code><button class="copy" data-cmd=".\build.ps1 -default-config -Shot work-order -message=&quot;After Generate: the compiled tool order and the g-code it produced, in the flyout.&quot;">copy</button></div></div>
+  <div class="brief"><p class="cap"><b>Caption today:</b> After Generate: the compiled tool order and the g-code it produced, in the flyout.</p></div>
   <div class="frame"><img src="img/work-order.png" data-base="img/work-order.png" loading="lazy" alt="work-order.png"></div>
 </section>
 <script>
@@ -437,13 +481,71 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     b.onclick = function () { reload(b.closest('section.shot')); };
   });
 
-  document.querySelectorAll('button.copy').forEach(function (b) {
-    b.onclick = function () {
-      navigator.clipboard.writeText(b.dataset.cmd).then(function () {
-        var t = b.textContent; b.textContent = 'copied';
-        setTimeout(function () { b.textContent = t; }, 1200);
+  // --- filing a capture -------------------------------------------------------------------------
+  // Only possible when this page is being SERVED: a page opened off disk has no way to write a file,
+  // so say so once, up front, rather than letting every button fail on click.
+  var served = location.protocol === 'http:' || location.protocol === 'https:';
+  if (!served) document.body.classList.add('offline');
+
+  function ago(iso) {
+    var s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 90) return Math.round(s) + 's ago';
+    if (s < 5400) return Math.round(s / 60) + 'm ago';
+    return Math.round(s / 3600) + 'h ago';
+  }
+
+  // What 'update' would file, and how old it is. Shown because the failure mode this page has to
+  // prevent is filing the WRONG capture - you shot one, got distracted, shot another. A timestamp in
+  // the bar makes that visible before the click rather than after it.
+  function pollLatest() {
+    if (!served) return;
+    fetch('api/recent').then(function (r) { return r.json(); }).then(function (j) {
+      var el = document.getElementById('latest');
+      if (!j.ok || !j.newest) { el.textContent = 'no captures found'; el.className = 'stale'; return; }
+      el.textContent = 'newest capture ' + ago(j.newest.time);
+      el.className = (Date.now() - new Date(j.newest.time).getTime() > 600000) ? 'stale' : '';
+    }).catch(function () { });
+  }
+
+  function update(sec) {
+    var btn = sec.querySelector('button.update');
+    var out = sec.querySelector('.result');
+    if (!btn) return;
+    btn.disabled = true;
+    out.className = 'result';
+    out.textContent = 'filing...';
+    fetch('api/update?name=' + encodeURIComponent(sec.dataset.name))
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        btn.disabled = false;
+        if (!j.ok) { out.className = 'result bad'; out.textContent = j.error; return; }
+        out.textContent = 'filed ' + j.from + ' (' + j.pixels + ')';
+        // Swap the image and its stamps in place. The whole reason for the button is not having to
+        // refresh, so nothing here may depend on a reload happening afterwards.
+        var frame = sec.querySelector('.frame');
+        var img = sec.querySelector('img[data-base]');
+        if (!img) {
+          frame.classList.remove('empty');
+          frame.innerHTML = '';
+          img = document.createElement('img');
+          img.setAttribute('data-base', 'img/' + sec.dataset.name);
+          frame.appendChild(img);
+        }
+        img.src = img.getAttribute('data-base') + '?t=' + Date.now();
+        var px = sec.querySelector('.px'), mt = sec.querySelector('.mt');
+        if (px) px.textContent = j.pixels;
+        if (mt) mt.textContent = 'captured ' + j.mtime;
+        pollLatest();
+      })
+      .catch(function (e) {
+        btn.disabled = false;
+        out.className = 'result bad';
+        out.textContent = 'failed: ' + e.message;
       });
-    };
+  }
+
+  document.querySelectorAll('button.update').forEach(function (b) {
+    b.onclick = function () { update(b.closest('section.shot')); };
   });
 
   document.addEventListener('keydown', function (e) {
@@ -454,7 +556,11 @@ body { font-family:Segoe UI, sans-serif; background:#161616; color:#ddd; margin:
     else if (k === 'r' || k === 'R') { reload(current()); }
     else if (k === 'a' || k === 'A') { all.forEach(reload); }
     else if (k === 'f' || k === 'F') { document.getElementById('filter').click(); }
+    else if (k === 'u' || k === 'U') { e.preventDefault(); update(current()); }
   });
+
+  pollLatest();
+  setInterval(pollLatest, 5000);
 
   var t = null;
   window.addEventListener('scroll', function () { clearTimeout(t); t = setTimeout(mark, 80); });
