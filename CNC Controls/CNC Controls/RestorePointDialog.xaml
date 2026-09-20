@@ -17,7 +17,7 @@
         </Grid.RowDefinitions>
 
         <TextBlock x:Uid="txt_restoreIntro" Grid.Row="0" Margin="0,0,0,6" TextWrapping="Wrap"
-                   Text="Pick the moment you want to go back to. Each restore point holds the machine's settings, ioSender's own configuration, or both - what it holds is shown beside it."/>
+                   Text="Pick the moment you want to go back to. A restore point can hold the machine's settings, its work offsets, ioSender's own configuration, or any combination - what it holds is shown beside it."/>
 
         <DataGrid x:Uid="dgrSnapshots" x:Name="dgrSnapshots" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
                   SelectionMode="Single" SelectionUnit="FullRow" HeadersVisibility="Column"
@@ -43,6 +43,17 @@
                              ToolTip="Homing, limits, travel, feeds - everything stored in the controller itself."/>
                 <RadioButton x:Uid="rb_rpConfig" x:Name="rbConfig" GroupName="rpwhat" Content="App configuration only (profiles, probes, fixtures, layout)" Margin="0,4,0,0"
                              ToolTip="ioSender's own settings. Restoring these restarts ioSender, because the configuration is read once at startup."/>
+                <!-- Work offsets are a CHECKBOX, not a fourth radio: they are a different kind of action.
+                     The radios above choose between two whole-machine restores that replace each other;
+                     writing G54-G59.3 back is an independent thing you may want alongside either, or on
+                     its own. Both boxes start UNCHECKED even when the point has offsets - ticking one
+                     overwrites the work zero currently on the machine, and someone who came here for the
+                     app configuration must not lose a freshly probed G54 to a box they did not read. -->
+                <Separator Margin="0,8,0,6"/>
+                <CheckBox x:Uid="chk_rpOffsets" x:Name="chkOffsets" Content="Work offsets and tool table (G54-G59.3)"
+                          ToolTip="Writes the stored work coordinate systems and tool table back to the controller. No motion - these are G10 writes, the same kind of thing as restoring a $ setting. This overwrites the work zero currently set on the machine."/>
+                <CheckBox x:Uid="chk_rpOffsetPositions" x:Name="chkOffsetPositions" Content="Also the G28 / G30 positions - opens a program you must run, and it MOVES the machine" Margin="18,4,0,0"
+                          ToolTip="G28 and G30 can only be restored by driving to each position and teaching it, so this opens the snapshot as a program in the Job tab for you to run. It begins with a warning and an M0 pause. Nothing moves until you press Start."/>
                 <TextBlock x:Name="txtWhatNote" Foreground="#586069" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"/>
             </StackPanel>
         </GroupBox>

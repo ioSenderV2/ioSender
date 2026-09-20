@@ -24,6 +24,16 @@ namespace CNC.Controls
         /// <summary>App configuration file to restore, or null. Valid when DialogResult is true.</summary>
         public string SelectedConfigFile { get; private set; }
 
+        /// <summary>Work offset snapshot to restore, or null. Valid when DialogResult is true.</summary>
+        public string SelectedOffsetsFile { get; private set; }
+
+        /// <summary>
+        /// True when the operator asked for the G28/G30 positions as well. Those cannot be written - the
+        /// firmware only teaches them from where the machine is standing - so the caller opens the snapshot
+        /// as a program instead of applying it. Never set without SelectedOffsetsFile.
+        /// </summary>
+        public bool RestoreOffsetPositions { get; private set; }
+
         public RestorePointDialog()
         {
             InitializeComponent();
@@ -45,11 +55,23 @@ namespace CNC.Controls
         {
             var p = Selected;
             bool hasGrbl = p != null && p.HasGrbl, hasConfig = p != null && p.HasConfig;
+            bool hasOffsets = p != null && p.HasOffsets;
 
             rbBoth.IsEnabled = hasGrbl && hasConfig;
             rbGrbl.IsEnabled = hasGrbl;
             rbConfig.IsEnabled = hasConfig;
-            btnRestore.IsEnabled = hasGrbl || hasConfig;
+
+            // Uncheck on the way out, not just disable: a tick left over from a point that HAD offsets would
+            // otherwise sit there looking chosen while doing nothing, and would come back the moment the
+            // operator reselected a point that has them.
+            chkOffsets.IsEnabled = hasOffsets;
+            if (!hasOffsets)
+                chkOffsets.IsChecked = false;
+            chkOffsetPositions.IsEnabled = hasOffsets;
+            if (!hasOffsets)
+                chkOffsetPositions.IsChecked = false;
+
+            btnRestore.IsEnabled = hasGrbl || hasConfig || hasOffsets;
 
             // Keep the selection on something legal for this point rather than leaving a checked-but-disabled
             // radio, which would restore nothing and look like a dead button.
@@ -62,13 +84,29 @@ namespace CNC.Controls
             else if (hasGrbl && hasConfig && rbBoth.IsChecked != true && rbGrbl.IsChecked != true && rbConfig.IsChecked != true)
                 rbBoth.IsChecked = true;
 
-            txtWhatNote.Text = p == null
-                ? string.Empty
-                : p.HasBoth
-                    ? "This moment has both. Restoring the app configuration restarts ioSender."
-                    : p.HasGrbl
-                        ? "This moment holds only the machine's settings - there is no app configuration snapshot beside it."
-                        : "This moment holds only the app configuration. Restoring it restarts ioSender.";
+            // Say what this point does and does not hold, and name the two consequences worth knowing before
+            // pressing Restore: the restart, and that the offsets are there but will not be touched unless
+            // asked for. The second is why it is said at all - the checkbox starts clear, so a point holding
+            // the very thing the operator came for would otherwise sit silent.
+            if (p == null)
+                txtWhatNote.Text = string.Empty;
+            else
+            {
+                var note = new System.Text.StringBuilder();
+
+                if (!p.HasGrbl)
+                    note.Append("No machine settings in this moment. ");
+                if (!p.HasConfig)
+                    note.Append("No app configuration in this moment. ");
+                if (p.HasConfig)
+                    note.Append("Restoring the app configuration restarts ioSender. ");
+                if (p.HasOffsets)
+                    note.Append("This moment also holds the work offsets - tick the box above to put them back.");
+                else
+                    note.Append("No work offsets in this moment.");
+
+                txtWhatNote.Text = note.ToString().Trim();
+            }
         }
 
         private void dgrSnapshots_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -83,12 +121,15 @@ namespace CNC.Controls
 
             bool wantGrbl = point.HasGrbl && (rbBoth.IsChecked == true || rbGrbl.IsChecked == true);
             bool wantConfig = point.HasConfig && (rbBoth.IsChecked == true || rbConfig.IsChecked == true);
+            bool wantOffsets = point.HasOffsets && (chkOffsets.IsChecked == true || chkOffsetPositions.IsChecked == true);
 
-            if (!wantGrbl && !wantConfig)
+            if (!wantGrbl && !wantConfig && !wantOffsets)
                 return;
 
             SelectedFile = wantGrbl ? point.GrblFile : null;
             SelectedConfigFile = wantConfig ? point.ConfigFile : null;
+            SelectedOffsetsFile = wantOffsets ? point.OffsetsFile : null;
+            RestoreOffsetPositions = wantOffsets && chkOffsetPositions.IsChecked == true;
             DialogResult = true;
         }
 
@@ -115,6 +156,8 @@ namespace CNC.Controls
             {
                 SelectedFile = file.FileName;
                 SelectedConfigFile = null;
+                SelectedOffsetsFile = null;   // browsing picks a settings file only - never leave a stale pick behind it
+                RestoreOffsetPositions = false;
                 DialogResult = true;
             }
         }

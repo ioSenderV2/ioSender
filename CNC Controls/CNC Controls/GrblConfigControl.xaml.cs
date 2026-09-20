@@ -480,6 +480,15 @@ namespace CNC.Controls
                     LoadFile(dlg.SelectedFile);
             }
 
+            // Work offsets next. Split deliberately into the half that writes and the half that moves:
+            // G54-G59.3 and the tool table are G10 writes with no motion at all, and that is the part a
+            // controller wipe actually loses, so it is applied here and now like any other setting. G28 and
+            // G30 cannot be written - the firmware only teaches them from where the machine is standing, so
+            // the snapshot drives to each position and issues G28.1/G30.1 - and that half is opened as a
+            // program for the operator to run, with its own warning and M0 already in the file.
+            if (!string.IsNullOrEmpty(dlg.SelectedOffsetsFile))
+                RestoreWorkOffsets(dlg.SelectedOffsetsFile, dlg.RestoreOffsetPositions);
+
             if (string.IsNullOrEmpty(dlg.SelectedConfigFile))
                 return;
 
@@ -499,6 +508,69 @@ namespace CNC.Controls
                                 "\n\nRestart now?",
                                 "Restore", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
                 GrblConfigView.DoRestart();
+        }
+
+        /// <summary>
+        /// Put the work offsets back from an Offsets_*.nc snapshot.
+        /// </summary>
+        /// <param name="path">The snapshot to restore from.</param>
+        /// <param name="includePositions">
+        /// True to also restore G28/G30, which needs motion and so opens the file as a program instead.
+        /// </param>
+        /// <remarks>
+        /// The offset lines are lifted out and run as a macro rather than the whole file being streamed. The
+        /// file is a mixture: G10 L1/L2 writes that move nothing, and - behind a warning and an M0 - rapids
+        /// to the G28 and G30 positions so the firmware can be taught them from where the machine stands.
+        /// Running the lot to recover a work zero would demand the operator be at the machine for something
+        /// that moves no axis, and running it unattended would be the kind of surprise this codebase has
+        /// been bitten by before.
+        /// </remarks>
+        private void RestoreWorkOffsets(string path, bool includePositions)
+        {
+            if (includePositions)
+            {
+                // The whole file, as a program. It opens with the warning and the M0, so nothing moves until
+                // the operator reads it and presses Start - which is the point of loading it rather than
+                // running it. The G10 writes at the top of the file go in on the same run, so this covers
+                // the offsets too and there is nothing to do here beyond handing it over.
+                GCode.File.Load(path);
+                AppDialogs.Show("The snapshot has been opened as a program in the Job tab.\n\n" +
+                                "It restores the work offsets and then drives to each stored G28 / G30 position to teach it. " +
+                                "Read the warning at the top, make sure the machine is homed and the path is clear, then press Start.",
+                                "Restore work offsets", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            string code;
+            try
+            {
+                // Keep only what writes: G10 L1 (tool table) and G10 L2 (coordinate systems). Everything else
+                // in the file is a comment, the M0 guard, a G0 G53 rapid or a G28.1/G30.1 teach - none of
+                // which belongs in a no-motion restore. Matching on the emitted prefix rather than parsing:
+                // Export() writes these lines and this reads them, and a line it does not recognise is left
+                // out rather than guessed at.
+                var lines = System.IO.File.ReadAllLines(path)
+                                          .Select(l => l.Trim())
+                                          .Where(l => l.StartsWith("G90G10L2") || l.StartsWith("G90G10L1"))
+                                          .ToList();
+
+                if (lines.Count == 0)
+                {
+                    AppDialogs.Show("That snapshot holds no work offsets to restore.", "Restore work offsets",
+                                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                code = string.Join("\n", lines);
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show("The work offsets could not be read: " + ex.Message, "Restore work offsets",
+                                MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            MacroProcessor.Run(model, "Restore work offsets", code);
         }
 
         private void dgrSettings_SelectionChanged(object sender, SelectionChangedEventArgs e)
