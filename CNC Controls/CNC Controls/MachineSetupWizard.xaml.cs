@@ -1654,9 +1654,23 @@ namespace CNC.Controls
 
             // The Name already carries the type (Renumber derives it from TypeName), so it reads as
             // "Touch plate (corner)" on its own - no need to append the type a second time.
+            //
+            // A corner plate gets told what choosing it MEANS, though. This picker only ever asks one
+            // question - which of these measures tool length - and the answer for a corner plate is "that
+            // one, turned over". Said on every corner-plate row rather than only the selected one, so it
+            // reads as a property of the choice while the list is open, which is when it is useful.
+            //
+            // Label only. Name is what gets stored (SelectedValuePath), so the two must not be conflated -
+            // decorating the stored value would break the lookup the moment the wording changed.
             var choices = ProbeDefinitions.Items
                 .Where(p => p.ProbeType == ProbeType.ToolSetter || p.ProbeType == ProbeType.TouchPlate)
-                .Select(p => new TloProbeChoice { Name = p.Name, Label = p.Name })
+                .Select(p => new TloProbeChoice
+                {
+                    Name = p.Name,
+                    Label = p.Name + (p.ProbeType == ProbeType.TouchPlate && p.CanProbeCorner
+                                        ? "  -  used upside down"
+                                        : string.Empty)
+                })
                 .ToList();
 
             bool wasLoading = _loading;
