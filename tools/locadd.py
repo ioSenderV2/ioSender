@@ -12,8 +12,15 @@ first column is always the en-US resource name even in the other-language files 
 keys them). Translators then translate the value column; satellites are regenerated externally with
 LocBaml. Idempotent: re-running adds nothing new.
 
-Usage:  python tools/locadd.py            # apply
-        python tools/locadd.py --dry-run  # show what would be added
+Adding is only half of it. Re-wording a string that ALREADY has a row changes the XAML and nothing
+else - and the CSV value is what ships, so the new wording sits in the source, absent from the app,
+with nothing reporting the difference. --sync is the pass that catches that: it refreshes rows whose
+English source has changed, but only where the stored value is still the untranslated English
+baseline. A row someone has actually translated is reported and left alone.
+
+Usage:  python tools/locadd.py                   # add missing rows
+        python tools/locadd.py --sync            # ...and refresh re-worded English
+        python tools/locadd.py --sync --dry-run  # show what both passes would do
 """
 
 import csv
@@ -234,9 +241,113 @@ def existing_keys(path):
     return keys
 
 
+def read_rows(path):
+    """Every row, in file order. Used to index existing values; the writer below does NOT round-trip
+       through this - see sync_values."""
+    rows = []
+    if not os.path.exists(path):
+        return rows
+    with open(path, encoding='utf-8-sig', newline='') as f:
+        for r in csv.reader(f):
+            rows.append(r)
+    return rows
+
+
+def serialize_row(row):
+    """One row, encoded exactly as the add pass would append it."""
+    import io
+    buf = io.StringIO()
+    csv.writer(buf, lineterminator='', quoting=csv.QUOTE_MINIMAL).writerow(row)
+    return buf.getvalue()
+
+
+def sync_values(path, rows, baseline, dry):
+    """Refresh rows whose ENGLISH SOURCE STRING HAS CHANGED since the row was added.
+
+    The gap this closes: the add pass only ever appends rows that are missing, so editing the wording of
+    a control that already HAS a row changes the XAML and nothing else - and the CSV value wins at
+    runtime. The new text is then in the source, absent from the app, and nothing reports it. That is how
+    a reworded string can look like it simply did not take effect.
+
+    Only rows that are still UNTRANSLATED are touched: a locale row qualifies when its current value is
+    byte-identical to the en-US baseline's value for the same key, which is what an English-seeded row
+    looks like. Anything that has genuinely been translated differs from the baseline, is left exactly as
+    it is, and is reported instead - a translator's work is not ours to overwrite.
+    """
+    if not os.path.exists(path):
+        return 0, []
+
+    want = {key: row[6] for (key, row) in rows}
+    changed, skipped = 0, []
+
+    # LINE-SURGICAL, deliberately. The obvious implementation - parse the whole CSV, edit the rows,
+    # write it back - produced a diff touching rows this pass never looked at: csv.writer re-quotes to
+    # its own rules, which are not always how the line was written originally, and the round trip also
+    # ate the file's BOM. Both are invisible in a value-by-value comparison and both showed up as churn
+    # across a 1500-line file. So: read the raw text, rewrite ONLY the lines whose value changes, and
+    # leave every other byte exactly as it was.
+    with open(path, 'rb') as f:
+        raw = f.read()
+    bom = raw.startswith(b'\xef\xbb\xbf')
+    text = raw.decode('utf-8-sig')
+    nl = '\r\n' if '\r\n' in text else '\n'
+    lines = text.split(nl)
+
+    for i, line in enumerate(lines):
+        if not line.strip():
+            continue
+        try:
+            r = next(csv.reader([line]))
+        except Exception:
+            continue
+        if len(r) < 7:
+            continue
+        key = (r[0], r[1])
+        if key not in want or r[6] == want[key]:
+            continue
+        # Translated away from the English baseline? Leave it and say so.
+        base = baseline.get(key)
+        if base is not None and r[6] != base:
+            skipped.append(key[1])
+            continue
+        r[6] = want[key]
+        lines[i] = serialize_row(r)
+        changed += 1
+
+    if changed and not dry:
+        out = nl.join(lines)
+        with open(path, 'wb') as f:
+            if bom:
+                f.write(b'\xef\xbb\xbf')
+            f.write(out.encode('utf-8'))
+
+    return changed, skipped
+
+
+def baseline_values(assembly):
+    """The en-US CSV's values, which are the English baseline every other locale is seeded from."""
+    path = os.path.join(REPO, 'Locale', 'en-US', 'csv', '%s.resources.en-US.csv' % assembly)
+    out = {}
+    for r in read_rows(path):
+        if len(r) >= 7:
+            out[(r[0], r[1])] = r[6]
+    return out
+
+
 def main():
     dry = '--dry-run' in sys.argv
+    sync = '--sync' in sys.argv
+    # --only <substring>: restrict BOTH passes to matching XAML paths. --sync over the whole repo turns up
+    # hundreds of rows whose English drifted years apart, which is a real finding but not something to
+    # bundle into whatever change is in hand - one file at a time keeps the diff reviewable.
+    only = None
+    if '--only' in sys.argv:
+        i = sys.argv.index('--only')
+        if i + 1 < len(sys.argv):
+            only = sys.argv[i + 1].lower()
     grand = 0
+    synced = 0
+    stale = []
     # A view's own XAML can carry BOTH localizable controls and <system:String> resource entries - JobView
     # does - so every target gets both extractors. Running only rows_for over TARGETS silently skipped the
     # string resources, which is how new <system:String> entries were being added with zero locale rows.
@@ -244,12 +355,27 @@ def main():
             [(x, a, rows_for_libstrings) for (x, a) in TARGETS] +
             [(x, a, rows_for_libstrings) for (x, a) in LIBSTRINGS])
     for xaml, assembly, builder in jobs:
+        if only and only not in xaml.lower():
+            continue
         if not os.path.exists(os.path.join(REPO, xaml)):
             print('  skip (missing): %s' % xaml)
             continue
         rows = builder(xaml, assembly)
+        base = baseline_values(assembly) if sync else None
         for loc in LOCALES:
             path = os.path.join(REPO, 'Locale', loc, 'csv', '%s.resources.%s.csv' % (assembly, loc))
+
+            # Re-word an existing string and the ADD pass sees nothing to do - the row is already there.
+            # The CSV value is what ships, so the new wording would sit in the XAML, absent from the app,
+            # with nothing reporting it. --sync is the pass that catches that.
+            if sync:
+                n, skipped = sync_values(path, rows, base, dry)
+                if n:
+                    synced += n
+                    print('%-45s %s  ~%d' % (os.path.basename(xaml), loc, n))
+                for k in skipped:
+                    stale.append('%s  %s  %s' % (loc, os.path.basename(xaml), k))
+
             have = existing_keys(path)
             new = [row for (key, row) in rows if key not in have]
             if not new:
@@ -265,6 +391,15 @@ def main():
                 for row in new:
                     w.writerow(row)
     print('%s %d row(s) across %d locales.' % ('Would add' if dry else 'Added', grand, len(LOCALES)))
+    if sync:
+        print('%s %d changed English value(s).' % ('Would update' if dry else 'Updated', synced))
+        if stale:
+            # Reported, never overwritten. These have been translated away from the English baseline, so
+            # the English has moved on and the translation now describes the old behaviour - a person has
+            # to decide what the new sentence is in that language.
+            print('\n%d row(s) TRANSLATED and now out of date - left alone, they need a translator:' % len(stale))
+            for s in stale:
+                print('   ', s)
 
 
 if __name__ == '__main__':

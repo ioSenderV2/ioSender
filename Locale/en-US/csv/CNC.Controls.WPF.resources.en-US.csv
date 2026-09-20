@@ -343,7 +343,7 @@ CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_intro:System.Wind
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,grp_machine:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,1 · Machine
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_startFrom:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,Start from your machine
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_firmwareInfo:System.Windows.Controls.ContentControl.Content,Button,True,True,,Firmware info…
-CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_firmwareInfo:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show the controller&apos;s $I build/version information.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_firmwareInfo:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Show the controller's $I build/version information.
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_pickHint:System.Windows.Controls.TextBlock.Text,TextBlock,True,True,,"Pick your manufacturer, product and model to fill the fields below. Not listed? Choose Custom / not listed and enter the values by hand."
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,grp_homePos:System.Windows.Controls.HeaderedContentControl.Header,Label,True,True,,2 · Home position
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,cnv_homeBox:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Click the top corner where your machine homes (looking down from above the front; Z homes at the top).
@@ -388,7 +388,7 @@ CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,col_name:System.Windo
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,col_current:System.Windows.Controls.DataGridColumn.Header,None,True,True,,Current
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,col_new:System.Windows.Controls.DataGridColumn.Header,None,True,True,,New
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_forget:System.Windows.Controls.ContentControl.Content,Button,True,True,,Forget machine
-CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_forget:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Clear the remembered machine. The Machine Setup Wizard will reappear on the next launch (does not change controller settings).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_forget:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Clear the remembered machine. The Machine Setup tab will reappear on the next launch (does not change controller settings).
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_reload:System.Windows.Controls.ContentControl.Content,Button,True,True,,Reload
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_reload:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Discard edits and re-read the current settings from the controller.
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_apply:System.Windows.Controls.ContentControl.Content,Button,True,True,,Apply
@@ -529,8 +529,8 @@ CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,chk_invertZ:System.Windows.
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_axTravel:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Maximum travel for this axis in mm - sets the soft-limit extent (grbl $130-$132).
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_axRate:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Maximum feed rate for this axis in mm/min (grbl $110-$112).
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_axSteps:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Steps per millimetre for this axis (grbl $100-$102).
-CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_axInvert:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Tick to reverse this axis&apos;s motion direction (grbl $3 direction-invert mask).
-CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_axLimitNC:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Tick if this axis&apos;s limit switches are wired normally-closed (grbl $5 invert mask).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_axInvert:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Tick to reverse this axis's motion direction (grbl $3 direction-invert mask).
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_axLimitNC:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Tick if this axis's limit switches are wired normally-closed (grbl $5 invert mask).
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_axHomeMin:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Tick if this axis homes toward its minimum end; untick to home toward the maximum end (grbl $23).
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,cbo_theme:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Application colour theme.
 CNC.Controls.WPF.g.en-US.resources:jogconfigcontrol.baml,fld_fastFeedrate:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Feed rate for fast keyboard jogging (e.g. while holding the fast-jog modifier key) - for quickly crossing the table.
@@ -674,7 +674,7 @@ CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_probesDesc:System
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,pdl_add:System.Windows.Controls.ContentControl.Content,Button,True,True,,Add
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,pdl_edit:System.Windows.Controls.ContentControl.Content,Button,True,True,,Edit
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,pdl_delete:System.Windows.Controls.ContentControl.Content,Button,True,True,,Delete
-CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_ctrlMacros:System.Windows.Controls.TextBlock.Text,Text,True,True,,6 · Controller macros
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_ctrlMacros:System.Windows.Controls.TextBlock.Text,Text,True,True,,7 · Controller macros
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_ctrlMacrosDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Controller-side macros on the controller's filesystem: the tool-change macro (tc) and the Setup corner probe (pcorner). Green = installed and current, orange = out of date, red = missing. Requires an ATC-capable grblHAL with a filesystem."
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_installMacros:System.Windows.Controls.ContentControl.Content,Button,True,True,,Install ATC macros…
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_refreshMacros:System.Windows.Controls.ContentControl.Content,Button,True,True,,Refresh
@@ -857,7 +857,7 @@ CNC.Controls.WPF.g.en-US.resources:macroexecutecontrol.baml,lbl_macrosTitle:Syst
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_uiScale:System.Windows.Controls.TextBlock.Text,Text,True,True,,UI scale
 CNC.Controls.WPF.g.en-US.resources:basicconfigcontrol.baml,lbl_uiScale:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Scales the whole app - fonts, controls, spacing - live, no restart needed. You may need to resize or maximize the window at higher scales."
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,step_fixtures:System.Windows.Controls.TextBlock.Text,Text,True,True,,6 · Fixture definitions
-CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_fixturesDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,Define the fixture types used to reference stock on this machine - origin corner and the probe offsets pcorner.macro uses. Prepopulated with common fixture shapes; only types marked Implemented currently generate working g-code.
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_fixturesDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Define the fixtures on this machine (a specific vise, fence, etc.). Add picks the TYPE first - Corner fence, Machinist vise, Dog-hole/grid corner, Vacuum table zero-corner, fixed choices ioSender knows the probe pattern for - which determines which offset fields apply. After OK, jog to the reference and click &quot;Set position&quot; to capture its machine-coordinate start point. Only Corner fence currently generates working g-code."
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,fxl_add:System.Windows.Controls.ContentControl.Content,Button,True,True,,Add
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,fxl_edit:System.Windows.Controls.ContentControl.Content,Button,True,True,,Edit
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,fxl_delete:System.Windows.Controls.ContentControl.Content,Button,True,True,,Delete
@@ -1448,7 +1448,7 @@ CNC.Controls.WPF.g.en-US.resources:feedsandspeedsview.baml,btn_fsWriteApply:Syst
 CNC.Controls.WPF.g.en-US.resources:feedsandspeedsview.baml,btn_fsAskAi:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Ask AI to review
 CNC.Controls.WPF.g.en-US.resources:feedsandspeedsview.baml,btn_fsSelectAllAi:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Prefer AI for all
 CNC.Controls.WPF.g.en-US.resources:oddjobsfeedsspeedsdialog.baml,fs_drillstyle:System.Windows.Controls.ContentControl.Content,Label,True,True,,Drill style:
-CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_tloRefDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Tool-length reference baseline - probed once against the toolsetter puck, reused by every job so 'work Z0' means the same real height no matter which tool is mounted. Whatever's in the spindle now touches the puck; check the box first if that's the 3D probe itself."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_tloRefDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Tool-length reference baseline - probed once against a fixed object at the G59.3 position, and reused by every job so 'work Z0' means the same real height no matter which tool is mounted. That object is the toolsetter puck if you have one; with no toolsetter it is a touch plate, which must then live in that same spot. Whatever's in the spindle now touches it; check the box first if that's the 3D probe itself."
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,chk_tloRef3d:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,3D probe is in the spindle now
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_tloRef:System.Windows.Controls.ContentControl.Content,Button,True,True,,Reference TLO
 CNC.Controls.WPF.g.en-US.resources:workorderview.baml,lbl_wosource:System.Windows.Controls.ContentControl.Content,Label,True,True,,Source toolpath:

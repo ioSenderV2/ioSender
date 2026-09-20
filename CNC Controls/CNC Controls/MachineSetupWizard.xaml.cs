@@ -1316,6 +1316,11 @@ namespace CNC.Controls
         {
             bool sel = grdProbes.SelectedItem is ProbeDefinition;
             btnProbeEdit.IsEnabled = btnProbeDelete.IsEnabled = sel;
+
+            // The TLO panel below reads the library - which probe it will use, and whether the 3D-probe
+            // question applies at all - so adding or removing a toolsetter has to reach it. Cheap, and it
+            // catches the add/edit/delete paths without each of them having to remember.
+            UpdateTloRefControls();
         }
 
         private void Probes_DoubleClick(object sender, MouseButtonEventArgs e)
@@ -1507,6 +1512,33 @@ namespace CNC.Controls
         {
             double v = AppConfig.Settings.Base.TloRefBaseline;
             txtTloRefValue.Text = v == 0d ? "Never referenced" : string.Format("Baseline: {0:0.0##} mm", v);
+            UpdateTloRefControls();
+        }
+
+        /// <summary>
+        /// The "3D probe is in the spindle now" question only makes sense against a PUCK - it chooses between
+        /// the toolsetter input and the main one. A touch plate is always the main input, so on a machine
+        /// with no toolsetter defined the checkbox is hidden rather than left sitting there inviting an
+        /// answer that changes nothing.
+        /// </summary>
+        private void UpdateTloRefControls()
+        {
+            if (chkTloRef3dProbe == null)
+                return;
+
+            bool haveSetter = ProbeDefinitions.Items.Any(x => x.ProbeType == ProbeType.ToolSetter);
+            chkTloRef3dProbe.Visibility = haveSetter ? Visibility.Visible : Visibility.Collapsed;
+
+            bool haveAny = haveSetter || ProbeDefinitions.Items.Any(x => x.ProbeType == ProbeType.TouchPlate);
+            if (btnReferenceTlo != null)
+            {
+                btnReferenceTlo.IsEnabled = haveAny;
+                btnReferenceTlo.ToolTip = haveAny
+                    ? (haveSetter
+                        ? "Probe the toolsetter puck and store the result as this machine's tool-length baseline."
+                        : "Probe the touch plate at the G59.3 position and store the result as this machine's tool-length baseline.")
+                    : "Define a tool setter or a touch plate above first.";
+            }
         }
 
         // Machine-wide TLO baseline (see the XAML comment on this section) - probes the puck exactly like
@@ -1520,18 +1552,43 @@ namespace CNC.Controls
             if (model == null)
                 return;
 
-            var p = ProbeDefinitions.Items.FirstOrDefault(x => x.ProbeType == ProbeType.ToolSetter);
+            // A toolsetter if there is one, otherwise the touch plate. Not a refusal: a machine with no
+            // toolsetter is the common hobby case, and the rest of the app already expects it - tc.macro and
+            // tlo.macro carry a touch-plate mode (#<_tc_touchplate>, set from GrblInfo.HasToolSetter) whose
+            // whole premise is a fixed plate block sitting where the puck would be. This step was the one
+            // place that still insisted on a puck, so the baseline those macros need could not be taken.
+            //
+            // ANY touch plate qualifies, corner-capable or not: this is a straight-down Z touch, which is
+            // the one thing a flat plate is for.
+            var p = ProbeDefinitions.Items.FirstOrDefault(x => x.ProbeType == ProbeType.ToolSetter)
+                    ?? ProbeDefinitions.Items.FirstOrDefault(x => x.ProbeType == ProbeType.TouchPlate);
             if (p == null)
             {
-                AppDialogs.Show(Window.GetWindow(this), "Define a Tool setter probe first (above).", "Reference TLO", MessageBoxButton.OK, MessageBoxImage.Information);
+                AppDialogs.Show(Window.GetWindow(this), "Define a tool setter or a touch plate first (above).", "Reference TLO", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            bool probeInSpindle = chkTloRef3dProbe.IsChecked == true;
+            bool usingPlate = p.ProbeType == ProbeType.TouchPlate;
+
+            // The plate is a loose object, and the baseline is only worth anything if every later
+            // tool-length probe finds it in the SAME place - tlo.macro goes to G59.3 and probes straight
+            // down, exactly as this does. Say so before moving, because getting it wrong does not fail, it
+            // silently shifts every tool length by however far the plate moved.
+            if (usingPlate && AppDialogs.Show(Window.GetWindow(this),
+                    "No tool setter is defined, so the baseline will be taken against the touch plate.\r\n\r\n" +
+                    "Put the plate where it permanently lives - at the G59.3 position, which is where the tool-length macro will go looking for it every time.\r\n\r\n" +
+                    "The machine will move to G59.3 and probe down. Ready?",
+                    "Reference TLO", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+                return;
+
+            // Which probe input. A plate has no switch of its own - it closes the circuit through the tool on
+            // the MAIN input, the same choice tlo.macro makes in touch-plate mode, so the checkbox below
+            // (which only ever asked "rigid tool or self-triggering 3D probe?") does not apply to it.
+            bool probeInSpindle = !usingPlate && chkTloRef3dProbe.IsChecked == true;
             string searchF = p.ProbeFeedRate.ToInvariantString("0.0##"), latchF = p.LatchFeedRate.ToInvariantString("0.0##");
 
             var b = new StringBuilder();
-            b.AppendLine("(Machine Setup - reference TLO at the puck)");
+            b.AppendLine(usingPlate ? "(Machine Setup - reference TLO at the touch plate)" : "(Machine Setup - reference TLO at the puck)");
             b.AppendLine("(PREREQ, connected, homed, noalarm, ATC=1, G30, G59.3)");
             b.AppendLine("G21 G90 G94 G17");
             b.AppendLine("G49");
@@ -1539,10 +1596,12 @@ namespace CNC.Controls
             b.AppendLine("G59.3");
             b.AppendLine("G0 X0 Y0");
             b.AppendLine("G0 Z0");
-            // Main probe input (Q0) if a self-triggering 3D probe is actually in the spindle, else the
-            // toolsetter input (Q1) for a rigid/cutting tool relying on continuity through the puck - same
-            // convention tc.macro's own T8-vs-not branch uses.
-            b.AppendLine(string.Format(GrblCommand.ProbeSelect, probeInSpindle ? 0 : 1));
+            // Main probe input (Q0) for a plate - it has no switch, it closes the circuit through the tool -
+            // or for a self-triggering 3D probe actually in the spindle; else the toolsetter input (Q1) for
+            // a rigid/cutting tool pushing the puck's own switch. The same three-way choice tlo.macro's
+            // o150 makes, and it has to agree with it: the baseline and the probes later measured against
+            // it are subtracted from one another, so they must come off the same input and the same object.
+            b.AppendLine(string.Format(GrblCommand.ProbeSelect, (usingPlate || probeInSpindle) ? 0 : 1));
             b.AppendLine("G91");
             b.AppendLine(string.Format("G38.2 Z-90 F{0}", searchF));
             b.AppendLine("G0 Z2");
