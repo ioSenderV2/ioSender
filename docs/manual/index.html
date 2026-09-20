@@ -1513,6 +1513,41 @@
       loaded job (see below), then streams it through the normal run pipeline.</li>
     </ul>
 
+    <h3>What Generate tells you</h3>
+    <p>A Generate on a large work order can take a while, so it <strong>says what it is doing and what the
+    result will cost</strong>. "Compiling work order…" while it works, then a line naming the work order and
+    the outcome: <em>"Work order compiled — 4,777 lines in 9.6 s, est. run 12m 40s."</em> That estimate is the
+    difference between a four-minute engraving and a forty-minute one, known <em>before</em> you press Run.
+    It is a naive kinematic estimate with no acceleration model, so it reads optimistic — many short moves
+    will take longer than it says. For the same figure broken down <strong>per toolpath</strong>, look at the
+    <a href="#job">toolpath outline</a> in the Job tab: every section header carries its own estimate.</p>
+    <div class="callout tip"><span class="k">A greyed-out Generate says what it wants</span><br>
+      When Generate is disabled, <strong>the reason is on the button</strong> — the tab's own explanation, in
+      words, not a generic "nothing to run yet". A tab that blocks generation always knows exactly why; that
+      reason used to go only into a warnings panel you might have scrolled past, so the button simply did
+      nothing and explained nothing.</div>
+
+    <h3>The blank a work order was authored for</h3>
+    <p>A work order is a recipe for a <em>known piece of stock</em> — you feed it a blank of a given size and
+    run it — so <strong>the blank's size is recorded in the work order file</strong> rather than borrowed
+    from whatever <a href="#setup">Setup</a> happens to be showing. That is what the layout diagram draws
+    against, which is why a work order opened months later still looks right.</p>
+    <p>A work order saved before this existed has <strong>no blank recorded</strong>, and is shown as unknown
+    rather than quietly falling back to Setup's current numbers. That is deliberate: a drawing of the right
+    toolpaths on the wrong stock is a drawing that lies. Enter the size once and it is kept with the file.
+    Material is <em>not</em> stored per work order — that stays one shared value on Setup, because two
+    authorities over it is how they drift apart.</p>
+
+    <div class="callout warn"><span class="k">Two changes worth watching on an existing work order</span><br>
+      <strong>A V-carve now cuts fewer, heavier passes.</strong> <em>Depth of cut</em> drives the carve step,
+      where it used to sub-divide far more finely — a groove that took six passes may now take two. The
+      reason is geometric: consecutive carve passes tile the cone exactly, so the fine detail added by one
+      pass was being removed by the next. Run the first one and watch it, especially in a hard material.<br>
+      <strong>A Bore's emitted feed may differ.</strong> Where a bore follows a <em>wall</em>, the engaged
+      edge of the cutter travels a bigger circle than the tool centre the feed rate governs, so it was
+      running faster than asked; those passes are now compensated by the ratio between the two circles. A
+      full-immersion helix is not compensated, because there the assumption does not hold.</div>
+
     <figure>
       <img src="img/work-order.png" alt="The Work Order tab with the compiled tool order and generated g-code shown in the flyout">
       <figcaption>After Generate: the compiled tool order and the g-code it produced, in the flyout.</figcaption>
@@ -2287,6 +2322,30 @@
       <a href="#heightmap">Height Map</a>'s <strong>Full work surface</strong> mode. Left undeclared on a
       machine where it isn't true, both run the cutter through open air at one end.</li>
     </ul>
+
+    <h3>Controller macros (step 7)</h3>
+    <p>Some of what ioSender does runs <em>on the controller</em> rather than being streamed to it — the tool
+    change, the corner and centre probes, the tool-length reference. Those live as macro files on the
+    controller's own storage, and step 7 is where they are installed and kept current. The step queries the
+    controller and shows each macro as installed, outdated or missing.</p>
+    <ul>
+      <li><strong>Only the macros that actually changed are sent.</strong> The files go up in small blocks and
+      the controller commits each one to flash, so a full set is around twenty-three seconds. Editing one
+      macro used to cost all of it; now it costs about three. (The comparison is per file and by content
+      hash, not by size — an edit that happens to preserve the byte count is still an edit.)</li>
+      <li><strong><code>tlo.macro</code> is a required macro.</strong> It is newer than the others, so an
+      existing installation will be offered an upload on the next visit to this step. Until you accept it,
+      anything that references it — the tool-length reference, and the calibration wizards that end at the
+      toolsetter — fails with <code>error:81</code>, which is the controller saying it cannot find the file
+      being called, not that anything is wrong with your machine.</li>
+    </ul>
+    <div class="callout note"><span class="k">A setting that hasn't arrived yet is not zero</span><br>
+      Machine Setup reads the controller's settings the moment a page opens, and the controller's reply can
+      land a fraction of a second later. A value that has not arrived <strong>leaves its field exactly as it
+      was</strong> — it is no longer turned into a <strong>0</strong> — and the page quietly comes back for it
+      a moment later rather than resting on one mechanism. Zero is a number an operator cannot tell from a
+      measurement, and Apply on a page full of them would have written those zeros to the controller. If a
+      page ever looked like it had "trashed" your setup on opening, this was why.</div>
 
     <h3>Why the order matters</h3>
     <p>The steps build on each other: you can't set useful <strong>soft limits</strong> (step 4) until the
