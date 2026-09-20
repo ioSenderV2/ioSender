@@ -35,8 +35,9 @@ namespace CNC.Controls
     public enum RestoreParts
     {
         None = 0,
-        MachineSettings = 1,   // Grbl_*.txt   - the controller's $ settings
-        AppConfig = 2          // App.config_* - ioSender's own configuration
+        MachineSettings = 1,   // Grbl_*.txt    - the controller's $ settings
+        AppConfig = 2,         // App.config_*  - ioSender's own configuration
+        WorkOffsets = 4        // Offsets_*.nc  - the work coordinate systems, G28/G30 and the tool table
     }
 
     public class RestorePoint
@@ -50,8 +51,12 @@ namespace CNC.Controls
         /// <summary>App configuration snapshot, or null if this moment has none.</summary>
         public string ConfigFile { get; set; }
 
+        /// <summary>Work offset snapshot (Offsets_*.nc), or null if this moment has none.</summary>
+        public string OffsetsFile { get; set; }
+
         public bool HasGrbl { get { return !string.IsNullOrEmpty(GrblFile); } }
         public bool HasConfig { get { return !string.IsNullOrEmpty(ConfigFile); } }
+        public bool HasOffsets { get { return !string.IsNullOrEmpty(OffsetsFile); } }
         public bool HasBoth { get { return HasGrbl && HasConfig; } }
 
         public RestoreParts Available
@@ -59,7 +64,8 @@ namespace CNC.Controls
             get
             {
                 return (HasGrbl ? RestoreParts.MachineSettings : RestoreParts.None) |
-                       (HasConfig ? RestoreParts.AppConfig : RestoreParts.None);
+                       (HasConfig ? RestoreParts.AppConfig : RestoreParts.None) |
+                       (HasOffsets ? RestoreParts.WorkOffsets : RestoreParts.None);
             }
         }
 
@@ -73,9 +79,22 @@ namespace CNC.Controls
         {
             get
             {
-                if (HasBoth)
-                    return "Machine settings + app configuration";
-                return HasGrbl ? "Machine settings only" : "App configuration only";
+                var parts = new List<string>();
+                if (HasGrbl)
+                    parts.Add("Machine settings");
+                if (HasOffsets)
+                    parts.Add("work offsets");
+                if (HasConfig)
+                    parts.Add("app configuration");
+
+                if (parts.Count == 0)
+                    return string.Empty;
+
+                // Composed rather than enumerated as fixed phrases: with three components there are seven
+                // combinations, and the one that matters most - offsets present, settings absent - is exactly
+                // the sort that gets left out of a hand-written list.
+                parts[0] = parts[0].Substring(0, 1).ToUpperInvariant() + parts[0].Substring(1);
+                return parts.Count == 1 ? parts[0] + " only" : string.Join(" + ", parts);
             }
         }
 
@@ -103,11 +122,15 @@ namespace CNC.Controls
         {
             var grbl = Files("Grbl_", ".txt", "Grbl_".Length);
             var cfg = Files("App.config_", ".config", "App.config_".Length);
+            var offs = Files("Offsets_", ".nc", "Offsets_".Length);
             var points = new List<RestorePoint>();
 
-            // Walk the controller snapshots first and claim the nearest unclaimed config snapshot for each,
-            // so a config file is never handed to two different moments.
+            // Walk the controller snapshots first and claim the nearest unclaimed config and offsets snapshot
+            // for each, so neither is ever handed to two different moments. The offsets file is written a
+            // second or so after the settings one - GrblWorkParameters.WriteSnapshot has to wait for the $#
+            // that GrblSettings.WriteSnapshot runs ahead of - which is well inside PairWindow.
             var takenConfigs = new HashSet<string>();
+            var takenOffsets = new HashSet<string>();
             foreach (var g in grbl)
             {
                 var match = cfg.Where(c => !takenConfigs.Contains(c.Key))
@@ -118,18 +141,59 @@ namespace CNC.Controls
                 if (paired)
                     takenConfigs.Add(match.Key);
 
-                points.Add(new RestorePoint
+                var om = offs.Where(o => !takenOffsets.Contains(o.Key))
+                             .OrderBy(o => Math.Abs((o.Value - g.Value).TotalSeconds))
+                             .FirstOrDefault();
+
+                bool hasOffsets = om.Key != null && Math.Abs((om.Value - g.Value).TotalSeconds) <= PairWindow.TotalSeconds;
+                if (hasOffsets)
+                    takenOffsets.Add(om.Key);
+
+                var point = new RestorePoint
                 {
                     GrblFile = g.Key,
                     ConfigFile = paired ? match.Key : null,
-                    Saved = paired && match.Value < g.Value ? match.Value : g.Value
-                });
+                    OffsetsFile = hasOffsets ? om.Key : null,
+                    Saved = g.Value
+                };
+
+                // The moment is stamped with its EARLIEST file, so a point never claims to be newer than the
+                // oldest thing it actually holds.
+                if (paired && match.Value < point.Saved)
+                    point.Saved = match.Value;
+                if (hasOffsets && om.Value < point.Saved)
+                    point.Saved = om.Value;
+
+                points.Add(point);
             }
 
             // Config snapshots with no controller snapshot near them are restore points in their own right -
-            // an app-config-only moment is still a moment worth going back to.
-            foreach (var c in cfg.Where(c => !takenConfigs.Contains(c.Key)))
-                points.Add(new RestorePoint { ConfigFile = c.Key, Saved = c.Value });
+            // an app-config-only moment is still a moment worth going back to. Same for offsets: the settings
+            // snapshot is skipped when the controller reports none, and the offsets one is skipped when there
+            // is nothing worth saving, so the two can legitimately occur apart.
+            foreach (var c in cfg.Where(c => !takenConfigs.Contains(c.Key)).ToList())
+            {
+                // Pair leftovers with each other too, or a moment that happens to have no settings snapshot
+                // would be split into two rows offering half of itself each - the exact failure the pairing
+                // in this file was written to stop.
+                var om = offs.Where(o => !takenOffsets.Contains(o.Key))
+                             .OrderBy(o => Math.Abs((o.Value - c.Value).TotalSeconds))
+                             .FirstOrDefault();
+
+                bool hasOffsets = om.Key != null && Math.Abs((om.Value - c.Value).TotalSeconds) <= PairWindow.TotalSeconds;
+                if (hasOffsets)
+                    takenOffsets.Add(om.Key);
+
+                points.Add(new RestorePoint
+                {
+                    ConfigFile = c.Key,
+                    OffsetsFile = hasOffsets ? om.Key : null,
+                    Saved = hasOffsets && om.Value < c.Value ? om.Value : c.Value
+                });
+            }
+
+            foreach (var o in offs.Where(o => !takenOffsets.Contains(o.Key)))
+                points.Add(new RestorePoint { OffsetsFile = o.Key, Saved = o.Value });
 
             return points.OrderByDescending(p => p.Saved).ToList();
         }
