@@ -1383,8 +1383,9 @@ namespace CNC.Controls
             double search = ComputeTloSearchDistance(ProbeDefinitions.TloTarget);
             if (txtTloSearchValue != null)
                 txtTloSearchValue.Text = search > 0d
-                    ? string.Format(CultureInfo.CurrentCulture, "probe searches {0:0.#} mm down", search)
-                    : "probe searches a fixed 90 mm down - set the surface above, and the target's height in its probe definition, to compute it";
+                    ? string.Format(CultureInfo.CurrentCulture,
+                        "Tool-length probe searches up to {0:0.#} mm down - far enough to reach the target, stopping 2 mm above the surface if nothing triggers.", search)
+                    : "Tool-length probe searches a fixed 90 mm down. Set the target surface above and it becomes a real limit instead of a guess.";
         }
 
         private static string DescribeStoredPosition(string code)
@@ -1537,7 +1538,11 @@ namespace CNC.Controls
             if (model == null)
                 return;
 
-            double z = model.Position.Z - model.WorkPositionOffset.Z;   // machine Z, however the DRO is showing it
+            // MachinePosition, not Position minus the work offset. The model reports machine position
+            // directly, so deriving it was doing arithmetic on two numbers to arrive at one that was
+            // already there - and it would have been wrong the moment the DRO was showing something other
+            // than what that subtraction assumed.
+            double z = model.MachinePosition.Z;
 
             if (AppDialogs.Show(Window.GetWindow(this),
                     string.Format("Record machine Z {0:0.0##} as the surface the tool-length target stands on?\r\n\r\n" +
@@ -1556,13 +1561,26 @@ namespace CNC.Controls
         /// How far the tool-length probe should search downward from the G59.3 origin, or 0 to say "cannot
         /// work it out - use the caller's own default".
         ///
-        /// search = (G59.3 origin Z) - (surface Z + target height) + margin
+        /// search = (G59.3 origin Z) - (surface Z) - standoff
         ///
-        /// Every input has to be present and sane or this returns 0. That asymmetry is deliberate: a search
-        /// that is too SHORT fails safely, with the probe stopping in air and an alarm the operator can
-        /// read, while one that is too LONG drives the tool through the target. So a missing surface, an
-        /// unstated height, or arithmetic that comes out backwards all decline to answer rather than
-        /// guessing, and the caller keeps its conservative literal.
+        /// A FLOOR, not a prediction of where the target top is. That distinction is the whole design, and
+        /// the first version got it wrong.
+        ///
+        /// The tempting arithmetic is "surface + the target's height = where the top is, probe to just past
+        /// that". It is exact, and it is exact only for the tool that was in the spindle when the surface
+        /// was captured. Every stored Z here is the machine's AXIS position, and the tip hangs a
+        /// tool-length below it - so the same physical surface reads 30 mm lower with a bit 30 mm shorter.
+        /// Predicting the target top therefore mis-predicts by the tool-length difference, and the error
+        /// can point either way.
+        ///
+        /// As a floor it cannot. The probe is allowed to travel to just above the SURFACE and no further:
+        ///   - a tool long enough to reach touches the target well before the floor and stops there;
+        ///   - a tool too short to reach runs out of travel in AIR and alarms.
+        /// Both are survivable, and neither depends on knowing which tool is fitted - which is the property
+        /// that matters, since this firmware has no tool table to ask.
+        ///
+        /// The target's height is not used here any more. It is still worth knowing, and the row shows what
+        /// it implies, but it is no longer load-bearing.
         /// </summary>
         internal static double ComputeTloSearchDistance(ProbeDefinition p)
         {
@@ -1570,25 +1588,22 @@ namespace CNC.Controls
                 return 0d;
 
             double surface = AppConfig.Settings.Base.TloSurfaceZ;
-            double height = p.TargetHeight;
-            if (surface == 0d || height <= 0d)
-                return 0d;                       // never captured / never stated - see the remarks
+            if (surface == 0d)
+                return 0d;                       // never captured - see the remarks
 
             var cs = GrblWorkParameters.GetCoordinateSystem("G59.3");
             if (cs == null || cs.Values.Length < 3 || double.IsNaN(cs.Values[2]))
                 return 0d;
 
             double originZ = cs.Values[2];
-            double targetTop = surface + height;
 
-            // Margin covers the pull-off and re-touch that follow the search, plus whatever the surface
-            // capture was out by. Small, because it is spent driving PAST where the target should be.
-            const double margin = 8d;
-            double search = originZ - targetTop + margin;
+            // How far above the surface the probe is allowed to get. Small: it is the gap left when
+            // NOTHING triggers, so it is the only thing between a disconnected plate and the spoilboard.
+            const double standoff = 2d;
+            double search = originZ - surface - standoff;
 
-            // Backwards means the target top is at or above where the probe starts - the G59.3 origin is
-            // too low, and no search distance fixes that. Say nothing and let the literal apply; the
-            // operator has a geometry problem, not a search-distance one.
+            // Backwards means the G59.3 origin is at or below the surface, which is not a search-distance
+            // problem - it is a G59.3 that has been set wrong. Say nothing and let the literal apply.
             if (search <= 0d)
                 return 0d;
 

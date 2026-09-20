@@ -411,7 +411,7 @@
                                  UpdateReferencePositions. -->
                             <TextBlock x:Uid="lbl_tloSurface" x:Name="lblTloSurface" Grid.Row="0" Grid.Column="0" Text="1. Target surface:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <TextBlock x:Uid="txt_tloSurfaceDesc" x:Name="txtTloSurfaceDesc" Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="11" Foreground="#FF5A5A5A"
-                                       Text="The spoilboard or table the plate stands on. With the plate's height this says where its top is, so the probe searches the right distance instead of a fixed 90 mm. Jog a tool down until it just touches, then click."/>
+                                       Text="The spoilboard or table the plate stands on. It is the FLOOR for the tool-length probe - the probe may travel to 2 mm above it and no further, so a plate that never triggers stops in air rather than at the table. Jog a tool down until it just touches, then click."/>
                             <TextBlock x:Name="txtTloSurfaceValue" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Margin="10,0,8,0" FontFamily="Consolas" FontSize="11"/>
                             <Button x:Uid="btn_setTloSurface" x:Name="btnSetTloSurface" Grid.Row="0" Grid.Column="3" Content="Set from here" Padding="8,1" MinHeight="24" Click="SetTloSurface_Click"
                                     ToolTip="Record the machine's CURRENT Z as the surface height. Jog a tool down until it just touches the spoilboard beside the plate first."/>
