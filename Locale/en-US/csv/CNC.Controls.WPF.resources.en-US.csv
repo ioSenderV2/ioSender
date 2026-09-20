@@ -795,9 +795,9 @@ CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_cancel:Syst
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_diameter:CNC.Controls.NumericField.Label,None,False,True,,Tip diameter:
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_diameter:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_diameter:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Diameter of the probe tip (3D / edge finder) or the bit in the collet (touch plate).
-CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_body:CNC.Controls.NumericField.Label,None,False,True,,Ball diameter:
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_body:CNC.Controls.NumericField.Label,None,False,True,,Body diameter:
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_body:CNC.Controls.NumericField.Unit,None,False,True,,mm
-CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_body:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,3D probe ball/body diameter; its radius is the minimum standoff kept clear of the work on rapid/G28 moves and the Setup approach clearance.
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_body:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,3D probe body diameter; its radius is the minimum standoff kept clear of the work on rapid/G28 moves and the Setup approach clearance.
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_plate:CNC.Controls.NumericField.Label,None,False,True,,Plate thickness:
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_plate:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_plate:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Plate height - work Z0 is the plate top minus this.
@@ -1783,3 +1783,10 @@ CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_g593Desc:System.W
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_setG593:System.Windows.Controls.ContentControl.Content,Button,True,True,,Set from here
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_setG593:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Store the machine's CURRENT position as the G59.3 origin. Jog over the toolsetter or plate first, at a safe height."
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_refPosAdjacent:System.Windows.Controls.TextBlock.Text,Text,True,True,,"Put them next to each other. Every tool change travels G30 → G59.3 and back, so the gap between them is paid twice per tool, every job."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,lbl_tloSurface:System.Windows.Controls.TextBlock.Text,Text,True,True,,Target surface:
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,txt_tloSurfaceDesc:System.Windows.Controls.TextBlock.Text,Text,True,True,,"The spoilboard or table the toolsetter or plate stands on. With the target's height this says where its top is, so the probe searches the right distance instead of a fixed 90 mm."
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_setTloSurface:System.Windows.Controls.ContentControl.Content,Button,True,True,,Set from here
+CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_setTloSurface:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Record the machine's CURRENT Z as the surface height. Jog a tool down until it just touches the spoilboard beside the target first.
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_targetHeight:CNC.Controls.NumericField.Label,None,False,True,,Height on table:
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_targetHeight:CNC.Controls.NumericField.Unit,None,False,True,,mm
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_targetHeight:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"How tall this stands above the surface it sits on - about 50 mm for a typical toolsetter, 15 mm for a touch plate. Only needed if this is what measures tool length at G59.3: it lets the probe work out how far to search instead of using a fixed 90 mm. Leave at 0 if unsure."

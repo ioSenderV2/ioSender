@@ -1244,10 +1244,19 @@ namespace CNC.Controls
             // parameter set, so only the FIRST reference after a reboot fails - and on 2026-09-14 that was a
             // Setup run 90 seconds after a reset, which is exactly the sequence nobody tries twice.
             //
-            // HasToolSetter, not a copy of tc.macro's literal 0: the variable asks "does toolsetter hardware
-            // exist" and this is the controller's own answer to that question. A second hardcoded constant
-            // beside tc.macro's is what tlo.macro exists to stop - read its header.
-            L(string.Format("#<_tc_touchplate> = {0}", GrblInfo.HasToolSetter ? 0 : 1));
+            // Two ways to be in touch-plate mode, and the second one was missing.
+            //
+            // The obvious one: the controller reports no toolsetter hardware, so there is no toolsetter
+            // input to select and everything probes on the main one.
+            //
+            // The one that was wrong: a machine that HAS a toolsetter fitted can still be using a touch
+            // plate at G59.3 - that is the operator's choice, made in Machine Setup step 5, and it is a
+            // fact about what is bolted to the table that GrblInfo cannot answer. A plate has no switch;
+            // it closes the circuit through the tool, and in practice every plate is wired together onto
+            // the one main probe input. Selecting the toolsetter input for it gives a probe move that can
+            // never trigger, which does not stop at the plate - it drives into it.
+            bool touchPlateMode = !GrblInfo.HasToolSetter || ProbeDefinitions.TloTargetIsTouchPlate;
+            L(string.Format("#<_tc_touchplate> = {0}", touchPlateMode ? 1 : 0));
             L("O<tlo> CALL");
             // Immediately after the CALL, before anything else this caller emits. The program streams as ONE
             // job, so without a sync point here a puck probe that alarms does not actually stop it - the

@@ -1351,6 +1351,17 @@ namespace CNC.Controls
 
             txtG30Value.Text = DescribeStoredPosition("G30");
             txtG593Value.Text = DescribeStoredPosition("G59.3");
+
+            double surface = AppConfig.Settings.Base.TloSurfaceZ;
+            txtTloSurfaceValue.Text = surface == 0d ? "not set" : "Z" + surface.ToString("0.0", CultureInfo.CurrentCulture);
+
+            // Say what the numbers add up to, so a search that will fall short is visible here rather than
+            // discovered as an alarm partway down. "Fixed 90 mm" is the honest label for the fallback.
+            double search = ComputeTloSearchDistance(ProbeDefinitions.TloTarget);
+            if (txtTloSearchValue != null)
+                txtTloSearchValue.Text = search > 0d
+                    ? string.Format(CultureInfo.CurrentCulture, "probe searches {0:0.#} mm down", search)
+                    : "probe searches a fixed 90 mm down - set the surface above, and the target's height in its probe definition, to compute it";
         }
 
         private static string DescribeStoredPosition(string code)
@@ -1429,6 +1440,85 @@ namespace CNC.Controls
 
             if (MacroProcessor.Run(model, "Set G59.3", b.ToString(), true))
                 RefreshStoredPositionsAfterWrite();
+        }
+
+        /// <summary>
+        /// Capture the machine Z of the surface the tool-length target stands on. No motion - like G30 it
+        /// records where the machine is standing, so the instruction is to jog a tool down until it just
+        /// touches the spoilboard beside the target, then click.
+        /// </summary>
+        private void SetTloSurface_Click(object sender, RoutedEventArgs e)
+        {
+            if (model == null)
+                return;
+
+            double z = model.Position.Z - model.WorkPositionOffset.Z;   // machine Z, however the DRO is showing it
+
+            if (AppDialogs.Show(Window.GetWindow(this),
+                    string.Format("Record machine Z {0:0.0##} as the surface the tool-length target stands on?\r\n\r\n" +
+                                  "Jog a tool down until it just touches the spoilboard beside the toolsetter or plate first. " +
+                                  "Nothing moves - this only reads the current position.\r\n\r\n" +
+                                  "It is used with the target's height to work out how far the tool-length probe has to search.", z),
+                    "Set target surface", MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+                return;
+
+            AppConfig.Settings.Base.TloSurfaceZ = z;
+            AppConfig.Settings.Save();
+            UpdateReferencePositions();
+        }
+
+        /// <summary>
+        /// How far the tool-length probe should search downward from the G59.3 origin, or 0 to say "cannot
+        /// work it out - use the caller's own default".
+        ///
+        /// search = (G59.3 origin Z) - (surface Z + target height) + margin
+        ///
+        /// Every input has to be present and sane or this returns 0. That asymmetry is deliberate: a search
+        /// that is too SHORT fails safely, with the probe stopping in air and an alarm the operator can
+        /// read, while one that is too LONG drives the tool through the target. So a missing surface, an
+        /// unstated height, or arithmetic that comes out backwards all decline to answer rather than
+        /// guessing, and the caller keeps its conservative literal.
+        /// </summary>
+        internal static double ComputeTloSearchDistance(ProbeDefinition p)
+        {
+            if (p == null)
+                return 0d;
+
+            double surface = AppConfig.Settings.Base.TloSurfaceZ;
+            double height = p.TargetHeight;
+            if (surface == 0d || height <= 0d)
+                return 0d;                       // never captured / never stated - see the remarks
+
+            var cs = GrblWorkParameters.GetCoordinateSystem("G59.3");
+            if (cs == null || cs.Values.Length < 3 || double.IsNaN(cs.Values[2]))
+                return 0d;
+
+            double originZ = cs.Values[2];
+            double targetTop = surface + height;
+
+            // Margin covers the pull-off and re-touch that follow the search, plus whatever the surface
+            // capture was out by. Small, because it is spent driving PAST where the target should be.
+            const double margin = 8d;
+            double search = originZ - targetTop + margin;
+
+            // Backwards means the target top is at or above where the probe starts - the G59.3 origin is
+            // too low, and no search distance fixes that. Say nothing and let the literal apply; the
+            // operator has a geometry problem, not a search-distance one.
+            if (search <= 0d)
+                return 0d;
+
+            // Never ask for more Z than the machine has below the start point, whatever the arithmetic
+            // says. Soft limits would refuse it anyway; this turns that into a shorter search rather than
+            // an alarm partway through one.
+            double travel = GrblSettings.GetDouble(GrblSetting.MaxTravelBase + 2);
+            if (!double.IsNaN(travel) && travel > 0d)
+            {
+                double available = originZ + travel;     // origin is negative, travel positive
+                if (available > 0d && search > available)
+                    search = available;
+            }
+
+            return search;
         }
 
         /// <summary>
@@ -1818,7 +1908,12 @@ namespace CNC.Controls
             // it are subtracted from one another, so they must come off the same input and the same object.
             b.AppendLine(string.Format(GrblCommand.ProbeSelect, (usingPlate || probeInSpindle) ? 0 : 1));
             b.AppendLine("G91");
-            b.AppendLine(string.Format("G38.2 Z-90 F{0}", searchF));
+            // Computed from the surface, the target's height and where G59.3 sits; the literal 90 only
+            // applies when one of those is missing. The old constant is too short for a plate low on the
+            // table - the case that sent me looking - and needlessly far for a tall puck.
+            double search = ComputeTloSearchDistance(p);
+            string searchZ = (search > 0d ? search : 90d).ToInvariantString("0.0##");
+            b.AppendLine(string.Format("G38.2 Z-{0} F{1}", searchZ, searchF));
             b.AppendLine("G0 Z2");
             b.AppendLine(string.Format("G38.2 Z-5 F{0}", latchF));
             b.AppendLine("#<_probe_z> = #5063");

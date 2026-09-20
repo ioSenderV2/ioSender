@@ -388,6 +388,7 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
                             <TextBlock x:Uid="lbl_g30" Grid.Row="0" Grid.Column="0" Text="G30 - tool swap:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -403,8 +404,16 @@
                             <TextBlock x:Name="txtG593Value" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="10,6,8,0" FontFamily="Consolas" FontSize="11"/>
                             <Button x:Uid="btn_setG593" x:Name="btnSetG593" Grid.Row="1" Grid.Column="3" Content="Set from here" Padding="8,1" MinHeight="24" Margin="0,6,0,0" Click="SetG593_Click"
                                     ToolTip="Store the machine's CURRENT position as the G59.3 origin. Jog over the toolsetter or plate first, at a safe height."/>
+
+                            <TextBlock x:Uid="lbl_tloSurface" Grid.Row="2" Grid.Column="0" Text="Target surface:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,6,8,0"/>
+                            <TextBlock x:Uid="txt_tloSurfaceDesc" Grid.Row="2" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="11" Foreground="#FF5A5A5A" Margin="0,6,0,0"
+                                       Text="The spoilboard or table the toolsetter or plate stands on. With the target's height this says where its top is, so the probe searches the right distance instead of a fixed 90 mm."/>
+                            <TextBlock x:Name="txtTloSurfaceValue" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" Margin="10,6,8,0" FontFamily="Consolas" FontSize="11"/>
+                            <Button x:Uid="btn_setTloSurface" x:Name="btnSetTloSurface" Grid.Row="2" Grid.Column="3" Content="Set from here" Padding="8,1" MinHeight="24" Margin="0,6,0,0" Click="SetTloSurface_Click"
+                                    ToolTip="Record the machine's CURRENT Z as the surface height. Jog a tool down until it just touches the spoilboard beside the target first."/>
                         </Grid>
-                        <TextBlock x:Uid="txt_refPosAdjacent" TextWrapping="Wrap" Margin="10,0,0,8" FontSize="11" Foreground="#FF5A5A5A"
+                        <TextBlock x:Name="txtTloSearchValue" x:Uid="txt_tloSearchValue" TextWrapping="Wrap" Margin="10,4,0,0" FontSize="11" Foreground="#FF1F3A5F" FontStyle="Italic"/>
+                        <TextBlock x:Uid="txt_refPosAdjacent" TextWrapping="Wrap" Margin="10,4,0,8" FontSize="11" Foreground="#FF5A5A5A"
                                    Text="Put them next to each other. Every tool change travels G30 → G59.3 and back, so the gap between them is paid twice per tool, every job."/>
 
                         <Separator Margin="0,10,0,6"/>

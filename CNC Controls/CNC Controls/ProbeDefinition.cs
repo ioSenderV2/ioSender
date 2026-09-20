@@ -37,7 +37,7 @@ namespace CNC.Controls
         private bool _canProbeCorner = true;
         private double _diameter = 2d, _bodyDiameter = 42d, _overallLength = 100d, _searchFeed = 200d, _latchFeed = 50d, _rapidsFeed = 0d,
                        _probeDistance = 25d, _latchDistance = 1d, _xyClearance = 5d, _depth = 10d,
-                       _offsetX = 0d, _offsetY = 0d, _plateThickness = 12d, _lipWidth = 10d, _setterHeight = 0d, _spinRPM = 0d, _bitLength = 40d;
+                       _offsetX = 0d, _offsetY = 0d, _plateThickness = 12d, _lipWidth = 10d, _setterHeight = 0d, _spinRPM = 0d, _bitLength = 40d, _targetHeight = 0d;
 
         public string Name { get { return _name; } set { _name = value; OnChanged(); } }
         public ProbeType ProbeType { get { return _type; } set { _type = value; OnChanged(); OnChanged(nameof(TypeName)); } }
@@ -154,6 +154,27 @@ namespace CNC.Controls
         public double LipWidth { get { return _lipWidth; } set { _lipWidth = value; OnChanged(); } }                  // touch plate lip XY offset from the stock edge
         public double BitLength { get { return _bitLength; } set { _bitLength = value; OnChanged(); } }                // overall length of the bit touching the plate (informational reference)
         public double SetterHeight { get { return _setterHeight; } set { _setterHeight = value; OnChanged(); } }      // tool setter trigger height
+
+        /// <summary>
+        /// How tall this thing stands above the surface it sits on - 50 mm for a typical toolsetter puck,
+        /// 15 mm for a touch plate. Only meaningful for a target used at the G59.3 tool-length position.
+        ///
+        /// It exists so the tool-length probe's search distance can be COMPUTED rather than being the
+        /// literal 90 mm that was hardcoded in three places: knowing where the surface is (
+        /// AppConfig.Base.TloSurfaceZ) and how tall the target is gives the machine Z of its top, and the
+        /// search is the gap from the G59.3 origin down to it plus a margin.
+        ///
+        /// A NEW field rather than reusing SetterHeight, which is labelled "trigger height", feeds
+        /// ProbingViewModel.FixtureHeight, and is documented nowhere as being measured from the table -
+        /// redefining it would silently change what it means for anyone who has already set one. Plate
+        /// thickness is not reused either: it is the same number for a plate standing on the spoilboard,
+        /// but it means "how far below the plate top work Z0 sits", which stops being the same thing the
+        /// moment the plate is packed up on anything.
+        ///
+        /// 0 = not stated, and the search then falls back to the literal. That is the safe direction:
+        /// an unstated height must not produce a computed distance, because a wrong one is a plunge.
+        /// </summary>
+        public double TargetHeight { get { return _targetHeight; } set { _targetHeight = value; OnChanged(); } }
         public double SpinRPM { get { return _spinRPM; } set { _spinRPM = value; OnChanged(); } }                     // spinning edge finder RPM (0 = none)
 
         public ProbeDefinition Clone()
@@ -170,6 +191,7 @@ namespace CNC.Controls
             LatchDistance = o.LatchDistance; XYClearance = o.XYClearance; Depth = o.Depth;
             ProbeOffsetX = o.ProbeOffsetX; ProbeOffsetY = o.ProbeOffsetY;
             PlateThickness = o.PlateThickness; LipWidth = o.LipWidth; BitLength = o.BitLength; SetterHeight = o.SetterHeight; SpinRPM = o.SpinRPM;
+            TargetHeight = o.TargetHeight;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -291,6 +313,48 @@ namespace CNC.Controls
             // looks exactly like a fresh install with no library to carry over.
             catch (System.Exception ex) { CNC.Core.DebugLog.Write("probes", "ReadLegacyFile failed, treating as no library to import - " + ex.Message); }
             return null;
+        }
+
+        /// <summary>
+        /// The probe that measures tool length at the G59.3 position: the operator's own choice from
+        /// Machine Setup step 5, falling back to the first toolsetter and then the first touch plate -
+        /// which is what every caller did before the question was asked.
+        ///
+        /// ONE place resolves this, because three separate pieces of code need the same answer and they
+        /// must not disagree: the Reference TLO step, the tool-length macro's probe-input select, and the
+        /// step-5 panel that describes what will happen.
+        /// </summary>
+        public static ProbeDefinition TloTarget
+        {
+            get
+            {
+                string name = AppConfig.Settings.Base.TloProbeName;
+                return (string.IsNullOrEmpty(name) ? null : Items.FirstOrDefault(p => p.Name == name))
+                       ?? Items.FirstOrDefault(p => p.ProbeType == ProbeType.ToolSetter)
+                       ?? Items.FirstOrDefault(p => p.ProbeType == ProbeType.TouchPlate);
+            }
+        }
+
+        /// <summary>
+        /// True when tool length is measured with a TOUCH PLATE rather than a toolsetter puck - which
+        /// decides which probe INPUT the probe move must select.
+        ///
+        /// A plate has no switch of its own: it closes the circuit through the tool, and in practice every
+        /// plate on the machine is wired together onto the one main probe input, alongside a 3D probe if
+        /// there is one. So a plate is always the MAIN input.
+        ///
+        /// Deliberately NOT "does the controller have toolsetter hardware". A machine can have a toolsetter
+        /// fitted and still use a plate at G59.3, and answering from the hardware alone would select the
+        /// toolsetter input for a plate that is not wired to it - a probe move that can never trigger, which
+        /// ends as a crash into the plate rather than a touch on it.
+        /// </summary>
+        public static bool TloTargetIsTouchPlate
+        {
+            get
+            {
+                var p = TloTarget;
+                return p != null && p.ProbeType == ProbeType.TouchPlate;
+            }
         }
 
         // Derive each probe's name from its type: "3D probe" when it's the only one of that type,

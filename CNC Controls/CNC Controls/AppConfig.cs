@@ -404,6 +404,24 @@ namespace CNC.Controls
         /// </summary>
         public string TloProbeName { get; set; } = string.Empty;
 
+        /// <summary>
+        /// Machine Z of the SURFACE the tool-length target stands on - the spoilboard or table under the
+        /// puck or plate. Captured once in Machine Setup step 5 by jogging a tool down to touch it.
+        ///
+        /// With this and the target's own height (ProbeDefinition.TargetHeight), the machine Z of the
+        /// target's TOP is known, and the tool-length probe's search distance can be computed as the gap
+        /// from the G59.3 origin down to it plus a margin - instead of the literal 90 mm that was
+        /// hardcoded, which is too far for a short plate low on the table and too short for a tall one.
+        ///
+        /// 0 = not captured, and the search then falls back to the literal. Zero is safe to overload here
+        /// in a way it is not elsewhere: it is the TOP of Z travel on a router, so a spoilboard sitting at
+        /// machine Z 0 is not a machine anyone has.
+        ///
+        /// It is a DATUM, not a limit. Nothing may use it as a floor to rapid to - that confusion is
+        /// exactly what drove a rapid 134 mm below the real surface into a touch plate once already.
+        /// </summary>
+        public double TloSurfaceZ { get; set; } = 0d;
+
         // ProbeDefinitions.SetItems seeds ONE touch plate on a fresh install (see its own comment) so the
         // Machine Setup gate no longer has to force a stop for step 5 - but those are generic numbers, not
         // this machine's actual probe geometry. False until the operator has been through Setup's readiness
