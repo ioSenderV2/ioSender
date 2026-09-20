@@ -1875,6 +1875,21 @@ namespace CNC.Controls
 
             bool usingPlate = p.ProbeType == ProbeType.TouchPlate;
 
+            // Where G59.3 actually is, in machine coordinates, read fresh - the program below drives to it
+            // with G53 rather than selecting it, so these numbers ARE the move. Refuse rather than move if
+            // they cannot be read: an unanswered $# would otherwise become a rapid to 0,0,0.
+            GrblWorkParameters.Get(model);
+            var g593cs = GrblWorkParameters.GetCoordinateSystem("G59.3");
+            if (g593cs == null || g593cs.Values.Length < 3 ||
+                double.IsNaN(g593cs.Values[0]) || double.IsNaN(g593cs.Values[1]) || double.IsNaN(g593cs.Values[2]))
+            {
+                AppDialogs.Show(Window.GetWindow(this),
+                    "Could not read where G59.3 is. Set it above first, and make sure the controller has answered.",
+                    "Reference TLO", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            var g593 = new { X = g593cs.Values[0], Y = g593cs.Values[1], Z = g593cs.Values[2] };
+
             // The plate is a loose object, and the baseline is only worth anything if every later
             // tool-length probe finds it in the SAME place - tlo.macro goes to G59.3 and probes straight
             // down, exactly as this does. Say so before moving, because getting it wrong does not fail, it
@@ -1898,9 +1913,21 @@ namespace CNC.Controls
             b.AppendLine("G21 G90 G94 G17");
             b.AppendLine("G49");
             b.AppendLine("G53 G0 Z-5");
-            b.AppendLine("G59.3");
-            b.AppendLine("G0 X0 Y0");
-            b.AppendLine("G0 Z0");
+            // MACHINE COORDINATES, not "G59.3 then G0 X0 Y0".
+            //
+            // This used to SELECT G59.3 to get to it, and never put the operator's own coordinate system
+            // back - so running Reference TLO once left G59.3 as the active WCS for everything afterwards.
+            // tlo.macro does the same selection but restores the caller's WCS at the end, and its header
+            // says in as many words that the restore must not be hardcoded; this inline copy took the
+            // selection and left the restore behind.
+            //
+            // The fix is not to add a restore but to stop selecting anything. Nothing this page does needs
+            // a work coordinate system: the approach is a fixed machine position and the probe itself runs
+            // in G91, so machine coordinates express all of it, and there is then no state to put back and
+            // nothing to get wrong. Resolved in C# because a streamed program cannot branch - an o-word
+            // ELSE/ENDIF is dropped by the line pipeline and wedges the controller's o-word engine.
+            b.AppendLine(string.Format("G53 G0 X{0} Y{1}", g593.X.ToInvariantString("0.0##"), g593.Y.ToInvariantString("0.0##")));
+            b.AppendLine(string.Format("G53 G0 Z{0}", g593.Z.ToInvariantString("0.0##")));
             // Main probe input (Q0) for a plate - it has no switch, it closes the circuit through the tool -
             // or for a self-triggering 3D probe actually in the spindle; else the toolsetter input (Q1) for
             // a rigid/cutting tool pushing the puck's own switch. The same three-way choice tlo.macro's
