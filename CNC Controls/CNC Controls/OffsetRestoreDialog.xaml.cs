@@ -29,12 +29,28 @@ namespace CNC.Controls
     /// One line of a work offset snapshot, as something the operator can read and correct.
     /// </summary>
     /// <remarks>
-    /// Plain settable properties: the DataGrid writes back through two-way binding, and there is no
-    /// change notification needed because nothing else reads these while the dialog is open.
+    /// Only Restore raises change notification, and only because the dialog's footer has to follow it:
+    /// the footer states what WILL happen given the current ticks, so it has to hear about a tick. The
+    /// value columns need none - nothing reads them until Restore is pressed.
     /// </remarks>
-    public class OffsetRestoreRow
+    public class OffsetRestoreRow : System.ComponentModel.INotifyPropertyChanged
     {
-        public bool Restore { get; set; } = true;
+        public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+
+        private bool restore = true;
+        public bool Restore
+        {
+            get { return restore; }
+            set
+            {
+                if (restore == value)
+                    return;
+                restore = value;
+                var h = PropertyChanged;
+                if (h != null)
+                    h(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Restore)));
+            }
+        }
 
         /// <summary>What the operator sees - "G54", "Tool 3", "G30".</summary>
         public string Item { get; set; }
@@ -68,6 +84,45 @@ namespace CNC.Controls
 
             rows = new ObservableCollection<OffsetRestoreRow>(parsed);
             dgrRows.ItemsSource = rows;
+
+            foreach (var r in rows)
+                r.PropertyChanged += (s, e) => UpdateFooter();
+            UpdateFooter();
+        }
+
+        /// <summary>
+        /// Say what pressing Restore will actually do, from the ticks as they stand.
+        /// </summary>
+        /// <remarks>
+        /// This was a fixed sentence about G28/G30 opening a program and driving the machine, shown whether
+        /// or not any such row was ticked - so it contradicted the table in front of it and was reported as
+        /// confusing on first use. A warning that is always there is not a warning, it is wallpaper. Now it
+        /// names the positions it will drive to, and when none are ticked it says so instead.
+        /// </remarks>
+        private void UpdateFooter()
+        {
+            var positions = rows.Where(r => r.Restore && r.MovesMachine).ToList();
+            int writes = rows.Count(r => r.Restore && !r.MovesMachine);
+
+            if (positions.Count == 0)
+            {
+                txtWarn.Foreground = System.Windows.Media.Brushes.DimGray;
+                txtWarn.Text = writes == 0
+                    ? "Nothing is ticked, so Restore will do nothing."
+                    : string.Format("Nothing ticked moves the machine. {0} offset{1} will be written to the controller.",
+                                    writes, writes == 1 ? "" : "s");
+                return;
+            }
+
+            var sb = new StringBuilder();
+            sb.Append(positions.Count == 1 ? "This MOVES the machine: " : "This MOVES the machine to " + positions.Count + " positions: ");
+            sb.Append(string.Join(", ", positions.Select(p => string.Format("{0} at X{1} Y{2} Z{3}",
+                      p.Item, Fmt(p.X), Fmt(p.Y), Fmt(p.Z)))));
+            sb.Append(". Those cannot be written - the controller only learns them from where the machine is standing - " +
+                      "so they open as a program in the Job tab. Nothing moves until you read it and press Start.");
+
+            txtWarn.Foreground = System.Windows.Media.Brushes.Firebrick;
+            txtWarn.Text = sb.ToString();
         }
 
         private void btnNone_Click(object sender, RoutedEventArgs e)
@@ -77,6 +132,7 @@ namespace CNC.Controls
             foreach (var r in rows)
                 r.Restore = false;
             dgrRows.Items.Refresh();
+            UpdateFooter();
         }
 
         private void btnRestore_Click(object sender, RoutedEventArgs e)

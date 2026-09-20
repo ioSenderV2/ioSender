@@ -387,7 +387,12 @@ namespace CNC.Controls
 
             if (summary.Count == 0)
             {
-                AppDialogs.Show((string)FindResource("SettingsRestoreNoChanges"), "ioSender", MessageBoxButton.OK, MessageBoxImage.Information);
+                // Captioned for WHICH restore this is about. A restore point can carry machine settings, work
+                // offsets and the app configuration, and this message concerns only the first of the three -
+                // captioned "ioSender" it read as "the restore did nothing", which on a run that was also
+                // putting work offsets back is simply wrong.
+                AppDialogs.Show((string)FindResource("SettingsRestoreNoChanges"), "Restore machine settings",
+                                MessageBoxButton.OK, MessageBoxImage.Information);
                 return false;
             }
 

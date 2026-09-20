@@ -50,8 +50,9 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <TextBlock x:Uid="txt_offsetRestoreWarn" Grid.Row="2" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="#B00020"
-                   Text="G28 and G30 cannot be written - the controller only learns them from where the machine is standing. Any of those rows left ticked open as a program in the Job tab that DRIVES to each position. Nothing moves until you read it and press Start."/>
+        <!-- Text and colour are set by UpdateFooter from the current ticks - see there for why this is not
+             a fixed sentence. Left empty here so a stale line can never be shown before the first update. -->
+        <TextBlock x:Name="txtWarn" Grid.Row="2" Margin="0,8,0,0" TextWrapping="Wrap"/>
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
             <Button x:Uid="btn_offNone" x:Name="btnNone" Content="Untick all" MinWidth="90" Margin="0,0,8,0" Click="btnNone_Click"/>

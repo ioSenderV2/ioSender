@@ -105,6 +105,25 @@ namespace RenderHarness
             // plain string Content it measured on one line and ran off the edge where nobody could see it.
             // Reads the real Backups folder, so what renders is the real list.
             ["RestorePointDialog"] = () => new CNC.Controls.RestorePointDialog(),
+
+            // The offset review table with BOTH position rows ticked - the tallest the footer ever gets,
+            // because it names every position it will drive to. That footer sits in an Auto row above the
+            // buttons, which is the arrangement that already pushed the buttons off the bottom of the
+            // restore dialog once. If this fits, it fits.
+            ["OffsetRestoreDialog"] = () =>
+            {
+                var rows = CNC.Controls.OffsetRestoreDialog.Parse(new[]
+                {
+                    "G90G10L2P1X151.489Y-631.781Z-76.392R0.0922",
+                    "G90G10L2P2X0Y0Z0",
+                    "G90G10L2P9X816.342Y-838.006Z0",
+                    "G0G53X0Y0Z0",
+                    "G28.1",
+                    "G0G53X702.352Y-838.008Z-20.248",
+                    "G30.1",
+                });
+                return new CNC.Controls.OffsetRestoreDialog(rows);
+            },
         };
     }
 
