@@ -2244,7 +2244,26 @@ namespace CNC.Core
             foreach (var coordinateSystem in CoordinateSystems)
             {
                 if (coordinateSystem.Id > 0)
-                    exp.Add(string.Format("G90G10L2P{0}{1}", coordinateSystem.Id, coordinateSystem.ToString(GrblInfo.AxisFlags)));
+                {
+                    // The R word, or the restore silently zeroes the rotation. ToString here is Position's -
+                    // axis words only - and CoordinateSystem.Rotation is not part of it, so every export
+                    // before this wrote a rotated WCS back as square. On this machine G54 carries 0.0951 deg
+                    // and the probing/ATC workflow is built on it; a "successful" restore left the work frame
+                    // wrong with nothing on screen to say so.
+                    //
+                    // FOUR decimals, not the default three: a consumer reconstructing the work frame rotates
+                    // about MACHINE zero, so the rounding becomes a position error of (rounding in radians) x
+                    // (distance from machine zero). Measured - 2 dp alone was 0.055 mm at 631 mm out. The
+                    // controller now reports $# at 4 dp (grbl 0aaf5ae), so the precision is there to keep.
+                    //
+                    // Only when non-zero: firmware built without ROTATION_ENABLE answers error:20 to any R
+                    // word and would halt the restore. A zero rotation has nothing to say, so it says nothing.
+                    exp.Add(string.Format("G90G10L2P{0}{1}{2}", coordinateSystem.Id,
+                                          coordinateSystem.ToString(GrblInfo.AxisFlags),
+                                          coordinateSystem.Rotation == 0d || double.IsNaN(coordinateSystem.Rotation)
+                                            ? string.Empty
+                                            : "R" + Math.Round(coordinateSystem.Rotation, 4).ToInvariantString()));
+                }
                 else
                 {
                     if (!warned)
