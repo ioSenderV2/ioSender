@@ -19,10 +19,16 @@ namespace CNC.Controls
             DataContext = definition;
 
             var type = definition.ProbeType;
-            bool xy = type == ProbeType.ThreeDProbe || type == ProbeType.EdgeFinder || type == ProbeType.TouchPlate;
 
-            Show(fldXYClr, xy);
-            Show(fldZClr, type != ProbeType.ToolSetter);
+            // Both of these describe approaching an edge FROM THE SIDE: stand off this far out, drop this
+            // far down, then probe sideways. A flat Z-only plate never does that - it is set on top of the
+            // work and touched straight down - so the two fields are not "leave them at the default", they
+            // describe a move it cannot make. A corner plate still shows them, because it does.
+            bool probesSideways = type == ProbeType.ThreeDProbe || type == ProbeType.EdgeFinder ||
+                                  (type == ProbeType.TouchPlate && definition.CanProbeCorner);
+
+            Show(fldXYClr, probesSideways);
+            Show(fldZClr, probesSideways);
             Show(fldOffsetX, type == ProbeType.ThreeDProbe);
             Show(fldOffsetY, type == ProbeType.ThreeDProbe);
         }
