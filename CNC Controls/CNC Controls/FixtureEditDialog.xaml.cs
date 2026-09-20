@@ -126,7 +126,10 @@ namespace CNC.Controls
         // follows. Applies to every fixture kind now, not just Vise - see UpdateFieldVisibility's own comment.
         private void UpdateFxProbeWarning()
         {
-            bool touchAvailable = ProbeDefinitions.Items.Any(p => p.ProbeType == ProbeType.TouchPlate);
+            // Corner-capable plates only: every use of a plate in this dialog registers it against the
+            // fixture's own corner (Test position's corner-locate, and the vise's jaw probe), which a flat
+            // Z-only plate cannot do. See ProbeDefinition.CanProbeCorner.
+            bool touchAvailable = ProbeDefinitions.Items.Any(p => p.ProbeType == ProbeType.TouchPlate && p.CanProbeCorner);
             bool probe3dAvailable = ProbeDefinitions.Items.Any(p => p.ProbeType == ProbeType.ThreeDProbe);
 
             rbFxProbeTouch.IsEnabled = touchAvailable;
@@ -149,7 +152,7 @@ namespace CNC.Controls
         private ProbeDefinition FixtureActiveProbe()
         {
             return rbFxProbeTouch.IsChecked == true
-                ? ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.TouchPlate)
+                ? ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.TouchPlate && p.CanProbeCorner)
                 : ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.ThreeDProbe);
         }
 

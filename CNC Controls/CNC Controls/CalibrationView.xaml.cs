@@ -73,8 +73,15 @@ namespace CNC.Controls
         // which is why it exists - so there is always a way to calibrate steps/mm.
         private void UpdateProbeAvailability()
         {
+            // The plate has to be a CORNER plate. Both wizards below reach a corner through pcorner.macro,
+            // and a flat Z-only plate has no edges to register against - it would qualify the tab and then
+            // fail at the first XY touch. See ProbeDefinition.CanProbeCorner.
+            //
+            // Spelled out rather than using IsCornerCapable, which also admits an edge finder: neither
+            // wizard has an edge-finder path (ActiveProbe is touch-plate-or-3D), so one would enable the
+            // tab and then hand it a null probe.
             bool canProbe = ProbeDefinitions.Items.Any(p => p.ProbeType == ProbeType.ThreeDProbe
-                                                         || p.ProbeType == ProbeType.TouchPlate);
+                                                         || (p.ProbeType == ProbeType.TouchPlate && p.CanProbeCorner));
             tabCalStepper.IsEnabled = canProbe;
             // Squareness (probe) rides on the same answer for the same reason - it probes a reference square
             // through the same pcorner.macro. Its pin-and-eye sibling needs no probe, which is why that one

@@ -1998,3 +1998,8 @@ CNC.Controls.WPF.g.en-US.resources:offsetrestoredialog.baml,txt_offsetRestoreWar
 CNC.Controls.WPF.g.en-US.resources:offsetrestoredialog.baml,btn_offNone:System.Windows.Controls.ContentControl.Content,Button,True,True,,Untick all
 CNC.Controls.WPF.g.en-US.resources:offsetrestoredialog.baml,btn_offRestore:System.Windows.Controls.ContentControl.Content,Button,True,True,,Restore
 CNC.Controls.WPF.g.en-US.resources:offsetrestoredialog.baml,btn_offCancel:System.Windows.Controls.ContentControl.Content,Button,True,True,,Cancel
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_plateKind:System.Windows.Controls.ContentControl.Content,Label,True,True,,Plate type:
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_plateCorner:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Corner (two lips)
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_plateCorner:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"A plate with two lips meeting at 90 degrees. It sits over the stock's corner, the lips register against the two edges, and it can probe X, Y and Z."
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_plateFlat:System.Windows.Controls.ContentControl.Content,RadioButton,True,True,,Flat (Z only)
+CNC.Controls.WPF.g.en-US.resources:probedefinitioneditdialog.baml,pd_plateFlat:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"A plain slab that lies on top of the work. It can set Z and nothing else - it has no edges to register against, so it cannot find a corner."

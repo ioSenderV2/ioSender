@@ -515,7 +515,17 @@ namespace GCode_Sender
         // is actually in the collet for THIS Start Job run) - unlike the general Probing tab, Start Job does
         // not read the loaded program's own (TOOL T=n D=..) comment, since Start Job typically runs before a
         // job is loaded. Null when none is defined.
+        // CORNER-capable only. Everything Setup does with a plate registers it against the stock's corner,
+        // and a flat Z-only plate has no edges to register with - offering one here would send the macro
+        // down the side of the stock waiting for a touch that cannot happen. See ProbeDefinition.CanProbeCorner.
         private ProbeDefinition TouchPlateProbe()
+        {
+            return ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.TouchPlate && p.CanProbeCorner);
+        }
+
+        // Any touch plate at all, corner-capable or not - so a refusal can tell "you have no plate" from
+        // "the plate you have only does Z", which are different problems with different answers.
+        private ProbeDefinition AnyTouchPlate()
         {
             return ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.TouchPlate);
         }
@@ -562,7 +572,11 @@ namespace GCode_Sender
                 // Same text txtNoProbe carries, so the button and the panel cannot say different things.
                 if (!ok)
                     MacroProcessor.GenerateBlockedReason = IsTouchPlate
-                        ? "No touch plate is defined - add one in Machine Setup > Probe definitions."
+                        ? (AnyTouchPlate() != null
+                            // Naming the real obstacle. "No touch plate is defined" in front of an operator
+                            // looking at their touch plate in the list reads as a bug in the app.
+                            ? "Your touch plate is set to Z only, and Setup has to find a corner - use a plate with two lips, or correct its type in Machine Setup > Probe definitions."
+                            : "No touch plate is defined - add one in Machine Setup > Probe definitions.")
                         : "No 3D probe is defined - add one in Machine Setup > Probe definitions.";
             }
             txtNoProbe.Visibility = ok ? Visibility.Collapsed : Visibility.Visible;

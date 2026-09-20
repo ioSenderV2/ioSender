@@ -733,9 +733,11 @@ namespace CNC.Controls
             return ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.ThreeDProbe);
         }
 
+        // Corner-capable only: this wizard probes the reference square's corners through pcorner.macro, so a
+        // flat Z-only plate has nothing to register against. See ProbeDefinition.CanProbeCorner.
         private static ProbeDefinition TouchPlateProbe()
         {
-            return ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.TouchPlate);
+            return ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.TouchPlate && p.CanProbeCorner);
         }
 
         private ProbeDefinition ActiveProbe()

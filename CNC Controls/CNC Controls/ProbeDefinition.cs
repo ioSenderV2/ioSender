@@ -34,12 +34,41 @@ namespace CNC.Controls
     {
         private string _name = "Probe";
         private ProbeType _type = ProbeType.ThreeDProbe;
+        private bool _canProbeCorner = true;
         private double _diameter = 2d, _bodyDiameter = 42d, _overallLength = 100d, _searchFeed = 200d, _latchFeed = 50d, _rapidsFeed = 0d,
                        _probeDistance = 25d, _latchDistance = 1d, _xyClearance = 5d, _depth = 10d,
                        _offsetX = 0d, _offsetY = 0d, _plateThickness = 12d, _lipWidth = 10d, _setterHeight = 0d, _spinRPM = 0d, _bitLength = 40d;
 
         public string Name { get { return _name; } set { _name = value; OnChanged(); } }
         public ProbeType ProbeType { get { return _type; } set { _type = value; OnChanged(); OnChanged(nameof(TypeName)); } }
+
+        /// <summary>
+        /// Touch plates come in two shapes and only one of them can find a corner.
+        ///
+        /// A CORNER plate has two lips meeting at 90 degrees: sit it over the stock's corner, the lips
+        /// register it against the two edges, and it can probe X, Y and Z. A FLAT plate is a slab - it
+        /// lies on top of the work and can only give you Z.
+        ///
+        /// Worth saying because the flat one is the cheaper, commoner object and nothing in the model
+        /// used to distinguish them: a flat plate looked corner-capable, was offered for corner probing,
+        /// and the macro would have driven it at the side of the stock looking for an edge touch that
+        /// cannot happen.
+        ///
+        /// Defaults to TRUE, which is deliberate for an install that predates this field: every plate was
+        /// implicitly treated as corner-capable before, so true is the value that changes nothing for an
+        /// existing library. XmlSerializer leaves an absent element at the C# default, the same way Wcs
+        /// and the work order's stock fields pick theirs up.
+        ///
+        /// Only meaningful for <see cref="ProbeType.TouchPlate"/>; ignored for every other type.
+        /// </summary>
+        public bool CanProbeCorner { get { return _canProbeCorner; } set { _canProbeCorner = value; OnChanged(); OnChanged(nameof(TypeName)); } }
+
+        /// <summary>True when this definition can be used to find a stock corner in X and Y.</summary>
+        [System.Xml.Serialization.XmlIgnore]
+        public bool IsCornerCapable
+        {
+            get { return _type == ProbeType.ThreeDProbe || _type == ProbeType.EdgeFinder || (_type == ProbeType.TouchPlate && _canProbeCorner); }
+        }
 
         // Friendly type name for the list grid (derived, not persisted).
         [System.Xml.Serialization.XmlIgnore]
@@ -50,7 +79,10 @@ namespace CNC.Controls
                 switch (_type)
                 {
                     case ProbeType.ThreeDProbe: return "3D probe";
-                    case ProbeType.TouchPlate: return "Touch plate";
+                    // Says which of the two plates it is, because that is the difference that decides
+                    // whether Setup can use it to find a corner - and the list is where an operator
+                    // looks to check.
+                    case ProbeType.TouchPlate: return _canProbeCorner ? "Touch plate (corner)" : "Touch plate (Z only)";
                     case ProbeType.ToolSetter: return "Tool setter";
                     case ProbeType.EdgeFinder: return "Edge finder";
                     default: return _type.ToString();
@@ -133,7 +165,7 @@ namespace CNC.Controls
 
         public void CopyFrom(ProbeDefinition o)
         {
-            Name = o.Name; ProbeType = o.ProbeType; ProbeDiameter = o.ProbeDiameter; BodyDiameter = o.BodyDiameter; OverallLength = o.OverallLength; ProbeFeedRate = o.ProbeFeedRate;
+            Name = o.Name; ProbeType = o.ProbeType; CanProbeCorner = o.CanProbeCorner; ProbeDiameter = o.ProbeDiameter; BodyDiameter = o.BodyDiameter; OverallLength = o.OverallLength; ProbeFeedRate = o.ProbeFeedRate;
             LatchFeedRate = o.LatchFeedRate; RapidsFeedRate = o.RapidsFeedRate; ProbeDistance = o.ProbeDistance;
             LatchDistance = o.LatchDistance; XYClearance = o.XYClearance; Depth = o.Depth;
             ProbeOffsetX = o.ProbeOffsetX; ProbeOffsetY = o.ProbeOffsetY;
@@ -222,17 +254,20 @@ namespace CNC.Controls
             if (list?.Items != null)
                 foreach (var d in list.Items)
                     _items.Add(d);
-            // Fresh install (no Probes section at all yet): ship a typical 3D probe + touch plate rather than
-            // an empty library, so the Machine Setup gate no longer has to force a stop over this (step 5 in
-            // MachineSetupWizard.FirstIncompleteStep) - a new operator can go straight into Start Job/Odd Jobs
-            // Setup, which prompts them once to review these generic numbers against their actual hardware
-            // (see AppConfig.Settings.Base.ProbeDefinitionsReviewed) rather than blocking on it up front.
+            // Fresh install (no Probes section at all yet): seed the ONE probe it is safe to assume, so the
+            // Machine Setup gate does not have to force a stop over an empty library (step 5 in
+            // MachineSetupWizard.FirstIncompleteStep) and a new operator can go straight into Setup, which
+            // prompts them once to review these generic numbers against their real hardware (see
+            // AppConfig.Settings.Base.ProbeDefinitionsReviewed).
+            //
+            // A touch plate, and ONLY a touch plate. This used to seed a 3D probe alongside it, and that was
+            // the wrong kind of help: most hobby machines do not have one, so a new user arrived at a library
+            // already listing hardware they do not own, configured, looking reviewed. A probe in the list is
+            // a claim about the machine - an empty slot invites the question, a wrong entry answers it.
+            // Machine Setup step 5 asks what is actually fitted instead.
             bool seeded = _items.Count == 0;
             if (seeded)
-            {
-                _items.Add(new ProbeDefinition { Name = "3D probe", ProbeType = ProbeType.ThreeDProbe });
-                _items.Add(new ProbeDefinition { Name = "Touch plate", ProbeType = ProbeType.TouchPlate });
-            }
+                _items.Add(new ProbeDefinition { Name = "Touch plate", ProbeType = ProbeType.TouchPlate, CanProbeCorner = true });
             Renumber(_items);
             CNC.Core.DebugLog.Write("probes", string.Format(
                 "SetItems: incoming={0} seeded={1} now={2}", list?.Items?.Count ?? -1, seeded, _items.Count));
