@@ -506,6 +506,12 @@ namespace CNC.Controls
                 grdProbes.ItemsSource = ProbeDefinitions.Items;
                 grdFixtures.ItemsSource = Fixtures.Items;
 
+                // Step 5's three questions all read live state - the probe library, the chosen tool-length
+                // probe, and the controller's own stored G30/G59.3 - so they are refreshed on activation
+                // rather than bound once.
+                LoadTloProbeChoices();
+                UpdateReferencePositions();
+
                 BuildAxes();
                 LoadCurrentSettings();
                 LoadWorkSurface();   // board extent - config, not controller settings (see WorkSurface.cs)
@@ -1317,9 +1323,11 @@ namespace CNC.Controls
             bool sel = grdProbes.SelectedItem is ProbeDefinition;
             btnProbeEdit.IsEnabled = btnProbeDelete.IsEnabled = sel;
 
-            // The TLO panel below reads the library - which probe it will use, and whether the 3D-probe
-            // question applies at all - so adding or removing a toolsetter has to reach it. Cheap, and it
-            // catches the add/edit/delete paths without each of them having to remember.
+            // Everything below this grid reads the library - the tool-length picker's contents, which probe
+            // the TLO step will use, and whether the 3D-probe question applies at all - so adding, editing
+            // or removing a probe has to reach them. Cheap, and it catches every one of those paths without
+            // each of them having to remember.
+            LoadTloProbeChoices();
             UpdateTloRefControls();
         }
 
@@ -1327,6 +1335,202 @@ namespace CNC.Controls
         {
             if (grdProbes.SelectedItem is ProbeDefinition)
                 EditSelectedProbe();
+        }
+
+        // ---- Step 5: the two reference positions, and what sits at G59.3 -------------------------------
+
+        /// <summary>
+        /// Show what G30 and G59.3 currently hold. "Not set" is a real answer here and has to look like
+        /// one: both default to all-zero in the controller, and zero is a position - it is just never the
+        /// one anybody meant, so a machine that has never been told either reads as configured.
+        /// </summary>
+        private void UpdateReferencePositions()
+        {
+            if (txtG30Value == null)
+                return;
+
+            txtG30Value.Text = DescribeStoredPosition("G30");
+            txtG593Value.Text = DescribeStoredPosition("G59.3");
+        }
+
+        private static string DescribeStoredPosition(string code)
+        {
+            var cs = GrblWorkParameters.GetCoordinateSystem(code);
+            if (cs == null)
+                return "not read";
+
+            // Same "any axis non-zero" test MacroRunner.CoordinateSystemDefined uses - grbl has no explicit
+            // "is defined" flag, so all-zero is how never-been-set looks. One deliberately left at machine
+            // zero would read as unset, which is a known and accepted false negative there and here.
+            bool any = false;
+            var sb = new StringBuilder();
+            for (int i = 0; i < GrblInfo.NumAxes && i < cs.Values.Length; i++)
+            {
+                double v = cs.Values[i];
+                if (!double.IsNaN(v) && v != 0d)
+                    any = true;
+                sb.Append(i == 0 ? "" : " ").Append(AxisLetterAt(i)).Append(v.ToString("0.0", CultureInfo.CurrentCulture));
+            }
+            return any ? sb.ToString() : "not set";
+        }
+
+        private static string AxisLetterAt(int i)
+        {
+            string letters = GrblInfo.AxisLetters;
+            return i >= 0 && i < letters.Length ? letters.Substring(i, 1) : "?";
+        }
+
+        /// <summary>
+        /// Store the machine's current position as G30. No motion: G30.1 takes no coordinates, it captures
+        /// wherever the machine physically is - which is why the instruction is "jog there first", the same
+        /// workflow the Offsets tab settled on.
+        /// </summary>
+        private void SetG30_Click(object sender, RoutedEventArgs e)
+        {
+            if (model == null)
+                return;
+
+            if (AppDialogs.Show(Window.GetWindow(this),
+                    "Store the machine's CURRENT position as G30, the tool-swap park?\r\n\r\n" +
+                    "Nothing moves - this records where the machine is standing right now. Jog it to the park position first if it isn't there.",
+                    "Set G30", MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+                return;
+
+            Comms.com.WriteCommand("G30.1");
+            RefreshStoredPositionsAfterWrite();
+        }
+
+        /// <summary>
+        /// Store the machine's current position as the G59.3 origin.
+        ///
+        /// Goes through MacroProcessor.EmitWcsWrite rather than writing G10 on its own, and that is not
+        /// ceremony: an offset write against a coordinate system that holds a rotation leaves the firmware's
+        /// parser holding a corrupted position, and the next move that leaves an axis unnamed flies to it.
+        /// The helper's own remarks carry the hardware incident. Every G10 L2/L20 in this app goes through
+        /// it; this one is no exception just because it is being issued from a settings page.
+        /// </summary>
+        private void SetG593_Click(object sender, RoutedEventArgs e)
+        {
+            if (model == null)
+                return;
+
+            if (AppDialogs.Show(Window.GetWindow(this),
+                    "Store the machine's CURRENT position as the G59.3 origin - the approach position over whatever measures tool length?\r\n\r\n" +
+                    "Jog over the toolsetter or plate first, centred on it, at a height your LONGEST tool clears.\r\n\r\n" +
+                    "The machine will make one no-op move to itself afterwards, which is what keeps the controller's parser in step with the new offset.",
+                    "Set G59.3", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+                return;
+
+            var b = new StringBuilder();
+            b.AppendLine("(Machine Setup - set G59.3 from the current position)");
+            b.AppendLine("(PREREQ, connected, homed, noalarm)");
+            b.AppendLine("G21 G90 G94 G17");
+            MacroProcessor.EmitWcsWrite(l => b.AppendLine(l), "G10 L20 P9 X0 Y0 Z0");
+
+            if (MacroProcessor.Run(model, "Set G59.3", b.ToString(), true))
+                RefreshStoredPositionsAfterWrite();
+        }
+
+        /// <summary>
+        /// Re-read $# and repaint. The stored positions live in the controller, so the display is only as
+        /// current as the last query - without this the row still says "not set" straight after setting it,
+        /// which reads as the button having done nothing.
+        /// </summary>
+        private void RefreshStoredPositionsAfterWrite()
+        {
+            GrblWorkParameters.Get(model);
+            UpdateReferencePositions();
+        }
+
+        /// <summary>
+        /// A row in the tool-length probe picker: a probe definition the operator has already described,
+        /// labelled the way they would recognise it rather than by type alone.
+        /// </summary>
+        private class TloProbeChoice
+        {
+            public string Name { get; set; }
+            public string Label { get; set; }
+        }
+
+        /// <summary>
+        /// Fill the picker from the probes actually defined. Only a toolsetter or a touch plate can do this
+        /// job - a 3D probe measures the WORK, not the tool in the spindle, and an edge finder has no Z at
+        /// all - so offering either would be offering a choice that cannot work.
+        /// </summary>
+        private void LoadTloProbeChoices()
+        {
+            if (cbxTloProbe == null)
+                return;
+
+            // The Name already carries the type (Renumber derives it from TypeName), so it reads as
+            // "Touch plate (corner)" on its own - no need to append the type a second time.
+            var choices = ProbeDefinitions.Items
+                .Where(p => p.ProbeType == ProbeType.ToolSetter || p.ProbeType == ProbeType.TouchPlate)
+                .Select(p => new TloProbeChoice { Name = p.Name, Label = p.Name })
+                .ToList();
+
+            bool wasLoading = _loading;
+            _loading = true;
+            cbxTloProbe.ItemsSource = choices;
+
+            // Keep the stored choice if it still resolves; otherwise fall back the same way the TLO step
+            // itself does, rather than leaving the box blank and the setting naming a probe that is gone.
+            string want = AppConfig.Settings.Base.TloProbeName;
+            var sel = choices.FirstOrDefault(c => c.Name == want)
+                      ?? choices.FirstOrDefault(c => c.Name.StartsWith("Tool setter", StringComparison.OrdinalIgnoreCase))
+                      ?? choices.FirstOrDefault();
+            cbxTloProbe.SelectedValue = sel?.Name;
+            _loading = wasLoading;
+
+            UpdateTloTargetAdvice();
+        }
+
+        private void TloProbe_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loading)
+                return;
+
+            AppConfig.Settings.Base.TloProbeName = (cbxTloProbe.SelectedValue as string) ?? string.Empty;
+            UpdateTloTargetAdvice();
+            UpdateTloRefControls();
+        }
+
+        /// <summary>The probe definition chosen for tool length, or null if the choice no longer resolves.</summary>
+        private static ProbeDefinition SelectedTloProbe()
+        {
+            string name = AppConfig.Settings.Base.TloProbeName;
+            return string.IsNullOrEmpty(name) ? null : ProbeDefinitions.Items.FirstOrDefault(p => p.Name == name);
+        }
+
+        /// <summary>
+        /// The advice that depends on WHICH probe was chosen. A puck is bolted down and needs nothing said.
+        /// A plate is a loose object, and a loose object at the tool-length position is the one mistake here
+        /// that does not announce itself: put it back a few tenths out and every tool is a few tenths out
+        /// with it, in the finished part, with nothing on screen to say so.
+        /// </summary>
+        private void UpdateTloTargetAdvice()
+        {
+            if (brdTloFixedWarn == null)
+                return;
+
+            var p = SelectedTloProbe();
+            if (p == null || p.ProbeType != ProbeType.TouchPlate)
+            {
+                brdTloFixedWarn.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            brdTloFixedWarn.Visibility = Visibility.Visible;
+            txtTloFixedWarn.Text =
+                "Give this plate a home it cannot miss. Tool length is worked out by comparing today's probe against the stored " +
+                "baseline, so the plate has to sit in exactly the same place every time - a few tenths out and every tool is a few " +
+                "tenths out with it, with nothing on screen to say so.\r\n\r\n" +
+                "A shallow pocket cut into the spoilboard that the plate drops into is the usual answer: it registers the plate in " +
+                "X and Y by itself, and you can see at a glance whether it is seated." +
+                (p.CanProbeCorner
+                    // Only worth saying for the plate that has lips. On a flat plate there is nothing to avoid.
+                    ? "\r\n\r\nThis is a corner plate, so upside down its lips point up - probe in the middle, clear of them."
+                    : string.Empty);
         }
 
         private void ProbeAdd_Click(object sender, RoutedEventArgs e)
@@ -1526,18 +1730,25 @@ namespace CNC.Controls
             if (chkTloRef3dProbe == null)
                 return;
 
-            bool haveSetter = ProbeDefinitions.Items.Any(x => x.ProbeType == ProbeType.ToolSetter);
-            chkTloRef3dProbe.Visibility = haveSetter ? Visibility.Visible : Visibility.Collapsed;
+            // Which probe will actually be used - the operator's choice if they made one, else the same
+            // fallback ReferenceTlo_Click applies. Read it the same way, so the tooltip and the button
+            // cannot describe different probes.
+            var chosen = SelectedTloProbe()
+                         ?? ProbeDefinitions.Items.FirstOrDefault(x => x.ProbeType == ProbeType.ToolSetter)
+                         ?? ProbeDefinitions.Items.FirstOrDefault(x => x.ProbeType == ProbeType.TouchPlate);
 
-            bool haveAny = haveSetter || ProbeDefinitions.Items.Any(x => x.ProbeType == ProbeType.TouchPlate);
+            bool isSetter = chosen != null && chosen.ProbeType == ProbeType.ToolSetter;
+            chkTloRef3dProbe.Visibility = isSetter ? Visibility.Visible : Visibility.Collapsed;
+
             if (btnReferenceTlo != null)
             {
-                btnReferenceTlo.IsEnabled = haveAny;
-                btnReferenceTlo.ToolTip = haveAny
-                    ? (haveSetter
-                        ? "Probe the toolsetter puck and store the result as this machine's tool-length baseline."
-                        : "Probe the touch plate at the G59.3 position and store the result as this machine's tool-length baseline.")
-                    : "Define a tool setter or a touch plate above first.";
+                btnReferenceTlo.IsEnabled = chosen != null;
+                btnReferenceTlo.ToolTip = chosen == null
+                    ? "Define a tool setter or a touch plate above first."
+                    : string.Format(isSetter
+                        ? "Probe the toolsetter ({0}) at G59.3 and store the result as this machine's tool-length baseline."
+                        : "Probe the touch plate ({0}) at G59.3 and store the result as this machine's tool-length baseline.",
+                        chosen.Name);
             }
         }
 
@@ -1560,7 +1771,11 @@ namespace CNC.Controls
             //
             // ANY touch plate qualifies, corner-capable or not: this is a straight-down Z touch, which is
             // the one thing a flat plate is for.
-            var p = ProbeDefinitions.Items.FirstOrDefault(x => x.ProbeType == ProbeType.ToolSetter)
+            // The operator's own answer first - step 5 asks which probe sits at G59.3, and a machine can
+            // hold a toolsetter AND plates, all of which could do this. Falling back only when they have
+            // not said, which is what this did before the question existed.
+            var p = SelectedTloProbe()
+                    ?? ProbeDefinitions.Items.FirstOrDefault(x => x.ProbeType == ProbeType.ToolSetter)
                     ?? ProbeDefinitions.Items.FirstOrDefault(x => x.ProbeType == ProbeType.TouchPlate);
             if (p == null)
             {

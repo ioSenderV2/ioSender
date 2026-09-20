@@ -384,10 +384,30 @@ namespace CNC.Controls
         // this replaced - "No need for Zspoil" once TLO is referenced against a fixed physical object first).
         // 0 = never captured.
         public double TloRefBaseline { get; set; } = 0d;
-        // ProbeDefinitions.SetItems seeds a typical 3D probe + touch plate on a fresh install (see its own
-        // comment) so the Machine Setup gate no longer has to force a stop for step 5 - but those are generic
-        // numbers, not this machine's actual probe geometry. False until the operator has been through Start
-        // Job/Odd Jobs Setup's readiness popup at least once (whether they edited them or accepted them as-is).
+
+        /// <summary>
+        /// Which defined probe measures tool length at the G59.3 position, asked in Machine Setup step 5
+        /// AFTER the operator has described the probes they actually own.
+        ///
+        /// A chosen definition rather than an abstract "kind" because the question only has a real answer
+        /// once the probes exist: a machine can hold a toolsetter and two plates, all three of which could
+        /// physically do this job, and the one at G59.3 is a fact about the bench that nothing in software
+        /// can derive. It also settles which feeds the probe move uses, which a kind could not.
+        ///
+        /// Keyed by NAME, because that is the only stable handle a ProbeDefinition has - there is no id,
+        /// and ProbeDefinitions.Renumber keeps names unique by construction. A name that no longer resolves
+        /// (the probe was deleted, or renumbering moved it) falls back rather than failing.
+        ///
+        /// Empty = not chosen; the TLO step then falls back to the first toolsetter, else the first touch
+        /// plate, which is what it did before this existed - so an install that predates the question
+        /// behaves exactly as it did.
+        /// </summary>
+        public string TloProbeName { get; set; } = string.Empty;
+
+        // ProbeDefinitions.SetItems seeds ONE touch plate on a fresh install (see its own comment) so the
+        // Machine Setup gate no longer has to force a stop for step 5 - but those are generic numbers, not
+        // this machine's actual probe geometry. False until the operator has been through Setup's readiness
+        // popup at least once (whether they edited them or accepted them as-is).
         public bool ProbeDefinitionsReviewed { get; set; } = false;
         // Odd Jobs Work Order tab: which .workorder file the CONTENT currently showing came from (null = never
         // loaded from/saved to one - New, or content only ever entered by hand). The content itself is a

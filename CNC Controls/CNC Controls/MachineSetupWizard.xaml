@@ -337,8 +337,81 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Row="0" Grid.ColumnSpan="2" x:Uid="txt_probesDesc" TextWrapping="Wrap" Margin="0,0,0,6"
-                               Text="Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Setup and the probing tabs."/>
+                    <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,8">
+
+                        <!-- The page asks three questions in the order they can actually be answered: what
+                             probes do you own, which of them measures tool length, and where do the two
+                             reference positions go. The second cannot be asked before the first (there is
+                             nothing to choose from), and the third reads better after it, because it can
+                             then name the thing the operator just said is sitting there. -->
+                        <TextBlock x:Uid="txt_probeIntroHdr" Text="1 · What probes does this machine have?" FontWeight="SemiBold" Margin="0,0,0,3"/>
+                        <TextBlock x:Uid="txt_probeIntro" TextWrapping="Wrap" Margin="0,0,0,4"
+                                   Text="Start with the list below. A new install begins with one generic touch plate - edit it to match the plate you actually own, and add a row for anything else: a toolsetter, a 3D probe, an edge finder. Nothing here is guessed from the controller; these are facts about your bench."/>
+                        <TextBlock x:Uid="txt_probeIntro2" TextWrapping="Wrap" Margin="0,0,0,8" FontSize="11" Foreground="#FF5A5A5A"
+                                   Text="A touch plate is the one thing nearly every machine has. If yours has two lips meeting at a right angle it can find a corner as well as set Z; a plain slab sets Z only. Say which in the plate's own editor - Setup relies on the answer."/>
+
+                        <!-- ===== Which probe measures tool length =====
+                             Asked second, because it is a choice AMONG the definitions above. All eligible
+                             answers probe the same way - straight down at G59.3 - so what this really
+                             settles is whose feeds get used, and what advice to give: a puck is bolted
+                             down, a plate is a loose object that has to be made to land in the same spot. -->
+                        <TextBlock x:Uid="txt_tloProbeHdr" Text="2 · Which one measures tool length?" FontWeight="SemiBold" Margin="0,4,0,3"/>
+                        <TextBlock x:Uid="txt_tloProbeDesc" TextWrapping="Wrap" Margin="0,0,0,4"
+                                   Text="Tool length is measured at the G59.3 position below. A dedicated toolsetter is the usual answer; with no toolsetter, a touch plate does the same job - including your corner plate turned upside down, probed in the middle clear of its lips."/>
+                        <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
+                            <Label x:Uid="lbl_tloProbe" Content="Tool-length probe:" VerticalAlignment="Center" Width="130" HorizontalContentAlignment="Right"/>
+                            <ComboBox x:Uid="cbx_tloProbe" x:Name="cbxTloProbe" MinWidth="240" MinHeight="22" VerticalAlignment="Center"
+                                      DisplayMemberPath="Label" SelectedValuePath="Id" SelectionChanged="TloProbe_SelectionChanged"
+                                      ToolTip="Which of your defined probes sits at the G59.3 position. Its feeds are the ones the tool-length probe move uses."/>
+                        </StackPanel>
+                        <Border x:Name="brdTloFixedWarn" BorderBrush="#FFE0A800" BorderThickness="1" Background="#FFFFF8E1"
+                                Padding="8,5" Margin="10,6,8,0" Visibility="Collapsed">
+                            <TextBlock x:Uid="txt_tloFixedWarn" x:Name="txtTloFixedWarn" TextWrapping="Wrap" FontSize="11"/>
+                        </Border>
+
+                        <!-- ===== Reference positions =====
+                             The two stored positions the tool-change flow bounces between. Explained here
+                             rather than assumed, because nothing else in the app ever says what they are
+                             FOR - and a machine with them unset or badly placed does not fail loudly, it
+                             just makes every tool change long, or drives the spindle into the puck. The
+                             contract below is tc.macro's own "Required state" section, not a paraphrase. -->
+                        <TextBlock x:Uid="txt_refPosHdr" Text="3 · Where do the reference positions go?" FontWeight="SemiBold" Margin="0,10,0,3"/>
+                        <TextBlock x:Uid="txt_refPosDesc" TextWrapping="Wrap" Margin="0,0,0,5"
+                                   Text="A tool change runs G30 → G59.3 → G30: park so you can reach the spindle, go and measure the new tool, come back. Both positions are stored in the controller, and both need setting once."/>
+                        <Grid Margin="10,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock x:Uid="lbl_g30" Grid.Row="0" Grid.Column="0" Text="G30 - tool swap:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock x:Uid="txt_g30Desc" Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="11" Foreground="#FF5A5A5A"
+                                       Text="Where the machine parks for you to change the tool, and where it returns afterwards. Near the top of Z, clear of the work, somewhere you can actually get at the collet."/>
+                            <TextBlock x:Name="txtG30Value" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Margin="10,0,8,0" FontFamily="Consolas" FontSize="11"/>
+                            <Button x:Uid="btn_setG30" x:Name="btnSetG30" Grid.Row="0" Grid.Column="3" Content="Set from here" Padding="8,1" MinHeight="24" Click="SetG30_Click"
+                                    ToolTip="Store the machine's CURRENT position as G30. Jog to the park position first."/>
+
+                            <TextBlock x:Uid="lbl_g593" Grid.Row="1" Grid.Column="0" Text="G59.3 - tool length:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,6,8,0"/>
+                            <TextBlock x:Uid="txt_g593Desc" Grid.Row="1" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="11" Foreground="#FF5A5A5A" Margin="0,6,0,0"
+                                       Text="The approach position over whatever measures tool length, centred on it in X and Y, with Z high enough that your LONGEST tool still clears it on the way in."/>
+                            <TextBlock x:Name="txtG593Value" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="10,6,8,0" FontFamily="Consolas" FontSize="11"/>
+                            <Button x:Uid="btn_setG593" x:Name="btnSetG593" Grid.Row="1" Grid.Column="3" Content="Set from here" Padding="8,1" MinHeight="24" Margin="0,6,0,0" Click="SetG593_Click"
+                                    ToolTip="Store the machine's CURRENT position as the G59.3 origin. Jog over the toolsetter or plate first, at a safe height."/>
+                        </Grid>
+                        <TextBlock x:Uid="txt_refPosAdjacent" TextWrapping="Wrap" Margin="10,0,0,8" FontSize="11" Foreground="#FF5A5A5A"
+                                   Text="Put them next to each other. Every tool change travels G30 → G59.3 and back, so the gap between them is paid twice per tool, every job."/>
+
+                        <Separator Margin="0,10,0,6"/>
+
+                        <TextBlock x:Uid="txt_probesDesc" TextWrapping="Wrap"
+                                   Text="The probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Setup and the probing tabs."/>
+                    </StackPanel>
                     <DataGrid x:Uid="grdProbes" x:Name="grdProbes" Grid.Row="1" Grid.Column="0" AutoGenerateColumns="False"
                               CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True" SelectionMode="Single"
                               HeadersVisibility="Column" GridLinesVisibility="All"
