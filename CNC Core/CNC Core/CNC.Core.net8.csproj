@@ -21,7 +21,9 @@
     <EnableDefaultItems>false</EnableDefaultItems>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <BaseOutputPath>bin\net8probe\</BaseOutputPath>
-    <BaseIntermediateOutputPath>obj\net8probe\</BaseIntermediateOutputPath>
+    <!-- BaseIntermediateOutputPath + MSBuildProjectExtensionsPath come from Directory.Build.props in
+         this folder, NOT from here: set in the body they are too late for NuGet, which writes
+         obj\project.assets.json with net8.0 in it and breaks the legacy net462 project beside us. -->
     <NoWarn>$(NoWarn);CS0168;CS0219;CS0414;CS0067</NoWarn>   <!-- pre-existing unused-variable noise -->
     <!-- USEWEBSOCKET IS defined here, and that is the point: WebsocketStream was ported off
          websocket-sharp (an unmaintained net462-only binary) onto System.Net.WebSockets.ClientWebSocket,

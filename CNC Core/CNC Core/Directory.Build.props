@@ -1,0 +1,28 @@
+<Project>
+  <!--
+    Keep the net8 probe's NuGet artifacts OUT of the shared obj\ folder. BaseIntermediateOutputPath
+    set inside an SDK-style csproj is too late for NuGet (MSB3539): the SDK import at the top of the
+    file has already fixed where restore writes, so obj\project.assets.json is produced anyway - with
+    net8.0 in it - and the LEGACY "CNC Core.csproj" then trips over it:
+
+        Your project does not reference ".NETFramework,Version=v4.6.2" framework. Add a reference to
+        ".NETFramework,Version=v4.6.2" in the "TargetFrameworks" property of your project file and
+        then re-run NuGet restore.
+
+    which is what VS Code's language server reported on every project reload (2026-09-20). Note that
+    CNC.Core.net8.csproj DID set BaseIntermediateOutputPath in its body and obj\net8probe\ exists -
+    so the redirect works for build intermediates and silently does not for restore. That is the trap:
+    the folder being there looks like the problem is already solved.
+
+    Unlike the sibling probes, this one's legacy project DOES carry a PackageReference
+    (System.Text.Json), so its own restore overwrites the poisoned file and the app still builds -
+    the two just take turns clobbering each other, and whichever ran last is what the IDE sees.
+
+    Same fix as CNC Common, CNC Contracts, CNC Client and CNC Svg (see those folders' copies). This
+    folder was the one that never got it.
+  -->
+  <PropertyGroup Condition="'$(MSBuildProjectFile)' == 'CNC.Core.net8.csproj'">
+    <MSBuildProjectExtensionsPath>$(MSBuildThisFileDirectory)obj\net8probe\</MSBuildProjectExtensionsPath>
+    <BaseIntermediateOutputPath>obj\net8probe\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+</Project>
