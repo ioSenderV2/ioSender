@@ -225,17 +225,17 @@ The program list now groups into collapsible **toolpath sections on any file wit
 just on ioSenderV2 Fusion add-in output. That also makes two commands reachable that most users will
 never have seen, because on an ordinary file they were not offered.
 
-- [ ] **`#job` — a sub-section on the outline.** Where sections come from (an M6, or the add-in's own
+- [x] **`#job` — a sub-section on the outline.** Where sections come from (an M6, or the add-in's own
       markers), the **Program start** and **Program end** groups, and the naming convention worth
       telling people about: *a comment immediately above the tool change becomes the toolpath's name*.
       That is opt-in behaviour a reader can use in their own posts and hand-written files.
-- [ ] **`#job` — the two run commands**, right-click on a group: **Start from this toolpath** (runs
+- [x] **`#job` — the two run commands**, right-click on a group: **Start from this toolpath** (runs
       Program start, then from there to the end) and **Run just this toolpath** (Program start, that
       toolpath, Program end). Both now run the program's own preamble rather than a synthetic one.
 - [ ] **Screenshot**: this wants a figure of the grouped list with one section expanded. Fold into the
       `job-runscreen.png` reshoot already owed as priority 1 of the audit's §6 — a job loaded with
       three toolpaths would cover the run strip, Peek, and the outline in one shot.
-- [ ] **Worth a mention in `#work-order`** too: a generated work order now outlines by tool change like
+- [x] **Worth a mention in `#work-order`** too: a generated work order now outlines by tool change like
       any other program.
 
 ---
@@ -249,15 +249,15 @@ weeks the audit below had to reconstruct.
 with the spindle off, look at the work, then Resume (or Cycle Start) to go back and carry on.
 Hardware-verified 2026-09-17 — see `docs/Architecture-Peek.md`.
 
-- [ ] **`#job` — the run strip.** The control list and the run-control table both need Peek adding.
+- [x] **`#job` — the run strip.** The control list and the run-control table both need Peek adding.
       It sits to the right of Stop and is **collapsed when it would do nothing**, like Feed Hold and
       Stop (#355), so "I don't see it" is expected rather than a fault.
-- [ ] **`#job` — a short sub-section on what Peek actually does**, because two things surprise:
+- [x] **`#job` — a short sub-section on what Peek actually does**, because two things surprise:
       it takes effect at the **end of the current block**, not instantly (Feed Hold remains the
       immediate stop), and it parks at **G30**, not at machine home.
-- [ ] **`#settings` — the Keyboard table.** The **Program** group gains a third row,
+- [x] **`#settings` — the Keyboard table.** The **Program** group gains a third row,
       *Peek / Resume*, beside MDI and Status. Unbound by default.
-- [ ] **Refusals worth documenting**: Peek is not offered for an **SD card job** (the controller
+- [x] **Refusals worth documenting**: Peek is not offered for an **SD card job** (the controller
       streams those itself, so the sender cannot starve it) or on a controller without expression
       support (the park reads the stored `G30` parameters).
 - [ ] **Screenshot**: `job-runscreen.png` is already owed a reshoot as priority 1 of the audit's §6.

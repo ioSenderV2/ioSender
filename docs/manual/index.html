@@ -1002,12 +1002,30 @@
       <li><strong>Work Parameters &amp; Spindle</strong> — the active work offset and tool, and manual spindle RPM/direction/override controls.</li>
       <li><strong>The fixture panel</strong> (far right, vertical) — quick-jump buttons to named machine positions like G28/G30/G54.</li>
       <li><strong>The run strip</strong> (bottom, spanning the window) — everything a running job needs, in one
-      place. On the left: the <strong>Run</strong> button and its mode dropdown, Feed Hold, Stop, the block
-      counter and an <strong>MDI</strong> button that opens the console ready to type; below them
-      Home/Unlock/Reset with the machine <strong>State</strong> beside them, then the coolant toggles and the
-      jog distance/feed presets. On the right, three groups — <strong>Jogging</strong>,
-      <strong>Signals</strong> and <strong>Overrides</strong> — see below. There is no longer a status bar
-      along the bottom of the window: everything it used to show is here or on the menu bar.</li>
+      place. On the left: the <strong>Run</strong> button and its mode dropdown, Feed Hold, Stop,
+      <strong>Peek</strong>, the block counter and an <strong>MDI</strong> button that opens the console ready
+      to type; below them Home/Unlock/Reset with the machine <strong>State</strong> beside them, then the
+      coolant toggles and the jog distance/feed presets. On the right, three groups —
+      <strong>Jogging</strong>, <strong>Signals</strong> and <strong>Overrides</strong> — see below. There is
+      no longer a status bar along the bottom of the window: everything it used to show is here or on the
+      menu bar.</li>
+    </ul>
+
+    <h4 class="subh">Two things on the strip worth knowing about</h4>
+    <ul>
+      <li><strong>State is colour-coded and clickable.</strong> The field beside Home/Unlock/Reset is the
+      controller's own state — Idle, Run, Hold, Alarm, Door — with a background colour that says it at a
+      glance and a tooltip that spells it out. <strong>Right-click it</strong> for three recovery goals:
+      <em>Reset</em>, <em>Reset and Unlock</em>, and <em>Reset, unlock and home</em>. Each one runs only the
+      steps the alarm you actually have needs; it will not reset if the alarm clears without one.
+      <strong>Elapsed job time</strong> sits next to it while a job is running, and stays there afterwards
+      showing the last run's time. It is absent rather than reading 00:00:00 when there has been no job.</li>
+      <li><strong>Signals</strong> is four rows of lamps: <em>Limit</em>, <em>Steppers</em>,
+      <em>Probes</em> and the <strong>TLO ref</strong> value. A lamp is the axis or signal letter itself,
+      dim when clear and red when asserted. Under Probes, <strong>P</strong> and <strong>T</strong> are the
+      two selectable probe <em>inputs</em> rather than two signals — only one is routed at a time and the
+      other is struck through; <strong>double-click the struck-through one to select it</strong>. TLO ref is
+      blank, not 0.000, until a tool-length reference has actually been set.</li>
     </ul>
     <p>The <strong>Job</strong> screen is where you load g-code, watch it, and run it. It's the home base
     you return to for every job.</p>
@@ -1029,6 +1047,34 @@
     <a href="#work-order">Work Order</a>, it shows in the same g-code list, runs the same way, and updates
     the same live per-line status as it executes. The program-view header's title names what's loaded (a
     filename, or "Work Order" for a generated run).</p>
+    <p>The load <strong>says what it is doing</strong> — "Loading <em>name</em>…" on the status line while it
+    reads, then "Loaded <em>name</em> — 220,144 lines in 3.1 s" when the list is bound. A file that big used
+    to sit behind a wait cursor long enough to read as a hang; now it reports, and the number it reports is
+    the one you actually waited, bind and all. The <strong>Data</strong> column shows the g-code from the
+    start rather than opening collapsed to nothing.</p>
+    <div class="callout warn"><span class="k">A program bigger than the machine is questioned, not started</span><br>
+      Press <strong>Run</strong> on a program whose X or Y footprint spans further than <code>$130</code>/
+      <code>$131</code> say the machine travels, and ioSender stops and asks — naming the axis, the span and
+      the travel in millimetres. If <a href="#settings">soft limits</a> are off it says so in as many words:
+      the controller will <em>not</em> stop it, the axis will run into its end stop and stall there. Answering
+      No refuses the run and writes the reason to the <a href="#errors-alarms">status log</a>. An axis whose
+      travel is not configured is left alone rather than being given an invented limit.</div>
+    <div class="callout note"><span class="k">A line ioSender cannot model is still sent</span><br>
+      ioSender parses your program to draw it and to work out its footprint — but it is not the authority on
+      what is valid g-code, the controller is. <strong>Every block this parser cannot make sense of is
+      streamed verbatim</strong> rather than dropped. That matters because the opposite behaviour edits your
+      program silently: a <code>G59.3</code> lost from a run once left the next line's <code>G0 Z0</code>
+      executing in the still-active <code>G54</code>, which turned "go to the top of the toolsetter" into a
+      128 mm plunge. A line the controller cannot execute comes back as an error, the run stops, and you can
+      see which line it was.</div>
+    <div class="callout warn"><span class="k">An exclamation mark in a comment is a feed hold</span><br>
+      <code>!</code>, <code>~</code> and <code>?</code> are grblHAL <em>realtime</em> characters. The
+      controller lifts them out of the stream <strong>before anything is parsed</strong>, so they act wherever
+      they appear in a line — including inside a comment. <code>!</code> is feed hold, <code>~</code> is
+      <em>cycle start</em>, and <code>?</code> asks for a status report. A line that <em>begins</em> with one
+      is held back by ioSender and logged, but a <code>(Watch out! deep pass)</code> comment in your own file
+      will still stop the machine mid-cut — and a stray <code>~</code> will start it moving again. Keep all
+      three out of g-code comments. Comments ioSender generates itself are stripped of them.</div>
 
     <h4 class="subh">Programs that ask you a question</h4>
     <p>A file can carry its own fields. Any comment of the form
@@ -1074,6 +1120,7 @@
       <tr><th>Control</th><th>Does</th></tr>
       <tr><td><strong>Feed Hold</strong></td><td>Pause: the machine decelerates smoothly and holds position (spindle keeps running). Run resumes.</td></tr>
       <tr><td><strong>Stop</strong></td><td>End the run.</td></tr>
+      <tr><td><strong>Peek</strong></td><td>Pause at the end of the current block, park at <code>G30</code> with the spindle off so you can look at the work, then press again (it reads <strong>Resume</strong>) to go back and carry on. See below.</td></tr>
       <tr><td><strong>Reset</strong></td><td>Soft-reset the controller — stops motion, clears an <a href="#errors-alarms">alarm</a>, and returns to a known idle state.</td></tr>
       <tr><td><strong>Optional stop</strong></td><td>Honour <code>M1</code> optional-stop pauses in the program.</td></tr>
     </table>
@@ -1081,28 +1128,112 @@
       Neither is permanently on the strip. <strong>Feed Hold</strong> appears whenever the machine
       <em>can</em> move — running, holding, jogging, mid-tool-change or with the door open — including while
       you are only jogging, since a feed hold during a jog decelerates and cancels it. <strong>Stop</strong> is
-      about a <em>job</em>, so it appears exactly when there is something streaming to stop. A greyed-out
-      button still asks to be read; these simply aren't there when they'd mean nothing.</div>
+      about a <em>job</em>, so it appears exactly when there is something streaming to stop.
+      <strong>Peek</strong> is the same: it is on the strip while a program is streaming, and while you are
+      parked, and not otherwise. A greyed-out button still asks to be read; these simply aren't there when
+      they'd mean nothing.</div>
     <div class="callout warn"><span class="k">Feed Hold vs Reset</span><br>
       <strong>Feed Hold</strong> is a graceful, resumable pause — use it first. <strong>Reset</strong> is the
       hard stop that also clears alarms but ends the job. Keep a hand near Feed Hold / Stop whenever you start
       a cut, and near the physical <strong>E-Stop</strong> for a true emergency.</div>
 
+    <h3>Peek — step away from a paused job and come back</h3>
+    <p>Mid-job you want to <em>look</em>: at the cut, at the chips, at whether that tab is still holding. The
+    choice used to be Stop and lose the run, or Feed Hold and peer past the gantry with the tool sitting in
+    the work. <strong>Peek</strong> is the third option — it is the tool-change pause without the tool
+    change.</p>
+    <p>Press it and ioSender stops feeding lines, lets the controller finish what it already has, then parks
+    the machine at <strong><code>G30</code></strong> with the spindle off. Look at the work as long as you
+    like. Press the same button again — it now reads <strong>Resume</strong> — and the machine goes back:
+    Z clear first, then X and Y, then the spindle restarted and given time to come up to speed, then the
+    plunge, and the program carries on from the block it stopped at. <kbd>Cycle Start</kbd> resumes too.</p>
+    <p>Two things about it surprise people, and both are deliberate:</p>
+    <ul>
+      <li><strong>It takes effect at the end of the block, not instantly.</strong> Usually well under a
+      second; on one long cutting move it is that move. That delay is what makes it safe — nothing is cut
+      short, no reset is needed, and the controller never loses its parser state, so there is nothing to
+      rebuild on the way back. <strong>Feed Hold remains the immediate stop</strong> and is unchanged.</li>
+      <li><strong>It parks at <code>G30</code>, not at machine home.</strong> Set <code>G30</code> somewhere
+      you can actually reach the work from — that is what makes Peek useful on your machine rather than just
+      out of the way.</li>
+    </ul>
+    <p>Peek refuses, and says why, in two cases. It is <strong>not offered for an SD card job</strong>: the
+    controller streams those itself, so the sender cannot pause the flow. And it needs a controller with
+    <strong>expression support</strong>, because the park reads the stored <code>G30</code> parameters. It is
+    unbound by default — give it a key under <strong>Settings → Keyboard &amp; Controller → Program</strong>,
+    alongside MDI and Status. It is not a menu item, on purpose: the menu bar is disabled while a job streams,
+    which is exactly when you want this.</p>
+
     <h3>Overrides</h3>
     <p>Tune a running job <em>without editing the g-code</em>: adjust <strong>Feed rate</strong>,
-    <strong>Rapids</strong> and <strong>Spindle</strong> live (with a reset-to-default), and watch the
-    <strong>run time</strong>. Overrides are how you dial in feeds by ear on the fly — see
-    <a href="#clean-results">reading the cut</a>.</p>
+    <strong>Rapids</strong> and <strong>Spindle</strong> live. Overrides are how you dial in feeds by ear on
+    the fly — see <a href="#clean-results">reading the cut</a>.</p>
+    <p>On the run strip each row is a <code>−</code> value <code>+</code> stepper, and <strong>the bar behind
+    the digits is the override itself</strong>: how far it fills says how much, and its colour says which way.
+    Half-full and green is 100% — the program's own feed — so a glance across the strip tells you whether the
+    machine is running what you asked for.</p>
+    <ul>
+      <li><strong>Feed rate</strong> and <strong>Spindle</strong> show the <em>live</em> value, not the
+      percentage. The buttons step the override by 10%; <strong>double-click the value to put it back to
+      100%</strong>. Feed rate is read-only (it comes from the program); spindle RPM you can type into and
+      press <kbd>Enter</kbd> to set.</li>
+      <li><strong>Rapids</strong> is a percentage, because there is no "current rapid rate" to show — only
+      the setting. grblHAL offers three values and no others: <strong>100 / 50 / 25</strong>. A
+      <em>single</em> click on the value resets it.</li>
+      <li>Under them, <strong>spindle direction</strong> — Off / CW / CCW. These follow what the machine
+      reports, so an <code>M3</code> typed at the MDI or a direction change inside the program moves them
+      too.</li>
+    </ul>
     <div class="callout note"><span class="k">Where did the feed rate's units go?</span><br>
       The run strip's <strong>Feed:</strong> readout drops the mm/min · in/min label — on that strip the room is
       better spent on digits — and states the unit in its tooltip instead. The full <em>Feed rate</em> panel
       still shows its unit inline, and both readouts now grow to fit a five-digit rate rather than clipping
       it.</div>
 
-    <h3>Start from a toolpath</h3>
-    <p>If you need to restart partway through — after a broken bit or a stopped job — you can begin from a
-    chosen point rather than the top, with a safe Z-up move first. Pick the point in the
-    <a href="#gcode-viewer">3D viewer</a>.</p>
+    <h3>The toolpath outline</h3>
+    <p>A program with tool changes in it does not arrive as one flat wall of lines. The g-code list
+    <strong>groups itself into collapsible toolpath sections</strong>, so what you see first is a summary of
+    the job — one row per toolpath, each showing its name, its line count and <strong>its own estimated run
+    time</strong>. Groups start collapsed; click a chevron to open one.</p>
+    <ul>
+      <li><strong>Where the sections come from.</strong> If the file carries the ioSender Fusion add-in's own
+      section markers, those are used. Otherwise ioSender derives the sections <strong>from the tool
+      changes</strong> — which means an ordinary CAM post, or a file you wrote by hand, gets an outline too.
+      Markers win where a file has both.</li>
+      <li><strong>Program start</strong> and <strong>Program end</strong> are sections in their own right:
+      everything before the first tool change (the preamble, the modal setup, the initial positioning), and
+      the wind-down after the last cut (spindle stop, park, <code>M30</code>). A program whose last toolpath
+      emits no spindle stop simply has no Program end section, rather than a guessed one.</li>
+      <li><strong>Naming — worth knowing for your own files.</strong> A section is named after the
+      <em>tool</em> where the program declares one ("T2 — 6 mm flat endmill"), because at a tool change the
+      thing you need to know is which bit to fit. Failing that, <strong>a comment immediately above the tool
+      change becomes the toolpath's name</strong> — the first comment of an unbroken comment run, so an
+      operation name above a tool description wins. That is opt-in behaviour you can use in your own posts
+      and hand-written programs: put <code>(Roughing pass)</code> on the line above the <code>M6</code> and
+      the outline says so.</li>
+    </ul>
+
+    <h3>Starting partway through</h3>
+    <p>After a broken bit, a stopped job, or a toolpath you want to repeat, you do not have to run the
+    program from the top. <strong>Right-click a toolpath's group header</strong> for the two commands that do
+    this properly:</p>
+    <table class="reftab">
+      <tr><th>Command</th><th>Runs</th></tr>
+      <tr><td><strong>Start from this toolpath</strong></td><td>Program start, then from this toolpath to the end of the program.</td></tr>
+      <tr><td><strong>Run just this toolpath</strong></td><td>Program start, this toolpath, then Program end. In that order — the job still winds down properly.</td></tr>
+    </table>
+    <p>Both ask first, naming the toolpath and saying exactly which sections will run. The important part is
+    that both run <strong>the program's own preamble</strong>, not a synthetic one: started mid-program, a
+    toolpath sets no units, no plane and no work offset — it inherited them from lines you are about to skip.
+    Running Program start re-establishes the real thing the program's author wrote. If the file has no
+    Program start section — its very first block is already inside a toolpath — the prompt says so, and warns
+    that units, plane and work offset will be whatever the machine currently holds.</p>
+    <div class="callout warn"><span class="k">"Start from here" on a single line is the blunter tool</span><br>
+      The program list's own right-click <strong>Start from here</strong> begins at the selected
+      <em>line</em>. It re-establishes distance/feed mode, plane and units — and nothing else. It does
+      <strong>not</strong> restore the work offset, the tool-length offset, the feed rate or the spindle, and
+      the confirmation says as much. Where the program has an outline, <em>Start from this toolpath</em> is
+      the supported route and the safer one.</div>
 
     <h3>What actually happened &mdash; the status line and the log</h3>
     <p>ioSender narrates itself. Loading a file, a connection and how many settings it read, a run starting
@@ -1344,6 +1475,10 @@
     other run. When the run ends — completes, is stopped, or a prerequisite check fails — ioSender switches
     you back to Work Order and restores whatever program was loaded before the run, so re-running the Work
     Order never clobbers a file you had open.</p>
+    <p>A generated work order gets a <a href="#job">toolpath outline</a> like any other program: the Job
+    tab's list groups it by tool change, one collapsible section per tool, each with its own estimated run
+    time. That is the quickest read on what Generate actually produced — and it is also how you re-run a
+    single toolpath afterwards without regenerating anything.</p>
 
     <h3>Mark only &mdash; dimple the hole centres and cut nothing else</h3>
     <p>Some holes are better drilled somewhere else. A router that flexes will not drill aluminium properly,
@@ -2441,10 +2576,12 @@
       are not views and cannot be placed on the strip — Connect, the File entries, the Help entries. Listed
       immediately above the tabs, because they're related; kept separate, because a tab can be moved and a
       File command cannot.</td></tr>
-      <tr><td><strong>Program</strong></td><td>The run strip's two smallest buttons: <strong>MDI</strong>
-      (opens the console with the caret in its input box) and <strong>Status</strong> (the message history).
-      These are the ones worth reaching without the mouse, and unlike the menu commands they
-      <strong>stay live during a run</strong> — which is exactly when you want them.</td></tr>
+      <tr><td><strong>Program</strong></td><td>Three run-strip buttons: <strong>MDI</strong>
+      (opens the console with the caret in its input box), <strong>Status</strong> (the message history) and
+      <strong>Peek / Resume</strong> (park at <code>G30</code> and look at the work — see
+      <a href="#job">Peek</a>). These are the ones worth reaching without the mouse, and unlike the menu
+      commands they <strong>stay live during a run</strong> — which is exactly when you want them. That is
+      also why Peek is here and not on a menu: the menu bar is disabled while a job streams.</td></tr>
     </table>
     <p>All start unbound. Sub-pages within a view — a particular Settings page or Machine Setup step — are
     deliberately not bindable; shortcuts address top-level destinations only.</p>
