@@ -99,6 +99,12 @@ namespace RenderHarness
                 settings.Copies = 4;
                 return Tab(new CNC.Converters.SvgLaserDialog(settings), 2);   // Burn - the tallest page
             },
+
+            // The restore dialog, for the WIDTH of its longest label. The G28/G30 checkbox carries a
+            // sentence that has to stay readable - it is the one that says the machine will move - and as a
+            // plain string Content it measured on one line and ran off the edge where nobody could see it.
+            // Reads the real Backups folder, so what renders is the real list.
+            ["RestorePointDialog"] = () => new CNC.Controls.RestorePointDialog(),
         };
     }
 

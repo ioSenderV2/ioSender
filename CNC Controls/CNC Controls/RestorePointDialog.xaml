@@ -5,9 +5,13 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:local="clr-namespace:CNC.Controls"
         mc:Ignorable="d"
-        d:DesignHeight="460" d:DesignWidth="620"
-        x:Uid="wnd_restorePoint" Title="Restore" Height="460" Width="620" MinWidth="480" MinHeight="320"
+        d:DesignHeight="580" d:DesignWidth="620"
+        x:Uid="wnd_restorePoint" Title="Restore" Height="580" Width="820" MinWidth="680" MinHeight="460"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Icon="App.ico">
+    <!-- Height is 580, not the original 460: rows 0, 2 and 3 are all Auto and only the snapshot list is
+         starred, so every line the intro or the Restore group gains comes straight out of the list. At 460
+         the list had already shrunk to a sliver and the buttons were clipped off the bottom edge - found in
+         tools/render-harness, which renders this window at its declared size. -->
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -26,8 +30,12 @@
                   SelectionChanged="dgrSnapshots_SelectionChanged"
                   MouseDoubleClick="dgrSnapshots_MouseDoubleClick">
             <DataGrid.Columns>
-                <DataGridTextColumn x:Uid="col_rpSaved" Header="Saved" Binding="{Binding SavedText}" Width="150"/>
-                <DataGridTextColumn x:Uid="col_rpAge" Header="When" Binding="{Binding AgeText}" Width="90"/>
+                <!-- Auto, not a fixed width. At 150 the stamp clipped to "2026-09-20 05:1" - losing exactly
+                     the digits that tell two restore points from the same session apart - and widening it to
+                     175 still cut the seconds. A number tuned against one font at one DPI is a guess that
+                     breaks on the next machine; Auto sizes to the content and cannot clip. -->
+                <DataGridTextColumn x:Uid="col_rpSaved" Header="Saved" Binding="{Binding SavedText}" Width="Auto"/>
+                <DataGridTextColumn x:Uid="col_rpAge" Header="When" Binding="{Binding AgeText}" Width="Auto"/>
                 <DataGridTextColumn x:Uid="col_rpContains" Header="Contains" Binding="{Binding ContainsText}" Width="*"/>
             </DataGrid.Columns>
         </DataGrid>
@@ -52,8 +60,15 @@
                 <Separator Margin="0,8,0,6"/>
                 <CheckBox x:Uid="chk_rpOffsets" x:Name="chkOffsets" Content="Work offsets and tool table (G54-G59.3)"
                           ToolTip="Writes the stored work coordinate systems and tool table back to the controller. No motion - these are G10 writes, the same kind of thing as restoring a $ setting. This overwrites the work zero currently set on the machine."/>
-                <CheckBox x:Uid="chk_rpOffsetPositions" x:Name="chkOffsetPositions" Content="Also the G28 / G30 positions - opens a program you must run, and it MOVES the machine" Margin="18,4,0,0"
-                          ToolTip="G28 and G30 can only be restored by driving to each position and teaching it, so this opens the snapshot as a program in the Job tab for you to run. It begins with a warning and an M0 pause. Nothing moves until you press Start."/>
+                <!-- Content is a wrapping TextBlock, not a plain string: as a string the label is measured on
+                     one line and simply runs off the edge of the dialog, which is how it shipped - the half
+                     that says it MOVES the machine was the half that disappeared. A CheckBox does not wrap a
+                     string Content at any width, and this one is long on purpose. -->
+                <CheckBox x:Uid="chk_rpOffsetPositions" x:Name="chkOffsetPositions" Margin="18,4,0,0"
+                          ToolTip="G28 and G30 can only be restored by driving to each position and teaching it, so this opens the snapshot as a program in the Job tab for you to run. It begins with a warning and an M0 pause. Nothing moves until you press Start.">
+                    <TextBlock x:Uid="txt_rpOffsetPositions" TextWrapping="Wrap"
+                               Text="Also the G28 / G30 positions - opens a program you must run, and it MOVES the machine"/>
+                </CheckBox>
                 <TextBlock x:Name="txtWhatNote" Foreground="#586069" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"/>
             </StackPanel>
         </GroupBox>
