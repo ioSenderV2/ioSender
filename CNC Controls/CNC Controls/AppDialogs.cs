@@ -247,30 +247,47 @@ namespace CNC.Controls
             return result;
         }
 
+        /// <summary>
+        /// Show a message box, owned by whatever window the operator is working in.
+        /// </summary>
+        /// <remarks>
+        /// This overload used to open the box with NO owner, and most callers use it - 207 of the 244
+        /// AppDialogs.Show calls in the app pass no window. An ownerless box is a TOP-LEVEL window: it does
+        /// not travel with the main window, so raising one while ioSender is in the background leaves it
+        /// behind whatever else is on screen. Bringing ioSender forward then shows a main window that will
+        /// not respond to anything, because a modal box nobody can see is waiting for an answer. It takes an
+        /// Alt-Tab to discover there is a dialog at all, and until then it looks exactly like a hang -
+        /// reported 2026-09-20 against Setup's measured-size warning.
+        ///
+        /// OwnerWindow() already worked this out, including preferring the ACTIVE window over the main one,
+        /// but only CNC.Core's prompts went through it. Now everything does.
+        ///
+        /// Resolved only when we are on the UI thread. OwnerWindow() walks Application.Current.Windows and
+        /// touches UI-owned objects, so calling it from a worker would throw "the calling thread cannot
+        /// access this object" from inside the error dialog - the exact failure RegisterCorePrompts
+        /// documents from 2026-08-08. Off the UI thread this falls back to the ownerless behaviour that was
+        /// here before, which is no worse than it was.
+        /// </remarks>
         public static MessageBoxResult Show(string message, string caption = "",
             MessageBoxButton buttons = MessageBoxButton.OK, MessageBoxImage icon = MessageBoxImage.None,
             MessageBoxResult defaultResult = MessageBoxResult.None, string id = null, string yesText = null, string noText = null)
         {
-            LogShown(caption, message);
+            // Delegate rather than duplicate: the owned overload already carries the test-server hook, the
+            // shutdown handling and the logging, and two copies of that is how they drift apart.
+            return Show(ResolveOwner(), message, caption, buttons, icon, defaultResult, id, yesText, noText);
+        }
 
-            string answer = Ask(id ?? caption, caption, message, buttons, defaultResult);
-            if (answer != null)
-                return Logged(caption, message, ParseResult(answer, buttons));
-            if (ApplicationShuttingDown)
-                return Logged(caption, message, ShutdownAnswer(message, buttons, defaultResult));
+        /// <summary>The owner an ownerless call should adopt, or null when it cannot be worked out safely.</summary>
+        private static Window ResolveOwner()
+        {
             try
             {
-                return Logged(caption, message, CustomMessageBox != null
-                    ? CustomMessageBox(null, message, caption, buttons, icon, DefaultOrNone(defaultResult), yesText, noText)
-                    : MessageBox.Show(message, caption, buttons, icon, DefaultOrNone(defaultResult)));
+                var dispatcher = Application.Current?.Dispatcher;
+                return dispatcher != null && dispatcher.CheckAccess() ? OwnerWindow() : null;
             }
-            // Belt and braces for the race the pre-check can lose (shutdown starting between the check
-            // and the construction). Filtered on the shutdown flag ON PURPOSE: an unfiltered catch here
-            // would also swallow genuine dialog bugs (e.g. a cross-thread "calling thread must be STA"
-            // is the same exception type) that must keep failing loudly.
-            catch (InvalidOperationException) when (ApplicationShuttingDown)
+            catch
             {
-                return Logged(caption, message, ShutdownAnswer(message, buttons, defaultResult));
+                return null;   // never let working out the owner be the reason a message box fails to appear
             }
         }
 

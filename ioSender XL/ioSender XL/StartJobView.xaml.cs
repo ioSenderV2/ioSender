@@ -1412,7 +1412,10 @@ namespace GCode_Sender
                 return;
             string text = pendingSizeWarning;
             pendingSizeWarning = null;
-            AppDialogs.Show(text, "Setup", MessageBoxButton.OK, MessageBoxImage.Warning);
+            // Titled for what it IS. "Setup" says only which tab raised it, which is the one thing already
+            // obvious; this box is advice about steps/mm calibration and the title should survive being read
+            // on its own in a taskbar button.
+            AppDialogs.Show(text, "Setup - Calibration Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         // Copy the measured stock size to the clipboard as "X Y [Z]" (mm) for pasting into the Fusion
