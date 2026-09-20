@@ -2313,6 +2313,79 @@ namespace CNC.Core
 
             return ok;
         }
+
+        // Timestamped restore point of the work offsets, beside the Grbl_*.txt settings snapshot and the
+        // App.config_* one, so a moment can carry all three. Same RotatingFileStore scheme, same folder.
+        //
+        // This exists because a controller NVS wipe took the work offsets with it and there was nothing to
+        // put back: the manual Backup button writes offsets.nc to the config root under a FIXED name with no
+        // history, the automatic on-connect backup did not write it at all, and RestorePoint had never heard
+        // of it. The settings came back from Backups\Saturday\Grbl_*.txt; the offsets had to be read out of
+        // wire.log by hand.
+        public static string SnapshotFolder { get { return Resources.BackupsFolder; } }
+
+        // Write a restore point of the work offsets just read from the controller; best-effort, never blocks
+        // connect.
+        //
+        // MUST be called AFTER GrblWorkParameters.Get(). It cannot go beside GrblSettings.WriteSnapshot(),
+        // which runs three lines earlier in JobView.InitSystem, before $# has been asked for - it would
+        // capture whatever the previous connection left behind, or nothing. The two land a second or so
+        // apart, comfortably inside RestorePoint's 90 s pairing window.
+        public static void WriteSnapshot()
+        {
+            // Never manufacture an empty restore point. The first connect after a wipe reads a controller
+            // holding nothing, and that capture would become the NEWEST one - which the restore dialog sorts
+            // to the top and preselects. A snapshot with nothing in it is worse than no snapshot, because it
+            // looks like a way back.
+            if (!HasOffsetsWorthSaving())
+                return;
+
+            try
+            {
+                string dayDir = RotatingFileStore.PrepareDayDirectory(SnapshotFolder, "Offsets", retentionCount: 10);
+                string path = System.IO.Path.Combine(dayDir, "Offsets_" + RotatingFileStore.Stamp() + ".nc");
+
+                using (var sw = new StreamWriter(path))
+                {
+                    foreach (string s in Export())
+                        sw.WriteLine(s);
+                }
+
+                RotatingFileStore.UpdateLatestLink(SnapshotFolder, "latest_Offsets.nc", path);
+            }
+            catch { }   // snapshots are a convenience; failure must not affect connect
+        }
+
+        /// <summary>
+        /// Is there anything here a restore could put back? A machine that genuinely holds all zeros has
+        /// nothing to lose, and a wiped one must not be allowed to look like a restore point.
+        /// </summary>
+        private static bool HasOffsetsWorthSaving()
+        {
+            if (CoordinateSystems.Count == 0)
+                return false;
+
+            foreach (var cs in CoordinateSystems)
+            {
+                if (cs.Code == "G92")
+                    continue;   // deliberately not exported - see Export()
+                if (cs.Id > 0 && cs.Rotation != 0d && !double.IsNaN(cs.Rotation))
+                    return true;
+                foreach (int i in GrblInfo.AxisFlags.ToIndices())
+                {
+                    if (!double.IsNaN(cs.Values[i]) && cs.Values[i] != 0d)
+                        return true;
+                }
+            }
+
+            foreach (var tool in Tools)
+            {
+                if (tool.Code != "None")
+                    return true;
+            }
+
+            return false;
+        }
     }
 
     public class SpindleDirection

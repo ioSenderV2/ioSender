@@ -967,6 +967,7 @@ namespace GCode_Sender
                 {
                     GrblParserState.Get();
                     GrblWorkParameters.Get();
+                    GrblWorkParameters.WriteSnapshot();   // restore point of the work offsets, AFTER the $# that reads them
                     GrblSpindles.Get();
                 }
                 else
