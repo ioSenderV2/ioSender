@@ -1352,8 +1352,22 @@ namespace CNC.Controls
             txtG30Value.Text = DescribeStoredPosition("G30");
             txtG593Value.Text = DescribeStoredPosition("G59.3");
 
+            // The surface only matters when a PLATE is doing the measuring: a dedicated toolsetter triggers
+            // on its own switch, so where the table is underneath it changes nothing. Hidden rather than
+            // shown-and-ignored, so a toolsetter owner is not asked to go and measure something irrelevant.
+            bool needSurface = ProbeDefinitions.TloTargetIsTouchPlate;
+            var surfaceVis = needSurface ? Visibility.Visible : Visibility.Collapsed;
+            lblTloSurface.Visibility = txtTloSurfaceDesc.Visibility = txtTloSurfaceValue.Visibility =
+                btnSetTloSurface.Visibility = surfaceVis;
+
             double surface = AppConfig.Settings.Base.TloSurfaceZ;
             txtTloSurfaceValue.Text = surface == 0d ? "not set" : "Z" + surface.ToString("0.0", CultureInfo.CurrentCulture);
+
+            // Placing G30 relative to G59.3 needs G59.3 to exist.
+            var g593known = GrblWorkParameters.GetCoordinateSystem("G59.3");
+            bool haveG593 = g593known != null && g593known.Values.Length >= 3 &&
+                            !double.IsNaN(g593known.Values[0]) && !double.IsNaN(g593known.Values[1]);
+            btnG30Left.IsEnabled = btnG30Right.IsEnabled = haveG593;
 
             // Say what the numbers add up to, so a search that will fall short is visible here rather than
             // discovered as an alarm partway down. "Fixed 90 mm" is the honest label for the fallback.
@@ -1439,6 +1453,68 @@ namespace CNC.Controls
             MacroProcessor.EmitWcsWrite(l => b.AppendLine(l), "G10 L20 P9 X0 Y0 Z0");
 
             if (MacroProcessor.Run(model, "Set G59.3", b.ToString(), true))
+                RefreshStoredPositionsAfterWrite();
+        }
+
+        /// <summary>
+        /// Place G30 a fixed distance to one side of G59.3 and store it there.
+        ///
+        /// Unlike the other two buttons on this row, this one MOVES the machine: G30.1 captures wherever
+        /// the machine physically is and takes no coordinates, so the only way to store a computed position
+        /// is to go to it first. Said plainly in the confirmation, because every other button here is a
+        /// read.
+        ///
+        /// 100 mm to one side keeps the tool change near the measuring point - the gap between G30 and
+        /// G59.3 is travelled twice per tool change - without the spindle parking over the toolsetter or
+        /// plate while both your hands are on a collet.
+        /// </summary>
+        private void PlaceG30_Click(object sender, RoutedEventArgs e)
+        {
+            if (model == null)
+                return;
+
+            int sign = (sender as FrameworkElement)?.Tag as string == "-1" ? -1 : 1;
+            const double offset = 100d, safeZ = -5d;
+
+            GrblWorkParameters.Get(model);
+            var cs = GrblWorkParameters.GetCoordinateSystem("G59.3");
+            if (cs == null || cs.Values.Length < 2 || double.IsNaN(cs.Values[0]) || double.IsNaN(cs.Values[1]))
+            {
+                AppDialogs.Show(Window.GetWindow(this), "Set G59.3 first - G30 is placed relative to it.",
+                    "Set G30", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            double x = cs.Values[0] + sign * offset, y = cs.Values[1];
+
+            // Refuse a target outside the machine rather than let the controller alarm partway there.
+            double travelX = GrblSettings.GetDouble(GrblSetting.MaxTravelBase);
+            if (!double.IsNaN(travelX) && travelX > 0d && (x > 0d || x < -travelX))
+            {
+                AppDialogs.Show(Window.GetWindow(this),
+                    string.Format(CultureInfo.CurrentCulture,
+                        "100 mm that way from G59.3 is X {0:0.0}, which is outside this machine's travel. Try the other side, or jog to a park position and use \"Set from here\".", x),
+                    "Set G30", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (AppDialogs.Show(Window.GetWindow(this),
+                    string.Format(CultureInfo.CurrentCulture,
+                        "THE MACHINE WILL MOVE.\r\n\r\nIt will lift Z to {0:0.0}, travel to X {1:0.0} Y {2:0.0}, and store that as G30.\r\n\r\n" +
+                        "Make sure that path is clear. Unlike the other buttons here, this one does not just read the current position.",
+                        safeZ, x, y),
+                    "Set G30", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+                return;
+
+            var b = new StringBuilder();
+            b.AppendLine("(Machine Setup - place G30 beside G59.3)");
+            b.AppendLine("(PREREQ, connected, homed, noalarm)");
+            b.AppendLine("G21 G90 G94 G17");
+            b.AppendLine(string.Format(CultureInfo.InvariantCulture, "G53 G0 Z{0}", safeZ.ToInvariantString("0.0##")));
+            b.AppendLine(string.Format("G53 G0 X{0} Y{1}", x.ToInvariantString("0.0##"), y.ToInvariantString("0.0##")));
+            b.AppendLine("G30.1");
+
+            if (MacroProcessor.Run(model, "Set G30", b.ToString(), true))
                 RefreshStoredPositionsAfterWrite();
         }
 

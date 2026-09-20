@@ -361,7 +361,7 @@
                         <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
                             <Label x:Uid="lbl_tloProbe" Content="Tool-length probe:" VerticalAlignment="Center" Width="130" HorizontalContentAlignment="Right"/>
                             <ComboBox x:Uid="cbx_tloProbe" x:Name="cbxTloProbe" MinWidth="240" MinHeight="22" VerticalAlignment="Center"
-                                      DisplayMemberPath="Label" SelectedValuePath="Id" SelectionChanged="TloProbe_SelectionChanged"
+                                      DisplayMemberPath="Label" SelectedValuePath="Name" SelectionChanged="TloProbe_SelectionChanged"
                                       ToolTip="Which of your defined probes sits at the G59.3 position. Its feeds are the ones the tool-length probe move uses."/>
                         </StackPanel>
                         <Border x:Name="brdTloFixedWarn" BorderBrush="#FFE0A800" BorderThickness="1" Background="#FFFFF8E1"
@@ -389,7 +389,7 @@
                              contract below is tc.macro's own "Required state" section, not a paraphrase. -->
                         <TextBlock x:Uid="txt_refPosHdr" Text="3 · Where do the reference positions go?" FontWeight="SemiBold" Margin="0,10,0,3"/>
                         <TextBlock x:Uid="txt_refPosDesc" TextWrapping="Wrap" Margin="0,0,0,5"
-                                   Text="A tool change runs G30 → G59.3 → G30: park so you can reach the spindle, go and measure the new tool, come back. Both positions are stored in the controller, and both need setting once."/>
+                                   Text="A tool change runs G30 → G59.3 → G30: park so you can reach the spindle, go and measure the new tool, come back. Work down these in order - each one is easier once the one above it is known."/>
                         <Grid Margin="10,0,0,4">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -401,28 +401,45 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
-                            <TextBlock x:Uid="lbl_g30" Grid.Row="0" Grid.Column="0" Text="G30 - tool swap:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <TextBlock x:Uid="txt_g30Desc" Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="11" Foreground="#FF5A5A5A"
-                                       Text="Where the machine parks for you to change the tool, and where it returns afterwards. Near the top of Z, clear of the work, somewhere you can actually get at the collet."/>
-                            <TextBlock x:Name="txtG30Value" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Margin="10,0,8,0" FontFamily="Consolas" FontSize="11"/>
-                            <Button x:Uid="btn_setG30" x:Name="btnSetG30" Grid.Row="0" Grid.Column="3" Content="Set from here" Padding="8,1" MinHeight="24" Click="SetG30_Click"
-                                    ToolTip="Store the machine's CURRENT position as G30. Jog to the park position first."/>
+                            <!-- Surface FIRST, and only when a plate is doing the measuring. A dedicated
+                                 toolsetter needs nothing here - it triggers on its own switch at a height
+                                 that does not depend on knowing where the table is - so the row is hidden
+                                 rather than asked and ignored. Rows are hidden as a group, see
+                                 UpdateReferencePositions. -->
+                            <TextBlock x:Uid="lbl_tloSurface" x:Name="lblTloSurface" Grid.Row="0" Grid.Column="0" Text="1. Target surface:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock x:Uid="txt_tloSurfaceDesc" x:Name="txtTloSurfaceDesc" Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="11" Foreground="#FF5A5A5A"
+                                       Text="The spoilboard or table the plate stands on. With the plate's height this says where its top is, so the probe searches the right distance instead of a fixed 90 mm. Jog a tool down until it just touches, then click."/>
+                            <TextBlock x:Name="txtTloSurfaceValue" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Margin="10,0,8,0" FontFamily="Consolas" FontSize="11"/>
+                            <Button x:Uid="btn_setTloSurface" x:Name="btnSetTloSurface" Grid.Row="0" Grid.Column="3" Content="Set from here" Padding="8,1" MinHeight="24" Click="SetTloSurface_Click"
+                                    ToolTip="Record the machine's CURRENT Z as the surface height. Jog a tool down until it just touches the spoilboard beside the plate first."/>
 
-                            <TextBlock x:Uid="lbl_g593" Grid.Row="1" Grid.Column="0" Text="G59.3 - tool length:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,6,8,0"/>
+                            <TextBlock x:Uid="lbl_g593" x:Name="lblG593" Grid.Row="1" Grid.Column="0" Text="2. G59.3 - tool length:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,6,8,0"/>
                             <TextBlock x:Uid="txt_g593Desc" Grid.Row="1" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="11" Foreground="#FF5A5A5A" Margin="0,6,0,0"
                                        Text="The approach position over whatever measures tool length, centred on it in X and Y, with Z high enough that your LONGEST tool still clears it on the way in."/>
                             <TextBlock x:Name="txtG593Value" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="10,6,8,0" FontFamily="Consolas" FontSize="11"/>
                             <Button x:Uid="btn_setG593" x:Name="btnSetG593" Grid.Row="1" Grid.Column="3" Content="Set from here" Padding="8,1" MinHeight="24" Margin="0,6,0,0" Click="SetG593_Click"
                                     ToolTip="Store the machine's CURRENT position as the G59.3 origin. Jog over the toolsetter or plate first, at a safe height."/>
 
-                            <TextBlock x:Uid="lbl_tloSurface" Grid.Row="2" Grid.Column="0" Text="Target surface:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,6,8,0"/>
-                            <TextBlock x:Uid="txt_tloSurfaceDesc" Grid.Row="2" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="11" Foreground="#FF5A5A5A" Margin="0,6,0,0"
-                                       Text="The spoilboard or table the toolsetter or plate stands on. With the target's height this says where its top is, so the probe searches the right distance instead of a fixed 90 mm."/>
-                            <TextBlock x:Name="txtTloSurfaceValue" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" Margin="10,6,8,0" FontFamily="Consolas" FontSize="11"/>
-                            <Button x:Uid="btn_setTloSurface" x:Name="btnSetTloSurface" Grid.Row="2" Grid.Column="3" Content="Set from here" Padding="8,1" MinHeight="24" Margin="0,6,0,0" Click="SetTloSurface_Click"
-                                    ToolTip="Record the machine's CURRENT Z as the surface height. Jog a tool down until it just touches the spoilboard beside the target first."/>
+                            <TextBlock x:Uid="lbl_g30" Grid.Row="2" Grid.Column="0" Text="3. G30 - tool swap:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,6,8,0"/>
+                            <TextBlock x:Uid="txt_g30Desc" Grid.Row="2" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="11" Foreground="#FF5A5A5A" Margin="0,6,0,0"
+                                       Text="Where the machine parks for you to change the tool, and where it returns afterwards. Near the top of Z, clear of the work, somewhere you can reach the collet."/>
+                            <TextBlock x:Name="txtG30Value" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" Margin="10,6,8,0" FontFamily="Consolas" FontSize="11"/>
+                            <Button x:Uid="btn_setG30" x:Name="btnSetG30" Grid.Row="2" Grid.Column="3" Content="Set from here" Padding="8,1" MinHeight="24" Margin="0,6,0,0" Click="SetG30_Click"
+                                    ToolTip="Store the machine's CURRENT position as G30. Jog to the park position first."/>
+
+                            <!-- Placing G30 relative to G59.3, which is why G59.3 is set first. 100 mm to one
+                                 side keeps the tool change close to the measuring point without the spindle
+                                 sitting over it while you have both hands on a collet. -->
+                            <StackPanel Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,4,0,0">
+                                <TextBlock x:Uid="txt_g30Offer" Text="or place it 100 mm from G59.3:" VerticalAlignment="Center" FontSize="11" Foreground="#FF5A5A5A" Margin="0,0,8,0"/>
+                                <Button x:Uid="btn_g30Left" x:Name="btnG30Left" Content="100 mm −X" Padding="8,1" MinHeight="22" Margin="0,0,6,0" Click="PlaceG30_Click" Tag="-1"
+                                        ToolTip="Move to 100 mm in −X from G59.3 at safe Z, and store that as G30. The machine WILL move."/>
+                                <Button x:Uid="btn_g30Right" x:Name="btnG30Right" Content="100 mm +X" Padding="8,1" MinHeight="22" Click="PlaceG30_Click" Tag="1"
+                                        ToolTip="Move to 100 mm in +X from G59.3 at safe Z, and store that as G30. The machine WILL move."/>
+                            </StackPanel>
                         </Grid>
                         <TextBlock x:Name="txtTloSearchValue" x:Uid="txt_tloSearchValue" TextWrapping="Wrap" Margin="10,4,0,0" FontSize="11" Foreground="#FF1F3A5F" FontStyle="Italic"/>
                         <TextBlock x:Uid="txt_refPosAdjacent" TextWrapping="Wrap" Margin="10,4,0,8" FontSize="11" Foreground="#FF5A5A5A"
