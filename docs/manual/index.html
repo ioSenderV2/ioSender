@@ -630,6 +630,39 @@
     only the views that controller actually supports — a tab or a menu entry for something your board can't
     do simply isn't there. This is also when the
     <a href="#getting-started">option-matched simulator</a> is selected, if you're running one.</p>
+    <p>It also <strong>says what it found</strong>, on the <a href="#job">status line</a> and in the log:
+    how many controller settings were read, the controller's identity, version, build and its reported
+    options, and — if the board was already latched in <a href="#errors-alarms">alarm</a> before you
+    connected — that, in as many words. That last one is worth the line it takes: an alarm blocks g-code
+    <em>and</em> filesystem access, so without it the symptom reads as "my macros have gone missing" rather
+    than "the machine is in alarm". "No controller settings were read" is flagged as an error, because
+    travel limits and soft-limit checks are unavailable until you reconnect.</p>
+
+    <h3>When a connect doesn't go cleanly</h3>
+    <ul>
+      <li><strong>A board that is slow to come back.</strong> Opening the port resets many controllers, and
+      a cheap one can take five or ten seconds to boot. Rather than waiting a fixed time, ioSender asks after
+      a couple of seconds of silence whether to <strong>keep waiting</strong>. It asks rather than simply
+      waiting longer because the two cases cost opposite things: a slow board wants patience, while a wrong
+      port or an unplugged cable wants to be told promptly.</li>
+      <li><strong>A controller left in check mode.</strong> Grbl answers every <code>$</code> query with
+      <code>error:8</code> in check mode, so the capability query cannot succeed there — and neither could a
+      reconnect, because check mode survives one. That used to loop for ever. ioSender now recognises it,
+      <strong>leaves check mode and reconnects by itself</strong>, and says so on the status line.</li>
+      <li><strong>Capabilities that could not be read.</strong> If the link is open but the controller's
+      capabilities never arrived, ioSender does <em>not</em> carry on as if everything were absent — which
+      is what an empty capability set reads as, and is how a board that supports expressions perfectly well
+      once got told it doesn't. It stops and offers two choices: <strong>reconnect</strong> (which normally
+      fixes it), or <strong>stay connected in check mode</strong> to look around. Staying is safe only
+      because check mode is then <em>enforced</em>, not merely entered: the machine cannot move until you
+      reconnect, and the status line says so.</li>
+    </ul>
+    <div class="callout note"><span class="k">Serial is the default tab</span><br>
+      A first connect opens on <strong>Serial</strong>. A first-time connect is far more likely to be a USB
+      cable already plugged in than a controller to go discovering for, and the Network tab's <em>Scan</em>
+      button is one click away. The matching setting, <em>Prefer network connection if available</em> in
+      <a href="#settings">Settings → Application → Main</a>, is <strong>off</strong> by default — turn it on and a serial
+      connect whose controller reports an IP will switch itself to the network once port 23 answers.</div>
 
     <div class="xref">Related: <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#settings">Settings</a> · <a href="#errors-alarms">Errors &amp; alarms</a></div>
   </section>
@@ -1349,6 +1382,23 @@
       sits at, then press <strong>Generate</strong> on the run strip at the bottom of the window (the shared
       Run button reads "Generate" while this tab is focused and nothing's built yet).</li>
     </ol>
+
+    <h3>Generate, then look before you run</h3>
+    <p><strong>Generate does not run anything.</strong> It builds the program, makes it the
+    <em>loaded job</em> — the real one, in the <a href="#job">Job</a> tab's own program list — and takes you
+    there to look at it. Read it, see it drawn in the <a href="#gcode-viewer">3D view</a>, check its
+    footprint against your stock, and then press <strong>Run</strong>. The program a Setup step builds gets
+    the same treatment as one you loaded off disk, because it <em>is</em> one.</p>
+    <p>Changed your mind? <kbd>Esc</kbd> <strong>discards the handed-off program</strong>, gives you back
+    whatever was loaded before, and returns you to the tab that built it. It only does this while a handoff
+    is actually outstanding and the job has not been started — Esc is not a Stop, and it refuses while
+    something is running.</p>
+    <div class="callout tip"><span class="k">The measurement survives a restart</span><br>
+      A four-corner measure is remembered and comes back next time you open ioSender — and the readout
+      <strong>names the date it was taken</strong>: <em>"Restored from the measure of Fri 19 Sep 14:22 —
+      re-measure if the stock has moved."</em> It says so because those numbers describe stock that may have
+      been re-clamped or replaced since, and <em>Verify skew</em> writes a work origin and rotation from
+      them. A partial measure is never saved — but it never erases a complete one either.</div>
 
     <div class="callout note"><span class="k">Verify skew — two modes</span><br>
       <strong>Verify skew</strong> visits the six points of the measured frame to check it before you commit
