@@ -576,18 +576,34 @@ namespace CNC.Controls
             if (dlg.ShowDialog() != true)
                 return;
 
-            // The writes first: G10 L1/L2 move nothing, so they can just go in.
             string writes = OffsetRestoreDialog.BuildWrites(dlg.Selected);
-            if (!string.IsNullOrEmpty(writes))
-                MacroProcessor.Run(model, "Restore work offsets", writes);
-
-            // Then the half that moves, as a program the operator starts - never run from here. It carries
-            // the same warning and M0 the snapshot does, now listing the actual positions it will drive to,
-            // because those are the numbers the table just let them change.
             string program = OffsetRestoreDialog.BuildPositionProgram(dlg.Selected);
-            if (string.IsNullOrEmpty(program))
-                return;
 
+            // SEQUENCE THESE, do not just call them in order. MacroProcessor.Run is ASYNCHRONOUS - it starts
+            // the macro and returns immediately - so loading the program on the next line loaded it while the
+            // G10 writes were still streaming. The Job tab then came up mid-run: Start disabled, Stop
+            // enabled, and the operator had to press Stop before they could press Start. onDone is the run's
+            // true terminal and fires on the UI thread, which is what it is there for.
+            if (!string.IsNullOrEmpty(writes))
+            {
+                MacroProcessor.Run(model, "Restore work offsets", writes,
+                                   onDone: ok => { if (!string.IsNullOrEmpty(program)) HandOffPositions(program); });
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(program))
+                HandOffPositions(program);
+        }
+
+        /// <summary>
+        /// Write the G28/G30 half out as a program, open it in the Job tab and get out of the way.
+        /// </summary>
+        /// <remarks>
+        /// Never run from here. The snapshot's own warning and M0 are kept, now listing the positions it
+        /// will actually drive to - the numbers the review table just let the operator change.
+        /// </remarks>
+        private void HandOffPositions(string program)
+        {
             try
             {
                 // A named file rather than a temp one: it is inspectable afterwards, and overwritten next
