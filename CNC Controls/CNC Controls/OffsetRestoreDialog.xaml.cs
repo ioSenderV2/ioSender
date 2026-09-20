@@ -306,10 +306,12 @@ namespace CNC.Controls
                 return null;
 
             var sb = new StringBuilder();
-            sb.AppendLine("(MSG,WARNING: axes will be moved to the positions below, ensure the machine is homed or abort!)");
+            // Every comment through SafeCommentText: realtime characters are acted on from INSIDE a comment,
+            // so an "!" here is a feed hold and a "~" would be a cycle start. See that method.
+            Msg(sb, "WARNING: axes will be moved to the positions below, ensure the machine is homed or abort");
             foreach (var r in positions)
-                sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "(MSG,  {0} -> X{1} Y{2} Z{3})",
-                              r.Item, Fmt(r.X), Fmt(r.Y), Fmt(r.Z)));
+                Msg(sb, string.Format(CultureInfo.InvariantCulture, "  {0} to X{1} Y{2} Z{3}",
+                        r.Item, Fmt(r.X), Fmt(r.Y), Fmt(r.Z)));
             sb.AppendLine("M0");
 
             foreach (var r in positions)
@@ -324,6 +326,11 @@ namespace CNC.Controls
 
             sb.AppendLine("M30");
             return sb.ToString();
+        }
+
+        private static void Msg(StringBuilder sb, string text)
+        {
+            sb.Append("(MSG,").Append(CNC.Core.GrblConstants.SafeCommentText(text)).AppendLine(")");
         }
 
         private static void Append(StringBuilder sb, string letter, double? value)

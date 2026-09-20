@@ -83,6 +83,39 @@ namespace CNC.Core
             CMD_TOOL_ACK = 0xA3,
             CMD_PROBE_CONNECTED_TOGGLE = 0xA4;
 
+        /// <summary>
+        /// Make text safe to put inside a g-code comment by removing the legacy realtime characters.
+        /// </summary>
+        /// <remarks>
+        /// THE CONTROLLER DOES NOT PARSE FIRST. Realtime characters are pulled out of the input stream the
+        /// instant they arrive, wherever they are - including inside a (MSG,...) comment, which is otherwise
+        /// inert. So an exclamation mark in a message is a FEED HOLD, a question mark is a status request and
+        /// a tilde is a CYCLE START.
+        ///
+        /// Found on hardware 2026-09-20: the work offset restore program opened with
+        /// "(MSG,WARNING: ... ensure the machine is homed or abort!)" and the operator hit two feed holds in
+        /// a program containing exactly one M0. The wire log shows the controller entering Hold:0 within
+        /// 174 ms of that comment being sent, with no hold byte from the sender - the "!" in "abort!" did it.
+        ///
+        /// A tilde is the one that should worry anybody reading this: a comment reading "wait~" would issue
+        /// a CYCLE START, which is the opposite of holding.
+        /// </remarks>
+        public static string SafeCommentText(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return text;
+
+            var sb = new System.Text.StringBuilder(text.Length);
+            foreach (char c in text)
+            {
+                // The legacy trio, plus the parentheses that would end the comment early and the soft-reset.
+                if (c == '!' || c == '?' || c == '~' || c == '(' || c == ')' || c == (char)0x18)
+                    continue;
+                sb.Append(c);
+            }
+            return sb.ToString();
+        }
+
         public const string
             CMD_STATUS_REPORT_LEGACY = "?",
             CMD_CYCLE_START_LEGACY = "~",

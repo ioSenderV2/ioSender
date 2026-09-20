@@ -2270,7 +2270,14 @@ namespace CNC.Core
                     {
                         warned = true;
                         exp.Add(";");
-                        exp.Add("(MSG,WARNING: axes will be moved to the G28 and G30 positions below, ensure the machine is homed or abort!)");
+                        // Through SafeCommentText, and note what came out: this line used to end "abort!",
+                        // and that exclamation mark is the legacy FEED HOLD character. grblHAL lifts realtime
+                        // characters out of the stream before parsing, so it acted on it from inside a
+                        // comment - the controller went to Hold:0 within 174 ms of the line being sent, and
+                        // the operator met a hold that no M0 accounts for. Never hand-write punctuation into
+                        // a (MSG,...) again; run it through here.
+                        exp.Add("(MSG," + GrblConstants.SafeCommentText(
+                            "WARNING: axes will be moved to the G28 and G30 positions below, ensure the machine is homed or abort") + ")");
                         exp.Add("M0");
                     }
                     if (coordinateSystem.Code != "G92")
