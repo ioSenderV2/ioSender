@@ -1680,29 +1680,39 @@ namespace CNC.Controls
                 return;
             }
 
+            // The label says what the CHOSEN PROBE needs, not what the current state happens to be - so it
+            // reads the same whether or not the setting already agrees, and the operator can see what the
+            // right answer is rather than inferring it from a button that only appears when something is
+            // wrong. Disabled when there is nothing to do; visible either way.
+            btnFixProbingFlags.Visibility = Visibility.Visible;
+            btnFixProbingFlags.Content = want.Value ? "Turn it on" : "Turn it off";
+
             if (flags < 0)
             {
-                // Unknown, said as unknown. See ReadProbingFlags.
+                // Unknown, said as unknown. See ReadProbingFlags. Nothing to act on either - a
+                // read-modify-write needs the value we could not read.
                 txtProbingFlags.Text = "Probe input: could not read $65, so whether the controller auto-selects the toolsetter is unknown.";
-                btnFixProbingFlags.Visibility = Visibility.Collapsed;
+                btnFixProbingFlags.IsEnabled = false;
+                btnFixProbingFlags.ToolTip = "$65 could not be read from the controller.";
                 return;
             }
 
             bool isSet = (flags & ToolsetterAutoSelectBit) != 0;
+            btnFixProbingFlags.IsEnabled = isSet != want.Value;
+
             if (isSet == want.Value)
             {
                 txtProbingFlags.Text = want.Value
                     ? "Probe input: $65 auto-selects the toolsetter near G59.3, which is right for a toolsetter."
                     : "Probe input: $65 leaves the probe input alone, which is right for a touch plate.";
-                btnFixProbingFlags.Visibility = Visibility.Collapsed;
+                btnFixProbingFlags.ToolTip = "Already set correctly for the probe chosen above.";
                 return;
             }
 
             txtProbingFlags.Text = want.Value
                 ? "Probe input: $65 does NOT auto-select the toolsetter near G59.3. With a dedicated toolsetter that is usually wanted."
                 : "Probe input: $65 auto-selects the TOOLSETTER input near G59.3 - but a touch plate is on the main input, so the probe would never trigger and the tool would be driven into the plate.";
-            btnFixProbingFlags.Content = want.Value ? "Turn it on" : "Turn it off";
-            btnFixProbingFlags.Visibility = Visibility.Visible;
+            btnFixProbingFlags.ToolTip = "Change bit 3 of $65 on the controller, leaving its other bits alone.";
         }
 
         private void FixToolsetterAutoSelect_Click(object sender, RoutedEventArgs e)
