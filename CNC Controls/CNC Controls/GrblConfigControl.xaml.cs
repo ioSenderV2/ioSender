@@ -596,11 +596,26 @@ namespace CNC.Controls
                 System.IO.File.WriteAllText(file, program);
                 GCode.File.Load(file);
 
+                // Put the operator where the program is. Loading it and leaving them on the settings tab
+                // means the one thing they now have to do is somewhere they cannot see - the same idiom the
+                // macro runner already uses to hand off to the Job tab.
+                MacroProcessor.SwitchToTab?.Invoke(ViewType.GRBL);
+
                 AppDialogs.Show("The G28 / G30 positions have been opened as a program in the Job tab.\n\n" +
                                 "They cannot be written - the controller only learns them from where the machine is " +
                                 "standing - so this drives to each one and teaches it. Read it, make sure the machine " +
                                 "is homed and the path is clear, then press Start.",
                                 "Restore work offsets", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+                // Close the settings window if that is what we are in - the cast is the guard, because when
+                // the Grbl config is an ordinary TAB this is the MAIN window and closing it would shut the
+                // application. Deferred so the close does not tear down the visual tree holding this control
+                // while we are still inside its own event handler.
+                var host = Window.GetWindow(this) as ViewHostWindow;
+                if (host != null)
+                    // System.Action fully qualified: CNC.Core.Action is a different type of the same name.
+                    Dispatcher.BeginInvoke(new System.Action(() => host.Close()),
+                                           System.Windows.Threading.DispatcherPriority.Background);
             }
             catch (Exception ex)
             {
