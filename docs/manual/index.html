@@ -2496,6 +2496,21 @@
     <em>active</em> WCS for you when you zero on your stock. The Offsets tab is for reviewing them, nudging
     a value, or setting up a second fixture.</p>
 
+    <h3>A stored offset is checked before the job, not discovered during it</h3>
+    <p>A generated program declares what it needs before it runs — homed, a tool-length reference,
+    <code>G30</code>, <code>G59.3</code>. Each of those is checked for being <em>set</em>. The ones that name
+    a machine position are also checked for being <strong>reachable</strong>: a position recorded when the
+    homing pull-off was smaller, or before the travel settings changed, stays in the controller at a
+    coordinate the machine will now refuse to rapid to.</p>
+    <p>All of <code>G28</code>, <code>G30</code> and <code>G54</code>–<code>G59.3</code> are checked. If one
+    sits outside the soft-limit envelope, the run is <strong>refused up front, with the overshoot in
+    millimetres</strong>: <em>"G59.3 is stored outside the machine's soft-limit travel: Y −884.5 is 24.5 mm
+    beyond the limit of −860.0. Move the machine inside its travel and set G59.3 again."</em></p>
+    <p>This is the check that turns a mid-run <a href="#errors-alarms"><code>ALARM:2</code></a> — probe
+    fitted, tool in the work, job half done — into a dialog before anything moves. It only runs where it can
+    answer: soft limits on, the machine homed, and travel configured for that axis. Anywhere it cannot know,
+    it stays quiet rather than refusing a job that would have run perfectly well.</p>
+
     <div class="callout note"><span class="k">Machinist — G10 &amp; discipline</span><br>
       Under the hood, offsets are set with <code>G10&nbsp;L2</code> (define a WCS in absolute machine
       coordinates) or <code>G10&nbsp;L20</code> (define it so the <em>current</em> position equals given work
@@ -2551,8 +2566,31 @@
       <tr><td><strong>Application</strong></td><td>One page per panel — <strong>Main</strong> is how ioSender <em>talks to the controller</em> (reset delay, poll interval, buffer size and aggressive buffering, comment/line-number handling, prefer-network-if-available, and the grbl auto-save pair), plus <strong>Work Order</strong>, <strong>Camera</strong> and <strong>Demo recording (OBS)</strong>. How the app itself <em>looks and behaves</em> is not here — that's User Interface → General, below.</td></tr>
       <tr><td><strong>Jogging</strong></td><td><strong>UI jogging</strong> and <strong>Keyboard jogging</strong> — jog steps and feeds for each, and mirroring them to the controller's firmware jog (<code>$5x</code>). See <a href="#jogging">Jogging</a>.</td></tr>
       <tr><td><strong>G Code</strong></td><td><strong>GCode command stripping</strong> (what gets filtered on the way out) and <strong>GCode Viewer</strong> (how the <a href="#gcode-viewer">3D view</a> draws it).</td></tr>
-      <tr><td><strong>User Interface</strong></td><td><strong>General</strong> — how the app itself looks and behaves: keep MDI focus, restore the last window size, friendly Start/Pause run-bar labels, UI scale, the go-to buttons on the <a href="#jogging">jog pad</a>, and the app's own auto-save / prompt-before-saving pair. Then <strong>Keyboard</strong> and <strong>Controller</strong> (game-controller bindings), <strong>Macros</strong>, <strong>Job tab layout</strong>, and <strong>Top-level tabs</strong>.</td></tr>
+      <tr><td><strong>User Interface</strong></td><td><strong>General</strong> — how the app itself looks and behaves: keep MDI focus, restore the last window size, friendly Start/Pause run-strip labels, UI scale, the go-to buttons on the <a href="#jogging">jog pad</a>, <strong>ESC closes current tab if closable</strong>, <strong>Show 3D view in split screen on Job tab</strong>, the <strong>status pop-up dwell</strong> slider, and the app's own auto-save / prompt-before-saving pair. Then <strong>Keyboard</strong> and <strong>Controller</strong> (game-controller bindings), <strong>Macros</strong>, <strong>Job tab layout</strong>, and <strong>Top-level tabs</strong>.</td></tr>
     </table>
+
+    <h3>Four in User Interface → General worth knowing about</h3>
+    <ul>
+      <li><strong>Dismiss pop-up status window after <em>n</em> seconds.</strong> The
+      <a href="#job">Status window</a> opens itself only for an <em>error or an alarm</em> — every other
+      message is recorded quietly — and this slider (1–60 s) is how long it lingers before dismissing itself.
+      Shortening it loses nothing: nothing is ever dropped from the log behind the <strong>Status</strong>
+      button. A window <em>you</em> opened never closes on its own.</li>
+      <li><strong>ESC closes current tab if closable.</strong> Off by default. Only a tab opened from the
+      <em>File</em> or <em>Tools</em> menu is closable — one you placed on the tab bar yourself stays, since
+      closing it would leave no way back to it. Esc keeps all its other jobs either way: it still dismisses a
+      dialog, cancels an edit in a text box, and cancels a
+      <a href="#setup">handed-off program</a> before it closes anything.</li>
+      <li><strong>Show 3D view in split screen on Job tab.</strong> Program list and 3D view side by side
+      with a draggable splitter, instead of a tab strip that switches between them — see
+      <a href="#job">the Job screen</a> for what gives up the space.</li>
+      <li><strong>Continuous jogging — hold to jog</strong> lives under <strong>Jogging → UI jogging</strong>.
+      It is the same selection the old on-screen jog panel's <em>Continuous</em> radio used to make; when the
+      abbreviated jog panels dropped that radio, the mode stayed reachable in code and persisted on disk with
+      nothing anywhere to turn it on. There is a <em>Continuous</em> tick on the run strip's Jogging group
+      too, and they are the same switch. A tap still moves one step either way, and
+      <kbd>Shift</kbd>/<kbd>Ctrl</kbd>+<kbd>Shift</kbd> jog continuously regardless of the setting.</li>
+    </ul>
     <figure>
       <img src="img/settings-search.png" alt="The Settings search filtered to two matches for the term strip, with the Matched tooltip explainer hovering over the Main entry">
       <figcaption>Searching the words on every page, not just page names — "strip" narrows twenty-odd pages
@@ -2850,8 +2888,27 @@
       to a safe height first, then rapids to the spot. A fast way to reach a feature without nudging with the
       <a href="#jogging">jog</a> keys.</div>
 
-    <p>You can also <strong>start a job from a chosen toolpath</strong> here — pick the point to resume from
-    (see <a href="#job">the Job screen</a>).</p>
+    <h3>The stock block, and what it is drawn from</h3>
+    <p>The block the toolpath carves into is not a decoration — it is a real dexel model, and it is drawn
+    from what the program actually says:</p>
+    <ul>
+      <li><strong>Where the program declares its stock</strong> (a Work Order does, and a Fusion post can),
+      that is exactly what you see: the declared board, in the declared place. Not a box grown to fit the
+      toolpath — a 368&nbsp;×&nbsp;232 board once rendered as a block the size of the lettering on it.</li>
+      <li><strong>The thickness comes from cutting moves only.</strong> Rapids, the machine-coordinate
+      preamble every generated program opens with, and probe moves are all excluded. A 6.35&nbsp;mm board
+      used to be drawn about 80&nbsp;mm thick, because a <code>G53</code> park at the top of travel was being
+      read as material.</li>
+      <li><strong>Where no size is known at all</strong> — nothing declared, and no cutting move to infer a
+      thickness from — the view says <strong>"No stock size information"</strong> and draws no block, rather
+      than inventing a plausible-looking slab that would misrepresent every depth in the program.</li>
+      <li><code>G53</code> <strong>moves are drawn in the right frame.</strong> A machine-coordinate park no
+      longer leaks into the work-coordinate picture — which is also what used to make a 32&nbsp;mm job
+      report an 858&nbsp;mm span to the <a href="#job">travel check</a>.</li>
+    </ul>
+
+    <p>To <strong>start a job partway through</strong> — from a chosen toolpath, or a chosen line — use the
+    program list's right-click menu on the <a href="#job">Job screen</a>, not this view.</p>
 
     <div class="xref">Related: <a href="#job">The Job screen</a> · <a href="#jogging">Jogging</a> · <a href="#setup">Setup</a></div>
   </section>
