@@ -199,6 +199,21 @@ namespace CNC.Controls
             if(GrblSettings.Backup(string.Format("{0}settings.txt", Core.Resources.ConfigPath)))
                 model.Message = string.Format((string)FindResource("SettingsWritten"), "settings.txt");
             GrblWorkParameters.Backup(string.Format("{0}offsets.nc", Core.Resources.ConfigPath));
+
+            // ...and a VERSIONED pair, so pressing this button actually creates a restore point.
+            //
+            // The two files above are written to the config root under FIXED names with no history, and the
+            // Restore dialog lists only the timestamped Backups\<Weekday>\ snapshots - which until now were
+            // written on connect and nowhere else. So "Save settings", then break something, then Restore
+            // offered nothing from the moment the operator had deliberately saved. That is the obvious
+            // reading of a button called Save, and it was the one thing it did not do.
+            //
+            // Written back to back so they land inside RestorePoint's 90 s PairWindow and show up as one
+            // moment rather than two rows offering half of it each. Each refuses to write when there is
+            // nothing to capture, so a press against a controller holding nothing cannot manufacture an
+            // empty restore point that the dialog would then sort to the top.
+            GrblSettings.WriteSnapshot();
+            GrblWorkParameters.WriteSnapshot();
         }
 
         // Restore controller $ settings to firmware defaults ($RST=$), then reload. Public: shared footer's
