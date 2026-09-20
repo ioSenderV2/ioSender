@@ -67,7 +67,7 @@
                 <CheckBox x:Uid="chk_rpOffsetPositions" x:Name="chkOffsetPositions" Margin="18,4,0,0"
                           ToolTip="G28 and G30 can only be restored by driving to each position and teaching it, so this opens the snapshot as a program in the Job tab for you to run. It begins with a warning and an M0 pause. Nothing moves until you press Start.">
                     <TextBlock x:Uid="txt_rpOffsetPositions" TextWrapping="Wrap"
-                               Text="Also the G28 / G30 positions - opens a program you must run, and it MOVES the machine"/>
+                               Text="Also the G28 / G30 positions - this MOVES the machine"/>
                 </CheckBox>
                 <TextBlock x:Name="txtWhatNote" Foreground="#586069" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"/>
             </StackPanel>
