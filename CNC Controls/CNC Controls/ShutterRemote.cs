@@ -28,11 +28,27 @@
  *     several places (a prompt, a running job, a hold) rather than only during a height-map hold.
  *   - When the press DOES mean something it is swallowed, because the alternative is the system volume
  *     marching to maximum over the course of a height map.
- *   - It debounces. The same measurement showed a held button auto-repeating every ~30 ms after a ~500 ms
- *     delay; a single tap gives exactly one event. Without a debounce one press would release several
- *     holds in a row and the machine would move to the next point - and the one after - while a hand is
- *     still on the plate. That is the difference between a convenience and a hazard, so the debounce is
- *     not tuning, it is the safety of the thing.
+ *   - ONE ACTION PER PHYSICAL PRESS. The same measurement showed a held button auto-repeating every
+ *     ~30 ms after a ~500 ms delay; a single tap gives exactly one event. Without that rule one press
+ *     would release several holds in a row and the machine would move to the next point - and the one
+ *     after - while a hand is still on the plate. It is not tuning, it is the safety of the thing.
+ *
+ *     It is enforced by the KEY-UP, not by a timer. A timer alone was not enough, and the gap it left is
+ *     worth keeping written down: the debounce clock is reset whenever a press passes through to Windows,
+ *     so that a key Windows handled does not debounce the next real one - and a single long press spans
+ *     both states. Hold the button while the machine is moving: nothing is waiting, so the repeats pass
+ *     through and keep clearing the clock. The machine arrives and holds. The very next repeat of that
+ *     SAME press now finds something waiting and a cleared clock, and releases it. Reported from the
+ *     machine 2026-09-20 as "I see it if I press the remote button and take too long to lift up".
+ *
+ *     So a press is now latched at its first key-down and stays latched until the key-up. Whatever
+ *     changes while the button is down, that press has already had its say. The timer stays beside it to
+ *     catch a remote bouncing its contacts into two complete press/release cycles, which the latch cannot
+ *     see.
+ *
+ *     If a remote ever failed to send a key-up, its button would stop working rather than start repeating.
+ *     That is the right way round: the operator notices at once and reaches for the keyboard, where the
+ *     other failure moves the machine.
  *
  * Both volume keys are accepted rather than one: the two modes of the same remote send different ones,
  * and asking an operator which mode their remote is in - to answer a question they only care about
@@ -52,7 +68,9 @@ namespace CNC.Controls
     {
         private const int WH_KEYBOARD_LL = 13;
         private const int WM_KEYDOWN = 0x0100;
+        private const int WM_KEYUP = 0x0101;
         private const int WM_SYSKEYDOWN = 0x0104;
+        private const int WM_SYSKEYUP = 0x0105;
         private const int VK_VOLUME_DOWN = 0xAE;
         private const int VK_VOLUME_UP = 0xAF;
 
@@ -79,6 +97,29 @@ namespace CNC.Controls
         private static DateTime _last = DateTime.MinValue;
 
         /// <summary>
+        /// True from the first key-down of a physical press until its key-up. ONE action per press, decided
+        /// at that first key-down and never revisited, however long the button is held.
+        ///
+        /// The timer alone could not do this. It is reset whenever a press passes through - so that a key
+        /// Windows handled does not debounce the next real one - and a held button spans both states: press
+        /// while the machine is moving and nothing is waiting, so the repeats pass through and keep clearing
+        /// the timer; the machine then arrives and holds; the very next repeat of the SAME press finds
+        /// something waiting and a cleared timer, and releases it. Reported from the machine 2026-09-20:
+        /// "I see it if I press the remote button and take too long to lift up."
+        ///
+        /// That is the hazard this file's header already names - the next point reached while a hand is
+        /// still on the plate - arriving by the one route the debounce did not cover.
+        /// </summary>
+        private static bool _pressActive = false;
+
+        /// <summary>
+        /// Whether this press's key-down was swallowed, so its key-up can be swallowed too. An orphan
+        /// key-up for a key whose key-down never arrived is the kind of thing that makes a volume control
+        /// behave oddly later, and it costs one bool not to find out.
+        /// </summary>
+        private static bool _swallowed = false;
+
+        /// <summary>
         /// What a press means right now: given true for VOLUME UP, returns what to do, or null when the
         /// press means nothing here and the key should go on to Windows. Answered on the UI thread (a
         /// low-level hook runs on the thread that installed it) and must be quick - it decides, the
@@ -99,6 +140,12 @@ namespace CNC.Controls
 
             if (_hook != IntPtr.Zero)
                 return;
+
+            // Start from "no press in progress". These are static and survive a stop/start, and a latch
+            // left set - the hook removed between a key-down and its key-up - would mean the remote
+            // silently never worked again this session.
+            _pressActive = _swallowed = false;
+            _last = DateTime.MinValue;
 
             _proc = Callback;
             _hook = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(null), 0);
@@ -126,12 +173,38 @@ namespace CNC.Controls
                 return CallNextHookEx(_hook, nCode, wParam, lParam);
 
             int msg = (int)wParam;
-            if (msg != WM_KEYDOWN && msg != WM_SYSKEYDOWN)
+            bool down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
+            bool up = msg == WM_KEYUP || msg == WM_SYSKEYUP;
+            if (!down && !up)
                 return CallNextHookEx(_hook, nCode, wParam, lParam);
 
             int vk = Marshal.ReadInt32(lParam);
             if (vk != VK_VOLUME_UP && vk != VK_VOLUME_DOWN)
                 return CallNextHookEx(_hook, nCode, wParam, lParam);
+
+            // The key-up is what ends a press. Until it arrives, every key-down for this key is the SAME
+            // press auto-repeating, whatever has changed in the meantime.
+            if (up)
+            {
+                bool swallowUp = _swallowed;
+                _pressActive = _swallowed = false;
+                return swallowUp ? new IntPtr(1) : CallNextHookEx(_hook, nCode, wParam, lParam);
+            }
+
+            // Repeats of a press that has already been decided. Nothing can make this act - that is the
+            // whole point - but it is still swallowed when something is waiting, so a held button does not
+            // march the system volume while a hold is pending.
+            if (_pressActive)
+            {
+                if (_swallowed)
+                {
+                    DebugLog.Write("remote", "shutter remote: auto-repeat ignored - button still held");
+                    return new IntPtr(1);
+                }
+                return CallNextHookEx(_hook, nCode, wParam, lParam);
+            }
+
+            _pressActive = true;
 
             // What it means is decided HERE, synchronously, because the answer also decides whether the key
             // is swallowed - and that has to be settled before returning from the hook. Only the action it
@@ -141,11 +214,17 @@ namespace CNC.Controls
 
             if (action == null)
             {
-                // Nothing is waiting on it: this is just a volume key, and Windows should have it.
+                // Nothing is waiting on it: this is just a volume key, and Windows should have it. The
+                // press stays marked active, so if something starts waiting while the button is still down
+                // it is the NEXT press that acts on it, not this one.
                 _last = DateTime.MinValue;   // a press that passed through must not debounce the next real one
                 return CallNextHookEx(_hook, nCode, wParam, lParam);
             }
 
+            _swallowed = true;
+
+            // The timer still earns its place beside the press latch: it catches a remote that bounces its
+            // contacts into two complete press/release cycles, which the latch alone cannot see.
             var now = DateTime.UtcNow;
             bool act = now - _last >= Debounce;
             _last = now;
@@ -157,6 +236,8 @@ namespace CNC.Controls
                     dispatcher.BeginInvoke(action);
                 DebugLog.Write("remote", string.Format("shutter remote: press (vk 0x{0:X2})", vk));
             }
+            else
+                DebugLog.Write("remote", "shutter remote: press ignored - within the debounce window");
 
             // Swallowed either way - a repeat that is ignored must not reach the volume control either.
             return new IntPtr(1);
