@@ -41,8 +41,10 @@ using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;   // ScrollBar - telling a user's scroll gesture from ours
 using System.Windows.Documents;   // AdornerLayer - see the find-in-log highlighting
 using System.Windows.Input;
+using System.Windows.Media;   // VisualTreeHelper - same
 using System.Windows.Threading;
 using CNC.Core;
 
@@ -80,6 +82,21 @@ namespace CNC.Controls
             txtOutput.AddHandler(ScrollViewer.ScrollChangedEvent,
                                  new ScrollChangedEventHandler((s, e) => _highlight?.InvalidateVisual()));
             txtOutput.SizeChanged += (s, e) => _highlight?.InvalidateVisual();
+
+            // ---- Who moved the scrollback? ----
+            // Following the tail is a USER INTENT, not something to re-read off the scroll offset (see
+            // FlushLog). These are the only gestures that change it, and every one of them is a real input
+            // event - a programmatic scroll cannot reach them. Preview, so a handled event still counts.
+            txtOutput.PreviewMouseWheel += (s, e) => UserScrolled();
+            txtOutput.PreviewKeyDown += (s, e) => { if (IsScrollKey(e.Key)) UserScrolled(); };
+            txtOutput.PreviewMouseLeftButtonDown += (s, e) =>
+            {
+                // Pressing the scrollbar means "I am taking over" - stop following NOW rather than at the end
+                // of the drag, or the next flush yanks the thumb out from under the mouse.
+                if (IsWithinScrollBar(e.OriginalSource as DependencyObject))
+                    SetFollowTail(false, "scrollbar pressed");
+            };
+            txtOutput.PreviewMouseLeftButtonUp += (s, e) => UserScrolled();
 
             // Resolve the adorner layer once there IS one - GetAdornerLayer returns null before the control
             // is in a rendered tree, and the console is built well before it is first shown.
@@ -129,9 +146,65 @@ namespace CNC.Controls
                 trimmedSinceFlush = 0;   // Clear all - the old offset means nothing against an empty log
         }
 
-        // Set by an MDI Enter: the next flush must land at the END whatever the scroll position was. Typing a
-        // command means "show me what happens", even if the user had scrolled up to read something first.
-        private bool jumpToEnd;
+        // ---- Follow the tail: an INTENT, not a measurement ----
+        //
+        // True = keep the newest line on screen. It starts true and is cleared by exactly one thing: the user
+        // scrolling the log backwards themselves (wheel, scrollbar, PageUp/Home/arrows - see the constructor).
+        // Scrolling back down to the bottom sets it again. Nothing the flush itself does can change it.
+        //
+        // This replaces re-deriving "am I at the bottom?" from txtOutput.VerticalOffset on every flush, which is
+        // where the console's recurring jump-to-line-0 came from. That reading is only meaningful if a layout
+        // pass ran between the previous flush's ScrollToEnd and this one's measurement, and on the pop-out MDI
+        // Console window it does not: MainWindow.openConsole news the window up, sets DataContext - which fires
+        // HookLog -> FlushLog straight away - and only THEN calls Show(). At that first flush the TextBox has no
+        // template yet, so its internal ScrollViewer is null and ScrollToEnd is a silent no-op; the window then
+        // lays out 2000 lines of text at offset 0. Every flush after that read offset 0 against a full extent,
+        // concluded "the user has scrolled to the top", and dutifully restored offset 0 - forever. The window is
+        // recreated on every start when it was left open, so it was stuck from launch, while the Console tab
+        // (laid out before its first flush) looked fine. Two previous fixes (2026-09-06 and 2026-09-16) each
+        // patched one side of the same measurement and left the other holding the snap.
+        //
+        // An intent flag is also self-healing: a ScrollToEnd that lands on a control with no ScrollViewer does
+        // nothing and the next tick simply tries again, instead of being read back as a decision.
+        private bool followTail = true;
+
+        private void SetFollowTail(bool follow, string why)
+        {
+            if (followTail == follow)
+                return;
+            followTail = follow;
+            DebugLog.Write("console", (follow ? "follow tail ON - " : "follow tail OFF - ") + why);
+        }
+
+        // Re-read where the user's gesture actually left the view, and follow again if it landed at the bottom.
+        // Deferred to Background: the offset at the moment the input event arrives is still the PRE-gesture one -
+        // the ScrollViewer applies a scroll during arrange, which runs at Render priority, above this.
+        private void UserScrolled()
+        {
+            Dispatcher.BeginInvoke(new System.Action(() =>
+            {
+                bool atBottom = txtOutput.ExtentHeight <= txtOutput.ViewportHeight + 1.0 ||
+                                txtOutput.VerticalOffset >= txtOutput.ExtentHeight - txtOutput.ViewportHeight - 1.0;
+                SetFollowTail(atBottom, atBottom ? "user scrolled back to the bottom" : "user scrolled up");
+            }), DispatcherPriority.Background);
+        }
+
+        private static bool IsScrollKey(Key k)
+        {
+            return k == Key.PageUp || k == Key.PageDown || k == Key.Up || k == Key.Down ||
+                   k == Key.Home || k == Key.End;
+        }
+
+        private static bool IsWithinScrollBar(DependencyObject d)
+        {
+            while (d != null)
+            {
+                if (d is ScrollBar)
+                    return true;
+                d = VisualTreeHelper.GetParent(d);
+            }
+            return false;
+        }
 
         // Lines dropped off the top since the last flush, and the line count that produced the current extent -
         // together they convert "the log scrolled under you" into the pixel correction the restore below needs.
@@ -145,17 +218,14 @@ namespace CNC.Controls
             logDirty = false;
 
             // Assigning Text snaps the internal ScrollViewer to offset 0, so this method has to put the view back
-            // afterwards - in BOTH cases, which is the bug fixed here. It used to restore only the at-bottom case
-            // and leave the scrolled-up case holding the snap, so every flush threw a reader to line 0 while the
-            // log kept streaming (reported 2026-09-16, the typed command 1000+ lines below the top). The earlier
-            // 2026-09-06 fix hit the same symptom from the follow side and never covered this half.
+            // afterwards. Where it goes is decided by followTail, NOT by measuring the offset we are about to
+            // destroy - see the followTail comment for why measuring it was the bug.
             //
-            // Read the scroll state BEFORE the replacement - afterwards it describes the snap, not the user.
+            // The scrolled-up case still needs the offset read BEFORE the replacement: afterwards it describes
+            // the snap, not the user.
             double prevOffset = txtOutput.VerticalOffset, prevH = txtOutput.HorizontalOffset;
-            bool atBottom = jumpToEnd || prevOffset >= txtOutput.ExtentHeight - txtOutput.ViewportHeight - 1.0;
             double lineH = txtOutput.ExtentHeight / Math.Max(1, lastLineCount);
             int trimmed = trimmedSinceFlush;
-            jumpToEnd = false;
             trimmedSinceFlush = 0;
 
             var log = logModel.ResponseLog;
@@ -165,8 +235,13 @@ namespace CNC.Controls
             txtOutput.Text = sb.ToString();
             lastLineCount = log.Count;
 
-            if (atBottom)
+            if (followTail)
+            {
+                // Assigning Text also puts the caret at 0, and a focused TextBox brings its caret into view -
+                // which would undo the scroll below. Park the caret at the end first so both agree.
+                txtOutput.CaretIndex = txtOutput.Text.Length;
                 txtOutput.ScrollToEnd();
+            }
             else
             {
                 // Hold the same TEXT still, not the same pixel offset: once the scrollback is at its cap every
@@ -251,7 +326,7 @@ namespace CNC.Controls
                             historyIndex = -1;
                             // The command's echo and its response are about to land in the log; the console
                             // should be looking at them, not at wherever it was scrolled. See FlushLog.
-                            jumpToEnd = true;
+                            SetFollowTail(true, "MDI command sent");
                             txtOutput.ScrollToEnd();
                         }
                         e.Handled = true;
@@ -312,6 +387,7 @@ namespace CNC.Controls
 
         private void btn_Clear(object sender, RoutedEventArgs e)
         {
+            SetFollowTail(true, "log cleared");   // an empty log has no "where I was" to hold
             (DataContext as GrblViewModel).ResponseLog.Clear();
         }
 
@@ -327,6 +403,7 @@ namespace CNC.Controls
 
         private void OutClearAll_Click(object sender, RoutedEventArgs e)
         {
+            SetFollowTail(true, "log cleared");
             (DataContext as GrblViewModel)?.ResponseLog.Clear();
         }
 
@@ -482,7 +559,13 @@ namespace CNC.Controls
                 SelectMatch();
             }
             else
+            {
                 txtOutput.Select(txtOutput.SelectionStart, 0);
+                // Emptying the search box means the user is done reading matches: if the view is sitting at the
+                // bottom, resume following. Same rule as any other gesture - decided from where they left it.
+                if (_matchQuery.Length == 0)
+                    UserScrolled();
+            }
 
             RefreshHighlight();
             UpdateMatchUi();
@@ -535,6 +618,9 @@ namespace CNC.Controls
             if (_matchIndex < 0 || _matchIndex >= _matches.Count)
                 return;
             int start = _matches[_matchIndex];
+            // Jumping to a match is the user asking to look at that match - stop following, or the next flush
+            // (250 ms away, on a live stream) drags them straight back to the bottom off it.
+            SetFollowTail(false, "search match selected");
             txtOutput.Select(start, _matchQuery.Length);
             int line = txtOutput.GetLineIndexFromCharacterIndex(start);
             if (line >= 0)
