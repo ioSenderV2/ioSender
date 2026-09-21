@@ -2029,3 +2029,4 @@ CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_g30Left:System.Wi
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_g30Left:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Move to 100 mm in −X from G59.3 at safe Z, and store that as G30. The machine WILL move."
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_g30Right:System.Windows.Controls.ContentControl.Content,Button,True,True,,100 mm +X
 CNC.Controls.WPF.g.en-US.resources:machinesetupwizard.baml,btn_g30Right:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Move to 100 mm in +X from G59.3 at safe Z, and store that as G30. The machine WILL move."
+CNC.Controls.WPF.g.en-US.resources:drocontrol.baml,dro_wcsHeader:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Click to change the work offset. Hover an entry to see what it holds.
