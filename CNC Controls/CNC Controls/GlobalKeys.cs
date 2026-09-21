@@ -68,22 +68,39 @@ namespace CNC.Controls
         }
 
         /// <summary>
-        /// While true, no key-DOWN is dispatched to jog, macros or shortcuts - the event is left alone to
-        /// tunnel on down to whatever control is showing.
+        /// Set by a panel where keys MEAN something other than what they normally do - the bindings
+        /// editor, where pressing a shortcut should FIND it rather than fire it. While it is set, no
+        /// key-DOWN goes to jog, macros or shortcuts; this gets it instead, and returns true if it used it.
         ///
-        /// For a panel where keys MEAN something other than what they do: the bindings editor, where
-        /// pressing a shortcut should find it rather than fire it. This class handler is registered on
-        /// Window's PreviewKeyDown, so it sees every key before any control in the tree - which is exactly
-        /// why the editor's own PreviewKeyDown never got a look at Ctrl+M, and the tab switched instead.
+        /// It lives HERE, rather than on the panel, for the reason the panel could not do it itself. This
+        /// class handler is registered on Window's PreviewKeyDown, so it sees every key before anything in
+        /// the tree - and, crucially, REGARDLESS OF FOCUS. A handler on the panel only fires when the
+        /// event tunnels through the panel, which means only when focus is already inside it: click the
+        /// Keyboard node in the settings tree, leave focus in that tree, and the panel never sees a key at
+        /// all. That is the second half of the same bug - the first half was the tab switching instead.
         ///
-        /// Key-UP is deliberately NOT suspended; see OnPreviewKeyUp for why that must never be gated.
+        /// Key-UP is deliberately NOT routed here; see OnPreviewKeyUp for why it must never be gated.
         /// </summary>
-        public static bool Suspended { get; set; }
+        public static Func<KeyEventArgs, bool> Intercept;
+
+        /// <summary>True while something has claimed the keyboard - see <see cref="Intercept"/>.</summary>
+        public static bool Suspended { get { return Intercept != null; } }
 
         private static void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Handled || Suspended)
+            if (e.Handled)
                 return;
+
+            var intercept = Intercept;
+            if (intercept != null)
+            {
+                // Handled or not, nothing downstream acts on it: that is what claiming the keyboard means.
+                // Returning false leaves the event to tunnel on, so the panel's own handlers - the capture
+                // that is waiting for a keypress, and ordinary navigation - still work.
+                if (intercept(e))
+                    e.Handled = true;
+                return;
+            }
 
             var keyboard = Handler;
 

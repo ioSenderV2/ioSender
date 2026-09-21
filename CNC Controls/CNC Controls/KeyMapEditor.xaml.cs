@@ -224,16 +224,28 @@ namespace CNC.Controls
         // so it is raised exactly while this tab is actually on screen.
         private void SuspendGlobalKeys(bool suspend)
         {
-            GlobalKeys.Suspended = suspend;
+            GlobalKeys.Intercept = suspend ? (Func<KeyEventArgs, bool>)InterceptKey : null;
+        }
+
+        /// <summary>
+        /// Every key-down while this panel is up, routed from GlobalKeys because that is the only handler
+        /// that runs regardless of where focus happens to be (see GlobalKeys.Intercept). Returns true when
+        /// it used the key.
+        /// </summary>
+        private bool InterceptKey(KeyEventArgs e)
+        {
+            // Mid-capture: the editor's own PreviewKeyDown is waiting for exactly this key, and it can
+            // only get it if the event carries on tunnelling. Stand aside.
+            if (capturing != null)
+                return false;
+
+            return FindByShortcut(e);
         }
 
         private void KeyMapEditor_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (capturing == null)
-            {
-                FindByShortcut(e);
-                return;
-            }
+                return;   // the find-by-shortcut route comes through GlobalKeys.Intercept, not here
 
             Key key = e.Key == Key.System ? e.SystemKey : e.Key;
             if (modifierKeys.Contains(key))
@@ -270,14 +282,14 @@ namespace CNC.Controls
         /// An unbound combo that DOES carry a modifier (or is a function key) beeps: those are never
         /// navigation, so saying "nothing is bound to that" costs nothing and answers the question.
         /// </summary>
-        private void FindByShortcut(KeyEventArgs e)
+        private bool FindByShortcut(KeyEventArgs e)
         {
             Key key = e.Key == Key.System ? e.SystemKey : e.Key;
             if (modifierKeys.Contains(key))
-                return;                       // a modifier on its own is not a shortcut yet
+                return false;                 // a modifier on its own is not a shortcut yet
 
             if (Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase)
-                return;                       // typing in a field, not asking a question
+                return false;                 // typing in a field, not asking a question
 
             ModifierKeys mods = Keyboard.Modifiers;
 
@@ -288,18 +300,19 @@ namespace CNC.Controls
 
             if (hit != null)
             {
-                e.Handled = true;
                 ShowRow(hit);
-                return;
+                return true;
             }
 
             // Nothing bound. Only say so for something that could not possibly be navigation.
             bool couldNotBeNavigation = mods != ModifierKeys.None || (key >= Key.F1 && key <= Key.F24);
             if (couldNotBeNavigation)
             {
-                e.Handled = true;
                 try { System.Media.SystemSounds.Beep.Play(); } catch { }
+                return true;
             }
+
+            return false;   // an unbound bare key: navigation, and none of our business
         }
 
         /// <summary>Bring a row into view and select it, so the answer is visible at once.</summary>
