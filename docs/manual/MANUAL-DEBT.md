@@ -475,9 +475,14 @@ running for six weeks.
       "Restore view" that the carve view has no equivalent of). The carve view has no keybinding at
       all. Line 2900 is describing a screen the user cannot reach — rewrite the whole entry, do not
       patch the shortcut.
-      ⚠️ Related CODE debt, not manual debt: **`KeyMapEditor` still offers `RenderControl.ResetView`
-      and `RenderControl.RestoreView`** as bindable actions (lines 825-826, 909-910). They bind to
-      nothing reachable. They go with the old-renderer removal.
+      ✅ Related CODE debt — **DONE 2026-09-21** (`acef2416`). It was **five** entries, not the two
+      named here: `ResetView`, `RestoreView`, `ToggleGrid`, `ToggleJobEnvelope`, `ToggleWorkEnvelope`,
+      plus the `Categorize` line and the group description that made a **"3D view"** group for them.
+      None could ever appear — the editor builds its rows from the handlers actually registered with
+      `KeypressHandler`, and the only place those five register is `RenderControl_Loaded`, which never
+      runs because `JobWorkspace` registers **CarveView** for `LayoutKeys.Toolpath3D`. `CarveView`
+      registers no key handlers at all, so the group was empty on both counts. The old `RenderControl`
+      itself stays — that is the larger old-renderer removal.
 - [ ] **New: the View options dialog.** Four toggles (rapid moves, stock block, bed grid, stored
       positions), three colour pickers (cut, rapid, stock), Default colours, Reset view. Document
       that colours persist, and the reason a lit surface does not match its swatch while the cut and
