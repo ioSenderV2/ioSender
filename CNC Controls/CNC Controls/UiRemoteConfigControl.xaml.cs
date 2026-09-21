@@ -1,8 +1,8 @@
 /*
  * UiRemoteConfigControl.xaml.cs - part of CNC Controls library for Grbl
  *
- * Settings > User Interface > Remote. The shutter-remote enable, and a plain statement of what a press
- * actually does.
+ * Settings > User Interface > Remote. The shutter-remote enable, what a press actually does, and the
+ * binding status.
  *
  * The setting itself is not new - it was born on the Height map tab (2026-09-18), because that is where
  * the need was: place the plate, press Continue, walk back, sixteen times, with the laptop across the
@@ -16,9 +16,23 @@
  *
  * The table is here because the policy lived only in RemoteActions' header comment, which is the one
  * place the operator standing at the machine cannot read.
+ *
+ * ---- Why the binding status line exists ----
+ *
+ * Binding is armed by ticking the box and completed by pressing a button on the remote. That is a good
+ * interaction - the remote is in your hand, pressing it is the most direct way to say "this one" - but
+ * built without this line it is ENTIRELY INVISIBLE. Shipped that way once, 2026-09-21: the mechanism
+ * worked perfectly, the log said "binding ARMED" and then "BOUND to ...", and the operator's report was
+ * simply "there was no binding UI when I tick the enable box". They were right. A chime is not feedback
+ * if nothing ever told you to listen for it.
+ *
+ * So this says which of the three states it is in, in words, on the page where the tick happens.
  */
 
+using System.ComponentModel;
+using System.Windows;
 using System.Windows.Controls;
+using CNC.Core;
 
 namespace CNC.Controls
 {
@@ -35,6 +49,104 @@ namespace CNC.Controls
         public UiRemoteConfigControl()
         {
             InitializeComponent();
+
+            Loaded += (s, e) => { Hook(); RefreshStatus(); };
+            Unloaded += (s, e) => Unhook();
+        }
+
+        private Config hooked;
+
+        private void Hook()
+        {
+            var config = AppConfig.Settings?.Base;
+            if (ReferenceEquals(config, hooked))
+                return;
+
+            Unhook();
+            hooked = config;
+            if (hooked != null)
+                hooked.PropertyChanged += Config_PropertyChanged;
+
+            // Raised from the raw-input path the instant a press claims the device. That path runs on the
+            // UI thread (HwndSource hook), so this can touch the controls directly.
+            RemoteDevices.BoundTo += OnBoundTo;
+        }
+
+        private void Unhook()
+        {
+            if (hooked != null)
+                hooked.PropertyChanged -= Config_PropertyChanged;
+            hooked = null;
+            RemoteDevices.BoundTo -= OnBoundTo;
+        }
+
+        private void Config_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(Config.ShutterRemoteEnabled) ||
+                 e.PropertyName == nameof(Config.ShutterRemoteDevice))
+                RefreshStatus();
+        }
+
+        private void OnBoundTo(string device)
+        {
+            RefreshStatus();
+        }
+
+        private void RefreshStatus()
+        {
+            var config = AppConfig.Settings?.Base;
+            bool on = config != null && config.ShutterRemoteEnabled;
+            string device = config == null ? string.Empty : config.ShutterRemoteDevice;
+
+            btnRebind.IsEnabled = on;
+            txtBindStatus.ToolTip = string.IsNullOrEmpty(device) ? null : device;
+
+            if (!on)
+            {
+                txtBindStatus.Text = "Switched off - tick the box above to use a remote.";
+                return;
+            }
+
+            if (string.IsNullOrEmpty(device))
+            {
+                // The armed state. Said plainly, because the operator has to DO something for this to
+                // resolve and nothing else on screen is going to tell them what.
+                txtBindStatus.Text = "Waiting - press a button on your remote to bind it.";
+                return;
+            }
+
+            txtBindStatus.Text = "Bound to " + Short(device);
+        }
+
+        /// <summary>
+        /// The raw-input device path is a wall of braces and hex that means nothing at a glance. Show the
+        /// part that distinguishes one remote from another, and keep the whole path in the tooltip for
+        /// when someone genuinely needs it.
+        /// </summary>
+        private static string Short(string device)
+        {
+            if (string.IsNullOrEmpty(device))
+                return "?";
+
+            int vid = device.IndexOf("VID", System.StringComparison.OrdinalIgnoreCase);
+            if (vid >= 0)
+            {
+                int end = device.IndexOf('#', vid);
+                string chunk = end > vid ? device.Substring(vid, end - vid) : device.Substring(vid);
+                if (chunk.Length > 0)
+                    return chunk;
+            }
+
+            return device.Length > 40 ? "..." + device.Substring(device.Length - 37) : device;
+        }
+
+        private void btnRebind_Click(object sender, RoutedEventArgs e)
+        {
+            // Forget, then listen again. Same two steps the tick does, without making the operator toggle
+            // the enable off and on - which also stops and restarts the hook for no reason.
+            RemoteDevices.ClearBinding();
+            RemoteDevices.ArmBinding();
+            RefreshStatus();
         }
     }
 }

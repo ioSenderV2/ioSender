@@ -17,6 +17,20 @@
                       Margin="5,0,0,0" IsChecked="{Binding Path=ShutterRemoteEnabled, Mode=TwoWay}"
                       ToolTip="Lets a cheap Bluetooth camera shutter remote act as a one-button pendant, so you can answer a prompt or hold the machine with your hands on the work instead of at the keyboard. Pair the remote to Windows as an ordinary keyboard first - ioSender does not pair to it itself. Off by default: it listens using a system-wide keyboard hook, and nobody who has not asked for that should get it."/>
 
+            <!-- Binding status. Ticking the box arms a one-shot bind; this is what says so, and what
+                 reports the result. Without it the whole thing happens silently apart from a chime, and
+                 an operator has no way to tell "waiting for your press" from "not working". -->
+            <Border x:Uid="bdr_remoteBinding" Margin="5,10,0,0" Padding="8,6" CornerRadius="3"
+                    BorderThickness="1" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Uid="lbl_remoteBindStatus" x:Name="txtBindStatus" VerticalAlignment="Center"
+                               TextWrapping="Wrap" Text="Not bound"/>
+                    <Button x:Uid="btn_remoteRebind" x:Name="btnRebind" Content="Rebind" Margin="12,0,0,0"
+                            Padding="10,2" VerticalAlignment="Center" Click="btnRebind_Click"
+                            ToolTip="Forget the bound remote and listen for the next button press. Use this after replacing the remote."/>
+                </StackPanel>
+            </Border>
+
             <TextBlock x:Uid="lbl_remoteWhatKeysDo" Margin="5,10,0,0" TextWrapping="Wrap" Opacity="0.75"
                        Text="These remotes send a media key, not a letter, and Windows never delivers one to an ordinary window. The remote's two buttons send different keys - on the PICO the Android button sends volume up and the iOS button volume down - so both are accepted."/>
 
