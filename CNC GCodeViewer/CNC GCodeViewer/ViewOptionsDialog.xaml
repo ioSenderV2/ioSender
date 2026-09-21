@@ -42,12 +42,16 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <TextBlock x:Uid="vo_lblCut" Grid.Row="0" Grid.Column="0" Text="Cut moves" VerticalAlignment="Center" Margin="0,3"/>
+            <TextBlock x:Uid="vo_lblCut" Grid.Row="0" Grid.Column="0" Text="Cut moves" VerticalAlignment="Center" Margin="0,3" Background="Transparent"
+                       ToolTip="Drawn as lines, which are not lit - this colour appears in the view exactly as picked."/>
             <local:ColorPicker x:Uid="vo_clrCut" x:Name="clrCut" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Margin="12,3,0,3"
+                               ToolTip="Drawn as lines, which are not lit - this colour appears in the view exactly as picked."
                                SelectedColor="{Binding Path=CutColor, Mode=TwoWay}"/>
 
-            <TextBlock x:Uid="vo_lblRapid" Grid.Row="1" Grid.Column="0" Text="Rapid moves" VerticalAlignment="Center" Margin="0,3"/>
+            <TextBlock x:Uid="vo_lblRapid" Grid.Row="1" Grid.Column="0" Text="Rapid moves" VerticalAlignment="Center" Margin="0,3" Background="Transparent"
+                       ToolTip="Drawn as lines, which are not lit - this colour appears in the view exactly as picked."/>
             <local:ColorPicker x:Uid="vo_clrRapid" x:Name="clrRapid" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="12,3,0,3"
+                               ToolTip="Drawn as lines, which are not lit - this colour appears in the view exactly as picked."
                                SelectedColor="{Binding Path=RapidColor, Mode=TwoWay}"/>
 
             <TextBlock x:Uid="vo_lblStock" Grid.Row="2" Grid.Column="0" Text="Stock" VerticalAlignment="Center" Margin="0,3" Background="Transparent"
