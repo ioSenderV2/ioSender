@@ -151,6 +151,17 @@ namespace CNC.Controls.Viewer
             // Jogging and running did not help, because neither changes anything the scene signature
             // watches. Only the settings themselves do, and they have an event for exactly this.
             GrblSettings.SettingsReloaded += Settings_Reloaded;
+
+            // The stored-position markers come from the $# report, which arrives on its own schedule -
+            // and the settings hook above does not cover it, because $# is not settings. Same shape as
+            // the envelope: data the scene needs, landing after the scene was built, with nothing asking
+            // for a redraw. Watching the collection covers both the late arrival and a later re-teach.
+            GrblWorkParameters.CoordinateSystems.CollectionChanged += CoordinateSystems_Changed;
+        }
+
+        private void CoordinateSystems_Changed(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            Dispatcher.BeginInvoke(new System.Action(ScheduleBuild), DispatcherPriority.Background);
         }
 
         /// <summary>
@@ -183,6 +194,7 @@ namespace CNC.Controls.Viewer
         private void CarveView_Unloaded(object sender, RoutedEventArgs e)
         {
             GrblSettings.SettingsReloaded -= Settings_Reloaded;
+            GrblWorkParameters.CoordinateSystems.CollectionChanged -= CoordinateSystems_Changed;
             if (wpos != null)
                 wpos.PropertyChanged -= Wpos_PropertyChanged;
             if (model != null)
@@ -443,7 +455,11 @@ namespace CNC.Controls.Viewer
             });
 
             // stored-position markers, inside the envelope they are measured against
-            AddPositionMarkers(zmin);
+            int marked = AddPositionMarkers(zmin);
+            if (DebugLog.Enabled)
+                DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "markers drawn={0} of {1} | coordinateSystems={2}",
+                    marked, MarkedPositions.Length, GrblWorkParameters.CoordinateSystems.Count));
 
             // stock: the solid carve mesh (deforms as the cutter passes) when a program is loaded; otherwise a
             // plain default block. Only one of them is shown so there is no z-fighting/see-through.
@@ -997,13 +1013,15 @@ namespace CNC.Controls.Viewer
         /// the grid. Without the dropline a point floating in a wireframe box is unplaceable by eye, which
         /// is the whole reason for drawing it.
         /// </summary>
-        private void AddPositionMarkers(double bedZ)
+        private int AddPositionMarkers(double bedZ)
         {
+            int drawn = 0;
             foreach (string code in MarkedPositions)
             {
                 var cs = GrblWorkParameters.CoordinateSystems.FirstOrDefault(c => c.Code == code);
                 if (!IsTaught(cs))
                     continue;
+                drawn++;
 
                 var p = MarkerPoint(cs);
                 // G30 is where you stand to change a tool; G59.3 is where the tool gets measured. Two
@@ -1031,6 +1049,8 @@ namespace CNC.Controls.Viewer
                     Foreground = new SolidColorBrush(colour)
                 });
             }
+
+            return drawn;
         }
 
         // The cone follows the live work position when not simulating; playback owns it while playing.
