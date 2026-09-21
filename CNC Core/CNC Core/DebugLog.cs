@@ -99,6 +99,10 @@ namespace CNC.Core
                     return;
                 }
 
+                // The link gate lives in CNC.Common, which cannot reference this - hand it a sink. It only
+                // reports contention, i.e. the case that used to corrupt a reply silently.
+                WaitFor.Log = message => Write("link", message);
+
                 // Run-start banner so multiple runs appended to the same file stay separable.
                 string ver = "?";
                 try { ver = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "?"; }

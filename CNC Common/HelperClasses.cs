@@ -300,6 +300,62 @@ namespace CNC.Core
     }
     public static class WaitFor
     {
+        #region Link gate
+
+        /// <summary>
+        /// One command-and-ack transaction on the link at a time.
+        ///
+        /// Every ack wait here has the same shape: write a command, then read lines until "ok". That is only
+        /// sound if nothing else writes in the meantime, and until this gate nothing enforced it. Controller
+        /// queries run their wait on a worker thread while PUMPING the UI thread (EventUtils.RunPumped), so
+        /// ordinary dispatcher work keeps running underneath - and dispatcher work issues queries of its own.
+        ///
+        /// Observed on hardware 2026-09-21, at connect: $I+ was still streaming its report when the 3D view
+        /// rebuilt, ran the emulator, and wrote $G. Both waits were then live on one link and both took the
+        /// SAME "ok" - $I's - as their answer. From there every reply was attributed to the previous command:
+        /// $# returned res=true having read a parser-state line, and its real report, [HOME:] included,
+        /// arrived 49 ms later with no reader attached. HomedMask stayed -1, which is the input to the stored
+        /// position reachability guard.
+        ///
+        /// Note what that failure looks like from inside: a wait that returns TRUE, promptly, having seen a
+        /// genuine "ok". Nothing about it reads as an error. Only the payload was missing, and only a caller
+        /// that checks for a specific line can tell - which is why this is fixed at the transaction and not
+        /// at the one query where it happened to be visible.
+        ///
+        /// Contending waits queue rather than refuse, so the second query still gets its answer, just in
+        /// turn. That cannot deadlock: the thread blocked here is a RunPumped worker, and its caller is
+        /// pumping the UI thread meanwhile, which is what delivers the responses the holder is waiting for.
+        /// </summary>
+        private static readonly SemaphoreSlim linkGate = new SemaphoreSlim(1, 1);
+
+        /// <summary>
+        /// Optional trace sink - wired to DebugLog by CNC Core, which this project cannot reference. Only
+        /// contention is reported, and contention is rare, so this does not chatter.
+        /// </summary>
+        public static Action<string> Log;
+
+        private static bool EnterLinkGate(int msTimeout, string what)
+        {
+            if (linkGate.Wait(0))
+                return true;
+
+            // Bounded by the caller's own timeout: a caller that would only have waited 1000 ms for an
+            // answer must not wait longer than that for a turn. Capped, because the gate can legitimately
+            // be held for a long time (an SD card upload, a homing cycle the controller answers nothing
+            // during) and blocking a nested query behind all of it is worse than telling it "no answer".
+            int budget = Math.Min(Math.Max(msTimeout, 250), 2000);
+
+            var sw = Stopwatch.StartNew();
+            bool acquired = linkGate.Wait(budget);
+
+            Log?.Invoke(string.Format("{0}: link busy, waited {1} ms of {2} - {3}",
+                                      what, sw.ElapsedMilliseconds, budget,
+                                      acquired ? "acquired, proceeding" : "GAVE UP, no command written"));
+            return acquired;
+        }
+
+        #endregion
+
         // https://stackoverflow.com/questions/17635440/how-to-wait-for-a-single-event-in-c-with-timeout-and-cancellation
         public static bool SingleEvent<TEvent>(this CancellationToken token, Action<TEvent> handler, Action<Action<TEvent>> subscribe, Action<Action<TEvent>> unsubscribe, int msTimeout, System.Action initializer = null)
         {
@@ -353,6 +409,11 @@ namespace CNC.Core
         /// </summary>
         public static AckOutcome AckOrErrorResponse<TEvent>(this CancellationToken token, Action<TEvent> handler, Action<Action<TEvent>> subscribe, Action<Action<TEvent>> unsubscribe, int msTimeout, System.Action initializer = null)
         {
+            // See linkGate: nothing else may write while this transaction is open. Reported as Timeout when
+            // the gate is not obtained, which is the truth - no command was sent, so there is no answer.
+            if (!EnterLinkGate(msTimeout, "AckOrErrorResponse"))
+                return AckOutcome.Timeout;
+
             var q = new BlockingCollection<TEvent>();
             Action<TEvent> add = item => { try { q.TryAdd(item); } catch (ObjectDisposedException) { } };
             subscribe(add);
@@ -375,11 +436,17 @@ namespace CNC.Core
             {
                 unsubscribe(add);
                 q.Dispose();
+                linkGate.Release();
             }
         }
 
         public static bool AckResponse<TEvent>(this CancellationToken token, Action<TEvent> handler, Action<Action<TEvent>> subscribe, Action<Action<TEvent>> unsubscribe, int msTimeout, System.Action initializer = null)
         {
+            // See linkGate: nothing else may write while this transaction is open. False when the gate is
+            // not obtained - no command was sent, so "did not answer" is exactly right.
+            if (!EnterLinkGate(msTimeout, "AckResponse"))
+                return false;
+
             var q = new BlockingCollection<TEvent>();
             // A DataReceived callback already in-flight on the comms thread can fire this after the finally
             // block has unsubscribed and disposed q - swallow the resulting ObjectDisposedException (the wait
@@ -402,6 +469,7 @@ namespace CNC.Core
             {
                 unsubscribe(add);
                 q.Dispose();
+                linkGate.Release();
             }
         }
 
