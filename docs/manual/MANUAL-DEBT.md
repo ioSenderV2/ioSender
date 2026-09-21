@@ -547,3 +547,60 @@ running for six weeks.
 ### Not manual debt, recorded so it is not mistaken for debt
 - The link gate (`7d7568b3`), the cone/envelope/marker late-arrival fixes and the remote debounce
   (`f21bc167`) are behaviour fixes with **no UI surface**. Nothing to document.
+
+---
+
+## Debt from the shutter-remote and keyboard-panel work (2026-09-21)
+
+Two new settings pages' worth of behaviour, and one existing page that now treats keys differently.
+None of it is documented anywhere in the manual today.
+
+### New topic owed: the shutter remote
+
+The remote went from "a tick on the Height map tab that answers height-map holds" to a bound, per-state
+configurable pendant. The manual has **nothing** on it. Worth its own topic, or a section under Settings.
+What it needs to say:
+
+- **Pairing is Windows' job.** Pair the remote as an ordinary Bluetooth keyboard; ioSender never pairs to
+  it. Then tick **Settings → App → User Interface → Remote**.
+- **Binding**: ticking the box arms a one-shot bind, and the next button press claims the device *and*
+  decides which button is PRIMARY. Untick and retick to rebind after replacing a remote. There is a
+  **Rebind** button for the same thing without toggling the enable.
+- **The buttons are not labelled up/down** — and on the common PICO the larger top button sends volume
+  DOWN. That is why the binding press defines the primary button rather than the manual naming one.
+- **A bound remote's buttons belong to ioSender**: a press that means nothing right now beeps and is
+  discarded. Every other device is ignored entirely, so the machine keyboard's volume keys are untouched.
+- 🔴 **The volume still moves when you press the remote, and cannot be prevented.** Say so plainly; it
+  looks like a bug otherwise. The reason is in RemoteDevices' header (raw input cannot swallow; the
+  suppression flag is rejected alongside the one that makes an unfocused remote work at all).
+- **The function table**, six rows, each with an On tick: prompt / height map / running / holding / idle /
+  in alarm. The last four are assignable from ten functions (Nothing, Cycle Start, Feed Hold, Stop,
+  Peek/Resume, MDI, Status, Reset, Unlock, Reset and unlock). Defaults reproduce the old fixed behaviour.
+- Worth calling out for safety: **both buttons mean Feed Hold while a job runs**, deliberately, and a
+  prompt with no Cancel button takes **either** button as OK.
+
+### Keyboard panel: keys behave differently in there now
+
+**Settings → App → User Interface → Keyboard**. Pressing a bound shortcut with that panel open **finds**
+it - expands its group and scrolls to it - instead of running it. An unbound combination with a modifier
+beeps. Unbound bare keys still navigate the list as before.
+
+The panel carries a one-line explanation on screen, so the manual mainly needs to not contradict it. If
+the manual anywhere implies shortcuts work normally while the settings page is open, fix that line.
+
+### Screenshots to reshoot / add
+- [ ] **NEW: Settings → App → User Interface → Remote** — the whole page: enable tick, binding status line
+      showing a bound device name, Rebind button, swap tick, and the six-row function table with its
+      dropdowns. This is the lead figure for the remote topic.
+- [ ] **Settings → App → User Interface → Keyboard** — any existing shot is now missing the new paragraph
+      in the help block at the top.
+- [ ] **Height map tab** — the shutter-remote tick is still there and still works, but the setting now has
+      a second home; a caption pointing at the Remote page would save a hunt.
+- [ ] **The settings navigation tree** — it has a new **Remote** node between Keyboard and Controller, so
+      any shot of the tree is stale.
+
+### Not manual debt, recorded so it is not mistaken for debt
+- The pcorner/tlo travel-height clamp, the seek-to-latch probe guard, `ReachableLimit`'s force-set-origin
+  fix, the console-window Owner fix and the `locadd --sync` CSV fix are all behaviour or tooling with **no
+  UI surface**. Nothing to document.
+- The probe false-triggering was **a wiring fault** (bare foil shield), not an app change.
