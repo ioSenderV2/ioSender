@@ -77,6 +77,10 @@ namespace CNC.Controls
         // come back as a different device instance - which is invisible from here without this, and looks
         // exactly like "the remote stopped sending" (which is what it looked like on 2026-09-21).
         private const int RIDEV_DEVNOTIFY = 0x00002000;
+        // Asks the system not to generate the legacy messages for a usage page. Applied ONLY to the
+        // consumer page below - never to the keyboard page, where it would take every keystroke away from
+        // the app and leave no way to type.
+        private const int RIDEV_NOLEGACY = 0x00000030;
         private const int WM_INPUT_DEVICE_CHANGE = 0x00FE;
         private const int RIDI_DEVICEINFO = 0x2000000b;
         private const int RIM_TYPEKEYBOARD = 1;
@@ -505,16 +509,45 @@ namespace CNC.Controls
 
             source.AddHook(WndProc);
 
+            // ---- the suppression attempt ----
+            //
+            // A press on the bound remote should not also move the system volume, and raw input is a READ
+            // path - it cannot swallow anything. The keyboard hook can, but on this remote it never sees
+            // the buttons at all (measured 2026-09-21), so it has nothing to swallow.
+            //
+            // RIDEV_NOLEGACY on the CONSUMER page is the one lever left: it asks the system not to
+            // generate the legacy messages for that page. Whether that is enough to stop the shell acting
+            // on a volume key is genuinely unknown - it is documented in terms of messages, and the shell
+            // may well act from its own raw-input listener instead. So it is TRIED, and what happened is
+            // logged, rather than asserted.
+            //
+            // Two guard rails, because this flag is the sort that can leave a machine unusable:
+            //   - NEVER on the keyboard page. There it would take every keystroke away from the app.
+            //   - If registration fails WITH it, register again WITHOUT it. A remote that moves the volume
+            //     is a nuisance; an app that stopped hearing its remote because a flag was rejected is a
+            //     regression, and the fallback keeps the working behaviour whatever the system thinks of
+            //     the experiment.
             var devices = new[]
             {
                 new RAWINPUTDEVICE { UsagePage = 0x01, Usage = 0x06, Flags = RIDEV_INPUTSINK | RIDEV_DEVNOTIFY, Target = handle },
-                new RAWINPUTDEVICE { UsagePage = 0x0C, Usage = 0x01, Flags = RIDEV_INPUTSINK | RIDEV_DEVNOTIFY, Target = handle }
+                new RAWINPUTDEVICE { UsagePage = 0x0C, Usage = 0x01, Flags = RIDEV_INPUTSINK | RIDEV_DEVNOTIFY | RIDEV_NOLEGACY, Target = handle }
             };
 
             bool ok = RegisterRawInputDevices(devices, devices.Length, Marshal.SizeOf(typeof(RAWINPUTDEVICE)));
+            bool suppressing = ok;
+
+            if (!ok)
+            {
+                int err = Marshal.GetLastWin32Error();
+                DebugLog.Write("remote", "device watch: NOLEGACY rejected (error " + err + ") - registering without it");
+
+                devices[1].Flags = RIDEV_INPUTSINK | RIDEV_DEVNOTIFY;
+                ok = RegisterRawInputDevices(devices, devices.Length, Marshal.SizeOf(typeof(RAWINPUTDEVICE)));
+            }
 
             DebugLog.Write("remote", ok
-                ? "device watch: registered for raw input (keyboard 01/06 + consumer 0C/01, INPUTSINK)"
+                ? "device watch: registered for raw input (keyboard 01/06 + consumer 0C/01, INPUTSINK" +
+                  (suppressing ? " + NOLEGACY on the consumer page - volume should NOT move)" : ")")
                 : "device watch: RegisterRawInputDevices FAILED, error " + Marshal.GetLastWin32Error());
 
             if (ok)

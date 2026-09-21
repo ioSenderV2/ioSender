@@ -222,9 +222,12 @@ namespace CNC.Controls
 
             if (action == null)
             {
-                // Cannot be swallowed from here, so the volume WILL move. Say so rather than beeping into
-                // a key that also turned the volume down - a beep would read as "handled".
-                DebugLog.Write("remote", "shutter remote: nothing was waiting (raw input; the key still reaches Windows)");
+                // Beep and stop. The operator asked for this: a press that finds nothing to do should say
+                // so out loud rather than disappear, so "the remote is not working" and "there is nothing
+                // for it to do right now" sound different. Whether the key ALSO reaches Windows depends on
+                // the suppression experiment in RemoteDevices - the beep is worth having either way.
+                try { System.Media.SystemSounds.Beep.Play(); } catch { }
+                DebugLog.Write("remote", "shutter remote: nothing was waiting - beeped and discarded (raw input)");
                 return;
             }
 
