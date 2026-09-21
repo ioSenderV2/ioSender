@@ -568,7 +568,27 @@ running for six weeks.
 Two new settings pages' worth of behaviour, and one existing page that now treats keys differently.
 None of it is documented anywhere in the manual today.
 
-### New topic owed: the shutter remote
+### New topic owed: the shutter remote — ✅ TEXT DONE 2026-09-21
+
+**Written as its own topic, `#remote` — "A shutter remote as a pendant"** — placed straight after
+`#settings`, with a `shot-todo` where its lead figure goes. It covers pairing, the arm-and-press binding and
+why the press picks the primary button, Rebind, the six-row table with the resolve ORDER stated (a prompt
+beats a height-map hold beats machine state), the ten functions as a table, the two safety callouts, and the
+one-action-per-press / only-the-bound-device / beep-means-heard details. `#settings` now names the **Remote**
+page in the User Interface row, `#heightmap` cross-links it from the hold-at-each-point bullet, and
+`#jogging`'s "a jog key jogs wherever you are" rule carries the Keyboard-panel exception.
+
+⚠️ **The volume item below was overstated, and the manual says something more careful.** Read
+`ShutterRemote.cs`: the hook DOES swallow a press that meant something — that is the whole reason it is
+there. What makes the volume move anyway is that this class of remote is not reliably delivered to the hook
+at all (measured on the PICO 2026-09-21: the machine's own keyboard reached the hook, the remote's buttons
+did not), and the raw-input path that does hear it **can read but not intercept**. So the honest statement is
+"expect the volume to step on each press; there is no setting that fixes it", not "ioSender cannot swallow
+it". 🔴 **The in-app string is the one that is now wrong**: `lbl_remoteFallthrough` on the Remote page says a
+discarded press "never reach[es] the volume control", which is only true on the hook path. Not fixed here —
+it is app text, not manual text.
+
+### (what it needed to say — the original list)
 
 The remote went from "a tick on the Height map tab that answers height-map holds" to a bound, per-state
 configurable pendant. The manual has **nothing** on it. Worth its own topic, or a section under Settings.
@@ -592,7 +612,10 @@ What it needs to say:
 - Worth calling out for safety: **both buttons mean Feed Hold while a job runs**, deliberately, and a
   prompt with no Cancel button takes **either** button as OK.
 
-### Keyboard panel: keys behave differently in there now
+### Keyboard panel: keys behave differently in there now — ✅ TEXT DONE 2026-09-21
+
+Covered by a callout in `#settings` under "Binding a key to a tab or menu entry", plus the exception added to
+`#jogging`'s jog-key rule. Nothing in the manual contradicted it; both additions are new.
 
 **Settings → App → User Interface → Keyboard**. Pressing a bound shortcut with that panel open **finds**
 it - expands its group and scrolls to it - instead of running it. An unbound combination with a modifier

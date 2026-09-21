@@ -714,7 +714,10 @@
       carrying <kbd>Ctrl</kbd> or <kbd>Alt</kbd> still fires even with the caret in a field, because it can't
       be mistaken for typing. Jogging while a setup dialog is open — lining a fixture up by eye — is the case
       this was built for. And a key <em>release</em> always stops a continuous jog, whatever has focus by
-      then: that's a moving machine, not a UI detail.</div>
+      then: that's a moving machine, not a UI detail.<br><br>
+      <strong>One exception:</strong> while <a href="#settings">Settings → User Interface →
+      Keyboard</a> is open, a bound shortcut is <em>found</em> in the list rather than run — see that
+      page. Jog keys are unaffected.</div>
 
     <h3>Step vs continuous</h3>
     <p><strong>Step</strong> moves an exact distance per press — use small steps for fine positioning near the
@@ -2185,7 +2188,9 @@
       so on anything non-conductive the plate has to travel with the probe. Ticked, the machine positions over
       each point and <em>waits</em>: put the plate under the bit and press <strong>Continue</strong> (Cycle
       Start does the same). It holds before every point except the first, where you are already standing at the
-      machine. Untick it only where the probe reaches the surface on its own.</li>
+      machine. Untick it only where the probe reaches the surface on its own. There is a tick on this panel
+      for a <a href="#remote">Bluetooth shutter remote</a> too &mdash; it releases each point from your hand,
+      which is what it was bought for, and it is the same switch as the one on the Remote settings page.</li>
       <li><strong>Drop allowance.</strong> Between points the tool lifts clear of the surface and then
       searches that lift <em>plus</em> this allowance, so a point up to the allowance lower than the one
       before it is still found. The note under the field spells out all three distances in millimetres as you
@@ -2582,7 +2587,7 @@
       <tr><td><strong>Application</strong></td><td>One page per panel — <strong>Main</strong> is how ioSender <em>talks to the controller</em> (reset delay, poll interval, buffer size and aggressive buffering, comment/line-number handling, prefer-network-if-available, and the grbl auto-save pair), plus <strong>Work Order</strong>, <strong>Camera</strong> and <strong>Demo recording (OBS)</strong>. How the app itself <em>looks and behaves</em> is not here — that's User Interface → General, below.</td></tr>
       <tr><td><strong>Jogging</strong></td><td><strong>UI jogging</strong> and <strong>Keyboard jogging</strong> — jog steps and feeds for each, and mirroring them to the controller's firmware jog (<code>$5x</code>). See <a href="#jogging">Jogging</a>.</td></tr>
       <tr><td><strong>G Code</strong></td><td><strong>GCode command stripping</strong> — what gets filtered on the way out to the controller. That is the whole category now: what the <a href="#gcode-viewer">3D view</a> draws is set <em>in the view</em>, from its own <strong>View options</strong> button. The <em>GCode Viewer</em> page that used to sit here drove an earlier renderer the app no longer uses, so nothing on it affected anything; it has been removed rather than left to mislead.</td></tr>
-      <tr><td><strong>User Interface</strong></td><td><strong>General</strong> — how the app itself looks and behaves: keep MDI focus, restore the last window size, friendly Start/Pause run-strip labels, UI scale, the go-to buttons on the <a href="#jogging">jog pad</a>, <strong>ESC closes current tab if closable</strong>, <strong>Show 3D view in split screen on Job tab</strong>, the <strong>status pop-up dwell</strong> slider, and the app's own auto-save / prompt-before-saving pair. Then <strong>Keyboard</strong> and <strong>Controller</strong> (game-controller bindings), <strong>Macros</strong>, <strong>Job tab layout</strong>, and <strong>Top-level tabs</strong>.</td></tr>
+      <tr><td><strong>User Interface</strong></td><td><strong>General</strong> — how the app itself looks and behaves: keep MDI focus, restore the last window size, friendly Start/Pause run-strip labels, UI scale, the go-to buttons on the <a href="#jogging">jog pad</a>, <strong>ESC closes current tab if closable</strong>, <strong>Show 3D view in split screen on Job tab</strong>, the <strong>status pop-up dwell</strong> slider, and the app's own auto-save / prompt-before-saving pair. Then <strong>Keyboard</strong>, <strong>Remote</strong> (a Bluetooth shutter remote as a one-button pendant — see <a href="#remote">A shutter remote as a pendant</a>), <strong>Controller</strong> (game-controller bindings), <strong>Macros</strong>, <strong>Job tab layout</strong>, and <strong>Top-level tabs</strong>.</td></tr>
     </table>
 
     <h3>Four in User Interface → General worth knowing about</h3>
@@ -2753,6 +2758,14 @@
     presses the actual button, so it can't drift from what clicking does, and it's refused while the button
     is disabled.</p>
 
+    <div class="callout tip"><span class="k">In this panel, a shortcut finds itself instead of firing</span><br>
+      Press a bound combination while the <strong>Keyboard</strong> page is open and it does not run the
+      action — it <em>locates</em> it, expanding its group and scrolling the row into view. That is what
+      you want when you are trying to remember what <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>H</kbd> was for, and
+      it means you can sweep a keyboard for collisions without homing the machine by accident. A combination
+      with modifiers that is <em>not</em> bound beeps and does nothing. Unbound bare keys still walk the list
+      as they always did. The page says as much on screen, above the tree.</div>
+
     <h3>Keeping ioSender up to date</h3>
     <p><strong>Help → Support → Check for updates...</strong> checks GitHub for a newer released version and
     walks you through installing it (on a dev build, it instead offers a dropdown of every published release
@@ -2762,6 +2775,126 @@
     work if you haven't updated at least once yet.</p>
 
     <div class="xref">Related: <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a> · <a href="#jogging">Jogging</a> · <a href="#lathe">Lathe</a></div>
+  </section>
+
+  <!-- ===================== REMOTE ===================== -->
+  <section class="topic" id="remote" data-title="A shutter remote as a pendant" data-level="int"
+           data-track="novice:0,intermediate:9,machinist:0">
+    <h2>A shutter remote as a pendant <a class="anchor" href="#remote">#</a></h2>
+    <div class="tags"><span class="tag int">Intermediate</span></div>
+
+    <div class="shot-todo">screenshot: Settings → App → User Interface → Remote — the enable tick, the
+    binding status line showing a bound device, Rebind, the swap tick, and the six-row function table with
+    its dropdowns</div>
+
+    <p>Probing a <a href="#heightmap">height map</a> with a touch plate means: place the plate, press
+    <em>Continue</em>, walk back, place the plate, press <em>Continue</em> — sixteen times for a 4×4 grid,
+    with the laptop across the shop each time. A cheap Bluetooth camera shutter remote solves that, and once
+    ioSender can hear one it is useful well beyond the height map: it can answer any prompt, hold a running
+    job, resume a hold, and get you out of an alarm — all with your hands on the work instead of on the
+    keyboard.</p>
+
+    <h3>What you need, and pairing it</h3>
+    <p>Any of the cheap two-button Bluetooth shutter remotes. They present themselves to Windows as ordinary
+    HID keyboards and send a <strong>media key</strong> — volume up or volume down — rather than Enter.</p>
+    <p><strong>Pair it in Windows,</strong> as you would any Bluetooth keyboard. ioSender never pairs to the
+    remote itself; it only listens for one that Windows has already brought in. It hears the remote whether
+    or not ioSender is the focused window, which is the whole point of a pendant.</p>
+
+    <h3>Turning it on and binding it</h3>
+    <p>Everything is on one page: <strong>Settings → App → User Interface → Remote</strong>.</p>
+    <ol>
+      <li>Tick <strong>A shutter remote drives the machine (volume keys)</strong>. It is <strong>off by
+      default</strong> — listening for a remote means installing a system-wide keyboard hook, and nobody who
+      has not asked for that should get it.</li>
+      <li>The status line under the tick reads <em>"Waiting — press a button on your remote to bind it."</em>
+      Ticking the box <strong>arms a one-shot bind</strong>; nothing is listening to any particular device
+      yet.</li>
+      <li><strong>Press a button on the remote.</strong> You get a chime, and the line changes to
+      <em>"Bound to &lt;your remote&gt; — the button you pressed is the primary one."</em> That press
+      only binds; it does not answer whatever happened to be on screen at the time.</li>
+    </ol>
+    <p>Two buttons, and <strong>the one you press when binding becomes the primary one</strong>. This is
+    deliberate rather than lazy: the buttons are not marked up and down, and which of them sends which media
+    key is the remote's own business — on the common PICO, the <em>larger top button</em> is the one that
+    sends volume <em>down</em>. So rather than the manual telling you which is which and being wrong for your
+    remote, you nominate it by pressing it. Changed your mind? <strong>Swap the two buttons</strong> does
+    exactly that.</p>
+    <p><strong>Rebind</strong> forgets the bound remote and listens for the next press — that is what to use
+    after replacing a remote, or if the wrong device claimed the binding. Unticking and reticking the enable
+    does the same thing, plus stopping and restarting the listener for no reason.</p>
+    <div class="callout note"><span class="k">The same tick is on the Height map tab</span><br>
+      That is where this setting was born, and it is left there on purpose — it is still where most people
+      discover they want it. It is the same switch, in two places, always in step. The <em>function table</em>
+      lives only here.</div>
+
+    <h3>What a press does</h3>
+    <p>The table on the page has one row per situation, each with its own <strong>On</strong> tick, so a
+    behaviour you dislike can be switched off without giving up the remote. The rows are consulted
+    <strong>in this order</strong> — a prompt on screen beats everything, then a height-map hold, and only
+    then does the machine's state decide.</p>
+    <table class="reftab">
+      <tr><th>When</th><th>Primary button</th><th>Secondary button</th><th>Assignable?</th></tr>
+      <tr><td>A prompt is on screen</td><td>OK / Yes</td><td>Cancel / No</td><td>No — on or off only</td></tr>
+      <tr><td>Height map is waiting</td><td>Continue</td><td>Continue</td><td>No — on or off only</td></tr>
+      <tr><td>A job is running</td><td><strong>Feed Hold</strong></td><td><strong>Feed Hold</strong></td><td>Yes</td></tr>
+      <tr><td>The machine is holding</td><td><strong>Cycle Start</strong></td><td><strong>Stop</strong></td><td>Yes</td></tr>
+      <tr><td>The machine is idle</td><td><strong>Nothing</strong></td><td><strong>Nothing</strong></td><td>Yes</td></tr>
+      <tr><td>The machine is in alarm</td><td><strong>Reset and unlock</strong></td><td><strong>Nothing</strong></td><td>Yes</td></tr>
+    </table>
+    <p>The values in bold are the defaults, which reproduce what the remote used to do before any of it was
+    configurable. Idle starts at <em>Nothing</em> on purpose: a pendant that acts when it is nudged on a
+    bench is a trap.</p>
+    <p>The four assignable rows each choose from the same ten functions:</p>
+    <table class="reftab">
+      <tr><th>Function</th><th>What it does</th></tr>
+      <tr><td><strong>Nothing</strong></td><td>The button does nothing in this state. It still beeps, so you know it was heard.</td></tr>
+      <tr><td><strong>Cycle Start</strong></td><td>Start a program, or resume from a hold.</td></tr>
+      <tr><td><strong>Feed Hold</strong></td><td>Decelerate and stop, keeping position.</td></tr>
+      <tr><td><strong>Stop</strong></td><td>End the run.</td></tr>
+      <tr><td><strong>Peek / Resume</strong></td><td>Pause at the end of the current block and park at <code>G30</code> with the spindle off; press again to go back and carry on.</td></tr>
+      <tr><td><strong>MDI (open console)</strong></td><td>Open the console with the caret in its input box.</td></tr>
+      <tr><td><strong>Status</strong></td><td>Show the status message history.</td></tr>
+      <tr><td><strong>Reset</strong></td><td>Soft-reset the controller (<code>Ctrl-X</code>). Stops motion immediately and clears the planner.</td></tr>
+      <tr><td><strong>Unlock</strong></td><td>Clear an alarm (<code>$X</code>) so the machine takes commands again.</td></tr>
+      <tr><td><strong>Reset and unlock</strong></td><td>Soft-reset, then clear the alarm once the controller has restarted — the usual way out of an alarm, in one press.</td></tr>
+    </table>
+    <p>Each of these presses the corresponding button on the <a href="#job">run strip</a>, so the remote can
+    never do something the app itself would refuse. Ask for <em>Cycle Start</em> when the Start button is
+    greyed out and you get the beep, not a surprise.</p>
+
+    <h3>Three things to know before you trust it</h3>
+    <div class="callout warn"><span class="k">Both buttons mean Feed Hold while a job runs</span><br>
+      Deliberately, and it is the shipped default for both. A hand reaching for the remote mid-cut wants the
+      machine to <em>stop</em> — not to pick the right button of two by feel. You can change either one in
+      the table, but think about that before you do.</div>
+    <div class="callout warn"><span class="k">A prompt with no Cancel takes either button as OK</span><br>
+      The commonest prompt of the lot — <em>"move the plate to the next corner, then click OK"</em> — has no
+      Cancel button. There is nothing else the secondary button could mean there, so both answer it. A button
+      that did nothing would just be one you have to remember not to press.</div>
+    <div class="callout warn"><span class="k">The system volume will probably still move</span><br>
+      These are volume keys, and Windows routes media keys to the shell and the audio endpoint on a path that
+      does not pass through ioSender's window at all. ioSender can suppress a press only in the one case where
+      Windows also delivers it as a keystroke — and on the remotes measured so far it does not: the buttons
+      arrive as raw HID input, which can be <em>read</em> but not intercepted. So expect the volume to step on
+      each press. <strong>It is not a fault, and there is no setting that fixes it</strong> — turn the machine
+      PC's volume down, or mute it, and ignore the on-screen volume bar.</div>
+
+    <h3>Odds and ends worth knowing</h3>
+    <ul>
+      <li><strong>One action per physical press.</strong> Holding a button down does not release one
+      height-map point after another while your hand is still on the plate — that is enforced by the
+      button's release, not by a timer.</li>
+      <li><strong>Only the bound remote is yours.</strong> Every other device is ignored entirely, so the
+      machine keyboard's own volume keys go on working exactly as they did.</li>
+      <li><strong>A press that means nothing beeps.</strong> That is the remote telling you it was heard and
+      had nothing to do, which is worth being able to tell apart from a flat battery.</li>
+      <li><strong>Bluetooth remotes sleep.</strong> Waking one can bring it back as a different device
+      instance; ioSender watches for that, but if a remote ever goes quiet for good, <strong>Rebind</strong>
+      is the fix.</li>
+    </ul>
+
+    <div class="xref">Related: <a href="#heightmap">Height map</a> · <a href="#job">The Job screen</a> · <a href="#settings">Settings</a> · <a href="#errors-alarms">Errors &amp; alarms</a></div>
   </section>
 
   <!-- ===================== FEEDS & SPEEDS ===================== -->
