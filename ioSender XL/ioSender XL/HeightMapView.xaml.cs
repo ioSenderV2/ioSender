@@ -47,10 +47,14 @@ namespace GCode_Sender
                 if (value == _area)
                     return;
                 _area = value;
-                // Full work surface is the movable-touch-plate case by default: the board cannot be probed
-                // without putting something conductive under the bit, so holding at each point is the norm
-                // rather than the exception. Set only on the transition, so an explicit untick survives.
-                if (_area == AreaSource.FullTravel)
+                // Full work surface is the movable-touch-plate case: a spoilboard cannot close a circuit, so
+                // something conductive has to go under the bit at every point. Set only on the transition, so
+                // an explicit untick survives.
+                //
+                // Asks which probe is selected, because a 3D probe does not care - it triggers mechanically
+                // and reaches a bare spoilboard on its own. Forcing the hold on for one was asking the
+                // operator to stand at the machine sixteen times for nothing.
+                if (_area == AreaSource.FullTravel && NeedsPlateByHand(cbxProbe.SelectedItem as ProbeDefinition))
                     HeightMap.AddPause = true;
                 DefaultArea();
                 RefreshPreview();
@@ -422,11 +426,23 @@ namespace GCode_Sender
                 .ToList();
 
             var sel = cbxProbe.SelectedItem as ProbeDefinition;
-            cbxProbe.ItemsSource = usable;
-            if (sel != null && usable.Contains(sel))
-                cbxProbe.SelectedItem = sel;
-            else
-                cbxProbe.SelectedItem = usable.FirstOrDefault(p => p.ProbeType == ProbeType.ThreeDProbe) ?? usable.FirstOrDefault();
+            settingProbeSelection = true;
+            try
+            {
+                cbxProbe.ItemsSource = usable;
+                if (sel != null && usable.Contains(sel))
+                    cbxProbe.SelectedItem = sel;
+                else
+                    cbxProbe.SelectedItem = usable.FirstOrDefault(p => p.ProbeType == ProbeType.ThreeDProbe) ?? usable.FirstOrDefault();
+            }
+            finally
+            {
+                settingProbeSelection = false;
+            }
+
+            // Baseline for the transition test below, recorded WITHOUT acting on it: this selection is this
+            // view's own choice, not the operator's.
+            lastProbeNeedsPlate = NeedsPlateByHand(cbxProbe.SelectedItem as ProbeDefinition);
 
             UpdateWarnings();
         }
@@ -1672,11 +1688,54 @@ namespace GCode_Sender
             SaveConfig();
         }
 
+        /// <summary>
+        /// Whether the selected probe has to be carried to each point by hand. A touch plate does - it is a
+        /// loose object that closes a circuit, and a spoilboard will not. A 3D probe and an edge finder
+        /// trigger mechanically and reach the surface on their own.
+        /// </summary>
+        private static bool NeedsPlateByHand(ProbeDefinition p)
+        {
+            return p != null && p.ProbeType == ProbeType.TouchPlate;
+        }
+
+        /// <summary>
+        /// The CLASS of the last selection acted on - not the probe itself. Swapping one plate for another is
+        /// not a transition worth re-asserting a hold the operator has since unticked; going from a plate to
+        /// a 3D probe is. Null until something has been selected.
+        /// </summary>
+        private bool? lastProbeNeedsPlate;
+
+        /// <summary>
+        /// Set while this view is choosing the combo's selection itself, so a programmatic pick never moves
+        /// the hold.
+        ///
+        /// This is load-bearing rather than tidy. Activate() calls RefreshProbes BEFORE LoadConfig, and
+        /// PrepareForSetup - the handoff from Setup's "Probe height map" - calls it with no LoadConfig at
+        /// all. RefreshProbes prefers a 3D probe when it has to choose, so without this guard arriving from
+        /// Setup would silently turn the hold OFF. That is the shape of the 2026-09-18 fault recorded on the
+        /// Area setter above: a height map probed with no holds and no plate under the bit.
+        /// </summary>
+        private bool settingProbeSelection;
+
         private void cbxProbe_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            // Nothing to seed any more: feeds, search distance and latch are read from the selected probe at
-            // run time (see StartProbing) rather than copied into fields on this page that then had to be
-            // kept in agreement with it by hand.
+            // Nothing to SEED: feeds, search distance and latch are read from the selected probe at run time
+            // (see StartProbing) rather than copied into fields on this page that then had to be kept in
+            // agreement with it by hand.
+            //
+            // What does follow from the probe is whether the plate has to be moved by hand between points,
+            // which is the one thing on this page the operator would otherwise have to remember to change
+            // every time they swap probe - and forgetting it in either direction wastes a run.
+            if (settingProbeSelection || loadingConfig)
+                return;
+
+            bool needs = NeedsPlateByHand(cbxProbe.SelectedItem as ProbeDefinition);
+            if (lastProbeNeedsPlate == needs)
+                return;
+
+            lastProbeNeedsPlate = needs;
+            HeightMap.AddPause = needs;
+            SaveConfig();
         }
     }
 }
