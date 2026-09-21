@@ -360,6 +360,7 @@ namespace CNC.Controls
         private string _shutterRemoteDevice = string.Empty;
         private string _shutterRemoteName = string.Empty;
         private bool _shutterRemoteSwap = false;
+        private int _shutterRemotePrimaryCode = 0;
         private bool _remoteOnPrompt = true, _remoteOnHeightMap = true, _remoteOnRun = true, _remoteOnHold = true, _remoteOnIdle = true;
         private string _remoteRunPrimary = "FeedHold", _remoteRunSecondary = "FeedHold";
         private string _remoteHoldPrimary = "CycleStart", _remoteHoldSecondary = "Stop";
@@ -577,6 +578,13 @@ namespace CNC.Controls
         //
         // false = volume up is primary (the common case), true = the two are swapped.
         public bool ShutterRemoteSwapButtons { get { return _shutterRemoteSwap; } set { if (_shutterRemoteSwap != value) { _shutterRemoteSwap = value; OnPropertyChanged(); } } }
+        // The HID report code of the PRIMARY button - the one held down when the remote was bound.
+        //
+        // Not a virtual key. Windows' translation of this remote's consumer usage into a keystroke turned
+        // out to be intermittent (present one run, absent the next, and the keyboard hook saw it once all
+        // day), so the report itself is the only dependable signal. On the operator's PICO the two
+        // buttons report 0x10 and 0x20, with 0x00 for release. Zero means nothing has bound yet.
+        public int ShutterRemotePrimaryCode { get { return _shutterRemotePrimaryCode; } set { if (_shutterRemotePrimaryCode != value) { _shutterRemotePrimaryCode = value; OnPropertyChanged(); } } }
 
         // ---- What the remote's buttons do, per machine state -----------------------------------------
         //

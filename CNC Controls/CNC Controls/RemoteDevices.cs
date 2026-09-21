@@ -73,6 +73,12 @@ namespace CNC.Controls
         private const int RID_INPUT = 0x10000003;
         private const int RIDI_DEVICENAME = 0x20000007;
         private const int RIDEV_INPUTSINK = 0x00000100;
+        // Ask to be told when a device arrives or leaves. A Bluetooth remote SLEEPS, and on waking it can
+        // come back as a different device instance - which is invisible from here without this, and looks
+        // exactly like "the remote stopped sending" (which is what it looked like on 2026-09-21).
+        private const int RIDEV_DEVNOTIFY = 0x00002000;
+        private const int WM_INPUT_DEVICE_CHANGE = 0x00FE;
+        private const int RIDI_DEVICEINFO = 0x2000000b;
         private const int RIM_TYPEKEYBOARD = 1;
         private const int RIM_TYPEHID = 2;
 
@@ -87,6 +93,10 @@ namespace CNC.Controls
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool RegisterRawInputDevices(RAWINPUTDEVICE[] devices, int count, int size);
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern int GetRawInputDeviceList(IntPtr list, ref uint count, int size);
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern int GetRawInputDeviceInfo(IntPtr hDevice, int command, IntPtr data, ref int size);
         [DllImport("user32.dll", SetLastError = true)]
         private static extern int GetRawInputData(IntPtr hRawInput, int command, IntPtr data, ref int size, int headerSize);
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
@@ -380,8 +390,25 @@ namespace CNC.Controls
         }
 
         /// <summary>
-        /// Is this key the primary button? Everything above the hook is written in terms of primary and
-        /// second, never up and down, because up and down are not written on the remote.
+        /// Is this HID button code the primary button? Compared against the code captured at binding, so
+        /// it needs no knowledge of which physical button sends which consumer usage - which is just as
+        /// well, since the usage does not reliably become a key at all.
+        /// </summary>
+        public static bool IsPrimaryCode(int code)
+        {
+            var cfg = AppConfig.Settings?.Base;
+            bool swapped = cfg != null && cfg.ShutterRemoteSwapButtons;
+            int primary = cfg == null ? 0 : cfg.ShutterRemotePrimaryCode;
+
+            // Nothing captured yet (a profile bound by an older build): fall back to "the lower code is
+            // primary", which matches the order the buttons report in, rather than refusing to work.
+            bool isPrimary = primary != 0 ? code == primary : code <= 0x10;
+            return isPrimary != swapped;
+        }
+
+        /// <summary>
+        /// Is this key the primary button? The hook's route, kept for machines where the hook does see
+        /// the remote - there the only thing available is the virtual key.
         /// </summary>
         public static bool IsPrimary(bool volumeUp)
         {
@@ -480,8 +507,8 @@ namespace CNC.Controls
 
             var devices = new[]
             {
-                new RAWINPUTDEVICE { UsagePage = 0x01, Usage = 0x06, Flags = RIDEV_INPUTSINK, Target = handle },
-                new RAWINPUTDEVICE { UsagePage = 0x0C, Usage = 0x01, Flags = RIDEV_INPUTSINK, Target = handle }
+                new RAWINPUTDEVICE { UsagePage = 0x01, Usage = 0x06, Flags = RIDEV_INPUTSINK | RIDEV_DEVNOTIFY, Target = handle },
+                new RAWINPUTDEVICE { UsagePage = 0x0C, Usage = 0x01, Flags = RIDEV_INPUTSINK | RIDEV_DEVNOTIFY, Target = handle }
             };
 
             bool ok = RegisterRawInputDevices(devices, devices.Length, Marshal.SizeOf(typeof(RAWINPUTDEVICE)));
@@ -490,7 +517,9 @@ namespace CNC.Controls
                 ? "device watch: registered for raw input (keyboard 01/06 + consumer 0C/01, INPUTSINK)"
                 : "device watch: RegisterRawInputDevices FAILED, error " + Marshal.GetLastWin32Error());
 
-            if (!ok)
+            if (ok)
+                LogDeviceList();
+            else
                 Stop();
         }
 
@@ -508,6 +537,17 @@ namespace CNC.Controls
 
         private static IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
+            if (msg == WM_INPUT_DEVICE_CHANGE)
+            {
+                // wParam: 1 = arrived, 2 = removed. lParam is the device handle.
+                int change = (int)wParam;
+                DebugLog.Write("remote", string.Format(CultureInfo.InvariantCulture,
+                    "DEVICE {0}: {1}", change == 2 ? "REMOVED" : "ARRIVED", NameOf(lParam)));
+                if (change == 2)
+                    names.Remove(lParam);
+                return IntPtr.Zero;
+            }
+
             if (msg == WM_INPUT)
             {
                 // Stamped FIRST, before any of the work below, so the number compared against the hook's
@@ -557,19 +597,54 @@ namespace CNC.Controls
                 {
                     string name = NameOf(device);
 
+                    // RAWHID is dwSizeHid, dwCount, then the report(s). Byte 0 of a report is its id; the
+                    // rest is the payload, and for a consumer-control remote that payload is a bitmap of
+                    // which button is down - 0 when they are all up. Measured on the PICO 2026-09-21:
+                    //     03 10  primary down     03 20  secondary down     03 00  released
+                    int reportSize = Marshal.ReadInt32(buffer, HeaderSize);
+                    int code = 0;
+                    for (int i = 1; i < reportSize && i < 16; i++)
+                        code |= Marshal.ReadByte(buffer, HeaderSize + 8 + i);
+
                     // This is the event that carries a usable identity, and it arrives before the hook -
                     // so recording it here is what lets the hook, microseconds later, know what pressed.
                     lastDevice = name;
                     lastDeviceAt = at;
 
-                    DebugLog.Write("remote", string.Format(CultureInfo.InvariantCulture,
-                        "RAWINPUT  t={0:F3}ms  hid  {1} bytes  device={2}",
-                        at, size - HeaderSize, name));
+                    // THE BYTES. Windows' synthesis of a keyboard event for a consumer usage is
+                    // intermittent on this remote - present one run, absent the next - so the HID report
+                    // is the only signal that is always there, and which button was pressed has to come
+                    // out of it rather than out of a vk. Logged to find out which byte says which.
+                    var hex = new StringBuilder();
+                    int payload = size - HeaderSize;
+                    for (int i = 0; i < payload && i < 32; i++)
+                        hex.Append(Marshal.ReadByte(buffer, HeaderSize + i).ToString("X2")).Append(' ');
 
-                    if (armed && !string.IsNullOrEmpty(name) && name != "?")
+                    DebugLog.Write("remote", string.Format(CultureInfo.InvariantCulture,
+                        "RAWINPUT  t={0:F3}ms  hid  {1} bytes  [{2}] code=0x{3:X2} device={4}",
+                        at, payload, hex.ToString().Trim(), code, name));
+
+                    // A button going DOWN on the bound device. Release (code 0) ends the press; it is
+                    // what lets a held button be one press rather than a stream of them.
+                    if (!armed && IsBound(name))
+                    {
+                        if (code == 0)
+                            ShutterRemote.RawPressReleased();
+                        else
+                            ShutterRemote.PressFromRawInput(IsPrimaryCode(code));
+                    }
+
+                    if (armed && code != 0 && !string.IsNullOrEmpty(name) && name != "?")
                     {
                         armed = false;
                         boundAt = at;
+
+                        // The binding press also says WHICH BUTTON is primary - the one under the thumb
+                        // when the operator said "this is my remote".
+                        if (AppConfig.Settings?.Base != null)
+                            AppConfig.Settings.Base.ShutterRemotePrimaryCode = code;
+                        DebugLog.Write("remote", string.Format(CultureInfo.InvariantCulture,
+                            "primary button = the one just pressed (code 0x{0:X2})", code));
 
                         // Resolved and STORED now, not looked up when the settings page happens to be
                         // shown: the name can only be read while the device is present, and the page is
@@ -591,6 +666,58 @@ namespace CNC.Controls
             finally
             {
                 Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        /// <summary>
+        /// Every raw-input device Windows currently knows about, written to the log once at registration.
+        ///
+        /// Diagnostic, and it earns its place: on 2026-09-21 the remote produced no raw input at all in
+        /// one run having produced it three minutes earlier, and there was no way from inside the app to
+        /// tell "the device is gone" from "the device is here and not reporting to us". Those want
+        /// completely different fixes.
+        /// </summary>
+        private static void LogDeviceList()
+        {
+            try
+            {
+                uint count = 0;
+                int entry = 8 + IntPtr.Size;   // RAWINPUTDEVICELIST: HANDLE + DWORD, padded to pointer size
+                entry = IntPtr.Size == 8 ? 16 : 8;
+
+                if (GetRawInputDeviceList(IntPtr.Zero, ref count, entry) != 0 || count == 0)
+                {
+                    DebugLog.Write("remote", "device list: none reported");
+                    return;
+                }
+
+                IntPtr buffer = Marshal.AllocHGlobal((int)(count * entry));
+                try
+                {
+                    int got = GetRawInputDeviceList(buffer, ref count, entry);
+                    if (got < 0)
+                        return;
+
+                    DebugLog.Write("remote", "device list: " + got + " devices");
+                    for (int i = 0; i < got; i++)
+                    {
+                        IntPtr h = Marshal.ReadIntPtr(buffer, i * entry);
+                        int type = Marshal.ReadInt32(buffer, i * entry + IntPtr.Size);
+                        string name = NameOf(h);
+                        // Only the ones that could possibly be a remote - a mouse list is noise here.
+                        if (type != 0)
+                            DebugLog.Write("remote", string.Format(CultureInfo.InvariantCulture,
+                                "  [{0}] {1}", type == 1 ? "kbd" : "hid", name));
+                    }
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(buffer);
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write("remote", "device list: " + ex.Message);
             }
         }
 

@@ -103,6 +103,15 @@ namespace CNC.Controls
         private static double _hookActedAt = double.NegativeInfinity;
         private const double DuplicateWindowMs = 250d;
 
+        // The raw path's equivalent of _pressActive - see PressFromRawInput.
+        private static bool _rawPressActive = false;
+
+        /// <summary>Every button on the remote is up again: the next report starts a new press.</summary>
+        public static void RawPressReleased()
+        {
+            _rawPressActive = false;
+        }
+
         /// <summary>
         /// True from the first key-down of a physical press until its key-up. ONE action per press, decided
         /// at that first key-down and never revisited, however long the button is held.
@@ -188,11 +197,19 @@ namespace CNC.Controls
         /// So the hook is no longer the way in. It is kept for what only it can do - SWALLOWING a press so
         /// the volume does not move - and this is the path that makes the buttons work either way.
         /// </summary>
-        public static void PressFromRawInput(bool volumeUp)
+        public static void PressFromRawInput(bool isPrimary)
         {
             // The hook got there first on a machine where it does fire: one press, one action.
             if (RemoteDevices.ElapsedMs - _hookActedAt <= DuplicateWindowMs)
                 return;
+
+            // ONE ACTION PER PHYSICAL PRESS, latched at the first report and released by the report that
+            // says all buttons are up. Same rule the hook path enforces with the key-up, and for the same
+            // reason: a held button must not release one height-map point after another while a hand is
+            // still on the plate.
+            if (_rawPressActive)
+                return;
+            _rawPressActive = true;
 
             if (RemoteDevices.PressJustBound())
             {
@@ -201,7 +218,7 @@ namespace CNC.Controls
             }
 
             var resolve = Resolve;
-            System.Action action = resolve == null ? null : resolve(RemoteDevices.IsPrimary(volumeUp));
+            System.Action action = resolve == null ? null : resolve(isPrimary);
 
             if (action == null)
             {
