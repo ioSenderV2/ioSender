@@ -1,0 +1,62 @@
+﻿<UserControl x:Class="CNC.Controls.UiRemoteConfigControl"
+             x:Uid="ctl_uiRemoteConfig"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+    <!-- Settings > User Interface > Remote. The enable lived only on the Height map tab, which is where it
+         was first needed (place the plate, press Continue, sixteen times, laptop across the shop) - but a
+         press now means something during any prompt, any running job and any hold, so the setting belongs
+         with the other input settings rather than inside one feature. The Height map checkbox binds the
+         same property and stays in step. -->
+    <GroupBox x:Uid="grp_uiRemote" Header="Remote" Margin="5">
+        <StackPanel Margin="5">
+            <CheckBox x:Uid="lbl_shutterRemoteEnabled" Content="A shutter remote drives the machine (volume keys)"
+                      Margin="5,0,0,0" IsChecked="{Binding Path=ShutterRemoteEnabled, Mode=TwoWay}"
+                      ToolTip="Lets a cheap Bluetooth camera shutter remote act as a one-button pendant, so you can answer a prompt or hold the machine with your hands on the work instead of at the keyboard. Pair the remote to Windows as an ordinary keyboard first - ioSender does not pair to it itself. Off by default: it listens using a system-wide keyboard hook, and nobody who has not asked for that should get it."/>
+
+            <TextBlock x:Uid="lbl_remoteWhatKeysDo" Margin="5,10,0,0" TextWrapping="Wrap" Opacity="0.75"
+                       Text="These remotes send a media key, not a letter - iOS mode sends volume up, Android mode volume down, and Windows never delivers either to an ordinary window. Both are accepted so the remote works whichever mode it is in."/>
+
+            <Grid Margin="24,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock x:Uid="lbl_remoteHdrWhen" Grid.Row="0" Grid.Column="0" Text="When" FontWeight="Bold" Margin="0,0,18,4"/>
+                <TextBlock x:Uid="lbl_remoteHdrUp" Grid.Row="0" Grid.Column="1" Text="Volume up" FontWeight="Bold" Margin="0,0,18,4"/>
+                <TextBlock x:Uid="lbl_remoteHdrDown" Grid.Row="0" Grid.Column="2" Text="Volume down" FontWeight="Bold" Margin="0,0,0,4"/>
+
+                <TextBlock x:Uid="lbl_remoteRowPrompt" Grid.Row="1" Grid.Column="0" Text="A prompt is on screen" Margin="0,0,18,2"/>
+                <TextBlock x:Uid="lbl_remoteRowPromptUp" Grid.Row="1" Grid.Column="1" Text="OK / Yes" Margin="0,0,18,2"/>
+                <TextBlock x:Uid="lbl_remoteRowPromptDown" Grid.Row="1" Grid.Column="2" Text="Cancel / No" Margin="0,0,0,2"/>
+
+                <TextBlock x:Uid="lbl_remoteRowMap" Grid.Row="2" Grid.Column="0" Text="Height map is waiting" Margin="0,0,18,2"/>
+                <TextBlock x:Uid="lbl_remoteRowMapUp" Grid.Row="2" Grid.Column="1" Text="Continue" Margin="0,0,18,2"/>
+                <TextBlock x:Uid="lbl_remoteRowMapDown" Grid.Row="2" Grid.Column="2" Text="Continue" Margin="0,0,0,2"/>
+
+                <TextBlock x:Uid="lbl_remoteRowRun" Grid.Row="3" Grid.Column="0" Text="A job is running" Margin="0,0,18,2"/>
+                <TextBlock x:Uid="lbl_remoteRowRunUp" Grid.Row="3" Grid.Column="1" Text="Feed Hold" Margin="0,0,18,2"/>
+                <TextBlock x:Uid="lbl_remoteRowRunDown" Grid.Row="3" Grid.Column="2" Text="Feed Hold" Margin="0,0,0,2"/>
+
+                <TextBlock x:Uid="lbl_remoteRowHold" Grid.Row="4" Grid.Column="0" Text="The machine is holding" Margin="0,0,18,2"/>
+                <TextBlock x:Uid="lbl_remoteRowHoldUp" Grid.Row="4" Grid.Column="1" Text="Start / resume" Margin="0,0,18,2"/>
+                <TextBlock x:Uid="lbl_remoteRowHoldDown" Grid.Row="4" Grid.Column="2" Text="Stop" Margin="0,0,0,2"/>
+            </Grid>
+
+            <TextBlock x:Uid="lbl_remoteFallthrough" Margin="5,10,0,0" TextWrapping="Wrap" Opacity="0.75"
+                       Text="At any other time the key is passed straight to Windows and the volume changes as usual, so enabling this does not take your volume keys away. Both keys mean Feed Hold while a job runs on purpose: a hand reaching for the remote mid-cut wants the machine to stop, and a press that did nothing because the remote was in the other mode is the worst outcome of that reach."/>
+        </StackPanel>
+    </GroupBox>
+</UserControl>

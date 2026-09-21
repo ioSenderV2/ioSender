@@ -393,6 +393,9 @@
     <Compile Include="UiGeneralConfigControl.xaml.cs">
       <DependentUpon>UiGeneralConfigControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="UiRemoteConfigControl.xaml.cs">
+      <DependentUpon>UiRemoteConfigControl.xaml</DependentUpon>
+    </Compile>
     <Compile Include="PanelFlyout.xaml.cs">
       <DependentUpon>PanelFlyout.xaml</DependentUpon>
     </Compile>
@@ -570,6 +573,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="UiGeneralConfigControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UiRemoteConfigControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

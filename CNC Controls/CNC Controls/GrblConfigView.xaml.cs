@@ -200,6 +200,7 @@ namespace CNC.Controls
             // views - usually after this Setup - so place present controls now and react to later additions.
             model.ConfigControls.Add(new BasicConfigControl());
             model.ConfigControls.Add(new UiGeneralConfigControl());
+            model.ConfigControls.Add(new UiRemoteConfigControl());
             model.ConfigControls.Add(new OddJobsSettingsControl());
             model.ConfigControls.Add(new JogUiConfigControl());
             model.ConfigControls.Add(new JogConfigControl());

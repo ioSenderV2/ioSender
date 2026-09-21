@@ -68,6 +68,7 @@ TARGETS = [
     ('CNC Controls/CNC Controls/GrblConfigControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/BasicConfigControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/UiGeneralConfigControl.xaml', 'CNC.Controls.WPF'),
+    ('CNC Controls/CNC Controls/UiRemoteConfigControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/OddJobsSettingsControl.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/CustomToolEditDialog.xaml', 'CNC.Controls.WPF'),
     ('CNC Controls/CNC Controls/KbdDefaultSpeedControl.xaml', 'CNC.Controls.WPF'),
