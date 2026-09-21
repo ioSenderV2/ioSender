@@ -218,6 +218,19 @@ namespace CNC.Controls.Viewer
         private void Wpos_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             posEvents++;
+
+            // Logged HERE, not in UpdateTool, and that distinction is the whole point. UpdateTool has
+            // four early returns before its own log line, so its silence during a move proves nothing:
+            // it cannot tell "called 44 times and bailed" from "not called until the end". This handler
+            // has no guards, so its timestamps are the arrival times of the notifications themselves.
+            //
+            // The previous instrument was in the wrong place for exactly that reason - it was placed
+            // where the answer was already filtered.
+            if (DebugLog.Enabled)
+                DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "posEvent #{0} prop={1} pos=({2:0.###},{3:0.###},{4:0.###}) state={5}",
+                    posEvents, e.PropertyName, wpos.X, wpos.Y, wpos.Z, model?.GrblState.State));
+
             UpdateTool();
         }
 
