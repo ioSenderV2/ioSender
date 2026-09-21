@@ -1347,7 +1347,9 @@
       stock against (defined in <a href="#machine-setup">Machine&nbsp;Setup</a>'s Fixture definitions, or the
       built-in <strong>Dynamic</strong> fixture below) and which <strong>Probe</strong> to use — a 3D probe,
       or a Touch Plate (electrical continuity). Safe Z delta sets how high the probe retracts between
-      touches.</li>
+      touches. Only probes that can do the job on offer appear here: a touch plate declared as
+      <em>Flat (Z only)</em> in <a href="#machine-setup">Machine&nbsp;Setup</a> is not offered for finding a
+      corner, because it has no lips to register against the stock's edges.</li>
       <li><strong>Geometry</strong> — only shown when the <strong>Dynamic</strong> fixture is picked: choose
       External/Internal and Is Circle with clickable corner/edge/centre picker grids, so a one-off feature
       that doesn't have a saved fixture position can still be set up here without leaving the tab.</li>
@@ -2304,7 +2306,7 @@
       <tr><td><strong>2 · Home position</strong></td><td>The corner your machine homes to (front-left / front-right / back-left / back-right). Must match where your limit switches actually are — this is also machine origin.</td><td><code>$23</code></td></tr>
       <tr><td><strong>3 · Axis information</strong></td><td>Per axis: travel, max rate, steps/mm, invert direction, limit-switch type and home direction. A <em>Live</em> column shows the controller's current value as you edit. Also <strong>Work surface (spoilboard)</strong> — see below.</td><td><code>$3</code> <code>$5</code> <code>$23</code> <code>$1nn</code></td></tr>
       <tr><td><strong>4 · Homing &amp; limits</strong></td><td>Enable limit switches, homing, force-origin and soft limits; set pull-off, locate/seek feed rates and debounce.</td><td><code>$27</code> <code>$24</code> <code>$25</code> <code>$26</code></td></tr>
-      <tr><td><strong>5 · Probe definitions</strong></td><td>Declare the probes fitted to this machine (touch plate / 3D probe / toolsetter) so probing and <a href="#setup">Setup</a> know what's available.</td><td>—</td></tr>
+      <tr><td><strong>5 · Probe definitions</strong></td><td>Three questions: what probes this machine has, which of them measures tool length, and where <code>G59.3</code> and <code>G30</code> go. Also where the tool-length baseline is probed — see below.</td><td><code>$65</code></td></tr>
       <tr><td><strong>6 · Fixture definitions</strong></td><td>Define your own named workholding fixtures (a specific vise, fence, dog-hole grid…) that <a href="#setup">Setup</a> can pick from, with a captured machine-coordinate reference position.</td><td>—</td></tr>
       <tr><td><strong>7 · Controller macros</strong></td><td>Install the controller-side macro set onto the controller's storage (e.g. <em>Install ATC macros…</em>). This step queries the controller to show what's installed or outdated.</td><td>—</td></tr>
       <tr><td><strong>8 · Build simulator</strong></td><td>Build a grblHAL simulator matching this machine's axes, probe and options — detected automatically, no picks needed — so you can test jobs offline (see <a href="#connect">Connect</a>).</td><td>—</td></tr>
@@ -2335,6 +2337,113 @@
       <a href="#work-order">Work Order</a>'s <strong>Entire spoilboard</strong> Surface toolpath and the
       <a href="#heightmap">Height Map</a>'s <strong>Full work surface</strong> mode. Left undeclared on a
       machine where it isn't true, both run the cutter through open air at one end.</li>
+    </ul>
+
+    <h3>Probes and the reference positions (step 5)</h3>
+    <p>Step 5 is not a list of checkboxes; it is three questions, asked in the order they can actually be
+    answered. The second cannot be asked before the first — there would be nothing to choose from — and the
+    third reads better after both, because it can then name the thing you have just said is sitting there.</p>
+
+    <h4 class="subh">1 · What probes does this machine have?</h4>
+    <ul>
+      <li>A fresh install starts with <strong>one generic touch plate</strong>. Edit it to match the plate you
+      actually own, and add a row for anything else — a toolsetter, a 3D probe, an edge finder. <strong>No 3D
+      probe is seeded</strong>: most machines do not have one, and a definition for a probe you do not own is
+      worse than no definition at all.</li>
+      <li>Nothing here is guessed from the controller. These are facts about your bench, and only you know
+      them.</li>
+      <li>A touch plate gets one extra question, up front beside the type rather than buried among the
+      measurements — <strong>Plate type: Corner (two lips)</strong> or <strong>Flat (Z only)</strong>:
+        <ul>
+          <li><strong>Corner</strong> — two lips meeting at 90°. It sits over the stock's corner, the lips
+          register against the two edges, and it can set X, Y <em>and</em> Z. Only this kind has a
+          <em>Lip width</em> field.</li>
+          <li><strong>Flat</strong> — a plain slab lying on top of the work. It sets Z and nothing else: there
+          is no edge to register against, so <a href="#setup">Setup</a> will not offer it for a corner.</li>
+        </ul>
+      </li>
+    </ul>
+    <div class="callout tip"><span class="k">One plate can be both</span><br>
+      <strong>Turn a corner plate upside down and it is a flat plate.</strong> The lips point up, so touch off
+      near the middle, clear of them. If you own one plate, that is how it does both jobs — and it is the
+      answer to "I have no toolsetter": the app says as much when you pick a corner plate to measure tool
+      length.</div>
+    <p><strong>Edit motion params…</strong> holds how a probe <em>moves</em>: approach speed, re-touch speed,
+    max search distance, back-off distance, edge standoff, drop to side, and the probe tip's offset from the
+    spindle centre in X and Y. Two of those only mean anything when probing <em>sideways</em>, so
+    <strong>Edge standoff</strong> and <strong>Drop to side</strong> are hidden for a flat plate.</p>
+    <div class="callout note"><span class="k">Two settings that have gone</span><br>
+      <strong>Travel speed</strong> and <strong>Target height</strong> are no longer part of a probe
+      definition. Nothing in the app ever read either of them, so they were two more numbers to get wrong for
+      no effect. If you remember setting them, you were not imagining it — they are gone, not hidden.</div>
+
+    <h4 class="subh">2 · Which one measures tool length?</h4>
+    <p>A dropdown over the probes you just defined, asked <em>after</em> they exist. Tool length is measured at
+    the <code>G59.3</code> position, and all the eligible answers probe the same way — straight down — so what
+    this really settles is <em>whose feeds get used</em>, and what advice the page can give you. A dedicated
+    toolsetter is the usual answer; with no toolsetter a touch plate does the same job.</p>
+    <div class="callout tip"><span class="k">Give a plate a seat</span><br>
+      A puck is bolted down and lands in the same place by construction. A plate is a loose object, and it has
+      to be <em>made</em> to land the same way every time — a shallow cutout it drops into, or anything that
+      registers it. Without that, every tool measurement carries however far the plate wandered. For the same
+      reason, put <code>G30</code> and <code>G59.3</code> next to each other.</div>
+    <p><strong>This answer drives <code>$65</code> bit 3</strong>, the controller's "auto-select the toolsetter
+    input near <code>G59.3</code>" flag. The page reads the bit out, says what it currently is and what the
+    probe you chose needs it to be, and offers a button that reads <strong>Turn it on</strong> or <strong>Turn
+    it off</strong> accordingly — greyed out when the controller already agrees. It does <em>not</em> write it
+    silently: this is a controller setting you may have chosen deliberately, and only bit 3 is touched. If
+    <code>$65</code> cannot be read, the page says so rather than guessing.</p>
+    <div class="callout warn"><span class="k">The trap this closes</span><br>
+      Plenty of touch plates are wired onto the ordinary <em>probe</em> input. If <code>$65</code> is set to
+      auto-select the <em>toolsetter</em> input whenever the machine is near <code>G59.3</code>, then a plate
+      on the main input <strong>never triggers</strong> — and the tool-length move drives the bit into the
+      plate looking for a switch that is not listening. That is a real crash, from one bit, and nothing else in
+      the app would have told you.</div>
+
+    <h4 class="subh">3 · Where do the reference positions go?</h4>
+    <p>A tool change runs <code>G30</code> → <code>G59.3</code> → <code>G30</code>: park where you can reach
+    the spindle, go and measure the new tool, come back. Work down these in order — each one is easier once the
+    one above it is known, and each has a <strong>Set from here</strong> button that stores the machine's
+    current position.</p>
+    <ol>
+      <li><strong>Target surface</strong> — <em>only when a plate does the measuring.</em> The spoilboard or
+      table the plate stands on. This is the <strong>floor</strong> for the tool-length probe: the move may
+      travel to 2&nbsp;mm above it and no further, so a plate that never triggers stops in air instead of at
+      the table. Jog a tool down beside the plate until it just touches, then click. A dedicated toolsetter
+      triggers on its own switch at a height that has nothing to do with where the table is, so this row is
+      <em>hidden</em> rather than asked and ignored — which is also why the numbering on screen may start at
+      <em>G59.3</em>.</li>
+      <li><strong><code>G59.3</code> — tool length.</strong> The approach position over whatever measures tool
+      length, centred on it in X and Y, with Z high enough that your <em>longest</em> tool still clears it on
+      the way in.</li>
+      <li><strong><code>G30</code> — tool swap.</strong> Where the machine parks for you to change the tool and
+      where it returns afterwards: near the top of Z, clear of the work, somewhere you can get a spanner to the
+      collet. Set it from the current position, or take the offer to place it <strong>100&nbsp;mm −X</strong> or
+      <strong>+X</strong> from <code>G59.3</code> — that one <em>moves the machine</em>.</li>
+    </ol>
+    <div class="callout note"><span class="k">The search distance is worked out, not typed</span><br>
+      The page computes how far the tool-length probe will search, from the chosen probe's height and the
+      <code>G59.3</code> Z, and tells you: <em>"searches up to n&nbsp;mm down — far enough to reach the target,
+      stopping 2&nbsp;mm above the surface if nothing triggers."</em> It is a <strong>limit</strong>, not a
+      prediction of where the target is. With no target surface set it falls back to a fixed 90&nbsp;mm and
+      says that too, so a search that will fall short is visible here rather than discovered as an alarm
+      partway down.</div>
+
+    <h4 class="subh">The tool-length reference baseline</h4>
+    <p>At the bottom of step 5, <strong>Reference TLO</strong> probes a baseline <em>once</em> against a fixed
+    object at the <code>G59.3</code> position, and every job reuses it — which is what makes "work Z0" the same
+    real height no matter which tool is in the spindle.</p>
+    <ul>
+      <li>That object is the <strong>toolsetter puck</strong> if you have one. With no toolsetter it is a touch
+      plate, which then has to <em>live</em> in that spot rather than being carried to it.</li>
+      <li>Whatever is in the spindle right now is what touches it. Tick <strong>3D probe is in the spindle
+      now</strong> first if that is what is fitted — the tick only appears where the question arises, because a
+      puck can be met either by a rigid tool on the toolsetter input or by a self-triggering 3D probe on the
+      main one, whereas a plate is always on the main input.</li>
+      <li>It runs in <strong>machine coordinates</strong> and leaves your active work offset alone — it does
+      not select <code>G59.3</code> and walk away with it active.</li>
+      <li><strong>Re-run it whenever the physical facts change</strong> — a new puck, a re-levelled machine, a
+      plate that got moved. It is just a fresh probe, not a once-ever commissioning step.</li>
     </ul>
 
     <h3>Controller macros (step 7)</h3>

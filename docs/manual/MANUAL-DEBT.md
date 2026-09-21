@@ -505,33 +505,48 @@ running for six weeks.
       Jogging tracks live; a streaming program does not. The rewrite says so, and points at Play, the
       program list and the DRO instead.
 
-### `#machine-setup` — step 5 is a different screen
-- [ ] **Line 2302** describes step 5 as "Declare the probes fitted to this machine (touch plate /
+### `#machine-setup` — step 5 is a different screen — ✅ TEXT DONE 2026-09-21
+
+Written as a new **"Probes and the reference positions (step 5)"** section in `#machine-setup`, with the
+three questions as `h4` sub-headings in the order the page asks them, plus the step-5 row in the eight-step
+table rewritten (and `$65` added to its grbl-settings column). The `$65` bit-3 trap has its own warn callout;
+the computed search distance has a note saying it is a LIMIT, not a prediction; the plate-with-a-seat advice
+and the adjacent-`G30` advice are both in. The tool-length baseline is its own sub-section, stating that
+Reference TLO runs in machine coordinates and leaves the active offset alone.
+
+**Checked, not assumed:** nothing in the manual ever told the reader to select `G59.3` first, so that item
+needed no correction.
+- [x] **Line 2302** describes step 5 as "Declare the probes fitted to this machine (touch plate /
       3D probe / toolsetter)". It is now a **three-part interview** and needs a real section:
       1. what probes you have, editing the seeded touch plate or defining new ones;
       2. which probe measures tool length — **asked after the probes exist**, not before;
       3. the positions: target surface Z (only when a plate, not a toolsetter, does tool length),
          then G59.3, then G30, with an offer to place G30 100 mm to either side of G59.3.
-- [ ] **`$65` bit 3 is now an OUTPUT of step 5** (`5161b4eb`, `220a1045`). Explain the trap it
+- [x] **`$65` bit 3 is now an OUTPUT of step 5** (`5161b4eb`, `220a1045`). Explain the trap it
       closes: touch plates wired OR'd onto the probe input must NOT auto-select the toolsetter
       input, and the button says "Turn it on"/"Turn it off" according to the probe chosen, greyed
       when the controller already agrees.
-- [ ] **The tool-length search distance is computed**, not typed — from the probe's height and the
+- [x] **The tool-length search distance is computed**, not typed — from the probe's height and the
       G59.3 Z, as a **floor** (`5c9588da`). Do not describe it as a prediction of the target top.
-- [ ] **Reference TLO runs in machine coordinates** and no longer leaves G59.3 as the active WCS
+- [x] **Reference TLO runs in machine coordinates** and no longer leaves G59.3 as the active WCS
       (`2916313d`). If any text says to select G59.3 first, delete it.
-- [ ] Mention the advice the interview gives: put G30 and G59.3 **adjacent**, and give a plate used
+- [x] Mention the advice the interview gives: put G30 and G59.3 **adjacent**, and give a plate used
       as a toolsetter a **repeatable seat** (a shallow cutout) so it lands the same way every time.
 
-### Probe definitions — `#setup` and `#machine-setup`
-- [ ] **Two touch-plate kinds**: corner (two 90° lips) and Z-only (flat). A corner plate can be
+### Probe definitions — `#setup` and `#machine-setup` — ✅ TEXT DONE 2026-09-21
+
+All four live in the new step-5 section: the two plate kinds with the upside-down trick as a tip callout, the
+Lip width field being corner-only, no seeded 3D probe, a note that **Travel speed** and **Target height** are
+gone rather than hidden, and Edge standoff / Drop to side being hidden for a flat plate. `#setup`'s Probe
+bullet now says why a flat plate is not offered for a corner.
+- [x] **Two touch-plate kinds**: corner (two 90° lips) and Z-only (flat). A corner plate can be
       **turned upside down** to act as a Z-only plate, and it says so when chosen for tool length
       (`96d31252`).
-- [ ] **The 3D probe is no longer seeded** — most users do not have one. Any "you will find a 3D
+- [x] **The 3D probe is no longer seeded** — most users do not have one. Any "you will find a 3D
       probe already defined" wording is wrong.
-- [ ] **Travel speed is GONE** from every probe definition (`43ef1da1`) — nothing read it. Also
+- [x] **Travel speed is GONE** from every probe definition (`43ef1da1`) — nothing read it. Also
       **Target height** (`cdc6f3af`). Check the probe-settings tables for both.
-- [ ] **Motion parameters hide Edge standoff and Drop to side for a flat plate** (`fdaae67d`) —
+- [x] **Motion parameters hide Edge standoff and Drop to side for a flat plate** (`fdaae67d`) —
       they only mean something when probing sideways.
 
 ### `#job` — two new controls
