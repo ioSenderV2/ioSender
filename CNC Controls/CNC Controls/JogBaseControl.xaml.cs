@@ -38,7 +38,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -737,6 +739,168 @@ namespace CNC.Controls
             string tag = (string)(sender as Button)?.Tag;
             if (tag != null && tag.Length == 2)
                 GoToCorner(tag[1] == 'R', tag[0] == 'T');
+        }
+
+        // ---- Go to a stored position -------------------------------------------------------------------
+
+        /// <summary>One thing the machine can be sent to, as the operator would recognise it.</summary>
+        private class GotoTarget
+        {
+            public string Name;         // "Vise", "G28", "G54"
+            public string Kind;         // what sort of thing it is, for the menu's grouping
+            public double X, Y, Z;      // MACHINE coordinates
+        }
+
+        /// <summary>
+        /// Everything worth offering: the fixtures that have a captured position, the stored machine
+        /// positions that have been set, and the work offsets that are not still at zero.
+        ///
+        /// Zero is the filter throughout, and it is the same convention the rest of the app uses - grbl has
+        /// no "is defined" flag for any of these, so all-zero is what never-been-set looks like. It also
+        /// happens to be the right SAFETY filter: an unset G28 reads as machine zero, and offering "go to
+        /// G28" on a machine whose G28 was never taught would send it to the top corner at rapid.
+        /// </summary>
+        private List<GotoTarget> BuildGotoTargets()
+        {
+            var list = new List<GotoTarget>();
+
+            foreach (var fx in Fixtures.Items)
+                if (fx.HasPosition)
+                    list.Add(new GotoTarget { Name = fx.Name, Kind = "Fixture", X = fx.X, Y = fx.Y, Z = fx.Z });
+
+            foreach (var cs in GrblWorkParameters.CoordinateSystems)
+            {
+                bool any = false;
+                for (int i = 0; i < GrblInfo.NumAxes && i < cs.Values.Length; i++)
+                    if (!double.IsNaN(cs.Values[i]) && cs.Values[i] != 0d)
+                        any = true;
+                if (!any)
+                    continue;
+
+                // G92 is an offset applied ON TOP of the active WCS, not a place - there is nothing to go
+                // to. Everything else here resolves to a machine position.
+                if (cs.Code == "G92")
+                    continue;
+
+                list.Add(new GotoTarget
+                {
+                    Name = cs.Code,
+                    Kind = cs.IsSelectableWcs ? "Work offset" : "Stored position",
+                    X = cs.Values.Length > 0 ? cs.Values[0] : 0d,
+                    Y = cs.Values.Length > 1 ? cs.Values[1] : 0d,
+                    Z = cs.Values.Length > 2 ? cs.Values[2] : 0d
+                });
+            }
+
+            return list;
+        }
+
+        private void GotoTargets_Click(object sender, RoutedEventArgs e)
+        {
+            var btn = sender as FrameworkElement;
+            var menu = btn?.ContextMenu;
+            var model = DataContext as GrblViewModel;
+            if (menu == null)
+                return;
+
+            menu.Items.Clear();
+
+            var targets = BuildGotoTargets();
+            if (model == null || targets.Count == 0)
+            {
+                menu.Items.Add(new MenuItem { Header = "Nothing stored to go to yet", IsEnabled = false });
+            }
+            else
+            {
+                string kind = null;
+                foreach (var t in targets)
+                {
+                    if (t.Kind != kind)     // a separator where the sort of thing changes
+                    {
+                        if (kind != null)
+                            menu.Items.Add(new Separator());
+                        kind = t.Kind;
+                    }
+
+                    menu.Items.Add(new MenuItem
+                    {
+                        Header = t.Name,
+                        Tag = t,
+                        // Where it will actually go, before it goes - these are machine coordinates, and a
+                        // fixture's name says nothing about where it is.
+                        ToolTip = string.Format(CultureInfo.CurrentCulture, "{0}\r\nMachine X {1:0.0##}  Y {2:0.0##}\r\nZ retracts to the top first; Z {3:0.0##} is NOT driven to.",
+                                                t.Kind, t.X, t.Y, t.Z)
+                    });
+                }
+
+                foreach (var item in menu.Items)
+                    if (item is MenuItem mi)
+                        mi.Click += GotoTarget_Click;
+            }
+
+            menu.PlacementTarget = btn;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Right;
+            menu.IsOpen = true;
+        }
+
+        private void GotoTarget_Click(object sender, RoutedEventArgs e)
+        {
+            var t = (sender as MenuItem)?.Tag as GotoTarget;
+            if (t != null)
+                GoToMachineXY(t.X, t.Y, t.Name);
+        }
+
+        /// <summary>
+        /// Retract Z, then travel to a machine X/Y - the same move the corner buttons make, through the same
+        /// guards, for the same reasons.
+        ///
+        /// Z IS NOT DRIVEN DOWN. The target's own Z is shown in the menu and deliberately not used: the
+        /// operator is asking to be ABOVE a place, and anything that lowered Z on the way to somewhere would
+        /// be a plunge to a height chosen before whatever is currently clamped to the table was clamped
+        /// there.
+        /// </summary>
+        private void GoToMachineXY(double x, double y, string what)
+        {
+            GrblViewModel model = DataContext as GrblViewModel;
+
+            if (model == null)
+                return;
+
+            if (model.HomedState != HomedState.Homed) {
+                model.SetErrorMessage("Go to " + what + ": home the machine first.");
+                return;
+            }
+
+            if (model.IsJobRunning ||
+                 !(model.GrblState.State == GrblStates.Idle || model.GrblState.State == GrblStates.Jog || model.GrblState.State == GrblStates.Tool)) {
+                model.SetErrorMessage("Go to " + what + ": the machine must be idle.");
+                return;
+            }
+
+            if (GrblInfo.MaxTravel.X <= 0d || GrblInfo.MaxTravel.Y <= 0d || GrblInfo.MaxTravel.Z <= 0d) {
+                model.SetErrorMessage("Go to " + what + ": set max travel ($130-$132) first.");
+                return;
+            }
+
+            if (GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1) {
+                model.SetErrorMessage("Go to " + what + ": enable soft limits ($20=1) first.");
+                return;
+            }
+
+            // Clamped rather than refused: a stored position a little outside the envelope (a pull-off
+            // changed, say) should still take the machine as close as it can safely get, which is what the
+            // corner buttons already do. The clamp is what keeps this inside travel whatever is stored.
+            double mx = ClampMachine(0, x), my = ClampMachine(1, y);
+            double mtop = ClampMachine(2, double.MaxValue);
+            double zFeed = RapidFeed(2), xyFeed = Math.Max(RapidFeed(0), RapidFeed(1));
+
+            model.Message = string.Format(CultureInfo.CurrentCulture, "Go to {0} at safe Z - X {1:0.0##} Y {2:0.0##}.", what, mx, my);
+
+            // Z first, then XY, as two queued jogs. $J= rather than G0 throughout: a jog is cancellable,
+            // and it does not touch the modal state or the parser's idea of position - which matters more
+            // here than it looks, given what an offset write can do to that.
+            model.ExecuteCommand(string.Format("$J=G53G21Z{0}F{1}", mtop.ToInvariantString(), Math.Ceiling(zFeed).ToInvariantString()));
+            model.ExecuteCommand(string.Format("$J=G53G21X{0}Y{1}F{2}", mx.ToInvariantString(), my.ToInvariantString(), Math.Ceiling(xyFeed).ToInvariantString()));
         }
 
         private void GoToCorner(bool xMax, bool yMax)

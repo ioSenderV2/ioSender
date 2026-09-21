@@ -160,7 +160,32 @@
                 </Grid>
                 <StackPanel Style="{StaticResource ZAxisVisibleStyle}" VerticalAlignment="Center" Margin="5,0,0,0">
                     <local:JogButton Content="Z+" Style="{StaticResource JogButtonStyle}" JogStart="JogButton_JogStart" JogEnd="JogButton_JogEnd"/>
-                    <local:JogButton Content="Z-" Style="{StaticResource JogButtonStyle}" Margin="0,70,0,0" VerticalAlignment="Top" JogStart="JogButton_JogStart" JogEnd="JogButton_JogEnd"/>
+                    <!-- Go to a stored position. It sits in the gap that used to be Z-'s 70px top margin -
+                         the one square in the pad that was empty, level with the middle row. The margins
+                         below add up to the same 190px the gap version did, so nothing else moves.
+
+                         The list is built as it opens (GotoTargets_Click): which fixtures exist, which
+                         stored positions are set, and which offsets are non-zero all change while this
+                         control is on screen. -->
+                    <Button x:Uid="btn_jogGoto" x:Name="btnJogGoto" Style="{StaticResource JogButtonStyle}" Margin="0,5,0,0"
+                            Click="GotoTargets_Click" ToolTip="Go to a stored position - a fixture, G28/G30, or a work offset. Retracts Z first, then travels in X and Y.">
+                        <Button.ContextMenu>
+                            <ContextMenu/>
+                        </Button.ContextMenu>
+                        <Viewbox Width="34" Height="34">
+                            <Grid Width="100" Height="100">
+                                <!-- A target with a pin dropping into it: "go to a place". -->
+                                <Ellipse Width="76" Height="76" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                                         Stroke="{StaticResource JogBaseBrush}" StrokeThickness="8" Fill="Transparent"/>
+                                <Ellipse Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,28"
+                                         Fill="{StaticResource JogBaseBrush}"/>
+                                <Line X1="50" Y1="2" X2="50" Y2="34" Stroke="{StaticResource JogBaseBrush}" StrokeThickness="8" StrokeStartLineCap="Round"/>
+                                <Line X1="34" Y1="20" X2="50" Y2="36" Stroke="{StaticResource JogBaseBrush}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Line X1="66" Y1="20" X2="50" Y2="36" Stroke="{StaticResource JogBaseBrush}" StrokeThickness="8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            </Grid>
+                        </Viewbox>
+                    </Button>
+                    <local:JogButton Content="Z-" Style="{StaticResource JogButtonStyle}" Margin="0,5,0,0" VerticalAlignment="Top" JogStart="JogButton_JogStart" JogEnd="JogButton_JogEnd"/>
                 </StackPanel>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Width="Auto" Height="Auto" Visibility="{Binding Path=LatheModeEnabled, Converter={StaticResource IsVisibleConverter}}">
