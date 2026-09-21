@@ -112,39 +112,151 @@ namespace CNC.Controls
         private const uint OPEN_EXISTING = 3;
         private static readonly IntPtr INVALID_HANDLE = new IntPtr(-1);
 
+        // ---- the device's friendly name, by two routes ------------------------------------------------
+        //
+        // Route 1 is the HID product string. It is the obvious one and it is what a USB HID device
+        // answers with - but a BLUETOOTH LE HID child frequently has none, which is exactly what happened
+        // here: the first build logged "(unnamed)" for the operator's PICO, 2026-09-21.
+        //
+        // Route 2 is the one that matches what Windows actually shows. "PICO V0.1:079B5C11FFF" in the
+        // Bluetooth list is the BLE device's OWN name, and it lives on the PARENT device node, not on the
+        // HID collection underneath it. So: turn the interface path into a device instance ID, locate the
+        // node, walk up one level, and read the parent's friendly name (falling back to its description).
+        //
+        // Both are tried and WHICH ONE ANSWERED IS LOGGED, because picking one on reasoning alone is how
+        // the first attempt got it wrong.
+
+        [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
+        private static extern int CM_Locate_DevNodeW(out uint devInst, string deviceId, uint flags);
+        [DllImport("cfgmgr32.dll")]
+        private static extern int CM_Get_Parent(out uint parent, uint devInst, uint flags);
+        [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
+        private static extern int CM_Get_DevNode_Registry_PropertyW(uint devInst, uint property,
+                                                                    out uint regDataType, StringBuilder buffer,
+                                                                    ref uint length, uint flags);
+
+        private const int CR_SUCCESS = 0;
+        private const uint CM_DRP_DEVICEDESC = 1;
+        private const uint CM_DRP_FRIENDLYNAME = 13;
+
         /// <summary>
-        /// The name Windows shows for this device, or null when it cannot be read - which is an ordinary
-        /// outcome, not a failure: the remote may be asleep, unpaired or simply not answering, and the
-        /// caller falls back to the path. Never throws.
+        /// The name Windows shows for this device, or null when it cannot be read - an ordinary outcome,
+        /// not a failure: the remote may be asleep, unpaired or simply not answering, and the caller falls
+        /// back to the path. Never throws.
         /// </summary>
         public static string ProductName(string devicePath)
         {
             if (string.IsNullOrEmpty(devicePath))
                 return null;
 
+            string name = HidProductString(devicePath);
+            if (!string.IsNullOrEmpty(name))
+            {
+                DebugLog.Write("remote", "name: HID product string = " + name);
+                return name;
+            }
+
+            name = ParentFriendlyName(devicePath);
+            if (!string.IsNullOrEmpty(name))
+            {
+                DebugLog.Write("remote", "name: parent device node = " + name);
+                return name;
+            }
+
+            DebugLog.Write("remote", "name: neither the HID product string nor the parent node gave one");
+            return null;
+        }
+
+        private static string HidProductString(string devicePath)
+        {
             IntPtr h = INVALID_HANDLE;
             try
             {
                 h = CreateFile(devicePath, 0, FILE_SHARE_READ_WRITE, IntPtr.Zero, OPEN_EXISTING, 0, IntPtr.Zero);
                 if (h == INVALID_HANDLE)
+                {
+                    DebugLog.Write("remote", "name: CreateFile on the device failed, error " + Marshal.GetLastWin32Error());
                     return null;
+                }
 
                 var sb = new StringBuilder(256);
                 if (!HidD_GetProductString(h, sb, sb.Capacity * 2))
+                {
+                    DebugLog.Write("remote", "name: HidD_GetProductString said no");
                     return null;
+                }
 
-                string name = sb.ToString().Trim();
-                return name.Length == 0 ? null : name;
+                return sb.ToString().Trim();
             }
-            catch
+            catch (Exception ex)
             {
-                return null;   // a cosmetic label must never take the app down
+                DebugLog.Write("remote", "name: " + ex.Message);
+                return null;
             }
             finally
             {
                 if (h != INVALID_HANDLE && h != IntPtr.Zero)
                     CloseHandle(h);
             }
+        }
+
+        private static string ParentFriendlyName(string devicePath)
+        {
+            try
+            {
+                string id = InstanceIdFrom(devicePath);
+                if (id == null)
+                    return null;
+
+                uint devInst;
+                if (CM_Locate_DevNodeW(out devInst, id, 0) != CR_SUCCESS)
+                {
+                    DebugLog.Write("remote", "name: could not locate a device node for " + id);
+                    return null;
+                }
+
+                uint parent;
+                if (CM_Get_Parent(out parent, devInst, 0) != CR_SUCCESS)
+                {
+                    DebugLog.Write("remote", "name: the device node has no parent");
+                    return null;
+                }
+
+                return NodeProperty(parent, CM_DRP_FRIENDLYNAME) ?? NodeProperty(parent, CM_DRP_DEVICEDESC);
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write("remote", "name: " + ex.Message);
+                return null;
+            }
+        }
+
+        private static string NodeProperty(uint devInst, uint property)
+        {
+            uint type, len = 512;
+            var sb = new StringBuilder((int)len);
+            if (CM_Get_DevNode_Registry_PropertyW(devInst, property, out type, sb, ref len, 0) != CR_SUCCESS)
+                return null;
+            string s = sb.ToString().Trim();
+            return s.Length == 0 ? null : s;
+        }
+
+        /// <summary>
+        /// Interface path to device instance ID: drop the leading prefix, drop the trailing
+        /// interface-class GUID, and the remaining '#' separators become backslashes.
+        /// </summary>
+        private static string InstanceIdFrom(string devicePath)
+        {
+            string p = devicePath;
+            if (p.StartsWith(@"\\?\", StringComparison.Ordinal) || p.StartsWith(@"\\.\", StringComparison.Ordinal))
+                p = p.Substring(4);
+
+            int guid = p.LastIndexOf("#{", StringComparison.Ordinal);
+            if (guid > 0)
+                p = p.Substring(0, guid);
+
+            p = p.Replace('#', '\\');
+            return p.Length == 0 ? null : p;
         }
 
         // RAWINPUTHEADER is dwType + dwSize (4 each) then hDevice + wParam (pointer-sized), so its length
