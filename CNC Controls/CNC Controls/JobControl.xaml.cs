@@ -446,6 +446,10 @@ namespace CNC.Controls
                 RemoteActions.StartButton = btnStart;
                 RemoteActions.HoldButton = btnHold;
                 RemoteActions.StopButton = btnStop;
+                // Not a button - the run strip has none for it - but the same principle: ONE
+                // implementation, registered by whoever owns it, so a remote assignment cannot drift
+                // from what the keyboard binding of the same name does.
+                RemoteActions.ResetAndUnlock = () => ResetAndUnlock(Key.None);
                 RemoteActions.Sync();
 
                 // Keyboard is the portable JogController unless the host registered the WPF handler

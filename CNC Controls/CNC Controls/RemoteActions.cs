@@ -180,6 +180,13 @@ namespace CNC.Controls
                 case RemoteFunctions.Reset:
                     return () => Grbl.Reset();
 
+                // Registered by JobControl, which owns the one implementation - a soft reset followed by
+                // $X once the controller has warm-restarted, with the delay that makes the $X land. The
+                // delay is not repeated here on purpose: a second copy of a timing constant that exists
+                // because of how a controller restarts is a copy that will drift.
+                case RemoteFunctions.ResetUnlock:
+                    return ResetAndUnlock;
+
                 case RemoteFunctions.Unlock:
                     return Grbl.GrblViewModel == null
                             ? (System.Action)null
@@ -188,6 +195,12 @@ namespace CNC.Controls
 
             return null;   // "None", and anything unrecognised - an unknown setting must read as harmless
         }
+
+        /// <summary>
+        /// Soft-reset then unlock, registered by JobControl (which has the sequence and its delay). Null
+        /// until it has, so an unregistered seam reads as "cannot do that right now" like everything else.
+        /// </summary>
+        public static System.Action ResetAndUnlock;
 
         /// <summary>A keyboard action, or null when nothing has registered a handler for it yet.</summary>
         private static System.Action Action(string id)

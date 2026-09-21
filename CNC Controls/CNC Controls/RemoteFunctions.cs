@@ -59,6 +59,7 @@ namespace CNC.Controls
         public const string Status = "Status";
         public const string Reset = "Reset";
         public const string Unlock = "Unlock";
+        public const string ResetUnlock = "ResetUnlock";
 
         public static readonly Function[] Catalog = new Function[]
         {
@@ -71,6 +72,7 @@ namespace CNC.Controls
             new Function { Id = Status,     Label = "Status",         Description = "Show the status message history." },
             new Function { Id = Reset,      Label = "Reset",          Description = "Soft-reset the controller (Ctrl-X). Stops motion immediately and clears the planner." },
             new Function { Id = Unlock,     Label = "Unlock",         Description = "Clear an alarm ($X) so the machine will take commands again." },
+            new Function { Id = ResetUnlock, Label = "Reset and unlock", Description = "Soft-reset the controller, then clear the alarm once it has restarted - the usual way out of an alarm, in one press." },
         };
 
         /// <summary>The catalogue entry for an id, or the "Nothing" entry when the id is unknown - an
