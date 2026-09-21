@@ -315,6 +315,21 @@ namespace CNC.Controls.Viewer
                         "X={0:0.###} Y={1:0.###} Z={2:0.###} hasOrigin={3} OX={4:0.###} OY={5:0.###}",
                         st.Value.X, st.Value.Y, st.Value.Z, st.Value.HasOrigin, st.Value.OX, st.Value.OY),
                     model?.FileName ?? string.Empty));
+
+                // The envelope's own numbers, because "the machine envelope is not drawn" cannot be told
+                // from "the machine envelope is drawn 1 mm wide at the origin" by looking at the picture -
+                // both are an empty screen with the stock framed by ZoomExtents. Travel comes from
+                // $130-$132 and reads 0 when the lookup misses, which collapses the box; the placement
+                // comes from the work offset. Logging the raw travel, the resulting bounds and the WCO
+                // separates those three causes in one line.
+                DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "envelope travel=({0:0.###},{1:0.###},{2:0.###}) dir=({3:0},{4:0},{5:0}) fso={6} | wco=({7:0.###},{8:0.###},{9:0.###}) | box X {10:0.###}..{11:0.###} Y {12:0.###}..{13:0.###} Z {14:0.###}..{15:0.###}",
+                    Travel(0), Travel(1), Travel(2),
+                    AxisDir(0), AxisDir(1), AxisDir(2), GrblInfo.ForceSetOrigin,
+                    Wco(0), Wco(1), Wco(2),
+                    EnvMin(0) - Wco(0), EnvMax(0) - Wco(0),
+                    EnvMin(1) - Wco(1), EnvMax(1) - Wco(1),
+                    EnvMin(2) - Wco(2), EnvMax(2) - Wco(2)));
             }
 
             if (sig == lastSceneSig && viewport.Children.Count > 0)
