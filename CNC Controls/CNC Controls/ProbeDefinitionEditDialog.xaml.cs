@@ -133,10 +133,6 @@ namespace CNC.Controls
             Show(fldLip, cornerPlate);
             Show(fldBitLength, isPlate);
             Show(fldSetter, type == ProbeType.ToolSetter);
-            // Only the two kinds that can sit at G59.3 and measure tool length have a "height on table"
-            // worth stating - it is what turns the probe's search distance into a computed number rather
-            // than a fixed 90 mm.
-            Show(fldTargetHeight, type == ProbeType.ToolSetter || type == ProbeType.TouchPlate);
             Show(fldSpin, type == ProbeType.EdgeFinder);
 
             // The schematic follows the type - shape + the key measurement labels for that probe.

@@ -37,7 +37,7 @@ namespace CNC.Controls
         private bool _canProbeCorner = true;
         private double _diameter = 2d, _bodyDiameter = 42d, _overallLength = 100d, _searchFeed = 200d, _latchFeed = 50d, _rapidsFeed = 0d,
                        _probeDistance = 25d, _latchDistance = 1d, _xyClearance = 5d, _depth = 10d,
-                       _offsetX = 0d, _offsetY = 0d, _plateThickness = 12d, _lipWidth = 10d, _setterHeight = 0d, _spinRPM = 0d, _bitLength = 40d, _targetHeight = 0d;
+                       _offsetX = 0d, _offsetY = 0d, _plateThickness = 12d, _lipWidth = 10d, _setterHeight = 0d, _spinRPM = 0d, _bitLength = 40d;
 
         public string Name { get { return _name; } set { _name = value; OnChanged(); } }
         public ProbeType ProbeType { get { return _type; } set { _type = value; OnChanged(); OnChanged(nameof(TypeName)); } }
@@ -155,26 +155,6 @@ namespace CNC.Controls
         public double BitLength { get { return _bitLength; } set { _bitLength = value; OnChanged(); } }                // overall length of the bit touching the plate (informational reference)
         public double SetterHeight { get { return _setterHeight; } set { _setterHeight = value; OnChanged(); } }      // tool setter trigger height
 
-        /// <summary>
-        /// How tall this thing stands above the surface it sits on - 50 mm for a typical toolsetter puck,
-        /// 15 mm for a touch plate. Only meaningful for a target used at the G59.3 tool-length position.
-        ///
-        /// It exists so the tool-length probe's search distance can be COMPUTED rather than being the
-        /// literal 90 mm that was hardcoded in three places: knowing where the surface is (
-        /// AppConfig.Base.TloSurfaceZ) and how tall the target is gives the machine Z of its top, and the
-        /// search is the gap from the G59.3 origin down to it plus a margin.
-        ///
-        /// A NEW field rather than reusing SetterHeight, which is labelled "trigger height", feeds
-        /// ProbingViewModel.FixtureHeight, and is documented nowhere as being measured from the table -
-        /// redefining it would silently change what it means for anyone who has already set one. Plate
-        /// thickness is not reused either: it is the same number for a plate standing on the spoilboard,
-        /// but it means "how far below the plate top work Z0 sits", which stops being the same thing the
-        /// moment the plate is packed up on anything.
-        ///
-        /// 0 = not stated, and the search then falls back to the literal. That is the safe direction:
-        /// an unstated height must not produce a computed distance, because a wrong one is a plunge.
-        /// </summary>
-        public double TargetHeight { get { return _targetHeight; } set { _targetHeight = value; OnChanged(); } }
         public double SpinRPM { get { return _spinRPM; } set { _spinRPM = value; OnChanged(); } }                     // spinning edge finder RPM (0 = none)
 
         public ProbeDefinition Clone()
@@ -191,7 +171,6 @@ namespace CNC.Controls
             LatchDistance = o.LatchDistance; XYClearance = o.XYClearance; Depth = o.Depth;
             ProbeOffsetX = o.ProbeOffsetX; ProbeOffsetY = o.ProbeOffsetY;
             PlateThickness = o.PlateThickness; LipWidth = o.LipWidth; BitLength = o.BitLength; SetterHeight = o.SetterHeight; SpinRPM = o.SpinRPM;
-            TargetHeight = o.TargetHeight;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

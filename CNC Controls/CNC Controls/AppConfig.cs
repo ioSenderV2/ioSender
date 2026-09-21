@@ -408,10 +408,13 @@ namespace CNC.Controls
         /// Machine Z of the SURFACE the tool-length target stands on - the spoilboard or table under the
         /// puck or plate. Captured once in Machine Setup step 5 by jogging a tool down to touch it.
         ///
-        /// With this and the target's own height (ProbeDefinition.TargetHeight), the machine Z of the
-        /// target's TOP is known, and the tool-length probe's search distance can be computed as the gap
-        /// from the G59.3 origin down to it plus a margin - instead of the literal 90 mm that was
-        /// hardcoded, which is too far for a short plate low on the table and too short for a tall one.
+        /// It is the FLOOR for the tool-length probe: the probe may travel from the G59.3 origin to just
+        /// above this and no further, instead of the literal 90 mm that was hardcoded - which is too far
+        /// for a short plate low on the table and too short for a tall one. A floor rather than a
+        /// prediction of where the target's top is, because every Z here is the machine's AXIS position
+        /// and the tool tip hangs a tool-length below it, so any prediction is only true for the tool that
+        /// was fitted when it was made. As a bound it cannot mislead: a tool long enough to reach touches
+        /// the target first, a tool too short runs out of travel in air.
         ///
         /// 0 = not captured, and the search then falls back to the literal. Zero is safe to overload here
         /// in a way it is not elsewhere: it is the TOP of Z travel on a router, so a spoilboard sitting at
