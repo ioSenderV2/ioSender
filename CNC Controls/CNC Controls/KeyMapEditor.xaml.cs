@@ -315,14 +315,31 @@ namespace CNC.Controls
             return false;   // an unbound bare key: navigation, and none of our business
         }
 
-        /// <summary>Bring a row into view and select it, so the answer is visible at once.</summary>
+        /// <summary>
+        /// Bring a row into view and select it, so the answer is visible at once.
+        ///
+        /// EXPANDING ITS GROUP IS THE WHOLE JOB. Groups default to collapsed here, and a row inside a
+        /// collapsed Expander is not realised - so ScrollIntoView finds nothing to scroll to and does
+        /// nothing at all, silently. The lookup worked from the first build; it just pointed at a row
+        /// nobody could see, and only looked broken because the operator had to open "Top Level Tabs" by
+        /// hand before the scroll had anywhere to land.
+        ///
+        /// Everything below the expand is therefore deferred to Loaded: expanding is a layout change, and
+        /// the rows it reveals do not exist until that pass has run.
+        /// </summary>
         private void ShowRow(BindingRow row)
         {
             // The keyboard grid only - rows holds the keyboard bindings, and the Controller tab's entries
             // are gamepad buttons, which no keypress can match anyway.
-            //
-            // Deferred to Loaded: the row may be inside a collapsed group, and ScrollIntoView before the
-            // layout pass that expands it does nothing at all. The same trap the grouped program list hit.
+            string group = row.Group?.Name;
+
+            foreach (var ex in FindVisualChildren<Expander>(grid))
+            {
+                string name = (ex.DataContext as CollectionViewGroup)?.Name as string;
+                if (name != null && name == group && !ex.IsExpanded)
+                    ex.IsExpanded = true;     // raises Group_Expanded, so the choice is remembered too
+            }
+
             Dispatcher.BeginInvoke((System.Action)(() =>
             {
                 grid.SelectedItem = row;
