@@ -123,6 +123,7 @@ TARGETS = [
 
     # CNC.Controls.Viewer (the 3D/carve viewer)
     ('CNC GCodeViewer/CNC GCodeViewer/CarveView.xaml', 'CNC.Controls.Viewer'),
+    ('CNC GCodeViewer/CNC GCodeViewer/ViewOptionsDialog.xaml', 'CNC.Controls.Viewer'),
 
     # CNC.Controls.Camera (the camera view + its App-settings panel)
     ('CNC Controls Camera/CNC Controls Camera/ConfigControl.xaml', 'CNC.Controls.Camera'),

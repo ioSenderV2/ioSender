@@ -46,3 +46,15 @@ CNC.Controls.Viewer.g.en-US.resources:carveview.baml,btn_carveStop:System.Window
 CNC.Controls.Viewer.g.en-US.resources:carveview.baml,btn_carveReset:System.Windows.Controls.ContentControl.Content,Button,True,True,,Reset view
 CNC.Controls.Viewer.g.en-US.resources:carveview.baml,cbxSpeed:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Playback speed
 CNC.Controls.Viewer.g.en-US.resources:carveview.baml,txt_carveNoStock:System.Windows.Controls.TextBlock.Text,Text,True,True,,No stock size information
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_intro:System.Windows.Controls.TextBlock.Text,Text,True,True,,What the 3D view draws. Changes apply straight away.
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_rapids:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Rapid moves
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_rapids:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,The grey lines between cuts. Hiding them leaves only the cutting path.
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_stock:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Stock block
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_stock:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The material the program cuts into. Hide it to see the whole toolpath, including the parts inside the material."
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_grid:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Bed grid
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_grid:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The table grid: 50 mm squares, heavier line every 100 mm."
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_stored:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Stored positions
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_stored:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The G30 park and toolsetter signs on the bed, and the dot at machine zero."
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_reset:System.Windows.Controls.ContentControl.Content,Button,True,True,,Reset view
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_reset:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Zoom and centre so the whole scene fits.
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_close:System.Windows.Controls.ContentControl.Content,Button,True,True,,Close
