@@ -749,6 +749,30 @@ namespace CNC.Controls
             public string Name;         // "Vise", "G28", "G54"
             public string Kind;         // what sort of thing it is, for the menu's grouping
             public double X, Y, Z;      // MACHINE coordinates
+            public bool DriveZ;         // see DrivesZ below
+        }
+
+        /// <summary>
+        /// Whether this target's stored Z is somewhere to GO, or merely somewhere that happens to be
+        /// recorded.
+        ///
+        /// For almost everything it is the latter. A fixture's Z and a work offset's Z are at the WORK -
+        /// the top of the stock, the face of a vise jaw - so driving to them is a plunge into whatever is
+        /// clamped there now, at a height decided before it was clamped.
+        ///
+        /// G30 and G59.3 are the exceptions, and they are exceptions by definition rather than by luck.
+        /// G30 is the tool-swap park, set near the top of travel over clear air so you can reach the
+        /// collet. G59.3 is the approach position over whatever measures tool length, and tc.macro's own
+        /// contract requires its Z to be high enough that the LONGEST tool still clears the target on the
+        /// way in. Both stored Zs ARE the height meant to be gone to; stopping at the top instead leaves
+        /// the machine somewhere the operator did not ask for.
+        ///
+        /// G28 is deliberately NOT in this list. It is conventionally a park too, but nothing in this app
+        /// writes or relies on it, so its Z is whatever a previous owner of the machine left there.
+        /// </summary>
+        private static bool DrivesZ(string code)
+        {
+            return code == "G30" || code == "G59.3";
         }
 
         /// <summary>
@@ -766,7 +790,7 @@ namespace CNC.Controls
 
             foreach (var fx in Fixtures.Items)
                 if (fx.HasPosition)
-                    list.Add(new GotoTarget { Name = fx.Name, Kind = "Fixture", X = fx.X, Y = fx.Y, Z = fx.Z });
+                    list.Add(new GotoTarget { Name = fx.Name, Kind = "Fixture", X = fx.X, Y = fx.Y, Z = fx.Z, DriveZ = false });
 
             foreach (var cs in GrblWorkParameters.CoordinateSystems)
             {
@@ -788,7 +812,8 @@ namespace CNC.Controls
                     Kind = cs.IsSelectableWcs ? "Work offset" : "Stored position",
                     X = cs.Values.Length > 0 ? cs.Values[0] : 0d,
                     Y = cs.Values.Length > 1 ? cs.Values[1] : 0d,
-                    Z = cs.Values.Length > 2 ? cs.Values[2] : 0d
+                    Z = cs.Values.Length > 2 ? cs.Values[2] : 0d,
+                    DriveZ = DrivesZ(cs.Code)
                 });
             }
 
@@ -828,8 +853,11 @@ namespace CNC.Controls
                         Tag = t,
                         // Where it will actually go, before it goes - these are machine coordinates, and a
                         // fixture's name says nothing about where it is.
-                        ToolTip = string.Format(CultureInfo.CurrentCulture, "{0}\r\nMachine X {1:0.0##}  Y {2:0.0##}\r\nZ retracts to the top first; Z {3:0.0##} is NOT driven to.",
-                                                t.Kind, t.X, t.Y, t.Z)
+                        ToolTip = string.Format(CultureInfo.CurrentCulture,
+                                    t.DriveZ
+                                      ? "{0}\r\nMachine X {1:0.0##}  Y {2:0.0##}  Z {3:0.0##}\r\nRetracts Z, travels in X and Y, then LOWERS Z to {3:0.0##}."
+                                      : "{0}\r\nMachine X {1:0.0##}  Y {2:0.0##}\r\nRetracts Z and travels in X and Y. Z {3:0.0##} is NOT driven to - it is at the work.",
+                                    t.Kind, t.X, t.Y, t.Z)
                     });
                 }
 
@@ -847,19 +875,24 @@ namespace CNC.Controls
         {
             var t = (sender as MenuItem)?.Tag as GotoTarget;
             if (t != null)
-                GoToMachineXY(t.X, t.Y, t.Name);
+                GoToMachineXY(t.X, t.Y, t.Name, t.DriveZ ? (double?)t.Z : null);
         }
 
         /// <summary>
         /// Retract Z, then travel to a machine X/Y - the same move the corner buttons make, through the same
         /// guards, for the same reasons.
         ///
-        /// Z IS NOT DRIVEN DOWN. The target's own Z is shown in the menu and deliberately not used: the
-        /// operator is asking to be ABOVE a place, and anything that lowered Z on the way to somewhere would
-        /// be a plunge to a height chosen before whatever is currently clamped to the table was clamped
-        /// there.
+        /// Z is driven down ONLY when <paramref name="z"/> is given, which is only for the two targets whose
+        /// stored Z is a height meant to be gone to - see DrivesZ. For everything else the target's Z is at
+        /// the WORK, and lowering to it would be a plunge to a height chosen before whatever is currently
+        /// clamped to the table was clamped there.
+        ///
+        /// Even when it is driven, it happens LAST and as its own jog: up, across, then down. Never down
+        /// before across, and never combined with the XY move - a diagonal into a park position is a
+        /// different path from the one the operator pictured, and the only clearance anyone has actually
+        /// checked is "at the top".
         /// </summary>
-        private void GoToMachineXY(double x, double y, string what)
+        private void GoToMachineXY(double x, double y, string what, double? z = null)
         {
             GrblViewModel model = DataContext as GrblViewModel;
 
@@ -894,13 +927,20 @@ namespace CNC.Controls
             double mtop = ClampMachine(2, double.MaxValue);
             double zFeed = RapidFeed(2), xyFeed = Math.Max(RapidFeed(0), RapidFeed(1));
 
-            model.Message = string.Format(CultureInfo.CurrentCulture, "Go to {0} at safe Z - X {1:0.0##} Y {2:0.0##}.", what, mx, my);
+            model.Message = z.HasValue
+                ? string.Format(CultureInfo.CurrentCulture, "Go to {0} - X {1:0.0##} Y {2:0.0##}, then Z {3:0.0##}.", what, mx, my, ClampMachine(2, z.Value))
+                : string.Format(CultureInfo.CurrentCulture, "Go to {0} at safe Z - X {1:0.0##} Y {2:0.0##}.", what, mx, my);
 
-            // Z first, then XY, as two queued jogs. $J= rather than G0 throughout: a jog is cancellable,
-            // and it does not touch the modal state or the parser's idea of position - which matters more
-            // here than it looks, given what an offset write can do to that.
+            // Z first, then XY, as queued jogs. $J= rather than G0 throughout: a jog is cancellable, and it
+            // does not touch the modal state or the parser's idea of position - which matters more here than
+            // it looks, given what an offset write can do to that.
             model.ExecuteCommand(string.Format("$J=G53G21Z{0}F{1}", mtop.ToInvariantString(), Math.Ceiling(zFeed).ToInvariantString()));
             model.ExecuteCommand(string.Format("$J=G53G21X{0}Y{1}F{2}", mx.ToInvariantString(), my.ToInvariantString(), Math.Ceiling(xyFeed).ToInvariantString()));
+
+            // ...and only then down, for the two targets that are over clear air by definition. Clamped like
+            // the rest: a stored Z below the machine's travel is not a reason to try to reach it.
+            if (z.HasValue)
+                model.ExecuteCommand(string.Format("$J=G53G21Z{0}F{1}", ClampMachine(2, z.Value).ToInvariantString(), Math.Ceiling(zFeed).ToInvariantString()));
         }
 
         private void GoToCorner(bool xMax, bool yMax)
