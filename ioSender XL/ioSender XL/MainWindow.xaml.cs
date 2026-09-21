@@ -4150,7 +4150,11 @@ namespace GCode_Sender
             // Kept as a fallback for keys that reach this window without going through the class handler.
             // GlobalKeys normally gets there first and marks the event handled, in which case this instance
             // handler is not called at all.
-            if (!e.Handled)
+            //
+            // Suspended is honoured here too: it is a FALLBACK for the same dispatch, so leaving it live
+            // while the class handler stands down would defeat the whole point - the bindings editor would
+            // still never see a shortcut.
+            if (!e.Handled && !CNC.Controls.GlobalKeys.Suspended)
                 e.Handled = dispatchGlobalShortcut(e);
         }
 

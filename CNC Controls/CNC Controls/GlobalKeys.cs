@@ -67,9 +67,22 @@ namespace CNC.Controls
             get { return Grbl.GrblViewModel?.Keyboard as KeypressHandler; }
         }
 
+        /// <summary>
+        /// While true, no key-DOWN is dispatched to jog, macros or shortcuts - the event is left alone to
+        /// tunnel on down to whatever control is showing.
+        ///
+        /// For a panel where keys MEAN something other than what they do: the bindings editor, where
+        /// pressing a shortcut should find it rather than fire it. This class handler is registered on
+        /// Window's PreviewKeyDown, so it sees every key before any control in the tree - which is exactly
+        /// why the editor's own PreviewKeyDown never got a look at Ctrl+M, and the tab switched instead.
+        ///
+        /// Key-UP is deliberately NOT suspended; see OnPreviewKeyUp for why that must never be gated.
+        /// </summary>
+        public static bool Suspended { get; set; }
+
         private static void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Handled)
+            if (e.Handled || Suspended)
                 return;
 
             var keyboard = Handler;

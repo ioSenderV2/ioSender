@@ -219,6 +219,14 @@ namespace CNC.Controls
             Key.LeftAlt, Key.RightAlt, Key.LWin, Key.RWin, Key.System, Key.None
         };
 
+        // Keys mean something else in here - see FindByShortcut - so nothing upstream may act on them.
+        // Set on the control's own Loaded/Unloaded, the same lifecycle the controller dispatch-pause uses,
+        // so it is raised exactly while this tab is actually on screen.
+        private void SuspendGlobalKeys(bool suspend)
+        {
+            GlobalKeys.Suspended = suspend;
+        }
+
         private void KeyMapEditor_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (capturing == null)
@@ -516,6 +524,11 @@ namespace CNC.Controls
         // live controller status/poll events. Paired with _Unloaded; guarded so re-entry doesn't double-hook.
         private void KeyMapEditor_Loaded(object sender, RoutedEventArgs e)
         {
+            // FIRST, and above the early return below: without it a shortcut never reaches this control at
+            // all. GlobalKeys is a CLASS handler on Window.PreviewKeyDown, so it sees Ctrl+M before this
+            // editor does and switches tabs - which is exactly what happened.
+            SuspendGlobalKeys(true);
+
             // Re-sync every time the tab is shown so bindings made via a tab's right-click "Bind to Key" (which
             // write straight to Config.TabShortcuts) are reflected here, even though this editor is built once.
             SyncTabRows();
@@ -534,6 +547,10 @@ namespace CNC.Controls
         // Tab hidden / view left: unhook and resume machine dispatch.
         private void KeyMapEditor_Unloaded(object sender, RoutedEventArgs e)
         {
+            // Also above the early return, and unconditional: leaving this set would silently kill every
+            // jog key, macro and shortcut in the whole application for the rest of the session.
+            SuspendGlobalKeys(false);
+
             if (!_controllerHooked)
                 return;
 
