@@ -8,26 +8,33 @@
  * That is a real wart, not a theoretical one: while a job is running BOTH volume keys mean Feed Hold, so
  * reaching up to turn the music down on the laptop holds the machine. Binding to one remote would fix it.
  *
- * ---- Why this file is, for now, ONLY AN INSTRUMENT ----
+ * ---- The measurement this rests on ----
  *
- * Raw Input (WM_INPUT) does report the device, so identification is possible. What is NOT known - and is
- * the whole question - is whether a raw-input event still arrives for a key the HOOK SWALLOWED, and if so
- * whether it arrives before or after the hook callback runs.
+ * The hook must answer swallow-or-pass SYNCHRONOUSLY, so per-device filtering is only possible if the
+ * device is already known by the time it runs. Three outcomes were plausible from the documentation, and
+ * one of them killed the design outright: a WH_KEYBOARD_LL hook sits upstream of raw input delivery, so a
+ * swallowed key might produce no WM_INPUT at all - leaving the device of every press we ACT on as
+ * precisely the one we could never learn.
  *
- * It matters because the hook has to answer swallow-or-pass SYNCHRONOUSLY. If WM_INPUT for a press lands
- * after the hook has already returned, the hook can never know the device in time, and per-device
- * filtering degrades to a "last device seen within N ms" heuristic. Worse: a WH_KEYBOARD_LL hook sits
- * upstream of raw input delivery, so a swallowed key may produce no WM_INPUT at all - in which case the
- * device of every press we ACT on is precisely the one we can never learn, and the design is dead.
+ * Measured on the operator's machine 2026-09-21 rather than argued about, and it came out favourable:
  *
- * All three outcomes are plausible from the documentation. So this measures first and decides after:
- * every raw-input keystroke is logged with its device path and a timestamp from the SAME clock the hook
- * logs against, and the two sequences are read off against each other afterwards. Nothing here changes
- * what the remote does.
+ *     t=230644.285ms   RAWINPUT  hid  10 bytes  device=\?\HID#{00001812-...}   <- the remote
+ *     t=230644.925ms   HOOK      vk=0xAE down
  *
- * Read the result with -debuglog=remote and press each device in turn - the remote, then the keyboard's
- * own volume key, first with nothing waiting (hook passes the key through) and then with a prompt on
- * screen (hook swallows it). The second case is the one that decides it.
+ * The device event lands 0.64 ms BEFORE the hook. So the hook can simply ask what arrived last, and the
+ * swallow question never arises - the HID event precedes the hook, leaving nothing for it to eat.
+ *
+ * Two things that measurement also settled, both of which would have broken a design built on assumption:
+ *
+ *   - The KEYBOARD event Windows synthesizes for a media key reports a device handle that cannot be
+ *     named (it is not a real device), so it logs as "?". Identity must come from the CONSUMER-HID event.
+ *     Registering only the keyboard page would have produced a device path of "?" and looked like a dead
+ *     end rather than a wrong choice of usage page.
+ *   - The remote and the machine's own keyboard are wholly distinct paths - a BLE HID device against
+ *     ACPI#LEN0071 - so telling them apart needs no heuristics.
+ *
+ * Re-run it any time with -debuglog=remote: every raw-input event is still logged with its device and a
+ * timestamp from the same clock the hook stamps against.
  *
  * ---- Registration notes ----
  *
@@ -95,6 +102,101 @@ namespace CNC.Controls
 
         /// <summary>True while raw input is being received.</summary>
         public static bool Watching { get { return source != null; } }
+
+        // ---- which device sent the last press -----------------------------------------------------
+        //
+        // Read by ShutterRemote's hook callback to decide whether a press is THE remote's. Both this and
+        // the hook run on the UI thread (a low-level hook is called on the thread that installed it), so
+        // these are plain fields rather than anything synchronised - and they must stay that way, because
+        // the hook has microseconds to answer.
+        //
+        // Only the consumer-HID event is recorded. The keyboard event Windows synthesizes for a media key
+        // reports a device handle that GetRawInputDeviceInfo cannot name - it is not a real device - so
+        // binding against it would bind to "?" and match everything. Measured 2026-09-21.
+        private static string lastDevice;
+        private static double lastDeviceAt = double.NegativeInfinity;
+
+        // The raw-input event for a press lands BEFORE the hook sees it - measured at 0.64 ms on the
+        // operator's own machine, which is the fact this whole design rests on (see the header). 250 ms is
+        // enormous next to that: it is sized to be unmistakably longer than the gap, not tuned to it,
+        // because being wrong in the other direction means the remote silently stops working.
+        private const double MatchWindowMs = 250d;
+
+        /// <summary>
+        /// Should this press be treated as coming from the bound remote?
+        ///
+        /// FAILS CLOSED, unlike most guards in this codebase, and deliberately: a device that is not the
+        /// bound one is not this operator's pendant, and nothing it sends should move a machine. With
+        /// NOTHING bound that means every device - the remote does nothing at all until one press has
+        /// bound it, which is one press, and the alternative is a stray volume key from any keyboard in
+        /// the building meaning Feed Hold.
+        ///
+        /// It cannot strand anyone: enabling with nothing bound arms the bind (RemoteActions.Sync), so
+        /// the very first press is the one that binds, and every press after it works.
+        /// </summary>
+        public static bool PressIsFromBoundDevice()
+        {
+            string bound = AppConfig.Settings?.Base?.ShutterRemoteDevice;
+            if (string.IsNullOrEmpty(bound))
+                return false;
+
+            if (lastDevice == null || ElapsedMs - lastDeviceAt > MatchWindowMs)
+                return false;   // bound to something, and nothing recent says it was that
+
+            return string.Equals(lastDevice, bound, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// True when the press being handled right now is the one that just bound the device. The hook
+        /// consumes it without acting: the operator pressed the button to say "this is my remote", not to
+        /// answer whatever happened to be on screen at the time.
+        /// </summary>
+        public static bool PressJustBound()
+        {
+            return ElapsedMs - boundAt <= MatchWindowMs;
+        }
+
+        private static double boundAt = double.NegativeInfinity;
+
+        /// <summary>
+        /// Arm a one-shot bind: the next button press on ANY remote becomes the bound device. Ticking the
+        /// enable calls this, so binding costs the operator one press and no dialog.
+        /// </summary>
+        public static void ArmBinding()
+        {
+            armed = true;
+            DebugLog.Write("remote", "binding ARMED - press a button on the remote to bind it");
+        }
+
+        /// <summary>Forget the bound device, so the next arm binds whatever is pressed.</summary>
+        public static void ClearBinding()
+        {
+            armed = false;
+            lastDevice = null;
+            if (AppConfig.Settings?.Base != null)
+                AppConfig.Settings.Base.ShutterRemoteDevice = string.Empty;
+            DebugLog.Write("remote", "binding cleared");
+        }
+
+        /// <summary>True while waiting for the press that will bind.</summary>
+        public static bool Binding { get { return armed; } }
+
+        /// <summary>
+        /// True when a specific remote is bound. Once one is, ITS buttons belong to ioSender outright -
+        /// a press that means nothing here is beeped and discarded rather than passed to the volume
+        /// control, because a dedicated pendant that sometimes changes the volume is just a broken
+        /// pendant. Unbound, that would be stealing the machine keyboard's volume keys, so it is exactly
+        /// the binding that earns the right.
+        /// </summary>
+        public static bool HasBinding
+        {
+            get { return !string.IsNullOrEmpty(AppConfig.Settings?.Base?.ShutterRemoteDevice); }
+        }
+
+        /// <summary>Raised on the UI thread when a device is bound, with its path.</summary>
+        public static event System.Action<string> BoundTo;
+
+        private static bool armed;
 
         /// <summary>
         /// Begin watching. Idempotent. Silent no-op when there is no main window handle yet - the caller
@@ -210,9 +312,28 @@ namespace CNC.Controls
                 }
                 else if (type == RIM_TYPEHID)
                 {
+                    string name = NameOf(device);
+
+                    // This is the event that carries a usable identity, and it arrives before the hook -
+                    // so recording it here is what lets the hook, microseconds later, know what pressed.
+                    lastDevice = name;
+                    lastDeviceAt = at;
+
                     DebugLog.Write("remote", string.Format(CultureInfo.InvariantCulture,
                         "RAWINPUT  t={0:F3}ms  hid  {1} bytes  device={2}",
-                        at, size - HeaderSize, NameOf(device)));
+                        at, size - HeaderSize, name));
+
+                    if (armed && !string.IsNullOrEmpty(name) && name != "?")
+                    {
+                        armed = false;
+                        boundAt = at;
+                        if (AppConfig.Settings?.Base != null)
+                            AppConfig.Settings.Base.ShutterRemoteDevice = name;
+                        DebugLog.Write("remote", "BOUND to " + name);
+                        var handler = BoundTo;
+                        if (handler != null)
+                            handler(name);
+                    }
                 }
             }
             finally

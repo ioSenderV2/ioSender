@@ -13,10 +13,10 @@
  *   the machine is HOLDing  vol up = Start / resume  vol down = Stop
  *   anything else           nothing - the key goes to Windows and the volume changes as usual
  *
- * Both keys mean Feed Hold while running on purpose. The remote has two modes that send different keys
- * (the PICO sends VOLUME UP in iOS mode and VOLUME DOWN in Android mode), the operator reaching for it
- * mid-cut wants the machine to STOP CUTTING, and a press that does nothing because the remote is in the
- * other mode is the worst possible outcome of that reach. Only once the machine is already held - nothing
+ * Both keys mean Feed Hold while running on purpose. The remote's two BUTTONS send different keys (on
+ * the PICO: the Android one VOLUME UP, the iOS one VOLUME DOWN), a hand reaching for it mid-cut grabs
+ * whichever button it finds first, and that hand wants the machine to STOP CUTTING. Asking an operator to
+ * pick the correct button of two while a cutter is in the work is the wrong thing to ask. Only once the machine is already held - nothing
  * moving, nothing burning - does the difference between the two keys start to carry meaning.
  *
  * ---- Why it presses the real buttons ----
@@ -97,24 +97,23 @@ namespace CNC.Controls
 
                 // No Cancel button => BOTH keys mean OK. This used to return the null Cancel, so on the
                 // commonest prompt of all - "move the plate to the next corner, then click OK", which has
-                // no Cancel - a remote in ANDROID mode did nothing whatsoever and the press went to the
+                // no Cancel - the iOS button did nothing whatsoever and the press went to the
                 // volume control instead. Confirmed on real hardware 2026-09-21: MBOX armed at 12:02:34,
                 // the operator's press logged at 12:02:55 as "nothing was waiting on it", and the prompt
                 // finally answered with the mouse at 12:02:59.
                 //
                 // It is the same argument this file already makes for the Run state, and it was wrong to
-                // stop short of it here: which key a remote sends depends on the mode it happens to be in
-                // (the PICO sends VOLUME UP in iOS mode and VOLUME DOWN in Android mode), so a press that
-                // does nothing because of a mode setting is the worst outcome of reaching for it. Where
-                // there are two real answers the two keys still differ; where there is only one, both keys
+                // stop short of it here: the remote has TWO BUTTONS and the operator may press either, so
+                // a button that did nothing would just be one they have to remember not to press. Where a
+                // prompt has two real answers the two buttons still differ; where it has only one, both
                 // give it.
                 return volumeUp || prompt.Cancel == null ? prompt.Ok : prompt.Cancel;
             }
 
             // A view waiting for the operator (the Height Map's per-point hold) takes BOTH keys as "carry
             // on", not just the up one. This is the case the remote was bought for, the operator has a hand
-            // on a touch plate, and which key their remote sends depends on the mode it happens to be in -
-            // so having one of the two mean STOP here would abort a half-probed map on a mode setting. The
+            // on a touch plate, and the remote has two buttons under their thumb - so having one of the two
+            // mean STOP here would throw away a half-probed map on a mis-press. The
             // view's own Stop button is a deliberate act at the keyboard, which is the right ceremony for
             // throwing away twenty minutes of probing.
             if (HoldContinue != null)
@@ -191,11 +190,18 @@ namespace CNC.Controls
                 // press does - but it is the plumbing per-device binding would need, and the question it
                 // answers first is whether that binding is possible at all. See RemoteDevices.
                 RemoteDevices.Start();
+
+                // Ticking the box arms a one-shot bind when nothing is bound yet. Unticking clears the
+                // binding (below), so untick-and-retick is how an operator rebinds after replacing a
+                // remote - no dialog, no device list, one button press.
+                if (string.IsNullOrEmpty(AppConfig.Settings.Base.ShutterRemoteDevice))
+                    RemoteDevices.ArmBinding();
             }
             else
             {
                 ShutterRemote.Stop();
                 RemoteDevices.Stop();
+                RemoteDevices.ClearBinding();
             }
         }
     }

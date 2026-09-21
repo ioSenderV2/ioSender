@@ -10,9 +10,10 @@
  * plate, press Continue - sixteen times for a 4x4 grid, with the laptop across the shop each time. A
  * shutter remote solves it for a few pounds, but only if the app can hear it.
  *
- * These remotes are HID keyboards and every one of them sends a MEDIA key. Measured on the operator's own
- * PICO remote 2026-09-18: iOS mode sends VOLUME UP (0xAF), Android mode VOLUME DOWN (0xAE), and it has no
- * mode that sends Enter. Windows routes media keys to the shell and the audio endpoint - they never reach
+ * These remotes are HID keyboards and every one of them sends a MEDIA key. The operator's PICO has TWO
+ * BUTTONS, not a mode switch - this file said "mode" for three months and was simply wrong, corrected by
+ * the operator 2026-09-21. The button marked for Android sends VOLUME UP (0xAF), the one marked for iOS
+ * sends VOLUME DOWN (0xAE). Neither sends Enter. Windows routes media keys to the shell and the audio endpoint - they never reach
  * an ordinary WPF window at all, so no amount of key binding inside the app can see one. A low-level
  * keyboard hook is the only thing that does.
  *
@@ -50,9 +51,8 @@
  *     That is the right way round: the operator notices at once and reaches for the keyboard, where the
  *     other failure moves the machine.
  *
- * Both volume keys are accepted rather than one: the two modes of the same remote send different ones,
- * and asking an operator which mode their remote is in - to answer a question they only care about
- * because of this file - is a worse design than accepting either. WHICH key was pressed is passed on
+ * Both volume keys are accepted rather than one: they are the remote's two BUTTONS, so the operator has
+ * both under their thumb and either may be the one they press. WHICH key was pressed is passed on
  * rather than discarded, since once the machine is safely held the two can mean different things - see
  * RemoteActions, which owns every decision about meaning. This file only hears.
  */
@@ -215,6 +215,34 @@ namespace CNC.Controls
 
             _pressActive = true;
 
+            // Not the bound remote? Then this is somebody's ordinary volume key - most likely the machine's
+            // own keyboard - and it must behave like one. Without this, BOTH volume keys mean Feed Hold
+            // while a job runs, so reaching up to turn the music down holds the machine.
+            //
+            // Answered from the raw-input event that landed just before this callback (RemoteDevices), and
+            // fails OPEN when nothing is bound, so an operator who has never bound anything is exactly
+            // where they were.
+            // The press that just bound the remote is consumed here and goes no further: the operator
+            // pressed the button to identify the device, not to answer whatever was on screen at the time.
+            if (RemoteDevices.PressJustBound())
+            {
+                _swallowed = true;
+                try { System.Media.SystemSounds.Asterisk.Play(); } catch { }
+                DebugLog.Write("remote", "shutter remote: that press bound the device - not acted on");
+                return new IntPtr(1);
+            }
+
+            // Not the bound remote? Then it is not this operator's pendant, and ioSender ignores it -
+            // the key goes to Windows and behaves exactly as it always did. That covers the machine's own
+            // keyboard, which is the whole point: without it, both volume keys mean Feed Hold while a job
+            // runs, so reaching up to turn the music down holds the machine.
+            if (!RemoteDevices.PressIsFromBoundDevice())
+            {
+                DebugLog.Write("remote", "shutter remote: not the bound device - ignored, passed to Windows");
+                _last = DateTime.MinValue;
+                return CallNextHookEx(_hook, nCode, wParam, lParam);
+            }
+
             // What it means is decided HERE, synchronously, because the answer also decides whether the key
             // is swallowed - and that has to be settled before returning from the hook. Only the action it
             // hands back is posted; nothing slow runs on the hook.
@@ -223,6 +251,22 @@ namespace CNC.Controls
 
             if (action == null)
             {
+                // A BOUND remote's buttons are ours outright, even when the press means nothing right now:
+                // beep so the operator knows it was heard and ignored, and discard it. A pendant that
+                // sometimes nudges the system volume instead is just a broken pendant, and over a height
+                // map it walks the volume to one end or the other.
+                //
+                // Only when bound, though. With nothing bound we cannot tell this remote from the machine's
+                // own keyboard, and swallowing then would take the keyboard's volume keys away from an
+                // operator who never asked for that. The binding is what earns the right.
+                if (RemoteDevices.HasBinding)
+                {
+                    _swallowed = true;   // so the matching key-up is swallowed too, not left orphaned
+                    try { System.Media.SystemSounds.Beep.Play(); } catch { }
+                    DebugLog.Write("remote", "shutter remote: nothing was waiting - beeped and discarded");
+                    return new IntPtr(1);
+                }
+
                 // Nothing is waiting on it: this is just a volume key, and Windows should have it. The
                 // press stays marked active, so if something starts waiting while the button is still down
                 // it is the NEXT press that acts on it, not this one.

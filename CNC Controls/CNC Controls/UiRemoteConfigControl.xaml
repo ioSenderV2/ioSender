@@ -18,7 +18,7 @@
                       ToolTip="Lets a cheap Bluetooth camera shutter remote act as a one-button pendant, so you can answer a prompt or hold the machine with your hands on the work instead of at the keyboard. Pair the remote to Windows as an ordinary keyboard first - ioSender does not pair to it itself. Off by default: it listens using a system-wide keyboard hook, and nobody who has not asked for that should get it."/>
 
             <TextBlock x:Uid="lbl_remoteWhatKeysDo" Margin="5,10,0,0" TextWrapping="Wrap" Opacity="0.75"
-                       Text="These remotes send a media key, not a letter - iOS mode sends volume up, Android mode volume down, and Windows never delivers either to an ordinary window. Both are accepted so the remote works whichever mode it is in."/>
+                       Text="These remotes send a media key, not a letter, and Windows never delivers one to an ordinary window. The remote's two buttons send different keys - on the PICO the Android button sends volume up and the iOS button volume down - so both are accepted."/>
 
             <Grid Margin="24,8,0,0">
                 <Grid.ColumnDefinitions>
@@ -56,10 +56,10 @@
             </Grid>
 
             <TextBlock x:Uid="lbl_remoteNoCancel" Margin="24,6,0,0" TextWrapping="Wrap" Opacity="0.75"
-                       Text="When a prompt has no Cancel button - as the &quot;move the plate to the next corner&quot; prompt does not - both keys mean OK. There is nothing else the down key could mean there, and a press that did nothing because the remote was in the other mode is the worst outcome of reaching for it."/>
+                       Text="When a prompt has no Cancel button - as the &quot;move the plate to the next corner&quot; prompt does not - both buttons mean OK. There is nothing else the second button could mean there, and a button that did nothing would just be one you have to remember not to press."/>
 
             <TextBlock x:Uid="lbl_remoteFallthrough" Margin="5,10,0,0" TextWrapping="Wrap" Opacity="0.75"
-                       Text="At any other time the key is passed straight to Windows and the volume changes as usual, so enabling this does not take your volume keys away. Both keys mean Feed Hold while a job runs on purpose: a hand reaching for the remote mid-cut wants the machine to stop, and a press that did nothing because the remote was in the other mode is the worst outcome of that reach."/>
+                       Text="Once bound, the remote's buttons belong to ioSender: a press that means nothing at that moment beeps and is discarded, never reaching the volume control. Every other device is ignored and behaves exactly as before, so your keyboard's own volume keys are untouched. Both buttons mean Feed Hold while a job runs on purpose - a hand reaching for the remote mid-cut wants the machine to stop, not to pick the right button of two."/>
         </StackPanel>
     </GroupBox>
 </UserControl>

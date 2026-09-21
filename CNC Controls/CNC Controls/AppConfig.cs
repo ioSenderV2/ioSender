@@ -357,6 +357,7 @@ namespace CNC.Controls
         private bool _showJobJogPad = true;
         private bool _showJobSplitView = false;
         private bool _shutterRemote = false;
+        private string _shutterRemoteDevice = string.Empty;
         private int _statusWindowAutoCloseSeconds = 10;
         private double _jobSplitRatio = 0.5d;
         // Serial is the default transport (2026-08-12). Off means a serial/USB link is left alone; a user
@@ -540,6 +541,22 @@ namespace CNC.Controls
         // ShutterRemote), and nobody who has not asked for that should get it. Persisted because an
         // operator who owns such a remote owns it every session.
         public bool ShutterRemoteEnabled { get { return _shutterRemote; } set { if (_shutterRemote != value) { _shutterRemote = value; OnPropertyChanged(); } } }
+        // The raw-input device path of the ONE remote that drives the machine, or empty for "any device".
+        //
+        // Without this, every volume key means what the remote's means - including the laptop's own, so
+        // reaching up to turn the music down during a job holds the machine. A low-level hook cannot tell
+        // devices apart (KBDLLHOOKSTRUCT carries no identity), so the path is learned from raw input; see
+        // RemoteDevices for why that is possible at all and what had to be measured first.
+        //
+        // Captured by ticking ShutterRemoteEnabled, which arms a one-shot bind, and cleared by unticking -
+        // so re-ticking rebinds. That is the whole binding UI, and it is deliberate: a remote is a thing
+        // you have in your hand, and pressing its button is a better way to identify it than picking a
+        // device path out of a list. It also survives the remote being replaced, which is the case the
+        // operator actually hits ("the shop ate the first one").
+        //
+        // Empty is not a failure state: nothing is bound, so any device's volume keys act, exactly as
+        // before this existed. Fail OPEN - a remote that cannot be identified must not stop working.
+        public string ShutterRemoteDevice { get { return _shutterRemoteDevice; } set { if (_shutterRemoteDevice != value) { _shutterRemoteDevice = value ?? string.Empty; OnPropertyChanged(); } } }
         // Where the splitter sits, as the program view's share of the split (0..1). Persisted so a layout
         // the operator has dragged to suit their screen survives a restart, like every other placement here.
         public double JobSplitRatio { get { return _jobSplitRatio < 0.1d || _jobSplitRatio > 0.9d ? 0.5d : _jobSplitRatio; } set { _jobSplitRatio = value; } }
