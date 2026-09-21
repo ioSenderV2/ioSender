@@ -25,7 +25,10 @@
                   ToolTip="The G30 park and toolsetter signs on the bed, and the dot at machine zero."
                   IsChecked="{Binding Path=ShowStoredPositions, Mode=TwoWay}"/>
 
-        <TextBlock x:Uid="vo_colours" Text="COLOURS" Foreground="Gray" FontSize="10" Margin="0,14,0,2"/>
+        <!-- Background="Transparent" is load-bearing on these labels: a TextBlock with a null background is
+             not hit-testable, so the tooltip would never appear however long you hovered. -->
+        <TextBlock x:Uid="vo_colours" Text="COLOURS" Foreground="Gray" FontSize="10" Margin="0,14,0,2" Background="Transparent"
+                   ToolTip="Lighting and viewing angle change how a colour looks in the view - a surface renders darker than its swatch, and darker still on faces turned away from the light."/>
 
         <Grid Margin="0,2,0,0">
             <Grid.ColumnDefinitions>
@@ -47,8 +50,10 @@
             <local:ColorPicker x:Uid="vo_clrRapid" x:Name="clrRapid" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="12,3,0,3"
                                SelectedColor="{Binding Path=RapidColor, Mode=TwoWay}"/>
 
-            <TextBlock x:Uid="vo_lblStock" Grid.Row="2" Grid.Column="0" Text="Stock" VerticalAlignment="Center" Margin="0,3"/>
+            <TextBlock x:Uid="vo_lblStock" Grid.Row="2" Grid.Column="0" Text="Stock" VerticalAlignment="Center" Margin="0,3" Background="Transparent"
+                       ToolTip="The stock is a lit surface, so it renders darker than the swatch and its sides darker again. Cut and rapid are lines, which take the colour exactly."/>
             <local:ColorPicker x:Uid="vo_clrStock" x:Name="clrStock" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" Margin="12,3,0,3"
+                               ToolTip="The stock is a lit surface, so it renders darker than the swatch and its sides darker again. Cut and rapid are lines, which take the colour exactly."
                                SelectedColor="{Binding Path=StockColor, Mode=TwoWay}"/>
         </Grid>
 
