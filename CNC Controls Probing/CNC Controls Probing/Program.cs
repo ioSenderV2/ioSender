@@ -305,7 +305,7 @@ namespace CNC.Controls.Probing
             _program.Add(probing.FastProbe + axisLetter + (negative ? "-" : "") + probing.ProbeDistance.ToInvariantString());
             if (probing.LatchDistance > 0d)
             {
-                _program.Add("!" + probing.RapidCommand + axisLetter + (negative ? "" : "-") + probing.LatchDistance.ToInvariantString());
+                _program.Add("!G0" + axisLetter + (negative ? "" : "-") + probing.LatchDistance.ToInvariantString());
                 _program.Add(probing.SlowProbe + axisLetter + (negative ? "-" : "") + Math.Max((probing.LatchDistance * 1.5d), 2d / probing.Grbl.UnitFactor).ToInvariantString());
             }
         }
@@ -329,7 +329,7 @@ namespace CNC.Controls.Probing
 
         public void AddRapid(string cmd)
         {
-            _program.Add(probing.RapidCommand + cmd);
+            _program.Add("G0" + cmd);
         }
 
         public void AddPause()
@@ -340,12 +340,12 @@ namespace CNC.Controls.Probing
 
         public void AddRapidToMPos(string cmd)
         {
-            _program.Add("G53" + probing.RapidCommand + cmd);
+            _program.Add("G53G0" + cmd);
         }
 
         public void AddRapidToMPos(Position pos, AxisFlags axisflags)
         {
-            _program.Add("G53" + probing.RapidCommand + pos.ToString(axisflags));
+            _program.Add("G53G0" + pos.ToString(axisflags));
         }
 
         public void ClearResponseQueue ()

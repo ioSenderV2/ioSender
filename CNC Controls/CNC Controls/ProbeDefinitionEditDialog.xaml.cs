@@ -161,7 +161,7 @@ namespace CNC.Controls
             switch (type)
             {
                 case ProbeType.ThreeDProbe:
-                    d.ProbeDiameter = 2d; d.BodyDiameter = 42d; d.OverallLength = 100d; d.ProbeFeedRate = 200d; d.LatchFeedRate = 50d; d.RapidsFeedRate = 0d;
+                    d.ProbeDiameter = 2d; d.BodyDiameter = 42d; d.OverallLength = 100d; d.ProbeFeedRate = 200d; d.LatchFeedRate = 50d;
                     d.ProbeDistance = 25d; d.LatchDistance = 1d; d.XYClearance = 5d; d.Depth = 10d;
                     d.ProbeOffsetX = 0d; d.ProbeOffsetY = 0d;
                     break;
@@ -170,17 +170,17 @@ namespace CNC.Controls
                     d.ProbeDiameter = 6d;   // bit in the collet
                     d.CanProbeCorner = true;   // the more capable of the two - and what every plate was before this existed
                     d.PlateThickness = 12d; d.LipWidth = 10d; d.BitLength = 40d; d.XYClearance = 5d; d.Depth = 5d;
-                    d.ProbeFeedRate = 100d; d.LatchFeedRate = 25d; d.RapidsFeedRate = 0d;
+                    d.ProbeFeedRate = 100d; d.LatchFeedRate = 25d;
                     d.ProbeDistance = 25d; d.LatchDistance = 1d;
                     break;
 
                 case ProbeType.ToolSetter:
-                    d.SetterHeight = 0d; d.ProbeFeedRate = 200d; d.LatchFeedRate = 25d; d.RapidsFeedRate = 0d;
+                    d.SetterHeight = 0d; d.ProbeFeedRate = 200d; d.LatchFeedRate = 25d;
                     d.ProbeDistance = 50d; d.LatchDistance = 2d;
                     break;
 
                 case ProbeType.EdgeFinder:
-                    d.ProbeDiameter = 10d; d.ProbeFeedRate = 150d; d.LatchFeedRate = 50d; d.RapidsFeedRate = 0d;
+                    d.ProbeDiameter = 10d; d.ProbeFeedRate = 150d; d.LatchFeedRate = 50d;
                     d.ProbeDistance = 25d; d.LatchDistance = 1d; d.XYClearance = 5d; d.Depth = 10d; d.SpinRPM = 0d;
                     break;
             }

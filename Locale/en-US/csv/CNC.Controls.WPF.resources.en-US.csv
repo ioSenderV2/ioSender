@@ -821,9 +821,6 @@ CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_searchFeed:Sy
 CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_latchFeed:CNC.Controls.NumericField.Label,None,False,True,,Re-touch speed:
 CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_latchFeed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
 CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_latchFeed:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Slow speed for the accurate second touch.
-CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_rapidsFeed:CNC.Controls.NumericField.Label,None,False,True,,Travel speed:
-CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_rapidsFeed:CNC.Controls.NumericField.Unit,None,False,True,,mm/min
-CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_rapidsFeed:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Speed for positioning moves on the Probing tab; 0 = use the controller default. Setup, the corner probe and the tool-length probe do not use it - they position with plain rapids."
 CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_probeDist:CNC.Controls.NumericField.Label,None,False,True,,Max search distance:
 CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_probeDist:CNC.Controls.NumericField.Unit,None,False,True,,mm
 CNC.Controls.WPF.g.en-US.resources:probemotionparamsdialog.baml,pd_probeDist:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Furthest it will travel looking for the surface.

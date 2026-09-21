@@ -290,7 +290,7 @@ namespace CNC.Controls.Probing
             bool wait = true, running = false;
             double delta, delta_max = 0d;
 
-            string command = "G53" + RapidCommand + pos.ToString(axisflags);
+            string command = "G53G0" + pos.ToString(axisflags);
 
             Comms.com.PurgeQueue();
 
@@ -395,7 +395,6 @@ namespace CNC.Controls.Probing
             {
                 if ((_selectedProbe = value) != null)
                 {
-                    RapidsFeedRate = value.RapidsFeedRate;
                     ProbeFeedRate = value.ProbeFeedRate;
                     LatchFeedRate = value.LatchFeedRate;
                     ProbeDistance = value.ProbeDistance;
@@ -450,7 +449,6 @@ namespace CNC.Controls.Probing
         public double ProbeRadius { get { return _ProbeDiameter / 2d; } }
         public double LatchDistance { get { return _latchDistance; } set { _latchDistance = value; OnPropertyChanged(); } }
         public double LatchFeedRate { get { return _latchFeedRate; } set { _latchFeedRate = value; OnPropertyChanged(); } }
-        public double RapidsFeedRate { get { return _rapidsFeedRate; } set { _rapidsFeedRate = value; OnPropertyChanged(); } }
         public double TouchPlateHeight { get { return _tpHeight; } set { _tpHeight = value; OnPropertyChanged(); } }
         public bool TouchPlateIsXY { get { return _isXYtp; } set { _isXYtp = value; OnPropertyChanged(); } }
         public bool TouchPlateXYEnabled { get { return _probingType != ProbingType.HeightMap; } }
@@ -513,7 +511,6 @@ namespace CNC.Controls.Probing
         public bool OffsetEnable { get { return ((_probingType == ProbingType.EdgeFinderInternal || _probingType == ProbingType.EdgeFinderExternal) && _isCorner) || _probingType == ProbingType.Rotation; } }
         public bool XYOffsetEnable { get { return ((_probingType == ProbingType.EdgeFinderInternal || _probingType == ProbingType.EdgeFinderExternal) && _edge != Edge.None && _edge != Edge.Z) || _probingType == ProbingType.CenterFinder || _probingType == ProbingType.Rotation || _probingType == ProbingType.HeightMap; } }
         public double Depth { get { return _depth; } set { _depth = value; OnPropertyChanged(); } }
-        public string RapidCommand { get { return RapidsFeedRate == 0d ? "G0" : "G1F" + RapidsFeedRate.ToInvariantString(); } }
         public string ProbeProgram { get { return Program.ToString().Replace("G53", string.Empty); } }
         public bool ProbeDiameterEnable { get { return _probingType == ProbingType.CenterFinder || ((_probingType == ProbingType.EdgeFinderInternal || _probingType == ProbingType.EdgeFinderExternal) && _edge != Edge.Z); } }
         public bool FixtureHeightEnable { get { return _probingType == ProbingType.ToolLength && _useFixture /*&& !ReferenceToolOffset && !Grbl.IsTloReferenceSet*/; } }

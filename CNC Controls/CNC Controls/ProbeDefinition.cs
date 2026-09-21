@@ -35,7 +35,7 @@ namespace CNC.Controls
         private string _name = "Probe";
         private ProbeType _type = ProbeType.ThreeDProbe;
         private bool _canProbeCorner = true;
-        private double _diameter = 2d, _bodyDiameter = 42d, _overallLength = 100d, _searchFeed = 200d, _latchFeed = 50d, _rapidsFeed = 0d,
+        private double _diameter = 2d, _bodyDiameter = 42d, _overallLength = 100d, _searchFeed = 200d, _latchFeed = 50d,
                        _probeDistance = 25d, _latchDistance = 1d, _xyClearance = 5d, _depth = 10d,
                        _offsetX = 0d, _offsetY = 0d, _plateThickness = 12d, _lipWidth = 10d, _setterHeight = 0d, _spinRPM = 0d, _bitLength = 40d;
 
@@ -143,7 +143,6 @@ namespace CNC.Controls
         public double MinStandoff { get { return _bodyDiameter / 2d; } }
         public double ProbeFeedRate { get { return _searchFeed; } set { _searchFeed = value; OnChanged(); } }     // search (initial) feed
         public double LatchFeedRate { get { return _latchFeed; } set { _latchFeed = value; OnChanged(); } }       // second slow probe feed
-        public double RapidsFeedRate { get { return _rapidsFeed; } set { _rapidsFeed = value; OnChanged(); } }    // 0 = use controller setting
         public double ProbeDistance { get { return _probeDistance; } set { _probeDistance = value; OnChanged(); } } // max probing move
         public double LatchDistance { get { return _latchDistance; } set { _latchDistance = value; OnChanged(); } } // retract before slow probe; 0 = skip
         public double XYClearance { get { return _xyClearance; } set { _xyClearance = value; OnChanged(); } }
@@ -167,7 +166,7 @@ namespace CNC.Controls
         public void CopyFrom(ProbeDefinition o)
         {
             Name = o.Name; ProbeType = o.ProbeType; CanProbeCorner = o.CanProbeCorner; ProbeDiameter = o.ProbeDiameter; BodyDiameter = o.BodyDiameter; OverallLength = o.OverallLength; ProbeFeedRate = o.ProbeFeedRate;
-            LatchFeedRate = o.LatchFeedRate; RapidsFeedRate = o.RapidsFeedRate; ProbeDistance = o.ProbeDistance;
+            LatchFeedRate = o.LatchFeedRate; ProbeDistance = o.ProbeDistance;
             LatchDistance = o.LatchDistance; XYClearance = o.XYClearance; Depth = o.Depth;
             ProbeOffsetX = o.ProbeOffsetX; ProbeOffsetY = o.ProbeOffsetY;
             PlateThickness = o.PlateThickness; LipWidth = o.LipWidth; BitLength = o.BitLength; SetterHeight = o.SetterHeight; SpinRPM = o.SpinRPM;
