@@ -448,3 +448,102 @@ The rule at the top of this file ("when shipping a UI change, add the impact her
 six weeks. The 18 unticked boxes above it are July items superseded by later payoff sections that never
 ticked them, so **the checkbox state is not a live signal either** — read the dated section headers, not
 the boxes.
+
+---
+
+## Debt from the setup + 3D-view wave (shipped 2026-09-20/21) — RECORDED AS IT SHIPPED
+
+38 commits over two days. Machine Setup's tool-length step became an interview, probe definitions
+gained a plate *kind* and lost two settings, the DRO title became an offset picker, the jog pad
+gained a Go-to button, and the 3D view changed substantially — including **the deletion of a
+Settings page**. Recorded as it shipped, which is the rule the process note below says stopped
+running for six weeks.
+
+### 🔴 A Settings page NO LONGER EXISTS
+- [ ] **`#settings` line 2584** — the **G Code** row promises "**GCode Viewer** (how the 3D view
+      draws it)". That page is **deleted** (`360a8976`). It drove the OLD renderer, which the UI has
+      no way to reach, so every option on it was inert: nothing on it ever affected the 3D view in
+      the Job tab. Rewrite the row to mention GCode command stripping only, and point viewer options
+      at the view's own **View options** button.
+- [ ] Sweep for any other mention of viewer settings living under Settings.
+
+### `#gcode-viewer` — the 3D view changed in five ways
+- [ ] **Line 2889 and line 2900** both describe a **Reset view** button. There is no such button:
+      it is now **View options**, and Reset view is a button *inside* that dialog. Line 2900 also
+      claims a <kbd>Ctrl</kbd>+<kbd>V</kbd> shortcut — **checked in source 2026-09-21: that is the
+      OLD renderer's** (`RenderControl.xaml` lines 77-78, with <kbd>Ctrl</kbd>+<kbd>R</kbd> for a
+      "Restore view" that the carve view has no equivalent of). The carve view has no keybinding at
+      all. Line 2900 is describing a screen the user cannot reach — rewrite the whole entry, do not
+      patch the shortcut.
+      ⚠️ Related CODE debt, not manual debt: **`KeyMapEditor` still offers `RenderControl.ResetView`
+      and `RenderControl.RestoreView`** as bindable actions (lines 825-826, 909-910). They bind to
+      nothing reachable. They go with the old-renderer removal.
+- [ ] **New: the View options dialog.** Four toggles (rapid moves, stock block, bed grid, stored
+      positions), three colour pickers (cut, rapid, stock), Default colours, Reset view. Document
+      that colours persist, and the reason a lit surface does not match its swatch while the cut and
+      rapid *lines* match exactly.
+- [ ] **New: stored-position signs.** G30 and the toolsetter (G59.3) are drawn as **100 mm signs
+      painted on the bed** — a parking P for the park, TS for the toolsetter — when taught. Say that
+      an all-zero position is treated as never taught and is not drawn.
+- [ ] **New: a green dot at machine zero**, drawn only when homing is enabled. Worth explaining
+      *why*: it is at the top of Z travel, so the gap between it and the stock is the headroom.
+- [ ] **Gone: the machine-envelope wireframe box.** If any text mentions a box around the work
+      envelope, remove it — the bed grid carries the footprint now.
+- [ ] The tool cone now **follows the live machine position** while jogging (`43201cf6`, `a1389639`).
+      If the manual says the view only moves during a program, that is now wrong.
+
+### `#machine-setup` — step 5 is a different screen
+- [ ] **Line 2302** describes step 5 as "Declare the probes fitted to this machine (touch plate /
+      3D probe / toolsetter)". It is now a **three-part interview** and needs a real section:
+      1. what probes you have, editing the seeded touch plate or defining new ones;
+      2. which probe measures tool length — **asked after the probes exist**, not before;
+      3. the positions: target surface Z (only when a plate, not a toolsetter, does tool length),
+         then G59.3, then G30, with an offer to place G30 100 mm to either side of G59.3.
+- [ ] **`$65` bit 3 is now an OUTPUT of step 5** (`5161b4eb`, `220a1045`). Explain the trap it
+      closes: touch plates wired OR'd onto the probe input must NOT auto-select the toolsetter
+      input, and the button says "Turn it on"/"Turn it off" according to the probe chosen, greyed
+      when the controller already agrees.
+- [ ] **The tool-length search distance is computed**, not typed — from the probe's height and the
+      G59.3 Z, as a **floor** (`5c9588da`). Do not describe it as a prediction of the target top.
+- [ ] **Reference TLO runs in machine coordinates** and no longer leaves G59.3 as the active WCS
+      (`2916313d`). If any text says to select G59.3 first, delete it.
+- [ ] Mention the advice the interview gives: put G30 and G59.3 **adjacent**, and give a plate used
+      as a toolsetter a **repeatable seat** (a shallow cutout) so it lands the same way every time.
+
+### Probe definitions — `#setup` and `#machine-setup`
+- [ ] **Two touch-plate kinds**: corner (two 90° lips) and Z-only (flat). A corner plate can be
+      **turned upside down** to act as a Z-only plate, and it says so when chosen for tool length
+      (`96d31252`).
+- [ ] **The 3D probe is no longer seeded** — most users do not have one. Any "you will find a 3D
+      probe already defined" wording is wrong.
+- [ ] **Travel speed is GONE** from every probe definition (`43ef1da1`) — nothing read it. Also
+      **Target height** (`cdc6f3af`). Check the probe-settings tables for both.
+- [ ] **Motion parameters hide Edge standoff and Drop to side for a flat plate** (`fdaae67d`) —
+      they only mean something when probing sideways.
+
+### `#job` — two new controls
+- [ ] **The DRO title is an offset picker** (`3740a198`). Clicking "DRO (G54)" drops down the
+      selectable work offsets with the current one ticked; hovering one shows its X/Y/Z and
+      rotation. It works in **both** places the DRO appears — the Job tab and the run strip — which
+      is the point: the run strip is reachable when the Job tab is not.
+- [ ] **A Go-to button** in the jog pad's empty 3-o'clock square (`bb20dd47`). It lists the stored
+      positions — fixtures, G28, G30, G59.3 and any non-zero offset — and moves there. **It drives
+      Z only for G30 and G59.3**, which are over clear air by definition; everything else is XY
+      only, at the current Z (`7e0556bb`). That distinction is a safety point, not a detail.
+- [ ] **The Work Parameters offset dropdown no longer lists G28/G30/G92** (`4f1d17e4`). They are
+      stored *positions*, and selecting one sent its code to the controller — which **rapids the
+      machine** from a dropdown next to the tool selector. If the manual documents that list,
+      correct it and say why.
+
+### Screenshots to reshoot
+- [ ] **Machine Setup step 5** — entirely new; the old shot shows a screen that no longer exists.
+- [ ] **Probe definition dialog** — plate-kind radios, inversion note, lip field only for corner.
+- [ ] **Probe motion parameters** — Travel speed gone; two fields hidden for a flat plate.
+- [ ] **The DRO panel**, both places — the title is now a dropdown affordance.
+- [ ] **The jog pad**, both places — the 3-o'clock square is no longer empty.
+- [ ] **The 3D view** — signs on the bed, green dot, no wireframe box, **View options** button.
+- [ ] **Settings → App → G Code** — and any shot of the settings tree showing a GCode Viewer page.
+
+### Not manual debt, recorded so it is not mistaken for debt
+- The link gate (`7d7568b3`), the cone/envelope/marker late-arrival fixes and the remote debounce
+  (`f21bc167`) are behaviour fixes with **no UI surface**. Nothing to document.
