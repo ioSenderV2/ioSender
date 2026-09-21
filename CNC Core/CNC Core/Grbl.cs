@@ -1121,7 +1121,21 @@ namespace CNC.Core
             if (double.IsNaN(top))
                 return expression;          // envelope unknown - fail open, exactly as ReachableLimit does
 
-            string t = top.ToInvariantString("0.0###");
+            // CLAMP TO JUST BELOW THE TOP, NEVER TO IT. pcorner reads 0 as "caller has no trusted safe
+            // height" (#<maxz>, tested NE 0 in three places), and on a Z-homes-to-top machine the top IS 0 -
+            // so a clamp landing exactly there would silently convert a trusted height into the sentinel.
+            // That is not a harmless downgrade: the o43 fallback is a BARE G53 G0 to #<_approach_z>, derived
+            // from #<_bottom>, which callers set to the machine floor. On the machine that prompted this
+            // (bottom -142, thickness 19, plate 12) that is a rapid to Z-101 with nothing to catch it - the
+            // same shape as the rapid that drove a tool into the touch plate on 2026-09-14. Clamping had to
+            // make the move safer, not swap one unguarded rapid for another.
+            //
+            // -0.01 is the offset the wizards already use for this exact sentinel collision (see
+            // AutoSquareProbeWizard / StepperCalibrationProbeWizard, both of which pass -0.01 rather than 0
+            // to say "machine top, and I mean it"). The ugliness is pcorner's contract, not ours.
+            const double sentinelClearance = 0.01;
+
+            string t = (top - sentinelClearance).ToInvariantString("0.0###");
 
             // min(a, t) with a = the caller's expression. Every sub-expression is bracketed rather than
             // leaning on operator precedence - the division in particular must not be able to bind to the
