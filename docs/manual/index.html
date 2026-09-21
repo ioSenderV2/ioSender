@@ -2581,7 +2581,7 @@
       <tr><td><strong>Controller</strong></td><td><strong>Grbl</strong> — every <code>$</code> setting the controller has, with its own group tree and <code>$</code>-search (see below). <strong>Simulator</strong> — build and manage the bundled option-matched grblHAL simulator (see <a href="#connect">Connect</a> and <a href="#machine-setup">Machine Setup</a>), also reachable at startup via the <code>-simulator</code> command-line flag.</td></tr>
       <tr><td><strong>Application</strong></td><td>One page per panel — <strong>Main</strong> is how ioSender <em>talks to the controller</em> (reset delay, poll interval, buffer size and aggressive buffering, comment/line-number handling, prefer-network-if-available, and the grbl auto-save pair), plus <strong>Work Order</strong>, <strong>Camera</strong> and <strong>Demo recording (OBS)</strong>. How the app itself <em>looks and behaves</em> is not here — that's User Interface → General, below.</td></tr>
       <tr><td><strong>Jogging</strong></td><td><strong>UI jogging</strong> and <strong>Keyboard jogging</strong> — jog steps and feeds for each, and mirroring them to the controller's firmware jog (<code>$5x</code>). See <a href="#jogging">Jogging</a>.</td></tr>
-      <tr><td><strong>G Code</strong></td><td><strong>GCode command stripping</strong> (what gets filtered on the way out) and <strong>GCode Viewer</strong> (how the <a href="#gcode-viewer">3D view</a> draws it).</td></tr>
+      <tr><td><strong>G Code</strong></td><td><strong>GCode command stripping</strong> — what gets filtered on the way out to the controller. That is the whole category now: what the <a href="#gcode-viewer">3D view</a> draws is set <em>in the view</em>, from its own <strong>View options</strong> button. The <em>GCode Viewer</em> page that used to sit here drove an earlier renderer the app no longer uses, so nothing on it affected anything; it has been removed rather than left to mislead.</td></tr>
       <tr><td><strong>User Interface</strong></td><td><strong>General</strong> — how the app itself looks and behaves: keep MDI focus, restore the last window size, friendly Start/Pause run-strip labels, UI scale, the go-to buttons on the <a href="#jogging">jog pad</a>, <strong>ESC closes current tab if closable</strong>, <strong>Show 3D view in split screen on Job tab</strong>, the <strong>status pop-up dwell</strong> slider, and the app's own auto-save / prompt-before-saving pair. Then <strong>Keyboard</strong> and <strong>Controller</strong> (game-controller bindings), <strong>Macros</strong>, <strong>Job tab layout</strong>, and <strong>Top-level tabs</strong>.</td></tr>
     </table>
 
@@ -2879,38 +2879,89 @@
     <h2>The 3D g-code viewer <a class="anchor" href="#gcode-viewer">#</a></h2>
     <div class="tags"><span class="tag int">Intermediate</span></div>
     <figure>
-      <img src="img/gcode-viewer.png" alt="The 3D toolpath viewer and its toolbar">
-      <figcaption>The Job screen with the 3D View sub-tab open, mid-program.</figcaption>
+      <img src="img/gcode-viewer.png" alt="The 3D toolpath view, its playback controls and the View options button">
+      <figcaption>The Job screen's 3D view, mid-playback. <em>This shot predates the September&nbsp;2026
+      rework</em>: it has no signs on the bed, no green dot at machine zero and no <strong>View
+      options</strong> button, and it still shows the wireframe box that has since gone.</figcaption>
     </figure>
+
+    <p>The 3D view sits beside the g-code list on the <a href="#job">Job screen</a> — as a sub-tab, or side
+    by side with the program list if you tick <strong>Show 3D view in split screen on Job tab</strong> in
+    <a href="#settings">Settings → User Interface → General</a>. It draws the whole program before you cut,
+    carved into a model of your actual stock, so you can see where the job sits on the board and how deep it
+    goes.</p>
+
     <p><strong>What you're looking at:</strong></p>
     <ul>
-      <li>The 3D pane itself sits between the DRO panel and the jogging controls on the Job screen (see <a href="#job">The Job screen</a>) — this shot shows it mid-program, with the toolpath already carved into the stock model.</li>
-      <li><strong>Play / Pause / Stop</strong> and the speed dropdown (<strong>1x</strong>) play back the toolpath animation at the chosen speed without actually running the machine.</li>
-      <li><strong>Reset view</strong> snaps the camera back to fit the whole scene; the small cube gizmo in the bottom-right corner (the ViewCube) can be clicked to snap to a specific face.</li>
-      <li>The orange cylinder is the cutting tool's current position; the brown block is the stock, shown at its real probed size.</li>
+      <li><strong>The stock block</strong> — the material, at the size the program declares or
+      <a href="#setup">Setup</a> probed, with the toolpath genuinely <em>removed</em> from it rather than
+      drawn on top of it. What that size is taken from is worth knowing — see below.</li>
+      <li><strong>Cut and rapid lines</strong> — every move in the program. Rapids are the thinner set, and
+      can be hidden.</li>
+      <li><strong>The cutter</strong> — a cone at the machine's live position. It follows the machine as you
+      jog.</li>
+      <li><strong>The bed grid</strong> — 50&nbsp;mm squares with a heavier line every 100&nbsp;mm, so a
+      distance in the view is a distance you can pace out on the real table.</li>
+      <li><strong>Signs painted on the bed</strong> — a blue <strong>P</strong> where <code>G30</code> parks
+      and an orange <strong>TS</strong> at the toolsetter (<code>G59.3</code>), each a real 100&nbsp;mm square
+      lying flat on the table. They tell you <em>where on the table</em> those positions are; their height
+      carries nothing, as both are over clear air by definition. A position still sitting at all zeros is
+      treated as never taught and is not drawn — better nothing than a park marked at the corner of the
+      machine.</li>
+      <li><strong>A green dot at machine zero</strong> — where the machine homes to, drawn only when homing is
+      enabled. Worth knowing why it earns its place: machine zero is at the <em>top</em> of Z travel, so the
+      gap between that dot and the top of your stock is your headroom, read against something real. On a
+      machine with homing turned off there is no such place, so there is no dot.</li>
+      <li><strong>The ViewCube</strong> in the corner, and a small axis triad showing which way X, Y and Z
+      run.</li>
     </ul>
-    <p>The 3D viewer sits beside the g-code list on the <a href="#job">Job</a> screen and draws the entire
-    toolpath before you cut — so you can sanity-check a program, see where it sits on your stock, and watch
-    progress as it runs.</p>
 
     <h3>Getting around</h3>
     <ul>
-      <li><strong>Drag</strong> to rotate, <strong>scroll</strong> to zoom, and use the <strong>ViewCube</strong>
-      to snap to a face.</li>
-      <li><strong>Reset view</strong> (<kbd>Ctrl</kbd>+<kbd>V</kbd>) re-fits the machine/program;
-      <strong>Save view</strong> stores the current angle as your default.</li>
+      <li><strong>Drag</strong> to rotate and <strong>scroll</strong> to zoom — both about the point under the
+      pointer, so you can zoom into a corner without losing it off the edge.</li>
+      <li><strong>Click a ViewCube face</strong> to snap square to it.</li>
+      <li><strong>Reset view</strong>, inside <strong>View options</strong>, zooms and centres so the whole
+      scene fits.</li>
     </ul>
+    <div class="callout note"><span class="k">This view has no keyboard shortcuts</span><br>
+      There is nothing here to bind. Earlier versions of this manual described
+      <kbd>Ctrl</kbd>+<kbd>V</kbd> for Reset view, <kbd>Ctrl</kbd>+<kbd>G</kbd> for the grid, a
+      <strong>Save view</strong> button that stored your angle, and <kbd>Ctrl</kbd>-click in the view to jog
+      to that point. All four belonged to an earlier renderer the app no longer uses — the buttons and the
+      keys are both gone, and there is no setting anywhere that brings them back.</div>
 
-    <h3>What you can show</h3>
-    <p>Toggle the <strong>grid</strong> (<kbd>Ctrl</kbd>+<kbd>G</kbd>), <strong>X/Y/Z axis markers</strong>,
-    the <strong>work envelope</strong> (your machine's travel), the program's <strong>bounding box</strong>,
-    the coordinate system and a text overlay. Colours for cuts, rapids, retracts and the highlight are all
-    configurable, and <strong>Highlight completed cuts</strong> shows how far a running job has got.</p>
+    <h3>View options — what the view draws</h3>
+    <p>The <strong>View options</strong> button opens a small dialog. Everything in it applies straight away
+    and is remembered between sessions.</p>
+    <table class="reftab">
+      <tr><th>Control</th><th>What it does</th></tr>
+      <tr><td><strong>Rapid moves</strong></td><td>The lines between cuts. Hiding them leaves only the cutting path.</td></tr>
+      <tr><td><strong>Stock block</strong></td><td>The material. Hide it to see the whole toolpath, including the parts buried inside the board.</td></tr>
+      <tr><td><strong>Bed grid</strong></td><td>The table grid.</td></tr>
+      <tr><td><strong>Stored positions</strong></td><td>The <code>G30</code> and toolsetter signs, and the dot at machine zero.</td></tr>
+      <tr><td><strong>Cut moves / Rapid moves / Stock</strong></td><td>Three colour pickers. <strong>Default colours</strong> puts all three back to the shipped palette.</td></tr>
+      <tr><td><strong>Reset view</strong></td><td>Zoom and centre so the whole scene fits.</td></tr>
+    </table>
+    <div class="callout note"><span class="k">Why the stock never matches its swatch</span><br>
+      Cut and rapid moves are drawn as <em>lines</em>, and lines are not lit — those two appear in the view
+      exactly as you picked them. The stock is a lit <em>surface</em>, so it renders darker than the swatch,
+      and its sides darker again where the light rakes across them. Pick the stock colour by what the block
+      looks like, not by matching the square in the dialog.</div>
 
-    <div class="callout tip"><span class="k">Click to jog</span><br>
-      Hold <kbd>Ctrl</kbd> and click a point in the view to <strong>jog there</strong> — the machine raises Z
-      to a safe height first, then rapids to the spot. A fast way to reach a feature without nudging with the
-      <a href="#jogging">jog</a> keys.</div>
+    <h3>Playback, and what the view does during a real job</h3>
+    <ul>
+      <li><strong>Play / Pause / Stop</strong>, at <strong>1x</strong>, <strong>2x</strong>, <strong>5x</strong>
+      or <strong>10x</strong>, runs the program <em>in the view only</em> — the machine does not move. The
+      block is carved as it goes with the cone where the cutter would be, which makes it the cheapest dry run
+      there is. It needs no controller and no connection.</li>
+      <li><strong>While a job is streaming, the view holds still.</strong> This is deliberate, not a fault:
+      redrawing a carve competes with feeding lines to the controller, and a controller starved of lines
+      stutters the cut. The view picks up again by itself once the job ends. Watch the shape with
+      <strong>Play</strong> beforehand, and watch the run on the program list and the DRO.</li>
+      <li><strong>Jogging does move the cone</strong> — and carves with it. Anything other than a streaming
+      program is tracked live.</li>
+    </ul>
 
     <h3>The stock block, and what it is drawn from</h3>
     <p>The block the toolpath carves into is not a decoration — it is a real dexel model, and it is drawn

@@ -460,15 +460,15 @@ Settings page**. Recorded as it shipped, which is the rule the process note belo
 running for six weeks.
 
 ### 🔴 A Settings page NO LONGER EXISTS
-- [ ] **`#settings` line 2584** — the **G Code** row promises "**GCode Viewer** (how the 3D view
+- [x] **`#settings` line 2584** — the **G Code** row promises "**GCode Viewer** (how the 3D view
       draws it)". That page is **deleted** (`360a8976`). It drove the OLD renderer, which the UI has
       no way to reach, so every option on it was inert: nothing on it ever affected the 3D view in
       the Job tab. Rewrite the row to mention GCode command stripping only, and point viewer options
       at the view's own **View options** button.
-- [ ] Sweep for any other mention of viewer settings living under Settings.
+- [x] Sweep for any other mention of viewer settings living under Settings.
 
 ### `#gcode-viewer` — the 3D view changed in five ways
-- [ ] **Line 2889 and line 2900** both describe a **Reset view** button. There is no such button:
+- [x] **Line 2889 and line 2900** both describe a **Reset view** button. There is no such button:
       it is now **View options**, and Reset view is a button *inside* that dialog. Line 2900 also
       claims a <kbd>Ctrl</kbd>+<kbd>V</kbd> shortcut — **checked in source 2026-09-21: that is the
       OLD renderer's** (`RenderControl.xaml` lines 77-78, with <kbd>Ctrl</kbd>+<kbd>R</kbd> for a
@@ -483,19 +483,27 @@ running for six weeks.
       runs because `JobWorkspace` registers **CarveView** for `LayoutKeys.Toolpath3D`. `CarveView`
       registers no key handlers at all, so the group was empty on both counts. The old `RenderControl`
       itself stays — that is the larger old-renderer removal.
-- [ ] **New: the View options dialog.** Four toggles (rapid moves, stock block, bed grid, stored
+- [x] **New: the View options dialog.** Four toggles (rapid moves, stock block, bed grid, stored
       positions), three colour pickers (cut, rapid, stock), Default colours, Reset view. Document
       that colours persist, and the reason a lit surface does not match its swatch while the cut and
       rapid *lines* match exactly.
-- [ ] **New: stored-position signs.** G30 and the toolsetter (G59.3) are drawn as **100 mm signs
+- [x] **New: stored-position signs.** G30 and the toolsetter (G59.3) are drawn as **100 mm signs
       painted on the bed** — a parking P for the park, TS for the toolsetter — when taught. Say that
       an all-zero position is treated as never taught and is not drawn.
-- [ ] **New: a green dot at machine zero**, drawn only when homing is enabled. Worth explaining
+- [x] **New: a green dot at machine zero**, drawn only when homing is enabled. Worth explaining
       *why*: it is at the top of Z travel, so the gap between it and the stock is the headroom.
-- [ ] **Gone: the machine-envelope wireframe box.** If any text mentions a box around the work
+- [x] **Gone: the machine-envelope wireframe box.** If any text mentions a box around the work
       envelope, remove it — the bed grid carries the footprint now.
-- [ ] The tool cone now **follows the live machine position** while jogging (`43201cf6`, `a1389639`).
+- [x] The tool cone now **follows the live machine position** while jogging (`43201cf6`, `a1389639`).
       If the manual says the view only moves during a program, that is now wrong.
+- [x] **Two more the audit had not caught, found while rewriting (2026-09-21).** Both were the same
+      old-renderer mistake: **Save view** and <kbd>Ctrl</kbd>-click **to jog to a point in the view**
+      were documented and neither exists — `ClickToJog` is read only in `Renderer.xaml.cs`, which only
+      `RenderControl` and the unused `Viewer` host. And the topic said you could "watch progress as it
+      runs": **the view deliberately holds still for the whole of a streaming job** (`CarveView`
+      position handler, the `IsJobRunning` guard) because redrawing the carve starves the line feed.
+      Jogging tracks live; a streaming program does not. The rewrite says so, and points at Play, the
+      program list and the DRO instead.
 
 ### `#machine-setup` — step 5 is a different screen
 - [ ] **Line 2302** describes step 5 as "Declare the probes fitted to this machine (touch plate /
