@@ -200,6 +200,19 @@ namespace CNC.Controls
             }
         }
 
+        // WALK THE WHOLE ANCESTRY, not just one level. The tree under a Bluetooth LE remote is three deep:
+        //
+        //     HID\{...}                       the HID collection - this is what raw input names
+        //       parent  BTHLEDEVICE\{...}      "Bluetooth Low Energy GATT compliant HID device"
+        //         parent  BTHLE\Dev_<addr>     "PICO V0.1:079B5C11FFF"   <- the one a human recognises
+        //
+        // Taking the immediate parent got the middle one, and since that node HAS a description it looked
+        // like a success: "Bound to Bluetooth Low Energy GATT compliant HID device". Right mechanism, one
+        // level short. A description is a device CLASS talking about itself; a friendly name is the thing
+        // the operator named or the device calls itself, so friendly names win at every level and a
+        // description is only a last resort.
+        private const int MaxAncestry = 6;
+
         private static string ParentFriendlyName(string devicePath)
         {
             try
@@ -208,21 +221,39 @@ namespace CNC.Controls
                 if (id == null)
                     return null;
 
-                uint devInst;
-                if (CM_Locate_DevNodeW(out devInst, id, 0) != CR_SUCCESS)
+                uint node;
+                if (CM_Locate_DevNodeW(out node, id, 0) != CR_SUCCESS)
                 {
                     DebugLog.Write("remote", "name: could not locate a device node for " + id);
                     return null;
                 }
 
-                uint parent;
-                if (CM_Get_Parent(out parent, devInst, 0) != CR_SUCCESS)
+                string firstDescription = null;
+
+                for (int level = 0; level < MaxAncestry; level++)
                 {
-                    DebugLog.Write("remote", "name: the device node has no parent");
-                    return null;
+                    uint parent;
+                    if (CM_Get_Parent(out parent, node, 0) != CR_SUCCESS)
+                        break;   // reached the root
+                    node = parent;
+
+                    string friendly = NodeProperty(node, CM_DRP_FRIENDLYNAME);
+                    string description = NodeProperty(node, CM_DRP_DEVICEDESC);
+
+                    // Logged per level: if this ever lands on the wrong node again, the chain is right
+                    // here rather than something to go and re-derive.
+                    DebugLog.Write("remote", string.Format(CultureInfo.InvariantCulture,
+                        "name: ancestor {0} friendly=[{1}] desc=[{2}]",
+                        level + 1, friendly ?? "", description ?? ""));
+
+                    if (!string.IsNullOrEmpty(friendly))
+                        return friendly;
+
+                    if (firstDescription == null && !string.IsNullOrEmpty(description))
+                        firstDescription = description;
                 }
 
-                return NodeProperty(parent, CM_DRP_FRIENDLYNAME) ?? NodeProperty(parent, CM_DRP_DEVICEDESC);
+                return firstDescription;
             }
             catch (Exception ex)
             {
