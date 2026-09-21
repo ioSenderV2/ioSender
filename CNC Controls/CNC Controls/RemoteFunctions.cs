@@ -37,11 +37,16 @@ namespace CNC.Controls
     {
         public class Function
         {
-            public string Id;
-            public string Label;
-            public string Description;
+            // PROPERTIES, NOT FIELDS. WPF data binding resolves against properties only - a ComboBox with
+            // DisplayMemberPath="Label" over a type whose Label is a field binds to nothing and renders a
+            // popup of the right height full of blank rows, which is exactly what shipped on 2026-09-21.
+            // It fails silently: no exception, no binding error loud enough to notice, just empty rows.
+            public string Id { get; set; }
+            public string Label { get; set; }
+            public string Description { get; set; }
 
-            // So a ComboBox bound straight to the catalogue shows the label.
+            // So a ComboBox bound straight to the catalogue still reads properly if DisplayMemberPath is
+            // ever dropped.
             public override string ToString() { return Label; }
         }
 
