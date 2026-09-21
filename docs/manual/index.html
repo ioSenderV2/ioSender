@@ -687,6 +687,26 @@
     <p>The per-axis <strong>zero</strong> buttons set the <em>work</em> origin at the current spot — handy for
     quick manual setups (though probing is more repeatable, see <a href="#setup">Setup</a>).</p>
 
+    <h4 class="subh">The DRO's own title is the offset picker</h4>
+    <p>The heading reads <strong>DRO (G54)</strong> — the work offset the readout is <em>in</em> — with a
+    chevron after it, because it is a dropdown. Click it and you get the selectable work offsets
+    (<code>G54</code>–<code>G59.3</code>) with the current one ticked; pick one and the machine switches to it.
+    Right-click does the same thing.</p>
+    <ul>
+      <li><strong>Hovering an entry shows what is in it</strong> — its X, Y and Z, and its rotation. So you can
+      choose between two offsets by reading them, rather than selecting one and then looking at the DRO, which
+      would mean changing the machine's state to answer a question.</li>
+      <li>The rotation is shown <em>always</em>, not only when it is non-zero: on a rotated offset it is the one
+      number that explains why a move went somewhere you did not expect, and leaving it out would read as "no
+      rotation" rather than "not shown".</li>
+      <li>Stored <em>positions</em> — <code>G28</code>, <code>G30</code>, <code>G92</code> — are deliberately
+      <strong>not</strong> in this list. They are not offsets you can work in, and sending their codes moves the
+      machine. See the jog pad's <strong>Go to</strong> button below for reaching those.</li>
+      <li>It works <strong>in both places the DRO appears</strong> — the Job tab's panel and the
+      <a href="#job">run strip</a>'s compact copy. That is the point of it living on the readout itself: the run
+      strip is reachable when the Job tab is not.</li>
+    </ul>
+
     <h3>Two ways to jog</h3>
     <p><strong>On-screen jog pad</strong> — arrow buttons for each axis, with:</p>
     <ul>
@@ -697,13 +717,33 @@
       machine envelope at safe Z.</li>
       <li><strong>Corner buttons</strong> (the four diagonals) — rapid to that corner of the machine envelope
       at safe Z, held back 20&nbsp;mm from each limit so you never drive into a switch.</li>
+      <li><strong>Go to</strong> — the target-and-pin button in the <strong>Z column, between Z+ and
+      Z−</strong>: the one square in the pad that used to be empty. A menu of everywhere
+      the machine has a <em>stored</em> position, grouped by what sort of thing it is: your
+      <a href="#machine-setup">fixtures</a> that have a captured position, the stored positions
+      (<code>G28</code>, <code>G30</code>, <code>G59.3</code>), and any work offset that is not still at zero.
+      Hovering an entry shows the machine coordinates it will go to, before it goes — a fixture's name says
+      nothing about where it is. Anything still sitting at all zeros is left out: grbl has no "has been taught"
+      flag, so all-zero is what never-set looks like, and offering to go to an untaught <code>G28</code> would
+      send the machine to the top corner at rapid.</li>
     </ul>
+    <div class="callout warn"><span class="k">Go to drives Z for two targets only</span><br>
+      Every target retracts Z first and then travels in X and Y. Only <code>G30</code> and <code>G59.3</code>
+      then <strong>lower Z</strong> to their stored height, and that is by definition rather than by luck:
+      <code>G30</code> is the tool-swap park, over clear air so you can reach the collet, and
+      <code>G59.3</code> is the approach over the toolsetter, whose Z has to clear your longest tool. For
+      everything else — a fixture, a work offset — the stored Z is <em>at the work</em>, so driving to it would
+      be a plunge to a height decided before whatever is clamped there now was clamped. Those go to X and Y at
+      the current Z and stop. <code>G28</code> is not in the drive-Z list either: nothing in ioSender writes
+      it, so its Z is whatever a previous owner of the machine left there. When Z is driven it happens
+      <em>last</em>, as its own move — up, across, then down, never a diagonal into a park.</div>
     <div class="callout note"><span class="k">The pad targets the machine, not the job</span><br>
       Centre and the four corners are the <em>machine envelope</em> — they don't follow the loaded program's
       bounding box. That way they mean the same thing whether or not a file is loaded.</div>
     <p>If you'd rather have a plain arrow pad, untick <em>Show go-to buttons on the jog pad</em> in
     <strong>Settings → User Interface → General</strong> — the centre and four corner buttons disappear and the
-    arrows stay exactly where they are.</p>
+    arrows stay exactly where they are. That tick covers the <em>envelope</em> buttons only: the arrows, the Z
+    buttons and <strong>Go to</strong> are unaffected.</p>
     <p><strong>Keyboard jogging</strong> — arrow keys for X/Y and Page&nbsp;Up/Down for Z. Hold a key for
     continuous motion; tap for a step. Holding <kbd>Ctrl</kbd> switches to a precise <strong>step jog</strong>
     of the distance shown as <em>Jog step</em> on the run strip.</p>
@@ -1036,13 +1076,21 @@
     </figure>
     <p><strong>What you're looking at:</strong></p>
     <ul>
-      <li><strong>DRO</strong> (top left) — the live X/Y/Z position, with a per-axis zero button; see <a href="#jogging">Jogging &amp; the DRO</a>.</li>
+      <li><strong>DRO</strong> (top left) — the live X/Y/Z position, with a per-axis zero button. Its title
+      reads <strong>DRO (G54)</strong> and is itself a <strong>dropdown of the work offsets</strong>, here and
+      on the run strip both; see <a href="#jogging">Jogging &amp; the DRO</a>.</li>
       <li><strong>Machine Position</strong> — the same position in fixed machine coordinates rather than your work origin.</li>
       <li><strong>Program limits</strong> — the loaded program's own footprint (min/max per axis), so you can sanity-check it fits your stock before running.</li>
       <li><strong>Coolant</strong> — manual Flood/Mist toggles, independent of whatever the running program itself commands.</li>
       <li><strong>The g-code list</strong> (centre) — the loaded program, line by line, with the current line highlighted as it runs. Hover any line for a plain-English tooltip explaining exactly what it does (shown here for <code>T1M6</code> — "Select tool 1", then "Tool change (M6)", in the same left-to-right order the words appear in the line) — click the tooltip to copy the line.</li>
       <li><strong>Jogging / UI Jogging / Keyboard jogging</strong> (right) — the on-screen jog pad plus the distance/feed presets each jog step uses. The pad is the widest thing on that side; if the run strip's own compact jog controls are enough for you, untick <em>Show the jog pad on the Job tab</em> in <strong>Settings → User Interface → Job tab layout</strong> and the panels get that height back. Keyboard and game-controller jogging are unaffected either way.</li>
-      <li><strong>Work Parameters &amp; Spindle</strong> — the active work offset and tool, and manual spindle RPM/direction/override controls.</li>
+      <li><strong>Work Parameters &amp; Spindle</strong> — the active work offset and tool, and manual spindle
+      RPM/direction/override controls. Its offset dropdown lists <code>G54</code>–<code>G59.3</code> only.
+      <code>G28</code>, <code>G30</code> and <code>G92</code> arrive from the controller in the same report and
+      used to appear here, which was a real hazard: this combo sends the selected code to the controller
+      verbatim, so picking <code>G28</code> did not select anything — it <em>rapided the machine</em> to the
+      stored <code>G28</code>, from a dropdown next to the tool selector. To reach a stored position on
+      purpose, use the jog pad's <a href="#jogging"><strong>Go to</strong></a> button.</li>
       <li><strong>The fixture panel</strong> (far right, vertical) — quick-jump buttons to named machine positions like G28/G30/G54.</li>
       <li><strong>The run strip</strong> (bottom, spanning the window) — everything a running job needs, in one
       place. On the left: the <strong>Run</strong> button and its mode dropdown, Feed Hold, Stop,

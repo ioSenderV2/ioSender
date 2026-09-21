@@ -549,16 +549,32 @@ bullet now says why a flat plate is not offered for a corner.
 - [x] **Motion parameters hide Edge standoff and Drop to side for a flat plate** (`fdaae67d`) —
       they only mean something when probing sideways.
 
-### `#job` — two new controls
-- [ ] **The DRO title is an offset picker** (`3740a198`). Clicking "DRO (G54)" drops down the
+### `#job` — two new controls — ✅ TEXT DONE 2026-09-21 (three, and mostly in `#jogging`)
+
+The DRO and the jog pad are documented in **`#jogging`**, so that is where the detail went, with pointers from
+`#job`'s at-a-glance list:
+
+- **`#jogging`** gained *"The DRO's own title is the offset picker"* — the chevron, the hover showing X/Y/Z
+  and rotation (and why rotation is shown even at zero), why `G28`/`G30`/`G92` are NOT in that list, and that
+  it works on the run strip's copy too because they are one control.
+- **`#jogging`**'s jog-pad list gained **Go to**, described by where it actually is — the target-and-pin
+  button in the **Z column between Z+ and Z−**, not the "3 o'clock square" this note called it — with a warn
+  callout for the Z rule: only `G30` and `G59.3` lower Z, everything else is XY at the current Z, `G28` is
+  excluded from drive-Z because nothing writes it, and the driven Z happens last as its own move.
+- **Corrected while there:** the *Show go-to buttons on the jog pad* tick covers the centre and corner
+  buttons only — the arrows, the Z buttons and **Go to** are unaffected. The manual now says so.
+- **`#job`**'s Work Parameters bullet explains the removed `G28`/`G30`/`G92` entries and why it mattered:
+  the combo sends the code verbatim, so picking one rapided the machine from a dropdown next to the tool
+  selector.
+- [x] **The DRO title is an offset picker** (`3740a198`). Clicking "DRO (G54)" drops down the
       selectable work offsets with the current one ticked; hovering one shows its X/Y/Z and
       rotation. It works in **both** places the DRO appears — the Job tab and the run strip — which
       is the point: the run strip is reachable when the Job tab is not.
-- [ ] **A Go-to button** in the jog pad's empty 3-o'clock square (`bb20dd47`). It lists the stored
+- [x] **A Go-to button** in the jog pad's empty 3-o'clock square (`bb20dd47`). It lists the stored
       positions — fixtures, G28, G30, G59.3 and any non-zero offset — and moves there. **It drives
       Z only for G30 and G59.3**, which are over clear air by definition; everything else is XY
       only, at the current Z (`7e0556bb`). That distinction is a safety point, not a detail.
-- [ ] **The Work Parameters offset dropdown no longer lists G28/G30/G92** (`4f1d17e4`). They are
+- [x] **The Work Parameters offset dropdown no longer lists G28/G30/G92** (`4f1d17e4`). They are
       stored *positions*, and selecting one sent its code to the controller — which **rapids the
       machine** from a dropdown next to the tool selector. If the manual documents that list,
       correct it and say why.
