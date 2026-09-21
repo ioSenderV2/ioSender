@@ -862,7 +862,6 @@ namespace CNC.Controls
             string m = r.Model.Method ?? string.Empty;
 
             if (m.StartsWith("DROControl.Zero")) r.Set("Zeroing", 8);
-            else if (m.StartsWith("RenderControl.")) r.Set("3D view", 11);
             else if (m.StartsWith("ProbingView.")) r.Set("Probing", 10);
             else if (m.Contains("JogStep") || m.Contains("JogFeed") ||
                      m.EndsWith("FeedInc") || m.EndsWith("FeedDec") ||
@@ -893,7 +892,6 @@ namespace CNC.Controls
             { "Zeroing", "Set the work-coordinate zero for an axis (or all axes)." },
             { "Program", "Program-level toggles (optional stop, single block, probe state), the console window, and the run strip's MDI and Status buttons." },
             { "Probing", "Start or stop probing and toggle the probe-connected state." },
-            { "3D view", "Control the 3D tool-path viewer." },
             { MenuGroup, "The built-in main-menu commands - Connect, File and Help. These are not views and cannot be placed on the tab strip. All unbound by default; a menu command that is greyed out does nothing when its key is pressed." },
             { TopLevelGroup, "The views that can sit on the top-level tab strip. A key reaches its target wherever that target currently lives - as a tab, or on the menu that hosts it when it is off the bar - so moving something in Settings > Top-level tabs never costs it its shortcut. All unbound by default." },
             { "Other", "Additional actions." }
@@ -940,11 +938,6 @@ namespace CNC.Controls
             { "JogBaseControl.FeedDec", "Decrease the jog feed rate." },
             { "JogBaseControl.StepInc", "Increase the jog step size." },
             { "JogBaseControl.StepDec", "Decrease the jog step size." },
-            { "RenderControl.ResetView", "Reset the 3D view to the default orientation." },
-            { "RenderControl.RestoreView", "Restore the last saved 3D view." },
-            { "RenderControl.ToggleGrid", "Show or hide the grid in the 3D view." },
-            { "RenderControl.ToggleJobEnvelope", "Show or hide the job bounding box." },
-            { "RenderControl.ToggleWorkEnvelope", "Show or hide the work envelope." },
             { "ProbingView.StartProbe", "Start the selected probing routine." },
             { "ProbingView.StopProbe", "Stop the running probing routine." },
             { "ProbingView.ProbeConnectedToggle", "Toggle the simulated probe-connected state." },
@@ -1024,11 +1017,6 @@ namespace CNC.Controls
             { "JogBaseControl.FeedDec", "Jog feed −" },
             { "JogBaseControl.StepInc", "Jog step +" },
             { "JogBaseControl.StepDec", "Jog step −" },
-            { "RenderControl.ResetView", "Reset view" },
-            { "RenderControl.RestoreView", "Restore view" },
-            { "RenderControl.ToggleGrid", "Toggle grid" },
-            { "RenderControl.ToggleJobEnvelope", "Toggle job envelope" },
-            { "RenderControl.ToggleWorkEnvelope", "Toggle work envelope" },
             { "ProbingView.StartProbe", "Start probe" },
             { "ProbingView.StopProbe", "Stop probe" },
             { "ProbingView.ProbeConnectedToggle", "Toggle probe connected" },
