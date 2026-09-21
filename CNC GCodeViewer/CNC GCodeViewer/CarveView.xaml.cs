@@ -15,6 +15,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -282,6 +283,38 @@ namespace CNC.Controls.Viewer
             return double.IsNaN(v) ? 0d : v;
         }
 
+        // The stored positions worth drawing: the tool-swap park and the tool-length position. Both are
+        // places the machine GOES, which is what makes them worth seeing next to the stock - a fixture or
+        // a work offset is somewhere the work IS, and the stock already shows that.
+        //
+        // All-zero means never taught (grbl has no "is defined" flag), so an untaught G30 is not drawn at
+        // machine zero as though it were a real park - the same filter the go-to menu applies, for the
+        // same reason.
+        private static readonly string[] MarkedPositions = { "G30", "G59.3" };
+
+        private static bool IsTaught(CoordinateSystem cs)
+        {
+            if (cs == null)
+                return false;
+            for (int i = 0; i < GrblInfo.NumAxes && i < cs.Values.Length; i++)
+                if (!double.IsNaN(cs.Values[i]) && cs.Values[i] != 0d)
+                    return true;
+            return false;
+        }
+
+        // Machine -> work, the same plain subtraction that places the envelope. Under a ROTATED work
+        // coordinate system that is an approximation: the rotation says how the work frame sits on the
+        // table, and honouring it is the controller's job. The markers are therefore exactly as right as
+        // the envelope they sit inside, which is the consistency that matters here - the live cone goes
+        // through ToWorkFrame and IS rotation-correct, so on a rotated WCS the cone is the one to trust.
+        private Point3D MarkerPoint(CoordinateSystem cs)
+        {
+            return new Point3D(
+                (cs.Values.Length > 0 ? cs.Values[0] : 0d) - Wco(0),
+                (cs.Values.Length > 1 ? cs.Values[1] : 0d) - Wco(1),
+                (cs.Values.Length > 2 ? cs.Values[2] : 0d) - Wco(2));
+        }
+
         // Signature of the inputs that shape the scene: the program (identity + size) plus the machine envelope
         // and work offset that size/place it. Re-showing the tab rebuilds only when one of these actually
         // changed - otherwise the retained visuals (including the live-carved mesh) just re-render.
@@ -301,13 +334,25 @@ namespace CNC.Controls.Viewer
                     ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "s{0:F2},{1:F2},{2:F2}",
                                     sec.Width, sec.Height, sec.Thickness)
                     : "-";
+            // The markers go in too, or re-teaching G30 leaves the old pin on screen: nothing else in
+            // this signature would differ.
+            var marks = new System.Text.StringBuilder();
+            foreach (string code in MarkedPositions)
+            {
+                var cs = GrblWorkParameters.CoordinateSystems.FirstOrDefault(c => c.Code == code);
+                marks.Append(IsTaught(cs)
+                    ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0}:{1:F3},{2:F3},{3:F3};",
+                                    code, cs.Values[0], cs.Values[1], cs.Values.Length > 2 ? cs.Values[2] : 0d)
+                    : code + ":-;");
+            }
+
             return string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "{0}|{1}|{2:F3},{3:F3},{4:F3},{5:F3},{6:F3},{7:F3}|{8}",
+                "{0}|{1}|{2:F3},{3:F3},{4:F3},{5:F3},{6:F3},{7:F3}|{8}|{9}",
                 cnt, name,
                 EnvMin(0) - Wco(0), EnvMax(0) - Wco(0),
                 EnvMin(1) - Wco(1), EnvMax(1) - Wco(1),
                 EnvMin(2) - Wco(2), EnvMax(2) - Wco(2),
-                stockSig);
+                stockSig, marks);
         }
 
         private void BuildScene()
@@ -396,6 +441,9 @@ namespace CNC.Controls.Viewer
                 Thickness = 0.6d,
                 Fill = Brushes.Gray
             });
+
+            // stored-position markers, inside the envelope they are measured against
+            AddPositionMarkers(zmin);
 
             // stock: the solid carve mesh (deforms as the cutter passes) when a program is loaded; otherwise a
             // plain default block. Only one of them is shown so there is no z-fighting/see-through.
@@ -942,6 +990,47 @@ namespace CNC.Controls.Viewer
                         dirtyCells.Add(j * (hnx + 1) + i);   // pushed to the mesh (in place) on the next throttle
                     }
                 }
+        }
+
+        /// <summary>
+        /// Draw a pin at each taught stored position, with a dropline to the bed so its XY can be read off
+        /// the grid. Without the dropline a point floating in a wireframe box is unplaceable by eye, which
+        /// is the whole reason for drawing it.
+        /// </summary>
+        private void AddPositionMarkers(double bedZ)
+        {
+            foreach (string code in MarkedPositions)
+            {
+                var cs = GrblWorkParameters.CoordinateSystems.FirstOrDefault(c => c.Code == code);
+                if (!IsTaught(cs))
+                    continue;
+
+                var p = MarkerPoint(cs);
+                // G30 is where you stand to change a tool; G59.3 is where the tool gets measured. Two
+                // colours so they are told apart at a glance rather than by reading the labels.
+                var colour = code == "G30" ? Colors.SteelBlue : Colors.DarkOrange;
+
+                viewport.Children.Add(new SphereVisual3D
+                {
+                    Center = p,
+                    Radius = 4d,
+                    Fill = new SolidColorBrush(colour)
+                });
+
+                viewport.Children.Add(new LinesVisual3D
+                {
+                    Points = new Point3DCollection { p, new Point3D(p.X, p.Y, bedZ) },
+                    Color = colour,
+                    Thickness = 1d
+                });
+
+                viewport.Children.Add(new BillboardTextVisual3D
+                {
+                    Text = code,
+                    Position = new Point3D(p.X, p.Y, p.Z + 10d),
+                    Foreground = new SolidColorBrush(colour)
+                });
+            }
         }
 
         // The cone follows the live work position when not simulating; playback owns it while playing.
