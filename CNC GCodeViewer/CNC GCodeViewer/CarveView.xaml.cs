@@ -20,6 +20,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using System.Windows.Threading;
 using HelixToolkit.Wpf;
@@ -1008,10 +1009,25 @@ namespace CNC.Controls.Viewer
                 }
         }
 
+        // The marker tile, in millimetres. A real 100 mm square on the bed, so it reads against the 50 mm
+        // grid as an area you could point at on the actual table - not a screen-sized badge that means a
+        // different amount of table at every zoom.
+        private const double MarkerTileSize = 100d;
+
+        // A sign, not a label: the glyph carries the meaning at any zoom where the tile is still legible.
+        // G30 is the park, so it gets the international parking P; G59.3 is where the tool gets measured,
+        // so TS for toolsetter.
+        private static string MarkerGlyph(string code)
+        {
+            return code == "G30" ? "P" : "TS";
+        }
+
         /// <summary>
-        /// Draw a pin at each taught stored position, with a dropline to the bed so its XY can be read off
-        /// the grid. Without the dropline a point floating in a wireframe box is unplaceable by eye, which
-        /// is the whole reason for drawing it.
+        /// Draw each taught stored position as a flat tile lying ON the bed. The earlier version put a pin
+        /// at the taught Z, which is up near the top of travel - so the marker floated beside the tool cone
+        /// with nothing under it, and its XY (the only part anyone wants from it) had to be traced down a
+        /// dropline to be read at all. Both of these positions are over clear air by definition, so their
+        /// Z carries no information worth the confusion: the tile shows where on the TABLE they are.
         /// </summary>
         private int AddPositionMarkers(double bedZ)
         {
@@ -1025,32 +1041,86 @@ namespace CNC.Controls.Viewer
 
                 var p = MarkerPoint(cs);
                 // G30 is where you stand to change a tool; G59.3 is where the tool gets measured. Two
-                // colours so they are told apart at a glance rather than by reading the labels.
+                // colours so they are told apart at a glance rather than by reading the caption.
                 var colour = code == "G30" ? Colors.SteelBlue : Colors.DarkOrange;
 
-                viewport.Children.Add(new SphereVisual3D
-                {
-                    Center = p,
-                    Radius = 4d,
-                    Fill = new SolidColorBrush(colour)
-                });
-
-                viewport.Children.Add(new LinesVisual3D
-                {
-                    Points = new Point3DCollection { p, new Point3D(p.X, p.Y, bedZ) },
-                    Color = colour,
-                    Thickness = 1d
-                });
-
-                viewport.Children.Add(new BillboardTextVisual3D
-                {
-                    Text = code,
-                    Position = new Point3D(p.X, p.Y, p.Z + 10d),
-                    Foreground = new SolidColorBrush(colour)
-                });
+                // Just clear of the bed: co-planar with the grid lines is a z-fight, and the loser is
+                // whichever the depth buffer feels like that frame.
+                AddMarkerTile(p.X, p.Y, bedZ + 0.25d, MakeMarkerIcon(MarkerGlyph(code), code, colour));
             }
 
             return drawn;
+        }
+
+        /// <summary>
+        /// Render the sign face once into a bitmap. Text as geometry would need a font tessellator this
+        /// toolkit build does not ship (no TextVisual3D), and a billboard would keep a fixed pixel size -
+        /// neither gives a mark that is 100 mm of table.
+        /// </summary>
+        private static ImageBrush MakeMarkerIcon(string glyph, string caption, Color colour)
+        {
+            const int px = 256;
+            var face = new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
+            var dv = new DrawingVisual();
+
+            using (var dc = dv.RenderOpen())
+            {
+                dc.DrawRoundedRectangle(new SolidColorBrush(colour), new Pen(Brushes.White, 12d),
+                                        new Rect(8d, 8d, px - 16d, px - 16d), 30d, 30d);
+
+                // Two glyph sizes: "TS" is twice as wide as "P" and would otherwise run off the tile.
+                var big = new FormattedText(glyph, System.Globalization.CultureInfo.InvariantCulture,
+                                            FlowDirection.LeftToRight, face,
+                                            glyph.Length > 1 ? 112d : 150d, Brushes.White, 1d);
+                dc.DrawText(big, new Point((px - big.Width) / 2d, 26d));
+
+                var small = new FormattedText(caption, System.Globalization.CultureInfo.InvariantCulture,
+                                              FlowDirection.LeftToRight, face, 38d, Brushes.White, 1d);
+                dc.DrawText(small, new Point((px - small.Width) / 2d, px - small.Height - 24d));
+            }
+
+            var bmp = new RenderTargetBitmap(px, px, 96d, 96d, PixelFormats.Pbgra32);
+            bmp.Render(dv);
+            bmp.Freeze();
+
+            var brush = new ImageBrush(bmp) { Stretch = Stretch.Fill };
+            brush.Freeze();
+
+            return brush;
+        }
+
+        /// <summary>
+        /// A textured quad flat on the bed. Emissive over black rather than diffuse: this is a sign, and a
+        /// sign that dims when the scene light rakes across it has stopped being one.
+        /// </summary>
+        private void AddMarkerTile(double cx, double cy, double z, ImageBrush icon)
+        {
+            const double half = MarkerTileSize / 2d;
+
+            var mesh = new MeshGeometry3D();
+            mesh.Positions.Add(new Point3D(cx - half, cy - half, z));
+            mesh.Positions.Add(new Point3D(cx + half, cy - half, z));
+            mesh.Positions.Add(new Point3D(cx + half, cy + half, z));
+            mesh.Positions.Add(new Point3D(cx - half, cy + half, z));
+
+            // V runs down the image, so the +Y edge of the tile is the top of the glyph: the sign reads
+            // right way up from the default overhead-ish view.
+            mesh.TextureCoordinates.Add(new Point(0d, 1d));
+            mesh.TextureCoordinates.Add(new Point(1d, 1d));
+            mesh.TextureCoordinates.Add(new Point(1d, 0d));
+            mesh.TextureCoordinates.Add(new Point(0d, 0d));
+
+            foreach (int i in new[] { 0, 1, 2, 0, 2, 3 })
+                mesh.TriangleIndices.Add(i);
+
+            var material = new MaterialGroup();
+            material.Children.Add(new DiffuseMaterial(Brushes.Black));
+            material.Children.Add(new EmissiveMaterial(icon));
+
+            viewport.Children.Add(new ModelVisual3D
+            {
+                Content = new GeometryModel3D(mesh, material) { BackMaterial = material }
+            });
         }
 
         // The cone follows the live work position when not simulating; playback owns it while playing.
