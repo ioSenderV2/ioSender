@@ -360,13 +360,16 @@ namespace CNC.Controls.Viewer
                     : code + ":-;");
             }
 
+            // Homing too: it decides whether machine zero is a place worth marking, and a controller that
+            // turns it on without changing a travel limit would otherwise leave the signature identical
+            // and the home dot missing for the rest of the session.
             return string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "{0}|{1}|{2:F3},{3:F3},{4:F3},{5:F3},{6:F3},{7:F3}|{8}|{9}",
+                "{0}|{1}|{2:F3},{3:F3},{4:F3},{5:F3},{6:F3},{7:F3}|{8}|{9}|{10}",
                 cnt, name,
                 EnvMin(0) - Wco(0), EnvMax(0) - Wco(0),
                 EnvMin(1) - Wco(1), EnvMax(1) - Wco(1),
                 EnvMin(2) - Wco(2), EnvMax(2) - Wco(2),
-                stockSig, marks);
+                stockSig, marks, GrblInfo.HomingEnabled);
         }
 
         private void BuildScene()
@@ -460,6 +463,8 @@ namespace CNC.Controls.Viewer
                 DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
                     "markers drawn={0} of {1} | coordinateSystems={2}",
                     marked, MarkedPositions.Length, GrblWorkParameters.CoordinateSystems.Count));
+
+            AddHomeMarker();
 
             // stock: the solid carve mesh (deforms as the cutter passes) when a program is loaded; otherwise a
             // plain default block. Only one of them is shown so there is no z-fighting/see-through.
@@ -1049,6 +1054,31 @@ namespace CNC.Controls.Viewer
             }
 
             return drawn;
+        }
+
+        /// <summary>
+        /// Machine zero - a dot where the machine homes to. Work space is machine minus the work offset,
+        /// so machine zero lands at minus the WCO.
+        ///
+        /// It also quietly answers the one thing the envelope wireframe was drawing: machine zero sits at
+        /// the top of Z travel, so the gap between this dot and the stock IS the headroom, read against
+        /// something real instead of against twelve grey lines.
+        ///
+        /// Only when homing is enabled. Without it, machine zero is wherever the controller happened to
+        /// power up - not a place, and drawing a "home" dot there would be a straight lie on a machine
+        /// like the laser.
+        /// </summary>
+        private void AddHomeMarker()
+        {
+            if (!GrblInfo.HomingEnabled)
+                return;
+
+            viewport.Children.Add(new SphereVisual3D
+            {
+                Center = new Point3D(-Wco(0), -Wco(1), -Wco(2)),
+                Radius = 6d,
+                Fill = Brushes.LimeGreen
+            });
         }
 
         /// <summary>
