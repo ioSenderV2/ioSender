@@ -968,6 +968,15 @@ namespace CNC.Controls.Viewer
             var p = new Point3D(x, y, z);
             toolCone.Origin = p;         // track the live cutter (cheap) when idle
 
+            // Reported 2026-09-21: the cone does not move during a go-to, it jumps to the destination when
+            // the move finishes. Two very different causes and the screen cannot tell them apart - either
+            // this runs once (the model is not notifying during motion) or it runs many times and nothing
+            // repaints. One line per call, with the position and the machine state, answers which.
+            if (DebugLog.Enabled)
+                DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "UpdateTool cone=({0:0.###},{1:0.###},{2:0.###}) state={3} visible={4}",
+                    x, y, z, model?.GrblState.State, IsVisible));
+
             // Live material removal (CarveTo mutates the stock mesh, PushMesh re-publishes it) is the expensive
             // part - only do it when the view is actually on screen.
             if (!IsVisible)
