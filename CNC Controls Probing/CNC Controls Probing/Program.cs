@@ -453,6 +453,22 @@ namespace CNC.Controls.Probing
                                 //    double val = _positions[_positions.Count - 1].Values[i] + dbl.Parse(_program[step].Substring(i, 3));
                                 //    _program[step] = _program[step] + val.ToInvariantString();
                                 //}
+                                // FUTURE WORK: these prefixes should be a flags field on a per-step record,
+                                // not characters glued to the front of the line. Three conventions live
+                                // here - '#' is a message, '!' drops the last recorded position, and a bare
+                                // "pause" is a sentinel - and every producer has to remember all three with
+                                // no compiler help.
+                                //
+                                // The character choice is the part that matters: '!' is a realtime FEED HOLD
+                                // on the wire. It is safe only because every path reaches the controller
+                                // through this one strip-and-dispatch loop, and nothing enforces that -
+                                // anything that ever forwards, replays or copies one of these strings
+                                // without coming through here sends a feed hold. Same shape as the bug where
+                                // an exclamation mark inside a g-code COMMENT held a running job.
+                                //
+                                // Mechanical to fix (line + flags enum; producers set what they already
+                                // know; this parsing is deleted rather than rewritten) and no behaviour
+                                // change intended. Not urgent - the loop is correct today.
                                 if (_program[step].StartsWith("#"))
                                 {
                                     Grbl.Message = _program[step].Substring(1);
