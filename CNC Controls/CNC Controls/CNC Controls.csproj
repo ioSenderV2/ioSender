@@ -96,6 +96,7 @@
     <Compile Include="RemoteActions.cs" />
     <Compile Include="ShutterRemote.cs" />
     <Compile Include="RemoteDevices.cs" />
+    <Compile Include="RemoteFunctions.cs" />
     <Compile Include="TabOrderConfig.cs" />
     <Compile Include="SvgLaserSettings.cs" />
     <Compile Include="WorkSurface.cs" />

@@ -94,8 +94,13 @@ namespace CNC.Controls
         /// binding and translated by ShutterRemote before it gets here (RemoteDevices.IsPrimary).</param>
         public static System.Action Resolve(bool isPrimary)
         {
+            var cfg = AppConfig.Settings?.Base;
+
             if (prompts.Count > 0)
             {
+                if (cfg != null && !cfg.RemoteOnPrompt)
+                    return null;
+
                 var prompt = prompts[prompts.Count - 1];
 
                 // No Cancel button => BOTH keys mean OK. This used to return the null Cancel, so on the
@@ -120,20 +125,74 @@ namespace CNC.Controls
             // view's own Stop button is a deliberate act at the keyboard, which is the right ceremony for
             // throwing away twenty minutes of probing.
             if (HoldContinue != null)
-                return HoldContinue;
+                return cfg != null && !cfg.RemoteOnHeightMap ? null : HoldContinue;
 
             var state = Grbl.GrblViewModel == null ? GrblStates.Unknown : Grbl.GrblViewModel.GrblState.State;
 
+            // The three state rows are the operator's to assign (RemoteFunctions). Each can be switched
+            // off on its own - a behaviour someone dislikes should be turnable off, not a reason to stop
+            // using the remote - and the defaults reproduce exactly what this switch used to hard-code.
             switch (state)
             {
                 case GrblStates.Run:
-                    return Press(HoldButton);
+                    if (cfg == null || !cfg.RemoteOnRun)
+                        return null;
+                    return Perform(isPrimary ? cfg.RemoteRunPrimary : cfg.RemoteRunSecondary);
 
                 case GrblStates.Hold:
-                    return isPrimary ? Press(StartButton) : Press(StopButton);
+                    if (cfg == null || !cfg.RemoteOnHold)
+                        return null;
+                    return Perform(isPrimary ? cfg.RemoteHoldPrimary : cfg.RemoteHoldSecondary);
+
+                case GrblStates.Idle:
+                    if (cfg == null || !cfg.RemoteOnIdle)
+                        return null;
+                    return Perform(isPrimary ? cfg.RemoteIdlePrimary : cfg.RemoteIdleSecondary);
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Turn an assigned function id into something to run, or null when it cannot run right now.
+        ///
+        /// Null is an ordinary answer, not an error: Cycle Start with the Start button disabled, Peek
+        /// before the run strip exists. The caller treats it as "this press means nothing", which for a
+        /// bound remote is a beep and a discarded press - the operator hears that it was heard and
+        /// refused. That keeps "the app would not let you click this" and "the remote does nothing" the
+        /// same thing, which is the rule the run-strip buttons already follow.
+        /// </summary>
+        private static System.Action Perform(string functionId)
+        {
+            switch (functionId)
+            {
+                case RemoteFunctions.CycleStart: return Press(StartButton);
+                case RemoteFunctions.FeedHold:   return Press(HoldButton);
+                case RemoteFunctions.Stop:       return Press(StopButton);
+
+                // Run-strip actions that already exist as bindable keyboard actions. Routed through
+                // ActionKeyBinder rather than reached for directly, so there is ONE implementation of
+                // each and a remote button cannot drift from what the same action does on a key.
+                case RemoteFunctions.Peek:   return Action("Program.Peek");
+                case RemoteFunctions.Mdi:    return Action("Program.Mdi");
+                case RemoteFunctions.Status: return Action("Program.Status");
+
+                case RemoteFunctions.Reset:
+                    return () => Grbl.Reset();
+
+                case RemoteFunctions.Unlock:
+                    return Grbl.GrblViewModel == null
+                            ? (System.Action)null
+                            : () => Grbl.GrblViewModel.ExecuteCommand(GrblConstants.CMD_UNLOCK);
+            }
+
+            return null;   // "None", and anything unrecognised - an unknown setting must read as harmless
+        }
+
+        /// <summary>A keyboard action, or null when nothing has registered a handler for it yet.</summary>
+        private static System.Action Action(string id)
+        {
+            return ActionKeyBinder.CanInvoke(id) ? (System.Action)(() => ActionKeyBinder.Invoke(id)) : null;
         }
 
         /// <summary>

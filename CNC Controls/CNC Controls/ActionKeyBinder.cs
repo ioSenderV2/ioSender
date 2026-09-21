@@ -152,6 +152,30 @@ namespace CNC.Controls
             handlers[id] = handler;
         }
 
+        /// <summary>
+        /// Run an action WITHOUT a keypress. Added for the shutter remote, whose buttons can be assigned
+        /// the same things (MDI, Status, Peek) but arrive through a keyboard hook rather than the shortcut
+        /// dispatcher - so there is no KeyEventArgs to hand Dispatch, and inventing one would be a lie.
+        ///
+        /// False when nothing is registered for the id, or the handler declines: the handlers refuse while
+        /// the thing they drive is disabled, and a caller must be able to tell "did nothing" from "did it".
+        /// </summary>
+        public static bool Invoke(string id)
+        {
+            Func<Key, bool> handler;
+            if (string.IsNullOrEmpty(id) || !handlers.TryGetValue(id, out handler) || handler == null)
+                return false;
+
+            try { return handler(Key.None); }
+            catch { return false; }   // a remote button must not be able to take the app down
+        }
+
+        /// <summary>Whether an action has a handler at all - so a caller can grey out what cannot run.</summary>
+        public static bool CanInvoke(string id)
+        {
+            return !string.IsNullOrEmpty(id) && handlers.ContainsKey(id);
+        }
+
         /// <summary>The action's current shortcut as a display string ("Ctrl+S"), or null when unbound.
         /// The ActionShortcuts counterpart of TabKeyBinder.CurrentDisplay, so a caller showing a binding
         /// (a menu item's gesture text, say) does not care which of the two stores it came from.</summary>

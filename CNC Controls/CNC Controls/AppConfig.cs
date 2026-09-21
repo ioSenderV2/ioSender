@@ -360,6 +360,10 @@ namespace CNC.Controls
         private string _shutterRemoteDevice = string.Empty;
         private string _shutterRemoteName = string.Empty;
         private bool _shutterRemoteSwap = false;
+        private bool _remoteOnPrompt = true, _remoteOnHeightMap = true, _remoteOnRun = true, _remoteOnHold = true, _remoteOnIdle = true;
+        private string _remoteRunPrimary = "FeedHold", _remoteRunSecondary = "FeedHold";
+        private string _remoteHoldPrimary = "CycleStart", _remoteHoldSecondary = "Stop";
+        private string _remoteIdlePrimary = "None", _remoteIdleSecondary = "None";
         private int _statusWindowAutoCloseSeconds = 10;
         private double _jobSplitRatio = 0.5d;
         // Serial is the default transport (2026-08-12). Off means a serial/USB link is left alone; a user
@@ -573,6 +577,30 @@ namespace CNC.Controls
         //
         // false = volume up is primary (the common case), true = the two are swapped.
         public bool ShutterRemoteSwapButtons { get { return _shutterRemoteSwap; } set { if (_shutterRemoteSwap != value) { _shutterRemoteSwap = value; OnPropertyChanged(); } } }
+
+        // ---- What the remote's buttons do, per machine state -----------------------------------------
+        //
+        // Five rows, each independently switchable, because a behaviour someone dislikes should be
+        // turnable off rather than a reason to stop using the remote. The two rows that ANSWER SOMETHING
+        // ALREADY ON SCREEN - a prompt, the height map's hold - are on/off only: there the button is
+        // saying yes to a question, and what else it might mean is not an open question.
+        //
+        // The three that depend only on machine state are the operator's to assign, from
+        // RemoteFunctions.Catalog. Defaults reproduce exactly what the remote did before these existed:
+        // both buttons Feed Hold while running, Cycle Start / Stop while holding. Idle starts as Nothing
+        // on both, because a pendant that does something the moment it is nudged on a bench is a trap.
+        public bool RemoteOnPrompt { get { return _remoteOnPrompt; } set { if (_remoteOnPrompt != value) { _remoteOnPrompt = value; OnPropertyChanged(); } } }
+        public bool RemoteOnHeightMap { get { return _remoteOnHeightMap; } set { if (_remoteOnHeightMap != value) { _remoteOnHeightMap = value; OnPropertyChanged(); } } }
+        public bool RemoteOnRun { get { return _remoteOnRun; } set { if (_remoteOnRun != value) { _remoteOnRun = value; OnPropertyChanged(); } } }
+        public bool RemoteOnHold { get { return _remoteOnHold; } set { if (_remoteOnHold != value) { _remoteOnHold = value; OnPropertyChanged(); } } }
+        public bool RemoteOnIdle { get { return _remoteOnIdle; } set { if (_remoteOnIdle != value) { _remoteOnIdle = value; OnPropertyChanged(); } } }
+
+        public string RemoteRunPrimary { get { return _remoteRunPrimary; } set { if (_remoteRunPrimary != value) { _remoteRunPrimary = value ?? "None"; OnPropertyChanged(); } } }
+        public string RemoteRunSecondary { get { return _remoteRunSecondary; } set { if (_remoteRunSecondary != value) { _remoteRunSecondary = value ?? "None"; OnPropertyChanged(); } } }
+        public string RemoteHoldPrimary { get { return _remoteHoldPrimary; } set { if (_remoteHoldPrimary != value) { _remoteHoldPrimary = value ?? "None"; OnPropertyChanged(); } } }
+        public string RemoteHoldSecondary { get { return _remoteHoldSecondary; } set { if (_remoteHoldSecondary != value) { _remoteHoldSecondary = value ?? "None"; OnPropertyChanged(); } } }
+        public string RemoteIdlePrimary { get { return _remoteIdlePrimary; } set { if (_remoteIdlePrimary != value) { _remoteIdlePrimary = value ?? "None"; OnPropertyChanged(); } } }
+        public string RemoteIdleSecondary { get { return _remoteIdleSecondary; } set { if (_remoteIdleSecondary != value) { _remoteIdleSecondary = value ?? "None"; OnPropertyChanged(); } } }
         // Where the splitter sits, as the program view's share of the split (0..1). Persisted so a layout
         // the operator has dragged to suit their screen survives a restart, like every other placement here.
         public double JobSplitRatio { get { return _jobSplitRatio < 0.1d || _jobSplitRatio > 0.9d ? 0.5d : _jobSplitRatio; } set { _jobSplitRatio = value; } }
