@@ -31,6 +31,11 @@ namespace CNC.Controls.Viewer
             resetView?.Invoke();
         }
 
+        private void btnDefaults_Click(object sender, RoutedEventArgs e)
+        {
+            (DataContext as CarveViewConfig)?.ResetColors();
+        }
+
         private void btnClose_Click(object sender, RoutedEventArgs e)
         {
             Close();

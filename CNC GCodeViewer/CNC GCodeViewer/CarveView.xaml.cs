@@ -377,13 +377,14 @@ namespace CNC.Controls.Viewer
             // as redundant and the checkbox does nothing.
             var opt = AppConfig.Settings.CarveView;
             return string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "{0}|{1}|{2:F3},{3:F3},{4:F3},{5:F3},{6:F3},{7:F3}|{8}|{9}|{10}|{11}{12}{13}{14}",
+                "{0}|{1}|{2:F3},{3:F3},{4:F3},{5:F3},{6:F3},{7:F3}|{8}|{9}|{10}|{11}{12}{13}{14}|{15},{16},{17}",
                 cnt, name,
                 EnvMin(0) - Wco(0), EnvMax(0) - Wco(0),
                 EnvMin(1) - Wco(1), EnvMax(1) - Wco(1),
                 EnvMin(2) - Wco(2), EnvMax(2) - Wco(2),
                 stockSig, marks, GrblInfo.HomingEnabled,
-                opt.ShowRapids, opt.ShowStock, opt.ShowGrid, opt.ShowStoredPositions);
+                opt.ShowRapids, opt.ShowStock, opt.ShowGrid, opt.ShowStoredPositions,
+                opt.CutColor, opt.RapidColor, opt.StockColor);
         }
 
         private void BuildScene()
@@ -497,7 +498,16 @@ namespace CNC.Controls.Viewer
             if (options.ShowStock)
             {
                 if (carveVisual != null)
+                {
+                    // Repaint before adding. The carve mesh is built once per program, so like the toolpath
+                    // lines it would otherwise keep the colour it was born with until the next file opened.
+                    if (carveVisual.Content is GeometryModel3D mesh)
+                    {
+                        mesh.Material = MaterialHelper.CreateMaterial(options.StockColor);
+                        mesh.BackMaterial = MaterialHelper.CreateMaterial(Shade(options.StockColor));
+                    }
                     viewport.Children.Add(carveVisual);
+                }
                 else
                     AddStock();
             }
@@ -602,7 +612,11 @@ namespace CNC.Controls.Viewer
                 Length = Math.Max(sx, 1d),
                 Width = Math.Max(sy, 1d),
                 Height = h,
-                Fill = new SolidColorBrush(Color.FromArgb(90, 237, 205, 176))   // translucent cherry stock - matches the carve mesh's top color
+                // Translucent, and the SAME colour as the carve mesh's top face - this is the no-program
+                // stand-in for that block, so the two must not drift apart when the colour is changed.
+                Fill = new SolidColorBrush(Color.FromArgb(90, AppConfig.Settings.CarveView.StockColor.R,
+                                                              AppConfig.Settings.CarveView.StockColor.G,
+                                                              AppConfig.Settings.CarveView.StockColor.B))
             });
         }
 
@@ -685,16 +699,25 @@ namespace CNC.Controls.Viewer
                     }
                 }
 
-                cutLines = new LinesVisual3D { Color = Color.FromRgb(0, 174, 239), Thickness = 1.4d, Points = cut };    // bright azure carve trails
-                rapidLines = new LinesVisual3D { Color = Color.FromRgb(160, 160, 160), Thickness = 0.6d, Points = rapid };
+                cutLines = new LinesVisual3D { Color = AppConfig.Settings.CarveView.CutColor, Thickness = 1.4d, Points = cut };
+                rapidLines = new LinesVisual3D { Color = AppConfig.Settings.CarveView.RapidColor, Thickness = 0.6d, Points = rapid };
 
                 InitHeightmap();   // fresh stock surface sized to the new program
                 framed = false;    // re-frame the camera to the new program/stock on the next build
             }
 
+            // Colours are applied HERE, not where the visuals are created: those are cached and only rebuilt
+            // when the program changes, so a colour set while a program is loaded would not have taken until
+            // the next file was opened.
+            var opt = AppConfig.Settings.CarveView;
+            if (cutLines != null)
+                cutLines.Color = opt.CutColor;
+            if (rapidLines != null)
+                rapidLines.Color = opt.RapidColor;
+
             // The rapids are still BUILT when hidden - they are part of the segment list playback walks, and
             // they size the stock. Only the lines are left out of the scene.
-            if (rapidLines != null && AppConfig.Settings.CarveView.ShowRapids)
+            if (rapidLines != null && opt.ShowRapids)
                 viewport.Children.Add(rapidLines);
             if (cutLines != null)
                 viewport.Children.Add(cutLines);
@@ -934,10 +957,21 @@ namespace CNC.Controls.Viewer
                 // stand out clearly instead of blending in. Light cherry/tan tone, genuinely brighter than the
                 // original (230,193,138)/(96,74,54) pair - not just more saturated - so the carve trail color
                 // reads clearly against it instead of both going muddy-dark together.
-                Material = MaterialHelper.CreateMaterial(Color.FromRgb(237, 205, 176)),
-                BackMaterial = MaterialHelper.CreateMaterial(Color.FromRgb(196, 155, 122))
+                Material = MaterialHelper.CreateMaterial(AppConfig.Settings.CarveView.StockColor),
+                BackMaterial = MaterialHelper.CreateMaterial(Shade(AppConfig.Settings.CarveView.StockColor))
             };
             carveVisual = new ModelVisual3D { Content = model };
+        }
+
+        /// <summary>
+        /// The darker back-face shade, derived from the one stock colour rather than chosen separately. The
+        /// per-channel factors are exactly the ratio of the original hand-picked pair, so the shipped colour
+        /// still produces the shipped pair - and any other colour gets the same warm falloff instead of a
+        /// flat grey multiply, which turned blues muddy.
+        /// </summary>
+        private static Color Shade(Color c)
+        {
+            return Color.FromRgb((byte)(c.R * 0.827d), (byte)(c.G * 0.756d), (byte)(c.B * 0.693d));
         }
 
         private static void AddQuad(Int32Collection t, int a, int b, int c, int d)

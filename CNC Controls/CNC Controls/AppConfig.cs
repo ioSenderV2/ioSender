@@ -201,10 +201,34 @@ namespace CNC.Controls
     {
         private bool _showRapids = true, _showStock = true, _showGrid = true, _showStoredPositions = true;
 
+        // Only these three are adjustable. The rest of the palette is a LEGEND - blue park sign, orange
+        // toolsetter sign, green machine zero, orange-red tool - and a legend that each install can
+        // rearrange is one the manual, the screenshots and any two people talking about the view can no
+        // longer agree on.
+        private Color _stock = Color.FromRgb(237, 205, 176);
+        private Color _rapid = Color.FromRgb(160, 160, 160);
+        private Color _cut = Color.FromRgb(0, 174, 239);
+
         public bool ShowRapids { get { return _showRapids; } set { _showRapids = value; OnPropertyChanged(); } }
         public bool ShowStock { get { return _showStock; } set { _showStock = value; OnPropertyChanged(); } }
         public bool ShowGrid { get { return _showGrid; } set { _showGrid = value; OnPropertyChanged(); } }
         public bool ShowStoredPositions { get { return _showStoredPositions; } set { _showStoredPositions = value; OnPropertyChanged(); } }
+
+        public Color StockColor { get { return _stock; } set { _stock = value; OnPropertyChanged(); } }
+        public Color RapidColor { get { return _rapid; } set { _rapid = value; OnPropertyChanged(); } }
+        public Color CutColor { get { return _cut; } set { _cut = value; OnPropertyChanged(); } }
+
+        /// <summary>
+        /// Back to the shipped palette. A colour picker can produce a scene where the cut path is the same
+        /// colour as the stock and nothing on screen says why the toolpath vanished, so the way back must
+        /// not require remembering three RGB triplets.
+        /// </summary>
+        public void ResetColors()
+        {
+            StockColor = Color.FromRgb(237, 205, 176);
+            RapidColor = Color.FromRgb(160, 160, 160);
+            CutColor = Color.FromRgb(0, 174, 239);
+        }
     }
 
     [Serializable]

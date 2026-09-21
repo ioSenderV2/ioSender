@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:local="clr-namespace:CNC.Controls.Viewer"
         mc:Ignorable="d"
         d:DesignHeight="240" d:DesignWidth="300"
         SizeToContent="WidthAndHeight" ResizeMode="NoResize" MinWidth="300"
@@ -24,10 +25,39 @@
                   ToolTip="The G30 park and toolsetter signs on the bed, and the dot at machine zero."
                   IsChecked="{Binding Path=ShowStoredPositions, Mode=TwoWay}"/>
 
+        <TextBlock x:Uid="vo_colours" Text="COLOURS" Foreground="Gray" FontSize="10" Margin="0,14,0,2"/>
+
+        <Grid Margin="0,2,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock x:Uid="vo_lblCut" Grid.Row="0" Grid.Column="0" Text="Cut moves" VerticalAlignment="Center" Margin="0,3"/>
+            <local:ColorPicker x:Uid="vo_clrCut" x:Name="clrCut" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Margin="12,3,0,3"
+                               SelectedColor="{Binding Path=CutColor, Mode=TwoWay}"/>
+
+            <TextBlock x:Uid="vo_lblRapid" Grid.Row="1" Grid.Column="0" Text="Rapid moves" VerticalAlignment="Center" Margin="0,3"/>
+            <local:ColorPicker x:Uid="vo_clrRapid" x:Name="clrRapid" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="12,3,0,3"
+                               SelectedColor="{Binding Path=RapidColor, Mode=TwoWay}"/>
+
+            <TextBlock x:Uid="vo_lblStock" Grid.Row="2" Grid.Column="0" Text="Stock" VerticalAlignment="Center" Margin="0,3"/>
+            <local:ColorPicker x:Uid="vo_clrStock" x:Name="clrStock" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" Margin="12,3,0,3"
+                               SelectedColor="{Binding Path=StockColor, Mode=TwoWay}"/>
+        </Grid>
+
         <Separator Margin="0,12,0,0"/>
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button x:Uid="vo_reset" x:Name="btnReset" Content="Reset view" MinWidth="80" MinHeight="24"
+            <Button x:Uid="vo_defaults" x:Name="btnDefaults" Content="Default colours" MinWidth="80" MinHeight="24"
+                    ToolTip="Put the three colours back to the shipped palette." Click="btnDefaults_Click"/>
+            <Button x:Uid="vo_reset" x:Name="btnReset" Content="Reset view" MinWidth="80" MinHeight="24" Margin="8,0,0,0"
                     ToolTip="Zoom and centre so the whole scene fits." Click="btnReset_Click"/>
             <Button x:Uid="vo_close" x:Name="btnClose" Content="Close" IsDefault="True" IsCancel="True"
                     MinWidth="80" MinHeight="24" Margin="8,0,0,0" Click="btnClose_Click"/>
