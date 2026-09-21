@@ -7,10 +7,10 @@
  *
  * ---- The policy ----
  *
- *   a prompt is on screen   primary = OK / Yes       second = Cancel / No
+ *   a prompt is on screen   primary = OK / Yes       secondary = Cancel / No
  *                           ...and when the prompt has NO Cancel button, both buttons mean OK
  *   the machine is RUNning  either button = Feed Hold
- *   the machine is HOLDing  primary = Start / resume second = Stop
+ *   the machine is HOLDing  primary = Start / resume secondary = Stop
  *   anything else           nothing - the key goes to Windows and the volume changes as usual
  *
  * Both keys mean Feed Hold while running on purpose. The remote's two BUTTONS send different keys (on

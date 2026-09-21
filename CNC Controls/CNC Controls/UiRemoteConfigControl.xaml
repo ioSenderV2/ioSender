@@ -36,7 +36,7 @@
                       ToolTip="Which physical button is the primary one. Set for you when you bind - the button you press becomes the primary - so you only need this if you want the other one to be OK/Start instead."/>
 
             <TextBlock x:Uid="lbl_remoteWhatKeysDo" Margin="5,10,0,0" TextWrapping="Wrap" Opacity="0.75"
-                       Text="The remote's two buttons are not marked, and which one sends which media key is not something anyone should have to know - on the PICO the larger top button is the one that sends volume DOWN. So the button you press when binding becomes the PRIMARY one, and the other is the second. Swap them below if you change your mind."/>
+                       Text="The remote's two buttons are not marked, and which one sends which media key is not something anyone should have to know - on the PICO the larger top button is the one that sends volume DOWN. So the button you press when binding becomes the PRIMARY one, and the other is the secondary. Swap them below if you change your mind."/>
 
             <Grid Margin="24,8,0,0">
                 <Grid.ColumnDefinitions>
@@ -54,7 +54,7 @@
 
                 <TextBlock x:Uid="lbl_remoteHdrWhen" Grid.Row="0" Grid.Column="0" Text="When" FontWeight="Bold" Margin="0,0,18,4"/>
                 <TextBlock x:Uid="lbl_remoteHdrUp" Grid.Row="0" Grid.Column="1" Text="Primary button" FontWeight="Bold" Margin="0,0,18,4"/>
-                <TextBlock x:Uid="lbl_remoteHdrDown" Grid.Row="0" Grid.Column="2" Text="Second button" FontWeight="Bold" Margin="0,0,0,4"/>
+                <TextBlock x:Uid="lbl_remoteHdrDown" Grid.Row="0" Grid.Column="2" Text="Secondary button" FontWeight="Bold" Margin="0,0,0,4"/>
 
                 <TextBlock x:Uid="lbl_remoteRowPrompt" Grid.Row="1" Grid.Column="0" Text="A prompt is on screen" Margin="0,0,18,2"/>
                 <TextBlock x:Uid="lbl_remoteRowPromptUp" Grid.Row="1" Grid.Column="1" Text="OK / Yes" Margin="0,0,18,2"/>
@@ -74,7 +74,7 @@
             </Grid>
 
             <TextBlock x:Uid="lbl_remoteNoCancel" Margin="24,6,0,0" TextWrapping="Wrap" Opacity="0.75"
-                       Text="When a prompt has no Cancel button - as the &quot;move the plate to the next corner&quot; prompt does not - both buttons mean OK. There is nothing else the second button could mean there, and a button that did nothing would just be one you have to remember not to press."/>
+                       Text="When a prompt has no Cancel button - as the &quot;move the plate to the next corner&quot; prompt does not - both buttons mean OK. There is nothing else the secondary button could mean there, and a button that did nothing would just be one you have to remember not to press."/>
 
             <TextBlock x:Uid="lbl_remoteFallthrough" Margin="5,10,0,0" TextWrapping="Wrap" Opacity="0.75"
                        Text="Once bound, the remote's buttons belong to ioSender: a press that means nothing at that moment beeps and is discarded, never reaching the volume control. Every other device is ignored and behaves exactly as before, so your keyboard's own volume keys are untouched. Both buttons mean Feed Hold while a job runs on purpose - a hand reaching for the remote mid-cut wants the machine to stop, not to pick the right button of two."/>
