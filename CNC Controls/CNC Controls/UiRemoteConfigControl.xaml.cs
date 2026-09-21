@@ -10,9 +10,10 @@
  *
  * It means something in several places now - any prompt, any running job, any hold (see RemoteActions) -
  * so it is an input setting rather than a height-map setting, and it belongs next to Keyboard and
- * Controller. The Height map checkbox binds the same Config.ShutterRemoteEnabled property and the two
- * stay in step automatically; it is left in place deliberately, since that is still where an operator
- * first discovers they want it.
+ * Controller. The Height map tab kept a second tick on the same Config.ShutterRemoteEnabled property
+ * for a few days, on the argument that it is where an operator first discovers they want one. Removed
+ * 2026-09-21: with a page of its own, and a manual topic pointing at it, the duplicate was one more
+ * place to look for a switch that is not there.
  *
  * The table is here because the policy lived only in RemoteActions' header comment, which is the one
  * place the operator standing at the machine cannot read.

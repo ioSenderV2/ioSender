@@ -9,8 +9,9 @@
     <!-- Settings > User Interface > Remote. The enable lived only on the Height map tab, which is where it
          was first needed (place the plate, press Continue, sixteen times, laptop across the shop) - but a
          press now means something during any prompt, any running job and any hold, so the setting belongs
-         with the other input settings rather than inside one feature. The Height map checkbox binds the
-         same property and stays in step. -->
+         with the other input settings rather than inside one feature. The Height map tab carried a second
+         tick bound to the same property until 2026-09-21; it was removed once this page existed, because a
+         duplicate of a global switch inside one feature is just somewhere else to look for it. -->
     <GroupBox x:Uid="grp_uiRemote" Header="Remote" Margin="5">
         <StackPanel Margin="5">
             <CheckBox x:Uid="lbl_shutterRemoteEnabled" Content="A shutter remote drives the machine (volume keys)"
