@@ -964,6 +964,14 @@ namespace CNC.Controls.Viewer
         // The cone follows the live work position when not simulating; playback owns it while playing.
         private void UpdateTool()
         {
+            // Entry log, before ANY guard. The instrument has now been wrong twice by sitting downstream
+            // of the thing it was meant to characterise: the calls that return early are exactly the ones
+            // worth seeing, and a probe placed after a return can only ever report the survivors.
+            if (DebugLog.Enabled)
+                DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "UpdateTool ENTRY playing={0} coneNull={1} wposNull={2} jobRunning={3} visible={4} state={5}",
+                    playing, toolCone == null, wpos == null, model?.IsJobRunning, IsVisible, model?.GrblState.State));
+
             if (playing || toolCone == null || wpos == null)
                 return;
 
