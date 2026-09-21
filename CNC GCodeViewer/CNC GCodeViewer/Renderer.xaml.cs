@@ -1025,11 +1025,19 @@ namespace CNC.Controls.Viewer
             }
             else if (job != null && block > 0)
             {
+                // Instrumented (UiDiag): this runs on the UI thread on every executing-line change, and each
+                // AddCutMove appends to the Point3DCollection that a LinesVisual3D is bound to - which
+                // rebuilds its whole screen-space mesh per change. Only live when the "render executed"
+                // setting is on, which is why it is reported separately from drain's total.
+                long diagStamp = UiDiag.Start();
+                long advanced = 0;
+
                 // Stop at end-of-program: if `block` is past the last token (an unreachable line number)
                 // MoveNext() returns false but Current stays put, so testing only LineNumber < block spins
                 // forever. Bounding the advance on MoveNext() makes an out-of-range block a no-op, not a hang.
                 while (job.Current.Token.LineNumber < block && job.MoveNext())
                 {
+                    advanced++;
                     point0 = job.Current.Start.ToMedia3D();
 
                     switch (job.Current.Token.Command)
@@ -1052,6 +1060,8 @@ namespace CNC.Controls.Viewer
                             break;
                     }
                 }
+
+                UiDiag.Stop("execpath", diagStamp, advanced);
             }
         }
 

@@ -1245,6 +1245,12 @@ namespace CNC.Core
                 SimulateActive = false;
                 RestoreAfterRun?.Invoke();
             }
+
+            // The run is over however it ended - write out what the UI thread spent it doing. This is the
+            // one choke point all three endings share (OnPumpJobFinished, OnPumpError, AbortPump all call
+            // here), and a short job can finish well inside UiDiag's reporting window, so without a forced
+            // flush the whole run would leave nothing in the log.
+            UiDiag.Flush("RUN END");
         }
 
         // Pump -> UI signals (marshalled onto the UI thread by the pump). The state machine and display stay here.

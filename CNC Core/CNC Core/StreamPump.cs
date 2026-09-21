@@ -746,6 +746,14 @@ namespace CNC.Core
 
         private void Drain()
         {
+            // Instrumented as the PARENT of every per-line UI cost: assigning BlockExecuting below fans out
+            // SYNCHRONOUSLY to every subscriber (the program list, the run-status strip, the 3D executed
+            // trail), so this one measurement bounds all of them. Its duty-cycle figure is what "the UI is
+            // unresponsive" actually means - the share of wall-clock the UI thread spends in here. Zero cost
+            // when tracing is off; see UiDiag.
+            long diagStamp = UiDiag.Start();
+            long applied = 0;
+
             Interlocked.Exchange(ref drainPending, 0);
 
             KeyValuePair<int, string> mark;
@@ -754,6 +762,7 @@ namespace CNC.Core
             {
                 if (mark.Key >= 0 && mark.Key < data.Count)
                     data[mark.Key].Sent = mark.Value;
+                applied++;
             }
 
             int block = latestBlock;
@@ -763,6 +772,8 @@ namespace CNC.Core
             int scroll = latestScroll;
             if (scroll >= 0)
                 model.ScrollPosition = scroll;
+
+            UiDiag.Stop("drain", diagStamp, applied);
         }
     }
 }

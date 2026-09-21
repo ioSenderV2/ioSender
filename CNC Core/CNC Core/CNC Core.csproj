@@ -94,6 +94,7 @@
     <Compile Include="DebugLog.cs" />
     <Compile Include="LinkMonitor.cs" />
     <Compile Include="PollDiag.cs" />
+    <Compile Include="UiDiag.cs" />
     <Compile Include="WireLog.cs" />
     <Compile Include="StreamCommsBase.cs" />
     <Compile Include="DemoMarker.cs" />
