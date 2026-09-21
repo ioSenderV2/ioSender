@@ -920,7 +920,8 @@ namespace CNC.Controls
             b.AppendLine("#<c1x> = #<_corner_x>");
             b.AppendLine("#<c1y> = #<_corner_y>");
             b.AppendLine("#<c1z> = #<_corner_z>");
-            b.AppendLine(string.Format("#<c1_maxz> = [#<c1z> + {0}]", cornerTravelMarginMm.ToInvariantString("0.0##")));
+            b.AppendLine("#<c1_maxz> = " + GrblInfo.ClampToZTop(
+                  string.Format("[#<c1z> + {0}]", cornerTravelMarginMm.ToInvariantString("0.0##"))));
 
             // A touch plate is handheld: it has to be physically carried to each corner between calls, unlike
             // a 3D probe that stays in the spindle for the whole run. pcorner.macro leaves the machine clear

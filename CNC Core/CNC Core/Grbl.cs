@@ -1088,6 +1088,48 @@ namespace CNC.Core
             return towardsHome ? -clearance : -(maxTravel - clearance);
         }
 
+        /// <summary>
+        /// Wrap a g-code expression yielding a MACHINE Z coordinate so it can never exceed the top of the
+        /// Z envelope. Returns a bracketed expression suitable for assigning to a parameter.
+        /// </summary>
+        /// <remarks>
+        /// Every caller that hands pcorner.macro a travel height (#&lt;_ls_maxz&gt;) computes it the same way -
+        /// a measured machine Z plus a clearance margin - and NONE of them clamped. pcorner then issues a
+        /// bare "G53 G0 Z[maxz]", so any margin larger than the gap between that datum and machine top aims
+        /// the rapid ABOVE the envelope and grblHAL refuses it at planning: Alarm:2, nothing moves, which
+        /// reads like a dead probe rather than an out-of-range target.
+        ///
+        /// Hit on real hardware 2026-09-21: the toolsetter puck sits at machine Z -12.534 and the corner
+        /// travel margin was 25, so Start Job asked for Z +12.466 on a machine whose envelope tops out at 0.
+        /// Clamping DOWN to the machine top is never less safe than the value it replaces - the top of
+        /// travel is the highest the tool can go, so it is the best available answer to "get clear".
+        ///
+        /// Emitted as arithmetic rather than an o-word IF, deliberately: o-word numbers are a shared
+        /// namespace across the generated program and every macro it calls (pcorner alone uses o42/o43/o48),
+        /// so handing out new ones from six call sites is a collision waiting to happen. The identity
+        /// min(a,t) = t + [[a-t] - ABS[a-t]] / 2 is exact, branch-free and cannot collide with anything.
+        /// ABS is a grblHAL unary operator (ngc_expr.c, NGCUnaryOp_ABS) and takes a bracketed argument.
+        ///
+        /// Returns the expression UNCHANGED when the envelope is unknown (travel or pull-off unreadable).
+        /// That is the same fail-open contract <see cref="ReachableLimit"/> has and
+        /// MacroRunner.StoredPositionUnreachable documents: a clamp against an invented bound would be a
+        /// confident wrong number, and the caller is no worse off than before this existed.
+        /// </remarks>
+        public static string ClampToZTop(string expression)
+        {
+            double top = ReachableLimit(2, true);
+            if (double.IsNaN(top))
+                return expression;          // envelope unknown - fail open, exactly as ReachableLimit does
+
+            string t = top.ToInvariantString("0.0###");
+
+            // min(a, t) with a = the caller's expression. Every sub-expression is bracketed rather than
+            // leaning on operator precedence - the division in particular must not be able to bind to the
+            // wrong side of the sum, and a mis-parsed clamp here is a rapid at the wrong height.
+            return string.Format(CultureInfo.InvariantCulture,
+                                  "[{0} + [[[[{1}] - {0}] - ABS[[{1}] - {0}]] / 2]]", t, expression);
+        }
+
         public static AxisFlags AxisLetterToFlag(string letter)
         {
             return (AxisFlags)(1 << AxisLetters.IndexOf(letter));

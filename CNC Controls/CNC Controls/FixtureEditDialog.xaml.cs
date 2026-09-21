@@ -691,7 +691,7 @@ namespace CNC.Controls
                 // made no sense once #<_ls_topx>/#<_ls_topy> stopped moving the reference anywhere.
                 b.AppendLine(string.Format("#<_bottom> = [{0}-{1}]", z, searchDepthMm.ToInvariantString("0.0##")));
                 b.AppendLine("#<_ls_startz> = 0");
-                b.AppendLine(string.Format("#<_ls_maxz> = [{0}+2]", z));
+                b.AppendLine("#<_ls_maxz> = " + GrblInfo.ClampToZTop(string.Format("[{0}+2]", z)));
                 b.AppendLine("#<_ls_appz> = 9999");
                 b.AppendLine(string.Format("O<pcorner> CALL [#<_ls_rad>]"));
                 // Park AT the true corner itself (not an inset/outset point) - CornerOffsetX/Y must be the raw

@@ -1123,7 +1123,8 @@ namespace CNC.Controls
             b.AppendLine("#<c1x> = #<_corner_x>");
             b.AppendLine("#<c1y> = #<_corner_y>");
             b.AppendLine("#<c1z> = #<_corner_z>");
-            b.AppendLine(string.Format("#<c1_maxz> = [#<c1z> + {0}]", cornerTravelMarginMm.ToInvariantString("0.0##")));
+            b.AppendLine("#<c1_maxz> = " + GrblInfo.ClampToZTop(
+                  string.Format("[#<c1z> + {0}]", cornerTravelMarginMm.ToInvariantString("0.0##"))));
             b.AppendLine(string.Format("(PRINT, SQ_{0}X=#<c1x>)", roleAtFence));
             b.AppendLine(string.Format("(PRINT, SQ_{0}Y=#<c1y>)", roleAtFence));
             // Abort the whole run on an alarmed probe rather than letting a stale/undefined value fall

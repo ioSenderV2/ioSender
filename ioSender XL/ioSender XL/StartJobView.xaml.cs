@@ -3193,7 +3193,13 @@ namespace GCode_Sender
                 // run, with whatever tool is actually in the spindle right now. Falls back to "0" (unset,
                 // pcorner uses its own #<_bottom>-derived estimate instead) when the operator skipped the TLO
                 // reference this run.
-                string c1maxz = setTloRef ? string.Format("[#<_probe_z> + {0}]", N(cornerTravelMarginMm)) : "0";
+                // Clamped to the top of Z travel: the puck can sit close enough to machine top that
+                // probe_z + margin lands ABOVE it, and pcorner rapids to this with a bare G53 G0. That is
+                // exactly what alarmed here on 2026-09-21 (puck -12.534, margin 25, asked for +12.466 on a
+                // machine topping out at 0). See GrblInfo.ClampToZTop.
+                string c1maxz = setTloRef
+                                 ? GrblInfo.ClampToZTop(string.Format("[#<_probe_z> + {0}]", N(cornerTravelMarginMm)))
+                                 : "0";
                 EmitCall(id1, refX, refY, "0", c1maxz);
             }
             L(string.Format("#<_ls_topx> = {0}", N(topClearance)));   // restore for corners 2-4's default (non-exact) path below
@@ -3220,7 +3226,8 @@ namespace GCode_Sender
             // plate's own top surface - see pcorner.macro's #<_ls_plateoffset>) - so this margin must ALSO add
             // plateOffset back on top when running a touch plate, or a margin smaller than the plate's own
             // thickness would rapid the tool straight into the plate at the next corner instead of clearing it.
-            L(string.Format("#<c1_maxz> = [#<c1z> + {0}]", N(cornerTravelMarginMm + plateOffset)));
+            L("#<c1_maxz> = " + GrblInfo.ClampToZTop(
+                  string.Format("[#<c1z> + {0}]", N(cornerTravelMarginMm + plateOffset))));
 
             if (measure)
             {
@@ -3560,7 +3567,7 @@ namespace GCode_Sender
                 // #<_ls_spacer> still applies: it is added to this floor by the caller-side emit above,
                 // so a sacrificial backer is respected the same as before.
                 L(string.Format("#<_bottom> = [#5163 - {0}]", N(DynamicSearchDepthMm)));
-                string dynMaxZ = "[#5163+2]";
+                string dynMaxZ = GrblInfo.ClampToZTop("[#5163+2]");
                 if (isEdge)
                 {
                     L(string.Format("(--- {0} edge midpoint ---)", EdgeNames[dynamicIndex]));
