@@ -1068,10 +1068,23 @@ namespace CNC.Core
 
             // Homes to the POSITIVE end (that axis' $23 bit set, with $22 bit3): 0 .. +travel.
             bool positive = ForceSetOrigin && HomingDirection.HasFlag(AxisIndexToFlag(axis));
-            if (positive)
-                return towardsHome ? clearance : maxTravel - clearance;
 
-            // Everything else runs from 0 at the home end down to -travel.
+            // FORCE-SET-ORIGIN PUTS THE HOME END EXACTLY AT ZERO - no pull-off is applied there. Both
+            // force_set_origin branches of the firmware's limits_set_work_envelope() write a literal 0.0f
+            // to the home end and fold the pull-off into the far end only; it is the NON-force-set-origin
+            // branch that backs the home end off by the pull-off (max = -pulloff). This returned -clearance
+            // (or +clearance) at the home end regardless, i.e. 6 mm short of the truth on a $22=9 machine -
+            // so the reachable top of Z read as -6 while G53 G0 Z0 demonstrably executes, which is the move
+            // every corner probe makes to retract between corners. Confirmed against machine_limits.c and
+            // against a wire log with three accepted G53 G0 Z0 moves, 2026-09-21.
+            //
+            // Only the home end was wrong; the far end was right in every case, which is why the existing
+            // floor callers (towardsHome: false) were unaffected and this sat latent.
+            if (ForceSetOrigin)
+                return towardsHome ? 0d
+                                   : (positive ? maxTravel - clearance : -(maxTravel - clearance));
+
+            // No force-set-origin: the home end sits one pull-off short of zero, the far end at -travel.
             return towardsHome ? -clearance : -(maxTravel - clearance);
         }
 
