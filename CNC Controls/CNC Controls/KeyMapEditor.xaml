@@ -80,6 +80,11 @@
                         </StackPanel>
                         <TextBlock x:Uid="txt_groupedHelp" Foreground="#FF707070" TextWrapping="Wrap"
                                    Text="Grouped by function. Right-click a group header for expand/collapse/reset; right-click a row to reset it. Changed bindings are highlighted."/>
+                        <!-- Its own paragraph, in the operator's own words. This is an invisible mode
+                             otherwise: a shortcut quietly stops doing its job and nothing on screen says
+                             why. See KeyMapEditor.FindByShortcut. -->
+                        <TextBlock x:Uid="txt_findByKeyHelp" Foreground="#FF707070" TextWrapping="Wrap" Margin="0,6,0,0"
+                                   Text="While in this panel, any key combination with modifiers scrolls tree view to assigned function or beeps and does nothing if not assigned."/>
                     </StackPanel>
 
                     <DataGrid x:Uid="grid" Grid.Row="2" x:Name="grid" AutoGenerateColumns="False" CanUserAddRows="False"
@@ -255,12 +260,6 @@
         </TabControl>
 
         <DockPanel x:Name="conflictBar" Grid.Row="1" Margin="0,8,0,0">
-            <!-- Says that keys behave differently here. Without it this is an invisible mode: a shortcut
-                 stops doing its job and jumps the list instead, with nothing on screen to explain why. -->
-            <TextBlock x:Uid="lbl_keyFindHint" x:Name="lblFindHint" DockPanel.Dock="Right" VerticalAlignment="Center"
-                       Margin="12,0,0,0" Opacity="0.75" TextWrapping="Wrap"
-                       Text="Press any shortcut to jump to it"
-                       ToolTip="With the list focused, pressing a bound shortcut scrolls to it and selects it instead of running it. Keys you use to move around the list still work normally."/>
             <TextBlock x:Name="lblConflict" VerticalAlignment="Center"
                        Foreground="#FFCF222E" TextWrapping="Wrap"/>
         </DockPanel>
