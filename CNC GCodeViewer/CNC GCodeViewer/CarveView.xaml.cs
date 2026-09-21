@@ -140,6 +140,25 @@ namespace CNC.Controls.Viewer
             if (wpos != null)
                 wpos.PropertyChanged += Wpos_PropertyChanged;
             model.PropertyChanged += Model_PropertyChanged;
+
+            // The machine envelope is sized from $130-$132, and those arrive AFTER this view first builds
+            // itself. Measured 2026-09-21: the scene was built at 01:36:45.399 with travel (0,0,0), and the
+            // settings landed at 01:36:46.055 - two thirds of a second later. Nothing asked for a rebuild,
+            // so the envelope stayed collapsed to its 1 mm floor for the rest of the session: a dot above
+            // the stock, indistinguishable from "no envelope drawn".
+            //
+            // Jogging and running did not help, because neither changes anything the scene signature
+            // watches. Only the settings themselves do, and they have an event for exactly this.
+            GrblSettings.SettingsReloaded += Settings_Reloaded;
+        }
+
+        /// <summary>
+        /// The controller's settings have (re)arrived - the envelope may now have a size, or a different
+        /// one. The signature check inside BuildScene makes this free when nothing actually moved.
+        /// </summary>
+        private void Settings_Reloaded(object sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(new System.Action(ScheduleBuild), DispatcherPriority.Background);
         }
 
         // Build the scene on a fresh dispatcher cycle. BuildToolpath runs GCodeEmulator.Execute, which pumps the
@@ -162,6 +181,7 @@ namespace CNC.Controls.Viewer
 
         private void CarveView_Unloaded(object sender, RoutedEventArgs e)
         {
+            GrblSettings.SettingsReloaded -= Settings_Reloaded;
             if (wpos != null)
                 wpos.PropertyChanged -= Wpos_PropertyChanged;
             if (model != null)
