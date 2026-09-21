@@ -344,6 +344,14 @@ namespace CNC.Controls
             return string.Equals(lastDevice, bound, StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>Is this device path the bound one? False when nothing is bound - unbound is ignored.</summary>
+        private static bool IsBound(string name)
+        {
+            string bound = AppConfig.Settings?.Base?.ShutterRemoteDevice;
+            return !string.IsNullOrEmpty(bound) && !string.IsNullOrEmpty(name) &&
+                    string.Equals(name, bound, StringComparison.OrdinalIgnoreCase);
+        }
+
         /// <summary>
         /// True when the press being handled right now is the one that just bound the device. The hook
         /// consumes it without acting: the operator pressed the button to say "this is my remote", not to
@@ -533,10 +541,17 @@ namespace CNC.Controls
                     ushort flags = (ushort)Marshal.ReadInt16(buffer, HeaderSize + 2);
                     ushort vkey = (ushort)Marshal.ReadInt16(buffer, HeaderSize + 6);
                     bool up = (flags & 0x01) != 0;
+                    string kbName = NameOf(device);
 
                     DebugLog.Write("remote", string.Format(CultureInfo.InvariantCulture,
                         "RAWINPUT  t={0:F3}ms  keyboard  vk=0x{1:X2} {2}  device={3}",
-                        at, vkey, up ? "up" : "down", NameOf(device)));
+                        at, vkey, up ? "up" : "down", kbName));
+
+                    // THE WAY IN, on a remote whose buttons the keyboard hook never sees. Key-down only,
+                    // volume keys only, and only from the device that is actually bound - which this event
+                    // names, unlike KBDLLHOOKSTRUCT. See ShutterRemote.PressFromRawInput.
+                    if (!up && (vkey == 0xAE || vkey == 0xAF) && IsBound(kbName))
+                        ShutterRemote.PressFromRawInput(vkey == 0xAF);
                 }
                 else if (type == RIM_TYPEHID)
                 {

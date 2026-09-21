@@ -96,6 +96,12 @@ namespace CNC.Controls
         private static HookProc _proc;
         private static Dispatcher _dispatcher;
         private static DateTime _last = DateTime.MinValue;
+        private static int _traced = 0;   // see the TEMPORARY TRACE in Callback
+
+        // When the HOOK last acted on a press, so the raw-input path below does not act on the same one
+        // twice. Both can deliver the same press on a machine where the hook does see media keys.
+        private static double _hookActedAt = double.NegativeInfinity;
+        private const double DuplicateWindowMs = 250d;
 
         /// <summary>
         /// True from the first key-down of a physical press until its key-up. ONE action per press, decided
@@ -168,6 +174,59 @@ namespace CNC.Controls
             DebugLog.Write("remote", "shutter remote: stopped listening");
         }
 
+        /// <summary>
+        /// A press that arrived by RAW INPUT rather than through the hook, already known to be from the
+        /// bound device. Acts, but cannot swallow - raw input is a read path.
+        ///
+        /// This exists because the hook is not a reliable way to hear this class of remote. Measured on
+        /// the operator's PICO 2026-09-21: every keystroke from the machine's own keyboard reached the
+        /// hook, and the remote's buttons did not reach it at all, while raw input reported both the key
+        /// and the device. A Bluetooth HID consumer control is delivered to the raw input stack and the
+        /// shell; whether it is ALSO injected as a keystroke the hook can see varies - the same remote did
+        /// reach the hook earlier the same day, before the device re-enumerated.
+        ///
+        /// So the hook is no longer the way in. It is kept for what only it can do - SWALLOWING a press so
+        /// the volume does not move - and this is the path that makes the buttons work either way.
+        /// </summary>
+        public static void PressFromRawInput(bool volumeUp)
+        {
+            // The hook got there first on a machine where it does fire: one press, one action.
+            if (RemoteDevices.ElapsedMs - _hookActedAt <= DuplicateWindowMs)
+                return;
+
+            if (RemoteDevices.PressJustBound())
+            {
+                DebugLog.Write("remote", "shutter remote: that press bound the device - not acted on");
+                return;
+            }
+
+            var resolve = Resolve;
+            System.Action action = resolve == null ? null : resolve(RemoteDevices.IsPrimary(volumeUp));
+
+            if (action == null)
+            {
+                // Cannot be swallowed from here, so the volume WILL move. Say so rather than beeping into
+                // a key that also turned the volume down - a beep would read as "handled".
+                DebugLog.Write("remote", "shutter remote: nothing was waiting (raw input; the key still reaches Windows)");
+                return;
+            }
+
+            var now = DateTime.UtcNow;
+            if (now - _last < Debounce)
+            {
+                DebugLog.Write("remote", "shutter remote: press ignored - within the debounce window");
+                return;
+            }
+            _last = now;
+
+            DebugLog.Write("remote", "shutter remote: press (raw input)");
+            var dispatcher = _dispatcher;
+            if (dispatcher != null)
+                dispatcher.BeginInvoke(action);
+            else
+                action();
+        }
+
         private static IntPtr Callback(int nCode, IntPtr wParam, IntPtr lParam)
         {
             if (nCode < 0)
@@ -180,6 +239,22 @@ namespace CNC.Controls
                 return CallNextHookEx(_hook, nCode, wParam, lParam);
 
             int vk = Marshal.ReadInt32(lParam);
+
+            // TEMPORARY TRACE. The remote's HID events were arriving and Windows was changing the volume,
+            // yet no HOOK line appeared for them - and with the log only written for 0xAE/0xAF there is no
+            // way to tell "the hook never fired" from "the key is not the one we filter for". Logging every
+            // key the hook sees settles it: ordinary typing appearing proves the hook is alive, and a
+            // remote press then either shows up with some other vk or does not show up at all.
+            //
+            // Capped so it cannot flood a long session, and behind the usual gate. Remove once the answer
+            // is in - it is a question, not an instrument worth keeping.
+            if (DebugLog.Enabled && _traced < 400)
+            {
+                _traced++;
+                DebugLog.Write("remote", string.Format(CultureInfo.InvariantCulture,
+                    "HOOKSAW   vk=0x{0:X2} {1}", vk, up ? "up" : "down"));
+            }
+
             if (vk != VK_VOLUME_UP && vk != VK_VOLUME_DOWN)
                 return CallNextHookEx(_hook, nCode, wParam, lParam);
 
@@ -290,6 +365,7 @@ namespace CNC.Controls
 
             if (act)
             {
+                _hookActedAt = RemoteDevices.ElapsedMs;   // so the raw-input path skips this same press
                 var dispatcher = _dispatcher;
                 if (dispatcher != null)
                     dispatcher.BeginInvoke(action);
