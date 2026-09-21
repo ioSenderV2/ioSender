@@ -305,15 +305,24 @@ def sync_values(path, rows, baseline, dry):
         if len(r) < 7:
             continue
         key = (r[0], r[1])
-        if key not in want or r[6] == want[key]:
+
+        # THE VALUE IS EVERYTHING FROM FIELD 6 ON, not field 6. Some rows in these files were written
+        # with an UNQUOTED comma inside the value, so csv.reader splits one value across several fields.
+        # Treating r[6] as the whole value and re-serialising the row then writes the new value AND the
+        # leftover fragments: "Dry run - spindle/coolant off, tool changes skipped...", tool changes
+        # skipped... - a corrupted row that still parses. It silently mangled 273 rows across 27 files
+        # on 2026-09-21 before the diff was read.
+        value = ','.join(r[6:]) if len(r) > 7 else r[6]
+
+        if key not in want or value == want[key]:
             continue
         # Translated away from the English baseline? Leave it and say so.
         base = baseline.get(key)
-        if base is not None and r[6] != base:
+        if base is not None and value != base:
             skipped.append(key[1])
             continue
-        r[6] = want[key]
-        lines[i] = serialize_row(r)
+        # Rebuild as exactly seven fields, so the rewritten row is well-formed however the old one was.
+        lines[i] = serialize_row(r[:6] + [want[key]])
         changed += 1
 
     if changed and not dry:
@@ -332,7 +341,9 @@ def baseline_values(assembly):
     out = {}
     for r in read_rows(path):
         if len(r) >= 7:
-            out[(r[0], r[1])] = r[6]
+            # Same unquoted-comma hazard as sync_values - the value is fields 6 onward, not field 6, and
+            # a truncated baseline here would make every such row look "translated" and be skipped.
+            out[(r[0], r[1])] = ','.join(r[6:]) if len(r) > 7 else r[6]
     return out
 
 
