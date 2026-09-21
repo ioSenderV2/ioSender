@@ -45,14 +45,24 @@ namespace CNC.Core
 
         public const double MM_PER_INCH = 25.4d;
 
-        public bool IsMetric
+        // Storage seam: GrblViewModel overrides this to back onto MachineState.IsMetric so the units
+        // mode reaches the wire (client/server split step 5 rule - state holds the storage, the view
+        // model holds the notification). Every derived getter below must read the hook, not _isMetric,
+        // or an overriding class silently splits into two sources of truth.
+        protected virtual bool IsMetricStore
         {
             get { return _isMetric; }
+            set { _isMetric = value; }
+        }
+
+        public bool IsMetric
+        {
+            get { return IsMetricStore; }
             set
             {
-                if (value != _isMetric)
+                if (value != IsMetricStore)
                 {
-                    _isMetric = value;
+                    IsMetricStore = value;
                     OnPropertyChanged("Unit");
                     OnPropertyChanged("FeedrateUnit");
                     OnPropertyChanged("UnitFactor");
@@ -63,16 +73,16 @@ namespace CNC.Core
             }
         }
 
-        public string Unit { get { return _isMetric ? "mm" : "in"; } }
-        public string FeedrateUnit { get { return _isMetric ? "mm/min" : "in/min"; } }
-        public double UnitFactor { get { return _isMetric ? 1.0d : 25.4d; } }
-        public string Format { get { return _isMetric ? GrblConstants.FORMAT_METRIC : GrblConstants.FORMAT_IMPERIAL; } }
+        public string Unit { get { return IsMetricStore ? "mm" : "in"; } }
+        public string FeedrateUnit { get { return IsMetricStore ? "mm/min" : "in/min"; } }
+        public double UnitFactor { get { return IsMetricStore ? 1.0d : 25.4d; } }
+        public string Format { get { return IsMetricStore ? GrblConstants.FORMAT_METRIC : GrblConstants.FORMAT_IMPERIAL; } }
         public string FormatSigned { get { return "-" + Format; } }
-        public int Precision { get { return _isMetric ? 3 : 4; } }
+        public int Precision { get { return IsMetricStore ? 3 : 4; } }
 
         public double ConvertMM2Current (double value)
         {
-            if(!_isMetric)
+            if(!IsMetricStore)
                 value /= 25.4d;
 
             return value;

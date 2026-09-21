@@ -67,7 +67,7 @@ namespace CNC.Controls
             InitializeComponent();
 
             this.model = model;
-            keyboard = model.Keyboard;
+            keyboard = model.Keyboard as KeypressHandler;
             DataContext = this;
             groupStateConverter = Resources["GroupState"] as KeyMapGroupStateConverter;
 
@@ -86,13 +86,7 @@ namespace CNC.Controls
         public void Commit()
         {
             keyboard.ApplyJogBindings(rows.Where(r => r.IsJog).Select(r => r.Model));
-            keyboard.ApplyActionBindings(rows.Where(r => !r.IsJog && !r.IsConsole).Select(r => r.Model));
-
-            var console = rows.FirstOrDefault(r => r.IsConsole);
-            if (console != null)
-                AppConfig.Settings.Base.ConsoleShortcut = console.Model.Key == Key.None
-                    ? string.Empty
-                    : ShortcutKey.ToStorageString(console.Model.Key, console.Model.Modifiers);
+            keyboard.ApplyActionBindings(rows.Where(r => !r.IsJog).Select(r => r.Model));
 
             // Rebuild the saved tab-switch list from the bound rows only (unbound tabs are simply absent).
             AppConfig.Settings.Base.TabShortcuts = rows
@@ -108,9 +102,9 @@ namespace CNC.Controls
                 .Select(r => new TabShortcut { Id = r.Model.Method, Key = r.Model.Key == Key.None ? string.Empty : ShortcutKey.ToStorageString(r.Model.Key, r.Model.Modifiers) })
                 .ToList();
 
-            if (model.ControllerMapper != null)
+            if (GamepadInput.Mapper != null)
             {
-                var m = model.ControllerMapper;
+                var m = GamepadInput.Mapper;
                 foreach (var r in controllerRows)
                     m.SetAction(r.Button, r.Action);
 
@@ -130,7 +124,6 @@ namespace CNC.Controls
 
             keyboard.SaveMappings();   // persists into the App.config "KeyMap" section
             AppConfig.Settings.Save();
-            AppConfig.NotifyConsoleShortcutChanged();
             AppConfig.NotifyTabShortcutsChanged();
         }
 
@@ -149,13 +142,12 @@ namespace CNC.Controls
                 Add(new BindingRow(b, Label(b.Method)) { Description = Description(b.Method) });
             }
 
-            // The console toggle is just another program-level toggle - surface it alongside the rest.
-            var console = new KeypressHandler.KeyBinding { Method = "Console.Toggle", Context = "null", DefaultKey = Key.Escape };
-            ShortcutKey.TryParse(AppConfig.Settings.Base.ConsoleShortcut, out console.Key, out console.Modifiers);
-            Add(new BindingRow(console, "Toggle console window") { IsConsole = true, Description = "Show or hide the console window." });
+            // ("Toggle console window" was removed 2026-08-13. The run strip's MDI button is bindable now -
+            //  ActionKeyBinder "Program.Mdi", in this same Program group - which reaches the console without
+            //  needing a second store and a second dispatch path of its own. Esc still closes the console.)
 
             // Tab-switch shortcuts. Unbound by default (DefaultKey = None); persisted in Base.TabShortcuts and
-            // dispatched at the main-window level like the console toggle, so they fire regardless of focus.
+            // dispatched at the main-window level, so they fire regardless of focus.
             var saved = AppConfig.Settings.Base.TabShortcuts;
             foreach (var t in TabTargets)
             {
@@ -227,10 +219,33 @@ namespace CNC.Controls
             Key.LeftAlt, Key.RightAlt, Key.LWin, Key.RWin, Key.System, Key.None
         };
 
+        // Keys mean something else in here - see FindByShortcut - so nothing upstream may act on them.
+        // Set on the control's own Loaded/Unloaded, the same lifecycle the controller dispatch-pause uses,
+        // so it is raised exactly while this tab is actually on screen.
+        private void SuspendGlobalKeys(bool suspend)
+        {
+            GlobalKeys.Intercept = suspend ? (Func<KeyEventArgs, bool>)InterceptKey : null;
+        }
+
+        /// <summary>
+        /// Every key-down while this panel is up, routed from GlobalKeys because that is the only handler
+        /// that runs regardless of where focus happens to be (see GlobalKeys.Intercept). Returns true when
+        /// it used the key.
+        /// </summary>
+        private bool InterceptKey(KeyEventArgs e)
+        {
+            // Mid-capture: the editor's own PreviewKeyDown is waiting for exactly this key, and it can
+            // only get it if the event carries on tunnelling. Stand aside.
+            if (capturing != null)
+                return false;
+
+            return FindByShortcut(e);
+        }
+
         private void KeyMapEditor_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (capturing == null)
-                return;
+                return;   // the find-by-shortcut route comes through GlobalKeys.Intercept, not here
 
             Key key = e.Key == Key.System ? e.SystemKey : e.Key;
             if (modifierKeys.Contains(key))
@@ -245,6 +260,92 @@ namespace CNC.Controls
             capturing = null;
 
             UpdateConflicts();
+        }
+
+        /// <summary>
+        /// Not capturing, and a key was pressed with the list focused: JUMP TO THE ROW that shortcut is
+        /// bound to, rather than running it.
+        ///
+        /// Two things this is for. A bindings list is the one place you want to ask "what does this key
+        /// already do?", and answering it by pressing the key is the obvious way - scrolling a grouped
+        /// list of a hundred rows hunting for a combo is not. And running the real thing from in here was
+        /// never anybody's intent: press a bound key while editing bindings and the machine started,
+        /// peeked, or ran a macro. Gamepad dispatch has been paused while this tab is visible since it was
+        /// written, for exactly that reason (see the class header); the keyboard never got the same care.
+        ///
+        /// WHAT IT DELIBERATELY DOES NOT TOUCH: any key that is not bound and carries no modifier. Tab,
+        /// the arrows, Enter, Space, Home/End, PageUp/Down are how this list is navigated without a mouse,
+        /// and on the jog tab the arrows and numpad ARE the bindings - so swallowing everything would make
+        /// the panel mouse-only and the jog tab unusable. Unbound bare keys therefore fall straight
+        /// through and behave exactly as they always did.
+        ///
+        /// An unbound combo that DOES carry a modifier (or is a function key) beeps: those are never
+        /// navigation, so saying "nothing is bound to that" costs nothing and answers the question.
+        /// </summary>
+        private bool FindByShortcut(KeyEventArgs e)
+        {
+            Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (modifierKeys.Contains(key))
+                return false;                 // a modifier on its own is not a shortcut yet
+
+            if (Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase)
+                return false;                 // typing in a field, not asking a question
+
+            ModifierKeys mods = Keyboard.Modifiers;
+
+            // Jog rows bind an unmodified key, so match them on the key alone - the same asymmetry the
+            // capture above applies when it stores one (Modifiers = None for a jog row).
+            var hit = rows.FirstOrDefault(r => r.Model.Key == key &&
+                                                (r.IsJog ? mods == ModifierKeys.None : r.Model.Modifiers == mods));
+
+            if (hit != null)
+            {
+                ShowRow(hit);
+                return true;
+            }
+
+            // Nothing bound. Only say so for something that could not possibly be navigation.
+            bool couldNotBeNavigation = mods != ModifierKeys.None || (key >= Key.F1 && key <= Key.F24);
+            if (couldNotBeNavigation)
+            {
+                try { System.Media.SystemSounds.Beep.Play(); } catch { }
+                return true;
+            }
+
+            return false;   // an unbound bare key: navigation, and none of our business
+        }
+
+        /// <summary>
+        /// Bring a row into view and select it, so the answer is visible at once.
+        ///
+        /// EXPANDING ITS GROUP IS THE WHOLE JOB. Groups default to collapsed here, and a row inside a
+        /// collapsed Expander is not realised - so ScrollIntoView finds nothing to scroll to and does
+        /// nothing at all, silently. The lookup worked from the first build; it just pointed at a row
+        /// nobody could see, and only looked broken because the operator had to open "Top Level Tabs" by
+        /// hand before the scroll had anywhere to land.
+        ///
+        /// Everything below the expand is therefore deferred to Loaded: expanding is a layout change, and
+        /// the rows it reveals do not exist until that pass has run.
+        /// </summary>
+        private void ShowRow(BindingRow row)
+        {
+            // The keyboard grid only - rows holds the keyboard bindings, and the Controller tab's entries
+            // are gamepad buttons, which no keypress can match anyway.
+            string group = row.Group?.Name;
+
+            foreach (var ex in FindVisualChildren<Expander>(grid))
+            {
+                string name = (ex.DataContext as CollectionViewGroup)?.Name as string;
+                if (name != null && name == group && !ex.IsExpanded)
+                    ex.IsExpanded = true;     // raises Group_Expanded, so the choice is remembered too
+            }
+
+            Dispatcher.BeginInvoke((System.Action)(() =>
+            {
+                grid.SelectedItem = row;
+                grid.ScrollIntoView(row);
+                grid.Focus();
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
         private void Binding_Click(object sender, RoutedEventArgs e)
@@ -292,7 +393,7 @@ namespace CNC.Controls
             foreach (var row in rows)
                 row.ResetToDefault();
 
-            if (model.ControllerMapper != null)
+            if (GamepadInput.Mapper != null)
                 foreach (var r in controllerRows)
                     r.Action = ControllerMapper.DefaultAction(r.Button);
 
@@ -416,19 +517,19 @@ namespace CNC.Controls
         {
             ActionItems = BuildActionItems();
 
-            if (model.Controller == null || model.ControllerMapper == null)
+            if (GamepadInput.Service == null || GamepadInput.Mapper == null)
             {
                 lblController.Text = "Controller support is not available.";
                 return;
             }
 
-            model.ControllerMapper.EnsureLoaded();   // show the saved map, not just defaults
+            GamepadInput.Mapper.EnsureLoaded();   // show the saved map, not just defaults
 
             foreach (var b in ControllerMapper.MappableButtons)
             {
                 var def = ControllerMapper.DefaultAction(b);
                 var choices = ActionItems.Select(a => a.Action == def ? new ActionItem(a.Action, "* " + a.Label, a.Description) : a).ToList();
-                controllerRows.Add(new ControllerRow(b, ButtonName(b), model.ControllerMapper.GetAction(b), choices));
+                controllerRows.Add(new ControllerRow(b, ButtonName(b), GamepadInput.Mapper.GetAction(b), choices));
             }
 
             gridController.ItemsSource = controllerRows;
@@ -438,7 +539,7 @@ namespace CNC.Controls
             UpdateRestoreDefaultsButton();
 
             // Analog jog settings
-            var m = model.ControllerMapper;
+            var m = GamepadInput.Mapper;
             chkAnalogEnabled.IsChecked = m.AnalogJogEnabled;
             txtDeadzone.Text = m.DeadzonePercent.ToString(System.Globalization.CultureInfo.InvariantCulture);
             txtFeedScale.Text = m.FeedScale.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
@@ -453,42 +554,51 @@ namespace CNC.Controls
         // live controller status/poll events. Paired with _Unloaded; guarded so re-entry doesn't double-hook.
         private void KeyMapEditor_Loaded(object sender, RoutedEventArgs e)
         {
+            // FIRST, and above the early return below: without it a shortcut never reaches this control at
+            // all. GlobalKeys is a CLASS handler on Window.PreviewKeyDown, so it sees Ctrl+M before this
+            // editor does and switches tabs - which is exactly what happened.
+            SuspendGlobalKeys(true);
+
             // Re-sync every time the tab is shown so bindings made via a tab's right-click "Bind to Key" (which
             // write straight to Config.TabShortcuts) are reflected here, even though this editor is built once.
             SyncTabRows();
 
-            if (_controllerHooked || model.Controller == null || model.ControllerMapper == null)
+            if (_controllerHooked || GamepadInput.Service == null || GamepadInput.Mapper == null)
                 return;
 
             _controllerHooked = true;
-            model.ControllerMapper.Enabled = false;
+            GamepadInput.Mapper.Enabled = false;
             UpdateControllerStatus();
-            model.Controller.Connected += Controller_StatusChanged;
-            model.Controller.Disconnected += Controller_StatusChanged;
-            model.Controller.Polled += Controller_Polled;
+            GamepadInput.Service.Connected += Controller_StatusChanged;
+            GamepadInput.Service.Disconnected += Controller_StatusChanged;
+            GamepadInput.Service.Polled += Controller_Polled;
         }
 
         // Tab hidden / view left: unhook and resume machine dispatch.
         private void KeyMapEditor_Unloaded(object sender, RoutedEventArgs e)
         {
+            // Also above the early return, and unconditional: leaving this set would silently kill every
+            // jog key, macro and shortcut in the whole application for the rest of the session.
+            SuspendGlobalKeys(false);
+
             if (!_controllerHooked)
                 return;
 
             _controllerHooked = false;
-            if (model.Controller != null)
+            if (GamepadInput.Service != null)
             {
-                model.Controller.Connected -= Controller_StatusChanged;
-                model.Controller.Disconnected -= Controller_StatusChanged;
-                model.Controller.Polled -= Controller_Polled;
+                GamepadInput.Service.Connected -= Controller_StatusChanged;
+                GamepadInput.Service.Disconnected -= Controller_StatusChanged;
+                GamepadInput.Service.Polled -= Controller_Polled;
             }
-            if (model.ControllerMapper != null)
-                model.ControllerMapper.Enabled = true;   // resume machine dispatch
+            if (GamepadInput.Mapper != null)
+                GamepadInput.Mapper.Enabled = true;   // resume machine dispatch
         }
 
         private void UpdateControllerStatus()
         {
-            lblController.Text = model.Controller != null && model.Controller.IsConnected
-                ? "Controller connected (slot " + model.Controller.ControllerIndex + ")."
+            lblController.Text = GamepadInput.Service != null && GamepadInput.Service.IsConnected
+                ? "Controller connected (slot " + GamepadInput.Service.ControllerIndex + ")."
                 : "No controller detected.";
         }
 
@@ -501,7 +611,7 @@ namespace CNC.Controls
         // check of what the controller actually reports (D-pad lights here = input is getting through).
         private void Controller_Polled(object sender, EventArgs e)
         {
-            ushort buttons = model.Controller.State.wButtons;
+            ushort buttons = GamepadInput.Service.State.wButtons;
             foreach (var r in controllerRows)
                 r.Pressed = (buttons & (ushort)r.Button) != 0;
         }
@@ -691,6 +801,7 @@ namespace CNC.Controls
             new TabTarget("Tab.MachineSetup", "Machine Setup",  "Show Machine Setup, wherever it lives - main tab or File menu."),
             new TabTarget("Tab.HeightMap",    "Height Map",     "Show Height Map, wherever it lives - main tab or Tools menu."),
             new TabTarget("Tab.LatheWizard",  "Lathe Tools",    "Show Lathe Tools, wherever it lives - main tab or Tools menu."),
+            new TabTarget("Tab.Calibration",  "Calibration",    "Show Calibration (stepper calibration and squareness), wherever it lives - main tab or Tools menu."),
 
             // The three tools the dissolved Tools tab used to carry. Their ids keep the old "Tab.Tools." prefix
             // so bindings made while they were sub-tabs still work; each is now a view in its own right (a
@@ -710,23 +821,42 @@ namespace CNC.Controls
 
         // ---- categories (outline groups) ------------------------------------------------------
 
-        /// <summary>The single group holding every top-level destination - tab strip entries and menu
-        /// entries alike. ActionKeyBinder's main-menu catalog entries name it too, so the two halves of the
-        /// list can't drift into separate groups.</summary>
+        /// <summary>The top-level VIEWS - what can sit on the tab strip (or be reached from the menu that
+        /// hosts it when it is not on the bar). Tab.* ids.</summary>
         public const string TopLevelGroup = "Top Level Tabs";
-        private const int TopLevelOrder = 13;
+
+        /// <summary>The built-in main-menu COMMANDS - Connect, File &gt; ..., Help &gt; ... - which are not
+        /// views at all and cannot be placed on the tab strip.
+        ///
+        /// These used to share TopLevelGroup, on the reasoning that to the operator both are just
+        /// "destinations". In practice it read as clutter: a list of tabs you can rearrange, with fifteen
+        /// menu commands you cannot, interleaved alphabetically among them. Ordered immediately BEFORE the
+        /// tabs so the two stay adjacent - they are related, just not the same thing.</summary>
+        public const string MenuGroup = "Top Level Menu Items";
+
+        private const int MenuOrder = 13;
+        private const int TopLevelOrder = 14;
+
+        /// <summary>Sort order for a group an ActionKeyBinder row named for itself. Anything unrecognised
+        /// keeps the historical "UI zoom" slot, which is where these rows sat before the field existed.</summary>
+        private static int GroupOrder(string group)
+        {
+            if (group == MenuGroup) return MenuOrder;
+            if (group == TopLevelGroup) return TopLevelOrder;
+            return 9;
+        }
 
         private static void Categorize(BindingRow r)
         {
             if (r.IsJog) { r.Set("Jog", 0); return; }
-            if (r.IsConsole) { r.Set("Program", 9); return; }
             // ActionKeyBinder rows carry their own group where they want one (the main-menu commands name
             // TopLevelGroup); the original zoom/OBS entries predate that field and default to "UI zoom".
-            if (r.IsZoomAction) { r.Set(r.ActionGroup ?? "UI zoom", r.ActionGroup == TopLevelGroup ? TopLevelOrder : 9); return; }
-            // One group for everything reachable from the top-level tab strip or the menus - the views
-            // (TabTargets) and the main-menu commands (ActionKeyBinder, handled above) sit together, because
-            // to the operator they are one list of destinations and whether a given one is currently a tab or
-            // a menu entry is their own layout choice, not a category.
+            // An ActionKeyBinder row carries its own group where it wants one (the main-menu commands name
+            // MenuGroup); the original zoom/OBS entries predate that field and default to "UI zoom".
+            if (r.IsZoomAction) { r.Set(r.ActionGroup ?? "UI zoom", GroupOrder(r.ActionGroup)); return; }
+            // The top-level VIEWS. The main-menu commands are handled above and land in MenuGroup, which
+            // sorts immediately before this one - adjacent, because they are related, but distinct, because
+            // a tab can be moved on and off the strip and a File/Help command cannot.
             if (r.IsTabSwitch) { r.Set(TopLevelGroup, TopLevelOrder); return; }
 
             string m = r.Model.Method ?? string.Empty;
@@ -761,10 +891,11 @@ namespace CNC.Controls
             { "Spindle override", "Real-time override of spindle speed." },
             { "Coolant & aux", "Toggle coolant outputs and the auxiliary fan." },
             { "Zeroing", "Set the work-coordinate zero for an axis (or all axes)." },
-            { "Program", "Program-level toggles (optional stop, single block, probe state) and the console window." },
+            { "Program", "Program-level toggles (optional stop, single block, probe state), the console window, and the run strip's MDI and Status buttons." },
             { "Probing", "Start or stop probing and toggle the probe-connected state." },
             { "3D view", "Control the 3D tool-path viewer." },
-            { TopLevelGroup, "Everything on the top-level tab strip and in the menus, in one list. A key reaches its target wherever that target currently lives - as a tab or as a menu entry - so moving something in Settings > Top-level tabs never costs it its shortcut. All unbound by default; a menu command that is greyed out does nothing." },
+            { MenuGroup, "The built-in main-menu commands - Connect, File and Help. These are not views and cannot be placed on the tab strip. All unbound by default; a menu command that is greyed out does nothing when its key is pressed." },
+            { TopLevelGroup, "The views that can sit on the top-level tab strip. A key reaches its target wherever that target currently lives - as a tab, or on the menu that hosts it when it is off the bar - so moving something in Settings > Top-level tabs never costs it its shortcut. All unbound by default." },
             { "Other", "Additional actions." }
         };
 
@@ -1013,7 +1144,6 @@ namespace CNC.Controls
             public KeypressHandler.KeyBinding Model { get; }
             public string Label { get; }
             public string Description { get; set; }
-            public bool IsConsole { get; set; }
             public bool IsTabSwitch { get; set; }
             public bool IsZoomAction { get; set; }
             public string ActionGroup { get; set; }   // ActionKeyBinder.ActionInfo.Group, when the entry names one

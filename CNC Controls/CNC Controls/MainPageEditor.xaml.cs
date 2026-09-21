@@ -294,16 +294,29 @@ namespace CNC.Controls
                 if (string.IsNullOrEmpty(label))
                     continue;   // a foreign key from another build - nothing to show, and nothing we can place
 
-                Placements.Add(new PlacementRow(key, label, placed[key], CanHide(key)));
+                Placements.Add(new PlacementRow(key, label, placed[key], CanHide(key), CanMenu(key)));
             }
         }
 
         // Settings, Machine Setup and the Job view must stay reachable: LayoutTree.EnsureEssentials puts any
         // of them back on the tab bar if the tree places them nowhere, so offering "Hidden" would be a lie -
-        // the choice would silently undo itself on the next load. They can still move between bar and menu.
+        // the choice would silently undo itself on the next load. Settings and Machine Setup can still move
+        // between bar and menu; the Job view cannot - see CanMenu.
         private static bool CanHide(string key)
         {
             return key != ProtectedTab && !LayoutKeys.Essential.Contains(key);
+        }
+
+        // The Job view is the one view that is not merely a place to put things: it boots the controller
+        // (Activate -> InitSystem -> $I and the settings load), owns the status poller, and hosts the run
+        // controls. A dozen call sites resolve it with getTab(ViewType.GRBL) and do nothing when that
+        // returns null - which is exactly what a menu-hosted Job view returns - so menuing it silently
+        // costs you the connect handshake. Rather than teach every one of those sites to open a window on
+        // connect, the invariant they already assume is made true here: Job lives on the tab bar.
+        // AppConfig.EnforceMenuPlacement repairs a profile that menued it under an earlier build.
+        private static bool CanMenu(string key)
+        {
+            return key != LayoutKeys.Grbl;
         }
 
         // Row identity + placement, flattened for change detection ("Job=TabBar|GRBLConfig=FileMenu|...").
@@ -426,19 +439,21 @@ namespace CNC.Controls
             get { return "Where " + Label + " appears. Applied on restart."; }
         }
 
-        // canHide == false drops the Hidden choice entirely rather than offering one that would be undone on
-        // the next load (see MainPageEditor.CanHide) - an unavailable option is better absent than a trap.
-        public PlacementRow(string name, string label, ViewPlacement placement, bool canHide)
+        // canHide/canMenu == false drop those choices entirely rather than offering one that would be undone
+        // on the next load (see MainPageEditor.CanHide / CanMenu) - an unavailable option is better absent
+        // than a trap. Each still keeps a choice the profile is CURRENTLY sitting on, so a row can always
+        // display its own state; the every-load invariant is what moves it back.
+        public PlacementRow(string name, string label, ViewPlacement placement, bool canHide, bool canMenu = true)
         {
             Name = name;
             Label = label;
             this.placement = placement;
 
-            Choices = new List<PlacementChoice> {
-                new PlacementChoice(ViewPlacement.TabBar, "Tab bar"),
-                new PlacementChoice(ViewPlacement.FileMenu, "File menu"),
-                new PlacementChoice(ViewPlacement.ToolsMenu, "Tools menu")
-            };
+            Choices = new List<PlacementChoice> { new PlacementChoice(ViewPlacement.TabBar, "Tab bar") };
+            if (canMenu || placement == ViewPlacement.FileMenu)
+                Choices.Add(new PlacementChoice(ViewPlacement.FileMenu, "File menu"));
+            if (canMenu || placement == ViewPlacement.ToolsMenu)
+                Choices.Add(new PlacementChoice(ViewPlacement.ToolsMenu, "Tools menu"));
             if (canHide || placement == ViewPlacement.Hidden)
                 Choices.Add(new PlacementChoice(ViewPlacement.Hidden, "Not shown"));
         }

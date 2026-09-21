@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CNC.Svg - SVG artwork to contours, and contours to laser g-code, with NO WPF and no native
+  dependencies, so the same assembly runs under .NET on a Raspberry Pi as under .NET Framework
+  inside ioSender.
+
+  WHY IT EXISTS: SvgOutlines used to live in CNC Controls because it leaned on WPF's Geometry.Parse
+  and GetFlattenedPathGeometry. PresentationCore is Windows-only, which meant the SVG-to-laser
+  converter could not run on the EngravingBox appliance that ultimately burns the file. Extracting
+  it needed exactly one thing replaced - the path parser and flattener (SvgPath.cs) plus the affine
+  matrix it used (SvgMatrix.cs). Everything else was already portable arithmetic.
+
+  Nothing in here may reference WPF, System.Drawing, or any native library. The point of the
+  assembly is that EngravingBox can xcopy it; a per-architecture .so would defeat that. The
+  net8 portability probe (CNC.Svg.net8.csproj, same folder, same sources, NOT in the .sln) is what
+  keeps that honest - it fails the moment a Windows-only reference creeps in.
+
+  This is the LEGACY net462 project the solution builds - same two-project pattern as CNC Common,
+  CNC Core and CNC Contracts.
+-->
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{E051200B-F61A-4E3F-8E80-0D9B14EE826B}</ProjectGuid>
+    <OutputType>library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>CNC.Svg</RootNamespace>
+    <AssemblyName>CNC.Svg</AssemblyName>
+    <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <WarningLevel>4</WarningLevel>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="SvgLaserFill.cs" />
+    <Compile Include="SvgLaserOptions.cs" />
+    <Compile Include="SvgLaserProgram.cs" />
+    <Compile Include="SvgMatrix.cs" />
+    <Compile Include="SvgOutlines.cs" />
+    <Compile Include="SvgPath.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CNC Common\CNC.Common.csproj">
+      <Project>{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}</Project>
+      <Name>CNC.Common</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

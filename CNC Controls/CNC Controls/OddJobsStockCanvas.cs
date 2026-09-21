@@ -28,6 +28,16 @@ namespace CNC.Controls
         // flipped). Falls back to a 100x100 mm placeholder if Setup hasn't set a stock size yet.
         public static Transform DrawStock(Canvas canvas)
         {
+            return DrawStock(canvas, SetupStockW(), SetupStockD());
+        }
+
+        /// <summary>
+        /// Same drawing, against a stock size the caller names rather than Setup's. The Work Order tab
+        /// draws against the size recorded IN the work order - a work order is a recipe for a known blank,
+        /// so its layout has to be shown on that blank and not on whatever Setup is currently set to.
+        /// </summary>
+        public static Transform DrawStock(Canvas canvas, double stockW, double stockH)
+        {
             canvas.Children.Clear();
             double w = canvas.ActualWidth, h = canvas.ActualHeight;
             var t = new Transform { Scale = 1d, OriginX = 0d, OriginY = 0d };
@@ -35,8 +45,8 @@ namespace CNC.Controls
                 return t;
 
             var s = StartJobConfig.Section;
-            double stockW = s != null && s.Width > 0d ? s.Width : 100d;
-            double stockH = s != null && s.Height > 0d ? s.Height : 100d;
+            if (stockW <= 0d) stockW = 100d;
+            if (stockH <= 0d) stockH = 100d;
 
             const double marginPx = 20d;
             double availW = Math.Max(10d, w - marginPx * 2), availH = Math.Max(10d, h - marginPx * 2);
@@ -63,7 +73,7 @@ namespace CNC.Controls
             // Shared keep-out inset from Setup (same dotted-red look Start Job's own drawing and Surface
             // Stock use) - every wizard drawn via this shared canvas gets it for free, no per-wizard drawing
             // code needed.
-            if (TrySafeArea(out double minX, out double minY, out double maxX, out double maxY))
+            if (TrySafeArea(stockW, stockH, out double minX, out double minY, out double maxX, out double maxY))
             {
                 var k0 = ToPixel(t, minX, maxY);
                 var k1 = ToPixel(t, maxX, minY);
@@ -91,9 +101,17 @@ namespace CNC.Controls
         // sides. Returns false when the inset swallows the whole area (nothing safe to place in).
         public static bool TrySafeArea(out double minX, out double minY, out double maxX, out double maxY)
         {
-            var s = StartJobConfig.Section;
-            double stockW = s != null && s.Width > 0d ? s.Width : 100d;
-            double stockH = s != null && s.Height > 0d ? s.Height : 100d;
+            return TrySafeArea(SetupStockW(), SetupStockD(), out minX, out minY, out maxX, out maxY);
+        }
+
+        /// <summary>Setup's own stock size, the fallback for every caller that doesn't name one.</summary>
+        public static double SetupStockW() { var s = StartJobConfig.Section; return s != null && s.Width > 0d ? s.Width : 100d; }
+        public static double SetupStockD() { var s = StartJobConfig.Section; return s != null && s.Height > 0d ? s.Height : 100d; }
+
+        public static bool TrySafeArea(double stockW, double stockH, out double minX, out double minY, out double maxX, out double maxY)
+        {
+            if (stockW <= 0d) stockW = 100d;
+            if (stockH <= 0d) stockH = 100d;
             double inset = KeepOutInset();
             minX = inset; minY = inset; maxX = stockW - inset; maxY = stockH - inset;
             return maxX > minX && maxY > minY;
@@ -106,7 +124,12 @@ namespace CNC.Controls
         // overlap it) - good enough for "don't let a click land ON the clamps", not a full collision check.
         public static Point ClampToKeepOut(double x, double y)
         {
-            if (!TrySafeArea(out double minX, out double minY, out double maxX, out double maxY))
+            return ClampToKeepOut(x, y, SetupStockW(), SetupStockD());
+        }
+
+        public static Point ClampToKeepOut(double x, double y, double stockW, double stockH)
+        {
+            if (!TrySafeArea(stockW, stockH, out double minX, out double minY, out double maxX, out double maxY))
                 return new Point(x, y);   // inset swallows the whole area - nothing valid to clamp to, leave as-is
             return new Point(Math.Min(Math.Max(x, minX), maxX), Math.Min(Math.Max(y, minY), maxY));
         }

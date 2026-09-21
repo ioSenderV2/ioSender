@@ -57,8 +57,19 @@ namespace CNC.Core
             catch { return null; }
         }
 
-        /// <summary>Append text (caller supplies its own line ending), rotating first if oversize. Never throws.</summary>
-        public void Write(string text)
+        /// <summary>
+        /// Append text (caller supplies its own line ending), rotating first if oversize. Never throws.
+        /// Returns true if the text reached the file.
+        /// <para>
+        /// The return value exists because a swallowed failure here is indistinguishable from "nothing
+        /// happened": Open() creates the file eagerly (so a latest-link has a target), which means a Write
+        /// that fails leaves a 3-byte, BOM-only file that reads exactly like a log with nothing to say.
+        /// That is precisely what an OutOfMemoryException produced on 2026-08-06 - AppendAllText needs a
+        /// StreamWriter and an encoder buffer, and under OOM it cannot have them. Callers who care (the
+        /// crash logger) check the result and retry; the high-frequency callers ignore it as before.
+        /// </para>
+        /// </summary>
+        public bool Write(string text)
         {
             lock (_sync)
             {
@@ -76,9 +87,11 @@ namespace CNC.Core
                         }
                     }
                     File.AppendAllText(Path, text, Encoding.UTF8);
+                    return true;
                 }
                 catch { /* logging must never take the app down */ }
             }
+            return false;
         }
     }
 }

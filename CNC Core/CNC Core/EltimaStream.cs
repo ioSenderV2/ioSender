@@ -40,16 +40,23 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using System;
 using System.Linq;
 using System.Text;
-using System.Windows.Forms;
 using System.IO.Ports;
-using System.Windows.Threading;
+#if USEELTIMA
+using System.Windows.Forms;      // only the Eltima body below needs these; outside the #if they would
+using System.Windows.Threading;  // keep CNC.Core tied to WPF for code that is not even compiled
+#endif
 using System.IO;
 using System.Collections.ObjectModel;
 
 namespace CNC.Core
 {
 #if USEELTIMA
-    public class EltimaStream : StreamComms
+    // NOTE: never compiled in this repo (DefineConstants carries xUSEELTIMA, i.e. disabled), so the
+    // StreamCommsBase conversion below is by inspection only, not by build. Its WriteString goes straight
+    // to serialPort.WriteStr and so bypasses the traced leaves - unlike the other three transports. Left
+    // as-is rather than "fixed" blind: changing an uncompilable write path on a guess is worse than an
+    // acknowledged gap.
+    public class EltimaStream : StreamCommsBase, StreamComms
     {
 
         private SPortLib.SPortAx serialPort = null;
@@ -62,12 +69,15 @@ namespace CNC.Core
         // Auto-reconnect is not implemented for the (optional, USEELTIMA) Eltima transport;
         // these satisfy the StreamComms contract.
         public bool IsReconnecting { get { return false; } }
+
+        // No auto-reconnect on this transport (see the comment above), so there is nothing to notify.
+        public void NotifyLinkLost() { }
         public event System.Action ConnectionLost;
         public event System.Action Reconnected;
 
         public event DataReceivedHandler DataReceived;
 
-        public Action<string> AckSink { get; set; }
+        public event Action<Comms.ReplyClass, string> ReplyClassified;
         public bool BlockingWrites { get; set; }   // Eltima writes are already synchronous; no-op here
 
 #if RESPONSELOG
@@ -87,7 +97,7 @@ namespace CNC.Core
 
             if (parameter.Count() < 4)
             {
-                AppDialogs.Show("Unable to open serial port: " + PortParams, "ioSender");
+                UserPrompt.Show("Unable to open serial port: " + PortParams, "ioSender");
                 System.Environment.Exit(2);
             }
 
@@ -97,7 +107,7 @@ namespace CNC.Core
             }
             catch
             {
-                AppDialogs.Show("Failed to load serial port driver.", "ioSender");
+                UserPrompt.Show("Failed to load serial port driver.", "ioSender");
                 System.Environment.Exit(1);
             }
 
@@ -157,7 +167,7 @@ namespace CNC.Core
                     log = new StreamWriter(Resources.DebugFile);
                 } catch
                 {
-                    AppDialogs.Show("Unable to open log file: " + Resources.DebugFile, "ioSender");
+                    UserPrompt.Show("Unable to open log file: " + Resources.DebugFile, "ioSender");
                 }
 #endif
             }
@@ -247,12 +257,12 @@ namespace CNC.Core
             return c;
         }
 
-        public void WriteByte(byte data)
+        protected override void WriteByteRaw(byte data)
         {
             serialPort.Write(ref data, 1);
         }
 
-        public void WriteBytes(byte[] bytes, int len)
+        protected override void WriteBytesRaw(byte[] bytes, int len)
         {
             serialPort.Write(ref bytes[0], len);
         }
@@ -279,36 +289,26 @@ namespace CNC.Core
             }
         }
 
-        public void AwaitAck()
+        // Pending predicates read this instance's own volatile state, not Comms.com's - the loops these
+        // replace all went through the global, which is only the same object by convention.
+        private bool AwaitingAck { get { return state == Comms.State.DataReceived || state == Comms.State.AwaitAck; } }
+
+        public bool AwaitAck()
         {
-            while (Comms.com.CommandState == Comms.State.DataReceived || Comms.com.CommandState == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
+            if (EventUtils.WaitWhile(() => AwaitingAck, Comms.AckTimeoutMs))
+                return true;
+
+            ConsoleLog.Write("[EltimaStream] AwaitAck: no ok/error within " + Comms.AckTimeoutMs + "ms");
+            return false;
         }
 
-        public void AwaitAck(string command)
+        public bool AwaitAck(string command)
         {
             PurgeQueue();
             Reply = string.Empty;
             WriteCommand(command);
 
-            while (Comms.com.CommandState == Comms.State.DataReceived || Comms.com.CommandState == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
-        }
-
-        public void AwaitResponse()
-        {
-            while (Comms.com.CommandState == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
-        }
-
-        public void AwaitResponse(string command)
-        {
-            PurgeQueue();
-            Reply = string.Empty;
-            WriteCommand(command);
-
-            while (Comms.com.CommandState == Comms.State.AwaitAck)
-                System.Threading.Thread.Sleep(15);
+            return AwaitAck();
         }
 
         public string GetReply(string command)
@@ -316,7 +316,12 @@ namespace CNC.Core
             Reply = string.Empty;
             WriteCommand(command);
 
-            AwaitResponse();
+            // Any reply ends this wait, not just ok/error - GetReply's caller wants the response line.
+            if (!EventUtils.WaitWhile(() => state == Comms.State.AwaitAck, Comms.AckTimeoutMs))
+            {
+                ConsoleLog.Write("[EltimaStream] GetReply('" + command + "'): no reply within " + Comms.AckTimeoutMs + "ms");
+                return string.Empty;
+            }
 
             return Reply;
         }
@@ -347,9 +352,14 @@ namespace CNC.Core
 
                         state = Reply == "ok" ? Comms.State.ACK : (Reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
 
-                        // Tap ok/error acks straight to the streamer (when installed), bypassing the UI dispatcher.
-                        if (AckSink != null && (state == Comms.State.ACK || state == Comms.State.NAK))
-                            AckSink(Reply);
+                        // Classified-reply tap straight to any subscriber, bypassing the UI dispatcher.
+                        // Raised for every reply, not just ack/nak - see the interface doc-comment.
+                        ReplyClassified?.Invoke(
+                            state == Comms.State.ACK ? Comms.ReplyClass.Ack :
+                            state == Comms.State.NAK ? Comms.ReplyClass.Nak :
+                            Reply.Length > 0 && Reply[0] == '<' ? Comms.ReplyClass.Status :
+                            Comms.ReplyClass.Other,
+                            Reply);
                     }
                 }
                 else

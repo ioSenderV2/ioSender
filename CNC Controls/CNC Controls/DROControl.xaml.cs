@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -73,6 +74,105 @@ namespace CNC.Controls
             }
         }
 
+        /// <summary>
+        /// Build the work-offset menu as it opens, so it shows what the controller reports NOW and which
+        /// offset is active NOW - both change under this control while it is on screen.
+        ///
+        /// Lives on DROControl itself, which is why it works in both places the DRO appears: the Job tab's
+        /// panel and the run strip's scaled copy are two instances of this one control, not two controls.
+        /// </summary>
+        private void DroWcs_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            BuildWcsMenu((sender as FrameworkElement)?.ContextMenu);
+        }
+
+        /// <summary>
+        /// Left-click opens the same list. The title reads "DRO (G54)" with a chevron after it, so it
+        /// looks like what it is - a dropdown naming the current work offset - rather than relying on
+        /// someone guessing that a right-click does something. Right-click still works; it costs nothing
+        /// to leave it.
+        /// </summary>
+        private void DroWcs_Click(object sender, MouseButtonEventArgs e)
+        {
+            var panel = sender as FrameworkElement;
+            var menu = panel?.ContextMenu;
+            if (menu == null)
+                return;
+
+            BuildWcsMenu(menu);
+            menu.PlacementTarget = panel;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.IsOpen = true;
+            e.Handled = true;
+        }
+
+        private void BuildWcsMenu(ContextMenu menu)
+        {
+            var model = DataContext as GrblViewModel;
+            if (menu == null)
+                return;
+
+            menu.Items.Clear();
+
+            if (model == null || model.CoordinateSystems == null || model.CoordinateSystems.Count == 0)
+            {
+                // An empty menu appears as a stray grey sliver with no explanation. Say why instead.
+                menu.Items.Add(new MenuItem { Header = "No work offsets reported yet", IsEnabled = false });
+                return;
+            }
+
+            string active = model.WorkCoordinateSystem;
+
+            // CoordinateSystem.IsSelectableWcs, not a list kept here: the same question is asked by the
+            // Work Parameters offset picker, and two copies of "which of these is selectable" would be two
+            // chances to let G28 into a list of offsets - where choosing it moves the machine.
+            foreach (var cs in model.CoordinateSystems.Where(c => c.IsSelectableWcs))
+            {
+                var item = new MenuItem
+                {
+                    Header = cs.Code,
+                    IsCheckable = true,
+                    IsChecked = cs.Code == active,
+                    // What is IN that offset, so the choice can be made without first selecting it and
+                    // looking at the DRO - which would mean changing the machine's state to read a number.
+                    ToolTip = DescribeOffset(cs, model)
+                };
+                item.Click += WcsMenuItem_Click;
+                menu.Items.Add(item);
+            }
+        }
+
+        /// <summary>The offset's own values, as the operator would need to see them to choose between them.</summary>
+        private static string DescribeOffset(CoordinateSystem cs, GrblViewModel model)
+        {
+            string fmt = model.Format;
+            var sb = new System.Text.StringBuilder();
+
+            for (int i = 0; i < GrblInfo.NumAxes && i < cs.Values.Length; i++)
+            {
+                if (sb.Length > 0)
+                    sb.Append("   ");
+                sb.Append(GrblInfo.AxisLetters.Substring(i, 1)).Append(' ')
+                  .Append(double.IsNaN(cs.Values[i]) ? "?" : cs.Values[i].ToString(fmt));
+            }
+
+            // Rotation, from the coordinate system's OWN Rotation - not from any R word elsewhere in the
+            // parameter report, where R is a tool radius. Shown always rather than only when non-zero: on a
+            // rotated WCS it is the one number that explains why a move went somewhere unexpected, and its
+            // absence would read as "no rotation" rather than "not shown".
+            sb.Append("\r\nR ").Append(cs.Rotation.ToString("0.###"));
+
+            return sb.ToString();
+        }
+
+        private void WcsMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            var code = (sender as MenuItem)?.Header as string;
+            var model = DataContext as GrblViewModel;
+            if (model != null && !string.IsNullOrEmpty(code))
+                model.ExecuteCommand(code);
+        }
+
         public new bool IsFocused { get { return hasFocus; } }
         public bool IsFocusable { get; set; }
 
@@ -86,10 +186,8 @@ namespace CNC.Controls
             if (System.ComponentModel.DesignerProperties.GetIsInDesignMode(this))
                 return;
 
-            if (!keyboardMappingsOk && DataContext is GrblViewModel)
+            if (!keyboardMappingsOk && (DataContext as GrblViewModel)?.Keyboard is KeypressHandler keyboard)
             {
-                KeypressHandler keyboard = (DataContext as GrblViewModel).Keyboard;
-
                 keyboardMappingsOk = true;
 
                 keyboard.AddHandler(Key.X, ModifierKeys.Control | ModifierKeys.Shift, ZeroX);

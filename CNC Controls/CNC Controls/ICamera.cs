@@ -38,6 +38,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using CNC.Core;
 
+namespace CNC.Core
+{
+    // Moved from CNC Core\Grbl.cs, namespace kept (zero call-site churn): camera move sequencing is
+    // client policy - which axis leads when driving the spindle to/from the camera offset - decided
+    // by the operator's config, consumed only by camera/jog UI. Nothing machine-side reads it.
+    public enum CameraMoveMode
+    {
+        XAxisFirst = 1,
+        YAxisFirst = 2,
+        BothAxes = 3
+    }
+}
+
 namespace CNC.Controls
 {
     public delegate void IsVisibilityChangedHandler();

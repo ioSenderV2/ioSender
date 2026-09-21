@@ -48,6 +48,37 @@ namespace CNC.Core
         {
             lock (_sync)
             {
+#if DEBUG
+                // Debug builds log EVERY category with no flag needed. Two reasons, and "poll" is only the
+                // first: the status-report latency instrument (see PollDiag) catches a fault that only shows
+                // after HOURS of uptime, so it has to be running in every ordinary development session or it
+                // is never on when the symptom appears - and the same is true of every other instrument here,
+                // because a development session IS the session where something unexpected happens and nobody
+                // gets to re-run it with the right flag afterwards. Volume is the price; a debug build is not
+                // where that is worth optimising.
+                //
+                // An explicit -debuglog=<cats> still narrows to exactly what it asked for (plus poll), for
+                // when a specific trace would otherwise drown. Release builds are unaffected and stay opt-in,
+                // so an end user's normal run still writes nothing.
+                if (!enabled)
+                {
+                    enabled = true;
+                    // ALL categories, not just "poll". This used to set categories = "poll", which reads as
+                    // additive next to the comment above but is the opposite: a null filter means "everything",
+                    // so replacing it with one category SUBTRACTS the other twenty. The effect was a debug build
+                    // that looked like it was logging - a growing file, a [poll] line every second - while every
+                    // instrument anyone actually reaches for was silently filtered out.
+                    //
+                    // It cost a diagnosis on 2026-09-16: a false "program does not fit" warning, whose cause is
+                    // recorded by two DebugLog lines written specifically to tell a bogus box from a real one,
+                    // and neither was in the file. A log that is on but empty is worse than one that is off,
+                    // because it answers "did we instrument this?" with a confident no.
+                    categories = null;
+                }
+                else if (!string.IsNullOrWhiteSpace(categories))
+                    categories += ",poll";
+                // enabled with no category filter already means "log everything", which includes poll.
+#endif
                 Enabled = enabled;
                 if (!enabled)
                     return;
@@ -67,6 +98,10 @@ namespace CNC.Core
                     Enabled = false;
                     return;
                 }
+
+                // The link gate lives in CNC.Common, which cannot reference this - hand it a sink. It only
+                // reports contention, i.e. the case that used to corrupt a reply silently.
+                WaitFor.Log = message => Write("link", message);
 
                 // Run-start banner so multiple runs appended to the same file stay separable.
                 string ver = "?";

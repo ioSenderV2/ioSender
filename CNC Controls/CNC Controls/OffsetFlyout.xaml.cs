@@ -28,8 +28,16 @@ namespace CNC.Controls
             this.code = code;
             PanelName = code;
             btnGo.Content = code;
-            // "Set" stores the current machine position: G28/G30 via their .1 form, G54-G59.3 via G10 L2.
+            // What "Set" means depends on what is being set, so say so on the button itself:
+            //   G54-G59    a WORK ORIGIN -> G10 L20, "make here read zero" (see btnSet_Click)
+            //   G59.1-.3   a MACHINE location (toolsetter etc.) -> G10 L2, raw machine position
+            //   G28/G30    a MACHINE location by definition -> G28.1/G30.1
             btnSet.Visibility = (code == "G28" || code == "G30" || code.StartsWith("G5")) ? Visibility.Visible : Visibility.Collapsed;
+            if (btnSet.Visibility == Visibility.Visible)
+                btnSet.ToolTip = string.Format(LibStrings.FindResource(
+                                                    code == "G28" || code == "G30" ? "SetTipPredefined"
+                                                     : IsWorkOrigin(code) ? "SetTipOrigin"
+                                                     : "SetTipMachinePos"), code);
 
             // G28 only: a read-only picker over the Fixture library (Machine Setup owns Set/edit - this
             // flyout only navigates). Only offers VALIDATED fixtures, same guard Start Job's own fixture
@@ -168,17 +176,44 @@ namespace CNC.Controls
                 return;
             }
 
-            // G54-G59.3: set this coordinate system's origin to the current machine position, all axes
-            // (e.g. jog to the toolsetter and Set G59.3). G10 L2 P<n> takes machine coordinates.
             var cs = Cs;
             if (cs == null)
                 return;
 
-            var sb = new StringBuilder("G10L2P" + cs.Id);
-            for (int i = 0; i < GrblInfo.NumAxes; i++)
-                sb.Append(GrblInfo.AxisIndexToLetter(i) + grbl.MachinePosition.Values[i].ToInvariantString("F3"));
+            StringBuilder sb;
+
+            if (IsWorkOrigin(code))
+            {
+                // A WORK ORIGIN. "Set G54" means "make here the origin", which is G10 L20 - the same thing
+                // the DRO's Zero all sends. L20 stores MPos - G92 - TLO (grblHAL gcode.c, the L20 case:
+                // "WPos = MPos - WCS - G92 - TLO -> WCS = MPos - G92 - TLO - WPos"), so the DRO reads zero
+                // afterwards whatever offsets are live.
+                //
+                // This used to send G10 L2 with the raw machine position, which stores MPos with nothing
+                // subtracted - identical while G92 and TLO are both zero, and silently wrong otherwise:
+                // with a tool length offset loaded it left the DRO reading -(G92 + TLO) instead of 0.
+                sb = new StringBuilder("G10L20P" + cs.Id);
+                for (int i = 0; i < GrblInfo.NumAxes; i++)
+                    sb.Append(GrblInfo.AxisIndexToLetter(i) + "0");
+            }
+            else
+            {
+                // G59.1-.3 are MACHINE locations, not work origins - G59.3 is conventionally the toolsetter
+                // (jog to it and Set). A tool length offset has no business entering those, so they keep the
+                // raw machine position. G10 L2 P<n> takes machine coordinates.
+                sb = new StringBuilder("G10L2P" + cs.Id);
+                for (int i = 0; i < GrblInfo.NumAxes; i++)
+                    sb.Append(GrblInfo.AxisIndexToLetter(i) + grbl.MachinePosition.Values[i].ToInvariantString("F3"));
+            }
 
             Comms.com.WriteCommand(sb.ToString());
+        }
+
+        // G54-G59 are the ordinary work origins; G59.1/.2/.3 (the only G5x codes carrying a suffix) are
+        // fixed machine references. The distinction decides whether Set means L20 or L2.
+        private static bool IsWorkOrigin(string code)
+        {
+            return code != null && code.StartsWith("G5") && !code.Contains(".");
         }
 
         private void btn_Close(object sender, RoutedEventArgs e)

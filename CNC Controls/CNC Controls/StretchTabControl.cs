@@ -184,7 +184,7 @@ namespace CNC.Controls
                 return;
             orderApplied = true;
 
-            var saved = ConfigStore.Get<TabOrderConfig>()?.Get(PersistKey);
+            var saved = CNC.Core.ConfigStore.Get<TabOrderConfig>()?.Get(PersistKey);
             if (saved == null || saved.Count == 0)
                 return;
 
@@ -304,7 +304,7 @@ namespace CNC.Controls
                 // Self-persist when we own the order; otherwise let the host store it (main bar / Tools).
                 if (!string.IsNullOrEmpty(PersistKey) && ItemsSource == null)
                 {
-                    var store = ConfigStore.Get<TabOrderConfig>();
+                    var store = CNC.Core.ConfigStore.Get<TabOrderConfig>();
                     if (store != null)
                     {
                         store.Set(PersistKey, Items.Cast<TabItem>().Select(IdOf));

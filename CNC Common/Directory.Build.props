@@ -1,0 +1,14 @@
+<Project>
+  <!--
+    Keep the net8 probe's NuGet artifacts OUT of the shared obj\ folder. BaseIntermediateOutputPath
+    set inside an SDK-style csproj is too late for NuGet (MSB3539): restore writes
+    obj\project.assets.json anyway, and the LEGACY CNC.Common.csproj build then trips over a
+    net8.0 assets file ("Your project does not reference .NETFramework,Version=v4.6.2"). The legacy
+    project has no PackageReference, so nothing ever overwrites the poisoned file. Same fix as
+    CNC Contracts (see that folder's Directory.Build.props).
+  -->
+  <PropertyGroup Condition="'$(MSBuildProjectFile)' == 'CNC.Common.net8.csproj'">
+    <MSBuildProjectExtensionsPath>$(MSBuildThisFileDirectory)obj\net8probe\</MSBuildProjectExtensionsPath>
+    <BaseIntermediateOutputPath>obj\net8probe\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+</Project>

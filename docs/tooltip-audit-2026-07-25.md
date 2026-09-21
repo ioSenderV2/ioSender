@@ -1,4 +1,4 @@
-﻿# Tooltip Audit — Missing Tooltips
+# Tooltip Audit — Missing Tooltips
 
 Generated 2026-07-25. Scanned 141 XAML files, 976 interactive controls (Button, ToggleButton, RepeatButton, CheckBox, RadioButton, DataGrid + column headers, TextBox, NumericField, ComboBox, TabItem, GroupBox, Expander, Slider, ToggleControl).
 

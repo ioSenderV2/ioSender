@@ -1,4 +1,4 @@
-/*
+﻿/*
  * StepperCalibrationProbeWizard.xaml.cs - part of CNC Controls library
  *
  * Steps/mm calibration by probing a reference block of ALREADY-KNOWN true size (a precision square,
@@ -32,7 +32,6 @@ namespace CNC.Controls
     {
         private GrblViewModel model;
         private string program = string.Empty;
-        private ProgramView programView;
         private bool subscribed = false;
         private string restoreFixtureName;   // captured from config, applied once RefreshFixtures has a list to match against
 
@@ -62,6 +61,19 @@ namespace CNC.Controls
         // statics (shared across all Generate-first tabs) so a stale event firing after this tab was left
         // can't stomp whichever OTHER tab is now focused. See StartJobView.isActiveTab's own comment.
         private bool isActiveTab = false;
+
+        // The run bar is ours while this tab is focused OR while our Generate has handed the program to the
+        // Job tab - across that handoff the bar keeps pointing here, so every write to the shared
+        // MacroProcessor statics has to be gated on this rather than isActiveTab alone. StartJobView's own
+        // OwnsRunBar, same reasoning; it just reads the shared handoff record instead of a private flag.
+        private bool OwnsRunBar { get { return isActiveTab || MacroProcessor.HoldsHandoffFrom(ViewType.Calibration); } }
+
+        // The name this tool's program is loaded under, one per axis mode. It is an IDENTITY, not a label:
+        // the handoff record and its watcher both test the loaded job against it to decide whether a
+        // terminal is ours to pop, so Generate and Run must name the program identically.
+        private const string ProgramNameXY = "Stepper calibration (probe) XY";
+        private const string ProgramNameZ = "Stepper calibration (probe) Z";
+        private string ProgramName { get { return rbAxisZ.IsChecked == true ? ProgramNameZ : ProgramNameXY; } }
 
         // (PRINT, CAL_X=..) / (PRINT, CAL_Y=..) - same "(PRINT, TAG=value)" idiom StartJobView's own
         // rxResult already parses for LS_X/LS_Y.
@@ -153,11 +165,10 @@ namespace CNC.Controls
 
         public GrblConfigType GrblConfigType { get { return GrblConfigType.StepperCalibrationProbe; } }
 
-        private void EnsureProgramView()
-        {
-            if (programView == null)
-                programView = new ProgramView { Title = "Stepper Calibration (probe)" };
-        }
+        // This tool no longer owns a ProgramView of its own. Generate hands the program to the Job tab as
+        // the loaded job (MacroProcessor.HandOffToJobTab), so the display is the Job tab's docked list and
+        // its jobProgramView - the same one every loaded file uses - rather than a floating overlay shown
+        // over whatever tab happened to be underneath.
 
         public void Activate(bool activate)
         {
@@ -168,16 +179,11 @@ namespace CNC.Controls
             if (activate)
             {
                 RefreshFixtures();
+                RefreshProbeChoices();   // probe definitions may have been edited since this tab was last shown
                 if (!subscribed && model != null)
                 {
                     model.PropertyChanged += Model_PropertyChanged;
                     subscribed = true;
-                }
-                if (!string.IsNullOrEmpty(program))
-                {
-                    EnsureProgramView();
-                    programView.SetProgramText(program);
-                    programView.Connect();
                 }
                 MacroProcessor.ActiveRun = Run;   // Cycle Start runs it
 
@@ -190,7 +196,12 @@ namespace CNC.Controls
                 MacroProcessor.IsProgramGenerated = !string.IsNullOrEmpty(program);
                 RefreshGenerateReady();
             }
-            else
+            // Our OWN handoff switching away to the Job tab, not the operator leaving: keep the run bar and
+            // keep the program. Tearing down here would land them on the Job tab holding a calibration
+            // program with no way to start it AS a calibration run - no confirmation, and no result parsing
+            // when it finishes. The teardown is deferred to the run's terminal, where the shared watcher
+            // switches back here and Activate(true) above re-registers everything.
+            else if (!MacroProcessor.IsHandingOffFrom(ViewType.Calibration))
             {
                 MacroProcessor.ActiveRun = null;
                 MacroProcessor.SupportsGenerateMode = false;
@@ -204,7 +215,7 @@ namespace CNC.Controls
                 // was already set false at the top of this same Activate() call - but THIS is exactly the
                 // moment that write is supposed to happen.
                 program = string.Empty;
-                programView?.Disconnect();
+                MacroProcessor.ReleaseHandoff(model);   // a program generated and never run gives the previous job back
             }
 
             if (model != null)
@@ -221,7 +232,31 @@ namespace CNC.Controls
         {
             if (!isActiveTab)
                 return;
-            MacroProcessor.IsGenerateReady = rbAxisZ.IsChecked == true ? ActiveProbe() != null : SelectedFixture != null;
+            bool isZ = rbAxisZ.IsChecked == true;
+            bool haveProbe = ActiveProbe() != null;
+            MacroProcessor.IsGenerateReady = haveProbe && (isZ || SelectedFixture != null);
+            // After the gate, never before: setting it ready clears the reason (see MacroProcessor).
+            if (!MacroProcessor.IsGenerateReady)
+                MacroProcessor.GenerateBlockedReason = !haveProbe
+                    ? "No " + (IsTouchPlate ? "touch plate" : "3D probe") + " is defined - add one in Machine Setup > Probe definitions."
+                    : "Select a validated Corner Fence fixture first (Machine Setup > Fixture definitions).";
+        }
+
+
+        // The handoff is over - the run reached its terminal. On a CLEAN finish the shared watcher has
+        // already switched back here and Activate(true) re-registered everything, so this no-ops. On an
+        // ABORT it deliberately leaves the operator on the Job tab, and the run bar would go on pointing at
+        // this off-screen tab: the next Cycle Start over a file of their own would run THIS program instead
+        // of it. Give the bar back; the program itself is kept, so coming back here still offers Run.
+        private void EndHandoff()
+        {
+            if (isActiveTab)
+                return;
+            MacroProcessor.ActiveRun = null;
+            MacroProcessor.SupportsGenerateMode = false;
+            MacroProcessor.ActiveGenerate = null;
+            MacroProcessor.DiscardGenerated = null;
+            MacroProcessor.IsProgramGenerated = false;
         }
 
         // Drop the generated program; also registered as MacroProcessor.DiscardGenerated (see Activate) -
@@ -229,7 +264,8 @@ namespace CNC.Controls
         private void DiscardProgram()
         {
             program = string.Empty;
-            if (isActiveTab)
+            MacroProcessor.ReleaseHandoff(model);   // no-op after a run: its watcher popped before calling us
+            if (OwnsRunBar)
                 MacroProcessor.IsProgramGenerated = false;
         }
 
@@ -250,6 +286,32 @@ namespace CNC.Controls
         }
 
         private Fixture SelectedFixture { get { return cbxFixture.SelectedItem as Fixture; } }
+
+        // Changing the probe type changes the generated program (pcorner mode, plate/lip offsets, and
+        // whether it pauses to let the plate be moved), so a program built for the other type is stale -
+        // same treatment as changing the fixture.
+        private void cbxProbeType_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // This fires DURING InitializeComponent, not just on a user pick: the ComboBox carries
+            // SelectedIndex="0" in the XAML, and WPF raises SelectionChanged from ItemsControl.EndInit as the
+            // BAML loads - at which point every OTHER x:Name field in this class is still null, so the line
+            // below threw and took the whole constructor with it. Opening Tools > Calibration then crashed the
+            // app, because the view could not be built at all.
+            //
+            // Nothing is lost by skipping the pre-init call: Activate(true) calls RefreshProbeChoices itself,
+            // which is what establishes the picker's real state once the probe definitions are readable.
+            // (CalAxis_Checked next door has the same exposure and gets away with it only because the panels
+            // it touches happen to be assigned by the time the radio default is applied - see its comment.)
+            if (!IsInitialized)
+                return;
+
+            btnSave.IsEnabled = false;
+            newStepsX = newStepsY = newStepsZ = null;
+            RefreshProbeChoices();
+            Persist();
+            DiscardProgram();
+            RefreshGenerateReady();
+        }
 
         private void cbxFixture_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -500,6 +562,10 @@ namespace CNC.Controls
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
+            // Before reading any field - these buttons are Focusable="False" so a click raises no
+            // LostFocus, and a length-unit field commits only then. See NumericField.CommitPendingEdits.
+            NumericField.CommitPendingEdits(this);
+
             switch ((string)((Button)sender).Tag)
             {
                 case "save":
@@ -511,9 +577,49 @@ namespace CNC.Controls
             }
         }
 
-        private ProbeDefinition ActiveProbe()
+        // Probe type picker (index 0 = 3D Probe, 1 = Touch Plate) - mirrors StartJobView.IsTouchPlate, whose
+        // Measure option is where corner-probing with a touch plate was proven on real hardware.
+        private bool IsTouchPlate
+        {
+            get { return cbxProbeType != null && cbxProbeType.SelectedIndex == 1; }
+            set { if (cbxProbeType != null) cbxProbeType.SelectedIndex = value ? 1 : 0; }
+        }
+
+        private static ProbeDefinition ThreeDProbe()
         {
             return ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.ThreeDProbe);
+        }
+
+        // Touch plate: probes by electrical continuity through the same probe input (pcorner.macro's
+        // _ls_mode = 1). Unlike a spindle-mounted 3D probe it is handheld and has to be moved to each corner,
+        // which is the one behavioural difference in the generated program - see BuildProgram's pauses.
+        private static ProbeDefinition TouchPlateProbe()
+        {
+            return ProbeDefinitions.Items.FirstOrDefault(p => p.ProbeType == ProbeType.TouchPlate);
+        }
+
+        private ProbeDefinition ActiveProbe()
+        {
+            return IsTouchPlate ? TouchPlateProbe() : ThreeDProbe();
+        }
+
+        // Offer only the probe types actually defined, and never leave the picker on one that is not - the
+        // same rule (and the same fallback) StartJobView.UpdateProbeWarning follows.
+        private void RefreshProbeChoices()
+        {
+            if (cbxProbeType == null)
+                return;
+
+            bool has3d = ThreeDProbe() != null, hasTouch = TouchPlateProbe() != null;
+            cbiProbe3d.IsEnabled = has3d;
+            cbiProbeTouch.IsEnabled = hasTouch;
+
+            if (IsTouchPlate && !hasTouch && has3d)
+                IsTouchPlate = false;
+            else if (!IsTouchPlate && !has3d && hasTouch)
+                IsTouchPlate = true;
+
+            txtNoProbe.Visibility = ActiveProbe() == null ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void Generate()
@@ -534,8 +640,10 @@ namespace CNC.Controls
                 txtWarnings.Text = "Select a validated Corner Fence fixture first.";
                 return;
             }
-            // Same "never actually captured under this scheme" guard StartJobView.Generate_Click uses.
-            if (fx.CornerOffsetX == 0d || fx.CornerOffsetY == 0d)
+            // Same "never actually captured under this scheme" guard StartJobView.Generate_Click uses -
+            // the explicit flag, not "either offset is 0" (0 is a legitimate measurement; see
+            // Fixture.CornerOffsetX).
+            if (!fx.CornerLocated)
             {
                 txtWarnings.Text = "This fixture's corner position hasn't been located yet - run Test position again in Machine Setup > Fixture definitions.";
                 return;
@@ -544,7 +652,7 @@ namespace CNC.Controls
             var p = ActiveProbe();
             if (p == null)
             {
-                txtWarnings.Text = "Define a 3D probe first (Machine Setup > Probe definitions).";
+                txtWarnings.Text = "Define a " + (IsTouchPlate ? "touch plate" : "3D probe") + " first (Machine Setup > Probe definitions).";
                 return;
             }
 
@@ -555,16 +663,27 @@ namespace CNC.Controls
                 return;
             }
 
+            if (double.IsNaN(SeekFloorZ()))
+            {
+                txtWarnings.Text = "The machine's Z travel or homing pull-off is not known yet, so a safe probe depth cannot be worked out. Connect and let the settings load, then try again.";
+                return;
+            }
+
             txtWarnings.Text = string.Empty;
             measuredWidth = measuredHeight = null;
             newStepsX = newStepsY = null;
             btnSave.IsEnabled = false;
             ShowResult();
 
-            program = BuildProgram(fx, p, trueW, trueH, CornerTravelMarginMm);
-            MacroProcessor.PublishGenerated("Stepper calibration (probe) XY", program, EnsureProgramView, () => programView);
-            if (isActiveTab)
-                MacroProcessor.IsProgramGenerated = true;   // flips the shared Run bar from "Generate" to "Run"
+            program = BuildProgram(fx, p, trueW, trueH, CornerTravelMarginMm, IsTouchPlate);
+            // Hand it to the Job tab as the loaded job and take the operator there to look at it, run bar
+            // still pointing back here - the same tail Work Order and Setup use.
+            MacroProcessor.HandOffToJobTab(model, ProgramNameXY, program, ViewType.Calibration, onHandoffEnd: EndHandoff);
+            // OwnsRunBar, not isActiveTab: the handoff's tab switch has already run this tab's own
+            // Activate(false) synchronously by now, so isActiveTab is false and this write - the one that
+            // flips the bar from "Generate" to "Run" - would simply be skipped.
+            if (OwnsRunBar)
+                MacroProcessor.IsProgramGenerated = true;
         }
 
         private void GenerateZ()
@@ -572,7 +691,7 @@ namespace CNC.Controls
             var p = ActiveProbe();
             if (p == null)
             {
-                txtWarnings.Text = "Define a 3D probe first (Machine Setup > Probe definitions).";
+                txtWarnings.Text = "Define a " + (IsTouchPlate ? "touch plate" : "3D probe") + " first (Machine Setup > Probe definitions).";
                 return;
             }
 
@@ -596,10 +715,10 @@ namespace CNC.Controls
             btnSave.IsEnabled = false;
             ShowResult();
 
-            program = BuildProgramZ(p, g1, g2, g3, reuseStartPos && hasStartPos, startPosX, startPosY, startPosZ);
-            MacroProcessor.PublishGenerated("Stepper calibration (probe) Z", program, EnsureProgramView, () => programView);
-            if (isActiveTab)
-                MacroProcessor.IsProgramGenerated = true;   // flips the shared Run bar from "Generate" to "Run"
+            program = BuildProgramZ(p, g1, g2, g3, reuseStartPos && hasStartPos, startPosX, startPosY, startPosZ, IsTouchPlate);
+            MacroProcessor.HandOffToJobTab(model, ProgramNameZ, program, ViewType.Calibration, onHandoffEnd: EndHandoff);
+            if (OwnsRunBar)
+                MacroProcessor.IsProgramGenerated = true;   // see the XY path above for why not isActiveTab
         }
 
         private void Run()
@@ -611,7 +730,7 @@ namespace CNC.Controls
             if (string.IsNullOrWhiteSpace(program))
                 return;
 
-            MacroProcessor.Run(model, "Stepper calibration (probe) " + (rbAxisZ.IsChecked == true ? "Z" : "XY"), program, true);
+            MacroProcessor.Run(model, ProgramName, program, true);
         }
 
         private void Save()
@@ -688,7 +807,29 @@ namespace CNC.Controls
         // both tight/"exact" references derived from the ENTERED true size - the whole premise of this
         // tool is that size is already precisely known, so there's no need for a loose locate pass. Same
         // "5mm inset" anchor formula as StartJobView.BuildProgram's own exact-size corners 2/3.
-        private static string BuildProgram(Fixture fx, ProbeDefinition p, double trueWidthMm, double trueHeightMm, double cornerTravelMarginMm)
+        /// <summary>
+        /// The deepest machine Z this tool may legally aim a seek at: the REACHABLE floor, not the raw
+        /// travel. Backed off a further 1mm so pcorner's own "#<_bottom> + 1" seek target still lands
+        /// inside the envelope rather than exactly on its edge.
+        /// </summary>
+        /// <remarks>
+        /// This was -(GrblInfo.MaxTravel.Z) + 1, which ignores the homing pull-off. On 2026-09-14 that
+        /// put the corner-1 top seek at Z-133 against a real envelope of -129..0 ($132=135, $27=6):
+        /// grblHAL refused it at PLANNING with Alarm:2 and the machine never moved, which looks like a
+        /// dead probe rather than an out-of-range target. GrblInfo.ReachableLimit is the shared formula.
+        /// </remarks>
+        /// <returns>NaN when the envelope is not known - the caller must REFUSE, not substitute.</returns>
+        private static double SeekFloorZ()
+        {
+            double floor = GrblInfo.ReachableLimit(2, false);
+            // Was "-9999" when travel was unknown. That is an invented number standing in for an unknown
+            // one, and it is the deepest possible seek target - the worst thing to guess. Not knowing the
+            // envelope is a reason to stop, not a reason to pick a value.
+            return double.IsNaN(floor) ? double.NaN : floor + 1.0d;
+        }
+
+        private static string BuildProgram(Fixture fx, ProbeDefinition p, double trueWidthMm, double trueHeightMm,
+                                          double cornerTravelMarginMm, bool touchPlate)
         {
             const double insetMm = 5d;
             double r = p.ProbeDiameter / 2d;
@@ -698,11 +839,13 @@ namespace CNC.Controls
             string latchF = p.LatchFeedRate.ToInvariantString("0.0##");
 
             var b = new StringBuilder();
-            b.AppendLine("(Stepper calibration - probe a reference block of known true size)");
-            b.AppendLine("(PREREQ, connected, homed, EXPR, noalarm)");
-            b.AppendLine("G21 G90 G94 G17");
-            b.AppendLine("G49");
-            b.AppendLine("G10 L2 P1 X0 Y0 Z0");
+            MacroProcessor.EmitProgramHeader(l => b.AppendLine(l), "connected, homed, EXPR, noalarm",
+                                             "(Stepper calibration - probe a reference block of known true size)");
+            MacroProcessor.EmitModalDefaults(l => b.AppendLine(l), cancelToolOffset: true);
+            // Through EmitWcsWrite, never bare - see its remarks. Same exposure the Squareness (probe)
+            // tool demonstrated on hardware: with a rotation live on the active WCS this line corrupts the
+            // parser position, and the G30 park's Z-only lift then traverses the table.
+            MacroProcessor.EmitWcsWrite(l => b.AppendLine(l), "G10 L2 P1 X0 Y0 Z0");
             if (GrblInfo.HasToolSetter)
                 b.AppendLine(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
 
@@ -713,49 +856,80 @@ namespace CNC.Controls
             // conservative (matching the approach height's own worst-case "assume <=1in" fallback) rather
             // than 0, which would under-size the clearance now that the global is actually used again.
             b.AppendLine("#<_ls_thickness> = 25.4");
-            b.AppendLine("#<_ls_mode> = 0");
-            b.AppendLine("#<_ls_plateoffset> = 0");
-            b.AppendLine("#<_ls_lipoffset> = 0");   // always the 3D probe here
+            // 2026-09-13: these were hardcoded to 0 with "always the 3D probe here". A touch plate works
+            // perfectly well against a reference block - demonstrated on hardware through Setup's own Measure
+            // option - it is just handheld rather than spindle-mounted. Same three variables, same meanings,
+            // as StartJobView's own corner probing, which is the proven caller of this macro.
+            b.AppendLine(string.Format("#<_ls_mode> = {0}", touchPlate ? 1 : 0));
+            b.AppendLine(string.Format("#<_ls_plateoffset> = {0}", (touchPlate ? p.PlateThickness : 0d).ToInvariantString("0.0##")));
+            b.AppendLine(string.Format("#<_ls_lipoffset> = {0}", (touchPlate ? p.LipWidth : 0d).ToInvariantString("0.0##")));
             b.AppendLine("#<_ls_edgemargin> = 10");   // see pcorner.macro's own comment - slop against an unconfirmed edge
-            b.AppendLine("#<_ls_spoilx> = 0");
-            b.AppendLine("#<_ls_spoily> = 0");
             b.AppendLine(string.Format("#<_ls_searchf> = {0}", searchF));
             b.AppendLine(string.Format("#<_ls_latchf> = {0}", latchF));
-            b.AppendLine(string.Format("#<_ls_zfloor> = {0}", (GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 1.0d : -9999d).ToInvariantString("0.0##")));
+            b.AppendLine(string.Format("#<_ls_zfloor> = {0}", SeekFloorZ().ToInvariantString("0.0##")));
 
             // Park at G30 and confirm the probe before touching anything - same pattern StartJobView.BuildProgram
-            // uses (EmitGotoG30 + MBOX). #<_abs_x>/#<_abs_y> are grblHAL's own live current-machine-position
-            // named parameters; every G53 move NAMES both axes explicitly (never a bare "G53 G0 Z0") - a firmware
-            // bug sign-flips a homing-direction-inverted ($23) axis's parser base after a G53 move that leaves
-            // it "unmoved", producing a false Alarm:2.
+            // uses (EmitGotoG30 + MBOX). Use the SHARED emitter rather than hand-rolling the three lines: this
+            // copy had drifted (it still named X/Y on the lift via #<_abs_x>/#<_abs_y> long after that was shown
+            // to be both a parse-time read and a soft-limit trap) while the other three call sites in this same
+            // file already went through MacroProcessor.EmitGotoG30. See EmitGotoG30's comment.
             b.AppendLine("(park at G30 - install / confirm the probe)");
-            b.AppendLine("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z0");
-            b.AppendLine("G53 G0 X[#5181] Y[#5182]");
-            b.AppendLine("G53 G0 X[#5181] Y[#5182] Z[#5183]");
+            MacroProcessor.EmitGotoG30(l => b.AppendLine(l));
             b.AppendLine("(WAITIDLE)");
-            b.AppendLine("(MBOX, OKCANCEL, Install and seat the probe, then click OK. Cancel aborts.)");
+            b.AppendLine(touchPlate
+                ? string.Format("(MBOX, OKCANCEL, Using touch plate: {0}. Fit the {1} bit or dowel it is set up for, clip the lead to the stock, and place the plate on the FIRST corner of the reference block. Click OK. Cancel aborts.)", p.Name, p.TipDescription)
+                : string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. It must MATCH what is in the spindle - the wrong tip silently shifts the work origin by half the diameter difference. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
 
             // Corner 1 (origin, FrontLeft) - REUSE mode, corner offset only (no locate pass). #<_bottom> falls
             // back to the machine's own Z floor rather than a cached spoilboard reading (see the TLO-baseline
             // design conversation this replaced - a raw machine-Z spoilboard cache is only valid for the exact
-            // tool length that captured it, unsound the moment a different bit is in the spindle) - a wider
-            // seek-depth cap than a tight cached estimate, but still a real, probe-guarded search, not a bare
-            // rapid, so a dead/mis-wired probe still alarms instead of ploughing into the reference block.
-            b.AppendLine(string.Format("#<_bottom> = {0}",
-                (GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 1.0d : -9999d).ToInvariantString("0.0##")));
+            // tool length that captured it, unsound the moment a different bit is in the spindle). It is a
+            // SEEK-DEPTH CAP and nothing more - see the crash note on #<_ls_maxz> just below before assuming
+            // it means anything about where the material is.
+            b.AppendLine(string.Format("#<_bottom> = {0}", SeekFloorZ().ToInvariantString("0.0##")));
             b.AppendLine("#<_ls_corner> = 1");
             b.AppendLine(string.Format("#<_ls_refx> = {0}", refX));
             b.AppendLine(string.Format("#<_ls_refy> = {0}", refY));
             b.AppendLine(string.Format("#<_ls_topx> = {0}", (fx.CornerOffsetX + insetMm).ToInvariantString("0.0##")));
             b.AppendLine(string.Format("#<_ls_topy> = {0}", (fx.CornerOffsetY + insetMm).ToInvariantString("0.0##")));
             b.AppendLine("#<_ls_startz> = 0");
-            b.AppendLine("#<_ls_maxz> = 0");
+            // ---------------------------------------------------------------------------------------------
+            // CRASHED THE MACHINE 2026-09-14. This was "#<_ls_maxz> = 0", which pcorner.macro reads as "the
+            // caller has no trusted safe height" - so its o43 branch rapids to
+            //     #<_approach_z> = #<_bottom> + #<_ls_thickness> + #<_ls_plateoffset> + 10
+            // That formula treats #<_bottom> as THE SURFACE THE STOCK SITS ON. We pass the machine's Z travel
+            // limit. With bottom=-134, thickness=25.4, plate=12 that aimed a G53 G0 - a bare rapid, NOT a
+            // probe - at Z-86.6, roughly the whole Z envelope below where the reference block actually was.
+            // It drove the tool into the touch plate at 4570 mm/min; the machine ended up parked at exactly
+            // -86.600 and the probe-released gate then reported the latched probe, which looked like a probe
+            // fault and was really the wreck. The slow G38.2 top seek only ever starts AFTER this rapid.
+            //
+            // Start Job avoids the same branch by handing corner 1 a freshly probed height from the TLO
+            // reference puck. This tool has no such reference - but machine top IS trustworthy here: the
+            // operator has just confirmed the probe at G30 and nothing is above Z0. It cannot be spelled "0",
+            // because that is pcorner's own sentinel for "unset" (its #<_ls_appz> sibling had to pick 9999 for
+            // exactly this reason - see that file's comment), hence the hair below.
+            //
+            // The point is not the number. With a trusted height the macro travels at the top and leaves the
+            // ENTIRE descent to its probe-guarded G38.2 at #<_ls_searchf> - so an unexpected obstruction stops
+            // the machine instead of being discovered by hitting it. That costs time and nothing else, which
+            // is the right trade for a tool that by definition knows nothing about the stock's height.
+            b.AppendLine("#<_ls_maxz> = -0.01");
             b.AppendLine("#<_ls_appz> = 9999");
             b.AppendLine("O<pcorner> CALL [#<_ls_rad>]");
             b.AppendLine("#<c1x> = #<_corner_x>");
             b.AppendLine("#<c1y> = #<_corner_y>");
             b.AppendLine("#<c1z> = #<_corner_z>");
-            b.AppendLine(string.Format("#<c1_maxz> = [#<c1z> + {0}]", cornerTravelMarginMm.ToInvariantString("0.0##")));
+            b.AppendLine("#<c1_maxz> = " + GrblInfo.ClampToZTop(
+                  string.Format("[#<c1z> + {0}]", cornerTravelMarginMm.ToInvariantString("0.0##"))));
+
+            // A touch plate is handheld: it has to be physically carried to each corner between calls, unlike
+            // a 3D probe that stays in the spindle for the whole run. pcorner.macro leaves the machine clear
+            // of the block after each corner, so this prompt IS the pause at safe Z. Not needed before corner
+            // 1 (that placement happens at the install prompt above) or after corner 3 (nothing left to
+            // probe). Same pattern, same reason, as StartJobView's own Measure sequence.
+            if (touchPlate)
+                b.AppendLine("(MBOX, OK, Move the touch plate to the X-neighbour corner (along the true WIDTH from the first corner), then click OK.)");
 
             // Corner 2 (X-neighbour, FrontRight, id=2) - tight reference from the ENTERED true width.
             b.AppendLine("(--- corner 2 (X-neighbour) ---)");
@@ -772,6 +946,9 @@ namespace CNC.Controls
             b.AppendLine("#<size_x> = [#<c2x> - #<c1x>]");
             b.AppendLine("(PRINT, CAL_X=#<size_x>)");
 
+            if (touchPlate)
+                b.AppendLine("(MBOX, OK, Move the touch plate to the Y-neighbour corner (along the true HEIGHT from the first corner), then click OK.)");
+
             // Corner 3 (Y-neighbour, BackLeft, id=3) - tight reference from the ENTERED true height.
             b.AppendLine("(--- corner 3 (Y-neighbour) ---)");
             b.AppendLine("#<_ls_corner> = 3");
@@ -786,8 +963,7 @@ namespace CNC.Controls
             b.AppendLine("(PRINT, CAL_Y=#<size_y>)");
 
             b.AppendLine("(--- park at G30 - no origin/WCS is set by this tool, it only measures ---)");
-            MacroProcessor.EmitGotoG30(l => b.AppendLine(l));
-            b.AppendLine("M2");
+            MacroProcessor.EmitProgramFooter(l => b.AppendLine(l), stopSpindle: false, parkAtG30: true, endWord: "M2");
 
             return b.ToString();
         }
@@ -806,8 +982,14 @@ namespace CNC.Controls
         // capture) rapids straight to that saved position instead of prompting for a manual jog - the
         // position is re-captured (and re-printed) either way, right after whichever path got there, so it
         // keeps tracking wherever the operator last actually confirmed, automated or not.
+        //
+        // touchPlate: the plate sits on the spoilboard for the baseline and on the block for each size, so
+        // its thickness appears in BOTH readings and CANCELS - every value this produces is a delta from the
+        // baseline (see Recompute's regression-through-the-origin comment), so no plate offset is applied
+        // here. What the plate does need is somewhere to be moved to between probes, which the existing
+        // per-size prompts already provide; only their wording changes.
         private static string BuildProgramZ(ProbeDefinition p, double g1Mm, double g2Mm, double g3Mm,
-            bool reuseStartPos, double startX, double startY, double startZ)
+            bool reuseStartPos, double startX, double startY, double startZ, bool touchPlate)
         {
             const double clearanceMm = 10d;
             const double jogSearchMm = 25d;    // step 1: operator jogged "within 10mm" by eye - generous margin
@@ -818,11 +1000,13 @@ namespace CNC.Controls
             double[] g = { g1Mm, g2Mm, g3Mm };
 
             var b = new StringBuilder();
-            b.AppendLine("(Stepper calibration - Z axis via a 1-2-3 gauge block)");
-            b.AppendLine("(PREREQ, connected, homed, EXPR, noalarm)");
-            b.AppendLine("G21 G90 G94 G17");
-            b.AppendLine("G49");
-            b.AppendLine("G10 L2 P1 X0 Y0 Z0");
+            MacroProcessor.EmitProgramHeader(l => b.AppendLine(l), "connected, homed, EXPR, noalarm",
+                                             "(Stepper calibration - Z axis via a 1-2-3 gauge block)");
+            MacroProcessor.EmitModalDefaults(l => b.AppendLine(l), cancelToolOffset: true);
+            // Through EmitWcsWrite, never bare - see its remarks. Same exposure the Squareness (probe)
+            // tool demonstrated on hardware: with a rotation live on the active WCS this line corrupts the
+            // parser position, and the G30 park's Z-only lift then traverses the table.
+            MacroProcessor.EmitWcsWrite(l => b.AppendLine(l), "G10 L2 P1 X0 Y0 Z0");
             if (GrblInfo.HasToolSetter)
                 b.AppendLine(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
 
@@ -831,7 +1015,9 @@ namespace CNC.Controls
             b.AppendLine("(park at G30 - install / confirm the probe)");
             MacroProcessor.EmitGotoG30(l => b.AppendLine(l));
             b.AppendLine("(WAITIDLE)");
-            b.AppendLine("(MBOX, OKCANCEL, Install and seat the probe, then click OK. Cancel aborts.)");
+            b.AppendLine(touchPlate
+                ? string.Format("(MBOX, OKCANCEL, Using touch plate: {0}. Fit the {1} bit or dowel it is set up for and clip the lead on. The plate goes on the SPOILBOARD for the baseline, then on top of the gauge block for each size - its thickness cancels out. Click OK. Cancel aborts.)", p.Name, p.TipDescription)
+                : string.Format("(MBOX, OKCANCEL, Install probe: {0}, which uses a {1} gauge pin or dowel. It must MATCH what is in the spindle - the wrong tip silently shifts the work origin by half the diameter difference. Click OK. Cancel aborts.)", p.Name, p.TipDescription));
 
             b.AppendLine("(--- spoilboard baseline ---)");
             if (reuseStartPos)
@@ -854,7 +1040,9 @@ namespace CNC.Controls
                 b.AppendLine("(WAITIDLE)");
             }
             else
-                b.AppendLine("(MBOX, OKCANCEL, Manually jog the probe to within 10mm of the spoilboard - clear of any obstructions - then click OK. Cancel aborts.)");
+                b.AppendLine(touchPlate
+                    ? "(MBOX, OKCANCEL, Place the touch plate flat on the spoilboard and jog the tool to within 10mm above it - clear of any obstructions - then click OK. Cancel aborts.)"
+                    : "(MBOX, OKCANCEL, Manually jog the probe to within 10mm of the spoilboard - clear of any obstructions - then click OK. Cancel aborts.)");
             // Capture the pre-descent position into NGC vars now (this IS the "starting point"), but don't
             // PRINT/persist it yet - only once the probe below actually PROVES it found the spoilboard (a
             // real trigger, #<_gz0> assigned). Saving on mere arrival - before the probe result is known -
@@ -882,8 +1070,11 @@ namespace CNC.Controls
             for (int i = 0; i < 3; i++)
             {
                 b.AppendLine(string.Format("(--- gauge size {0} ({1}) ---)", i + 1, sizeLabel[i]));
-                b.AppendLine(string.Format("(MBOX, OKCANCEL, Position the gauge block under the probe tip - its {0} ({1}mm) side up. Only one orientation fits here. Click OK. Cancel aborts.)",
-                    sizeLabel[i], g[i].ToInvariantString("0.0##")));
+                b.AppendLine(touchPlate
+                    ? string.Format("(MBOX, OKCANCEL, Position the gauge block under the tool - its {0} ({1}mm) side up - and put the touch plate flat on top of it. Only one orientation fits here. Click OK. Cancel aborts.)",
+                        sizeLabel[i], g[i].ToInvariantString("0.0##"))
+                    : string.Format("(MBOX, OKCANCEL, Position the gauge block under the probe tip - its {0} ({1}mm) side up. Only one orientation fits here. Click OK. Cancel aborts.)",
+                        sizeLabel[i], g[i].ToInvariantString("0.0##")));
                 b.AppendLine("G91");
                 b.AppendLine(string.Format("G38.2 Z-{0} F[{1}]", probeSearchMm.ToInvariantString("0.0##"), searchF));
                 b.AppendLine("G0 Z2");
@@ -904,8 +1095,7 @@ namespace CNC.Controls
             }
 
             b.AppendLine("(--- park at G30 - no origin/WCS is set by this tool, it only measures ---)");
-            MacroProcessor.EmitGotoG30(l => b.AppendLine(l));
-            b.AppendLine("M2");
+            MacroProcessor.EmitProgramFooter(l => b.AppendLine(l), stopSpindle: false, parkAtG30: true, endWord: "M2");
 
             return b.ToString();
         }
@@ -929,6 +1119,7 @@ namespace CNC.Controls
             TrueHeight = p.TrueHeight;
             CornerTravelMarginMm = p.CornerTravelMarginMm;
             restoreFixtureName = p.FixtureName;
+            IsTouchPlate = p.Probe == "TouchPlate";
             GaugeSize1 = p.GaugeSize1;
             GaugeSize2 = p.GaugeSize2;
             GaugeSize3 = p.GaugeSize3;
@@ -955,6 +1146,7 @@ namespace CNC.Controls
                 TrueHeight = TrueHeight,
                 CornerTravelMarginMm = CornerTravelMarginMm,
                 FixtureName = SelectedFixture?.Name ?? restoreFixtureName,
+                Probe = IsTouchPlate ? "TouchPlate" : "ThreeDProbe",
                 CalibrateZ = rbAxisZ.IsChecked == true,
                 GaugeSize1 = GaugeSize1,
                 GaugeSize2 = GaugeSize2,
@@ -983,6 +1175,10 @@ namespace CNC.Controls
         public double TrueWidth = 400d, TrueHeight = 400d;
         public double CornerTravelMarginMm = 15d;
         public string FixtureName = string.Empty;
+        // "ThreeDProbe" or "TouchPlate" - same two spellings StartJobSettings.Probe uses, so the two tools
+        // describe the same choice the same way. RefreshProbeChoices overrides it on load if the saved type
+        // is no longer defined.
+        public string Probe = "ThreeDProbe";
         public bool CalibrateZ = false;
         public double GaugeSize1 = 25.4d, GaugeSize2 = 50.8d, GaugeSize3 = 76.2d;
         public bool GaugeIsImperial = true;

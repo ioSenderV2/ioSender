@@ -79,8 +79,6 @@ CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,hdr_preview:System.W
 CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,lbl_addOffset:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Добавить смещение
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,lbl_addOffset:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,"Determine X0,Y0 for right angled workpiece"
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,lbl_addOffset:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Adds a probe point on the left edge.
-CNC.Controls.Probing.g.en-US.resources:configcontrol.baml,lbl_chkProbeConnected:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,A dialog will be shown until the probe is asserted or the dialog is cancelled.
-CNC.Controls.Probing.g.en-US.resources:configcontrol.baml,lbl_chkProbeConnected:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Manually validate probe is connected
 CNC.Controls.Probing.g.en-US.resources:configcontrol.baml,lbl_chkProbeStatus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Авария будет активирована контроллером, при срабатвании не активного датчика."
 CNC.Controls.Probing.g.en-US.resources:configcontrol.baml,lbl_chkProbeStatus:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Проверять состояние датчика перед стартом (G59.3)
 CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,lbl_clearToolOffset:System.Windows.Controls.ContentControl.Content,Button,True,True,,Отменить коррекцию длинны
@@ -161,7 +159,6 @@ CNC.Controls.Probing.g.en-US.resources:probingview.baml,str_jogActive:System.Str
 CNC.Controls.Probing.g.en-US.resources:probingview.baml,str_jogDisabled:System.String.$Content,None,True,True,,Перемещение клавиатурой отключено
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_macroChangedSave:System.String.$Content,None,True,True,,"Macro was changed, save?"
 CNC.Controls.Probing.g.en-US.resources:centerfindercontrol.baml,str_positionsRequired:System.String.$Content,None,True,True,,Необходимо {0} точек измерения.
-CNC.Controls.Probing.g.en-US.resources:probeverify.baml,str_probeVerify:System.Windows.Controls.ContentControl.Content,Label,True,True,,Assert probe to verify connection.
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probing:System.String.$Content,None,True,True,,Измерение...
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingDistanceError:System.String.$Content,None,True,True,,Дистанция измерения должна быть более зазора XY + ½ диаметра щупа.
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingFailedAlarm:System.String.$Content,None,True,True,,"Авария при измерении, очистьте аварию на закладке Grbl."
@@ -173,11 +170,9 @@ CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingLatchDistanceE
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingNoPos:System.String.$Content,None,True,True,,"Ошибка измерения, текущяя позиция не известна."
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingNoProbe:System.String.$Content,None,True,True,,"Ошибка измерения, датчик не подключен."
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingNotIdle:System.String.$Content,None,True,True,,"Ошибка измерения, Grbl не в режиме ГОТОВ или смена инструмента."
-CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingNoVerifyContinue:System.String.$Content,None,True,True,,"Probe connection was not verified, continue anyway?"
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingProbeAsserted:System.String.$Content,None,True,True,,"Ошибка измерения, неожиданный сигнал с датчика."
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingProbingAtX0Y0:System.String.$Content,None,True,True,,Probing @X0Y0...
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingRadiusArcs:System.String.$Content,None,True,True,,GCode содержит дуги в плоскости XZ или YZ (G18/19). Трансляция невозможна. Используйте &apos;Arcs to Lines&apos; при необходимости.
-CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingVerifyStart:System.String.$Content,None,True,True,,Press [Start] again to start probing.
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,str_rotationCompleted:System.String.$Content,None,True,True,,Измерение завершено.
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,str_rotationFailed:System.String.$Content,None,True,True,,Ошибка измерения
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,str_rotationInitFailed:System.String.$Content,None,True,True,,Угол: {0} град
@@ -241,3 +236,4 @@ CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,str_rotationDescript
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,txt_warning:System.Windows.Documents.Run.Text,Text,True,True,,Warning! Use with care - incorrect parameters may damage your probe!
 CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,str_toolLengthDescription:System.Windows.Documents.Run.Text,Text,True,True,,"Use after a tool change, or to set a tool-length reference, so the controller knows the current tool's length. Probes Z down onto a toolsetter or touch plate. Probe fixture @ G59.3 measures against a fixed toolsetter at a known machine position, so a new tool re-measures to the same reference (applied as G43.1). Establish reference offset stores the master-tool baseline other tools measure against; Clear removes the active offset (G49). Tick 'Also set work origin' to instead set work Z0 from a touch-off on the job. Probe: toolsetter / Z touch plate."
 CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,txt_warning:System.Windows.Documents.Run.Text,Text,True,True,,Warning! Use with care - incorrect parameters may damage your probe!
+CNC.Controls.Probing.g.en-US.resources:edgefinderintcontrol.baml,str_edgeIntFinderOffsetWarning:System.String.$Content,None,True,True,,Offset is less than XY Clearance + ½ Probe/tool diameter.\nUse Offset as clearance and run anyway?.

@@ -1,68 +1,32 @@
-/*
+﻿/*
  * MacroProcessor.cs - part of CNC Controls library
  *
- * Runs a macro, interpreting the parenthesised ioSender macro directives before the
- * remaining lines are streamed to the controller as G-code:
+ * The desktop face of macro / generated-program running. The engine - the directive loop, prerequisite
+ * evaluation, the flow-controlled streamer, the idle/alarm waits - is CNC.Core.MacroRunner. What is left
+ * here is what talks to the operator, plus the Run-bar state that is pure client bookkeeping:
  *
- *   (PREREQ, cond, ...)   Require machine state before the macro runs. If any condition
- *                         is not met the macro is aborted with a message and nothing is
- *                         sent - so a macro that runs is guaranteed its prerequisites held.
- *                         Conditions: homed, tlo, idle, noalarm, connected; stored positions
- *                         / work offsets g28, g30, g92, g54..g59, g59.1, g59.2, g59.3 (each
- *                         "set" if any axis offset is non-zero, from the $# report); and any
- *                         other string is required to be a controller $I build option (NEWOPT),
- *                         matched exactly and case-sensitively (e.g. EXPR, TC, THC).
+ *   - the active-program / Generate-mode surface (ActiveRun, SupportsGenerateMode, IsProgramGenerated, ...)
+ *     that the shared Run bar and each wizard tab coordinate through;
+ *   - the dialogs: the (PROMPT) parameter form and the (MBOX) hold prompt;
+ *   - PublishGenerated, which drives a tab's own ProgramView.
  *
- *   (MBOX, [buttons,] message)
- *                         Pop a Windows MessageBox. Streaming of the following lines is
- *                         held until it is dismissed. Optional buttons: OK (default),
- *                         OKCANCEL, YESNO - Cancel/No aborts the rest of the macro.
+ * The (MBOX) hold in particular cannot move: it is a deliberately non-modal, ShowActivated=false window
+ * pumped with its own DispatcherFrame, and it forwards jog keys to the KeypressHandler so the operator can
+ * jog to a corner while it is up. That is WPF by design, not by accident.
  *
- *   (WAITIDLE)            Hold streaming of the following lines until the controller has
- *                         finished what was sent so far and returned to the Idle state.
- *                         Needed after a controller-side job such as $F=<file> on an SD
- *                         card, which acks immediately and then drops sender input while
- *                         it runs - so a line sent right after would otherwise be lost.
- *                         Aborts the macro if the controller alarms or the link is lost.
- *
- *   (PROMPT param, default [, label])
- *                         Ask the user for an input value before the macro runs. All such
- *                         prompts are collected into a single dialog shown up front (after
- *                         PREREQ); each row shows 'label' (default: the parameter name) with
- *                         'default' pre-filled and editable. Cancel aborts the macro. The
- *                         entered value is bound to a global named parameter both ways:
- *                         it is assigned on the controller (so $F=<file> jobs can read it)
- *                         and substituted into the streamed body (so inline references work
- *                         on any controller). 'param' is normalised to #<_name> form.
- *                         A bare (PROMPT) with no arguments is just a run confirmation.
- *
- *   @<path>               If the macro body is a single line starting with '@', it is a
- *                         reference to an external file: that file's current contents are
- *                         loaded and run in its place, re-read on every run - so a macro can be
- *                         developed by editing the file directly. The loaded contents are then
- *                         processed normally (they may use the directives above).
- *
- * Every macro, with or without directives, is streamed through the flow-controlled job streamer
- * (see Flush below) - nothing generated here ever takes the raw MDI path. MDI is reserved
- * exclusively for text the operator typed into the MDI box (JobControl.SendCommand), so a
- * feature like dry-run mode (spindle/coolant suppression) that filters streamed content is a
- * structural guarantee for every macro/wizard/probing run, not a heuristic that depends on what
- * a burst happens to contain.
+ * Run is the unified-engine ENTRY since Step 7 (load the macro as the job, start it, pop-restore at the
+ * terminal); EmitGotoG30 / CoordinateSystemDefined / SaveGeneratedCopy stay here as forwarders so none
+ * of the ~50 call sites across the app had to move.
  */
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
-using System.IO;
 using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using CNC.Core;
-using CNC.GCode;
 
 namespace CNC.Controls
 {
@@ -101,7 +65,16 @@ namespace CNC.Controls
         public static bool SupportsGenerateMode
         {
             get { return _supportsGenerateMode; }
-            set { _supportsGenerateMode = value; ActiveProgramChanged?.Invoke(); }
+            set
+            {
+                _supportsGenerateMode = value;
+                // Tab teardown clears the blocked reason with everything else. These statics are SHARED by
+                // every Generate-first tab, so a reason left behind by the tab you just left would otherwise
+                // sit on the next tab's disabled button describing the wrong thing entirely.
+                if (!value)
+                    GenerateBlockedReason = string.Empty;
+                ActiveProgramChanged?.Invoke();
+            }
         }
 
         // Opt-in for a Generate-first tab whose generated program IS a real cutting program worth Dry
@@ -127,8 +100,30 @@ namespace CNC.Controls
         public static bool IsGenerateReady
         {
             get { return _isGenerateReady; }
-            set { _isGenerateReady = value; ActiveProgramChanged?.Invoke(); }
+            set
+            {
+                _isGenerateReady = value;
+                // "Ready" can never carry a reason it is not ready - clearing it HERE rather than asking
+                // every caller to remember means a gate that flips back to ready cannot leave its old
+                // explanation on the button. Callers therefore only ever need to set the reason on the
+                // blocking branch, and must set it AFTER IsGenerateReady, not before.
+                if (value)
+                    GenerateBlockedReason = string.Empty;
+                ActiveProgramChanged?.Invoke();
+            }
         }
+
+        /// <summary>
+        /// Why <see cref="IsGenerateReady"/> is false, in the operator's words - shown on the disabled Run
+        /// bar so a greyed-out button says what it wants. Empty when there is no specific reason.
+        ///
+        /// A tab that blocks generation knows exactly why (a validation warning, usually), and that reason
+        /// used to go only into the tab's own warnings panel. If the panel had scrolled, or the operator was
+        /// looking at the button rather than the panel, the button simply did nothing and explained nothing.
+        /// Set it wherever IsGenerateReady is set, or leave it empty and the bar falls back to its generic
+        /// "nothing to run yet" text.
+        /// </summary>
+        public static string GenerateBlockedReason { get; set; } = string.Empty;
 
         // False = nothing generated yet (or it was discarded) - Run bar reads "Generate". True = a program is
         // built and ActiveRun will stream it - Run bar reads "Run". The tab flips this true right after a
@@ -154,23 +149,26 @@ namespace CNC.Controls
         // Start" status prompt. Null when no wizard program is active.
         public static string ActiveProgramName;
 
-        // Hook to stream a generated program with full flow control (Feed Hold/Stop live) WITHOUT touching the
-        // loaded job: args are (model, name, lines, isFinalBurst, preferJobView, onDone). Set by the shell
-        // (ioSender XL). EVERY streamed run goes through this - a tool that owns a ProgramView streams into it,
-        // a plain macro gets its own run view - so a run never overwrites the loaded program or hijacks the Job
-        // tab. Cycle Start is deferred to a background dispatcher tick (see the implementation), so this call
-        // returns before the burst actually starts - onDone is invoked once it reaches a true terminal state,
-        // letting StreamProgram optionally wait for it (see Flush's 'wait' parameter) instead of racing the next
-        // burst against this one.
-        // isFinalBurst (added alongside the wait plumbing below): true only for the macro's own fire-and-forget
-        // closing burst (Flush's wait=false call) - the host uses it to tell "the whole macro just finished" apart
-        // from "one more mid-macro burst just finished, more is coming right behind it".
-        // preferJobView (2026-08-01): opt-in escape hatch from the "never hijack the Job tab" rule above, for
-        // the one case where hijacking it is exactly the point - Work Order already made itself the loaded job
-        // via GCode.File.Push/LoadText before streaming, so its own burst should show live status in the real
-        // docked Job-tab list instead of a separate floating view. False for every other caller (Setup,
-        // calibration, fixture tools, ...) - those must keep the "don't touch the Job tab" guarantee.
-        public static System.Action<GrblViewModel, string, string[], bool, bool, System.Action> RunStreamedJobInPlace;
+        // Optional one-liner about how the active program was built ("4777 lines in 9.6 s"), appended to the
+        // "ready - press Cycle Start" prompt. Exists because that prompt lands right after Generate's own
+        // completion message and OVERWROTE it - the compile result was on screen for a frame. Set by whoever
+        // builds a program (Work Order does), cleared by PublishGenerated when a caller has none to report.
+        public static string ActiveProgramStats;
+
+        // Bumped every time new program text reaches the program view (PublishGenerated, below - the one
+        // place that happens). It exists so a consumer can tell "a different program" from "the same
+        // program again": JobControl announces "<name> ready - press Run to run." once per program rather
+        // than on every false->true edge of the ready cue, since that cue also flips with tab activation
+        // and re-reading the same sentence on every visit to the Job tab is noise, not news.
+        public static int ActiveProgramVersion { get; private set; }
+
+
+        // Step 7 seam (unified streaming engine): start the just-loaded job as a macro run - the shell
+        // (ioSender XL) points this at its run bar's JobControl.RunMacro, since the JobControl INSTANCE
+        // lives in that assembly. Same idiom as SwitchToTab below. The bool is 'unattended'. Null means
+        // no streamer is wired (headless/degenerate host) - Run() refuses rather than sending motion
+        // without flow control, exactly as the retired MacroRunner.Flush did.
+        public static System.Action<bool> StartLoadedJob;
 
         // Set by the shell: switches the main tab strip to the given tab. Used by Work Order's Run - hands
         // its generated program off to the Job tab ("one mental model of running a program" regardless of
@@ -182,215 +180,6 @@ namespace CNC.Controls
         // the stale frame) beats fighting to force one in place.
         public static System.Action<ViewType> SwitchToTab;
 
-        // Name given to the in-memory program when a flush is streamed (set per run).
-        private static string _streamName = "Macro";
-
-        /// <summary>Run a macro. Returns false if it was aborted (prerequisite unmet or user cancelled).</summary>
-        /// <param name="unattended">Skip every routine confirmation this macro would otherwise pop (the
-        /// confirm-before-run prompt, bare mid-body (PROMPT) run-confirmations, and (MBOX) holds - all
-        /// auto-answered OK/Yes) and take an unanswered (PROMPT param, default, ...) input's own default
-        /// rather than asking. For a "Generate and Run" action that a tab offers explicitly (see
-        /// MacroProcessor.SupportsGenerateAndRun) - NOT a general silencing knob. PREREQ failures and
-        /// alarm-abort checks still apply and still stop the run; this only skips prompts that exist purely
-        /// to ask "are you sure" / "ready?", not safety gates.</param>
-        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false, bool unattended = false, bool preferJobView = false)
-        {
-            if (model == null || string.IsNullOrEmpty(code))
-                return true;
-
-            if (string.IsNullOrEmpty(name))
-                name = "Macro";
-
-            _streamName = name;
-
-            // A macro whose body is a single "@<path>" line is a reference to an external file;
-            // load and run that file's current contents (re-read every run, so the macro can be
-            // developed by editing the file - no copy/paste back into ioSender).
-            if (!ResolveFileReference(ref code, name))
-                return false;
-
-            SaveGeneratedCopy(name, code);
-
-            string[] lines = code.Replace("\r", string.Empty).Split('\n');
-            var buffer = new StringBuilder();
-
-            // 1) Prerequisites - evaluated up front, before anything is streamed.
-            var conditions = new List<string>();
-            foreach (var raw in lines)
-            {
-                if (!IsDirective(raw, "PREREQ"))
-                    continue;
-                foreach (var arg in Body(raw, "PREREQ").Split(','))
-                {
-                    string cond = arg.Trim();   // original case kept - build options match case-sensitively
-                    if (cond.Length > 0)
-                        conditions.Add(cond);
-                }
-            }
-
-            // The homed state and stored positions / work coordinate systems all come from the $#
-            // report - fetch it once up front if any such prerequisite is present so they are read
-            // fresh from the controller (the status-report H: field is change-based and goes stale).
-            if (conditions.Any(c => c.Equals("homed", StringComparison.OrdinalIgnoreCase) || CoordinateSystemCodes.Contains(c.ToUpperInvariant())))
-                GrblWorkParameters.Get(model);
-
-            var unmet = new List<string>();
-            foreach (var cond in conditions)
-            {
-                string fail = EvalPrereq(model, cond);
-                if (fail != null)
-                    unmet.Add(fail);
-            }
-            if (unmet.Count > 0)
-            {
-                ShowMessage(string.Format("Cannot run macro \"{0}\":\r\n\r\n• {1}", name, string.Join("\r\n• ", unmet)),
-                    "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return false;
-            }
-
-            // 2) Input prompts - gather every (PROMPT param, default [, label]) into a single
-            //    dialog shown up front, then bind the entered values two ways (hybrid):
-            //      - assign the globals on the controller (so $F=<file> jobs can read them), and
-            //      - substitute the references in the streamed body (so inline use works on any
-            //        controller and ioSender's own parser stays consistent).
-            var fields = new List<PromptField>();
-            foreach (var raw in lines)
-            {
-                if (!IsDirective(raw, "PROMPT"))
-                    continue;
-                var field = ParsePromptField(raw);
-                if (field != null && !fields.Any(f => f.Inner.Equals(field.Inner, StringComparison.OrdinalIgnoreCase)))
-                    fields.Add(field);
-            }
-            // An input prompt's OK/Cancel is itself the run confirmation, so a separate "Prompt to
-            // run" box would be redundant - only show that when there are no input prompts to gate on.
-            if (fields.Count > 0)
-            {
-                // Unattended: no operator to ask - each field just keeps the macro's own declared default
-                // (PromptField.Value is already seeded with it by ParsePromptField) rather than showing the
-                // dialog.
-                if (!unattended && !ShowPromptDialog(name, fields))
-                    return false;   // cancelled
-
-                // Assign the globals on the controller before the body runs (so $F=<file> jobs can read
-                // them too) - folded into the same streamed buffer as everything else, never MDI.
-                foreach (var field in fields)
-                    buffer.Append(field.Param).Append('=').Append(field.Value).Append('\n');
-            }
-            else if (confirm && !unattended && !ConfirmRun(name))
-                return false;
-
-            // Dry-run/verify mode: neutralise spindle-on (M3/M4), coolant-on (M7/M8) and tool-change (M6)
-            // lines. Only needed here when preferJobView is FALSE: a preferJobView run (Work Order) ends up
-            // as the real, non-transient GCode.File source - RunStreamedJobInPlace hands it to
-            // RunControl.Run(0, false), which lands in JobControl.Run's ordinary Source.IsLoaded branch and
-            // gets FULL protection there (StreamPump's own HasSpindleOrCoolantOn/HasToolChange check, from
-            // the real parser, PLUS the G92 Z-offset clearance this streamer doesn't even provide) - so
-            // neutralising here too was pure redundant double-handling on the exact same lines, not defense
-            // in depth (confirmed while diagnosing a real hardware incident - see git history). Every OTHER
-            // caller (Start Job, Auto Square, Stepper Calibration, Fixture probes) streams as a TRANSIENT
-            // source, which StreamPump's own check explicitly EXCLUDES by design (dry-run must never leak
-            // into a probing/wizard macro just because a loaded-job test left it armed - see
-            // JobControl.Run's own comment) - for those, THIS is the only protection that exists, so it must
-            // still run. Uses the real parser (not a regex) so a comment that happens to mention "M3" can't
-            // cause a false positive - but only best-effort: a line the parser can't handle (some macro
-            // directive/expression syntax this streamer tolerates that a strict parse might not) is left
-            // exactly as it would have been before this existed, never blocked or altered.
-            var dryRunParser = (model.IsDryRunMode && !preferJobView) ? new GCodeParser() : null;
-            dryRunParser?.Reset();
-
-            // Does this macro start a controller-side job ($F=<file> on an SD card)? Such a job acks
-            // immediately and only THEN begins moving, so WAITIDLE after one has to allow time to observe
-            // motion start before it can trust an Idle report. Nothing else does that - an ordinary burst has
-            // already finished moving by the time Flush(wait:true) returns - so the long allowance is scoped
-            // to the case that needs it instead of being charged to every (WAITIDLE) in every macro.
-            bool sdJobPossible = false;
-            foreach (var l in lines)
-                if (l.TrimStart().StartsWith("$F=", StringComparison.OrdinalIgnoreCase))
-                    sdJobPossible = true;
-
-            // 3) Stream the G-code, holding at each (MBOX)/(WAITIDLE) and substituting prompt values.
-            foreach (var raw in lines)
-            {
-                if (IsDirective(raw, "PREREQ"))
-                    continue;
-
-                if (IsDirective(raw, "PROMPT"))
-                {
-                    // Input prompts were collected up front; a bare (PROMPT) is just a run confirmation.
-                    if (Body(raw, "PROMPT").Trim().Length == 0 && !unattended)
-                    {
-                        // Snapshot BEFORE Flush - see AbortedByAlarm's own comment on why sampling the
-                        // CURRENT state after the burst already ran isn't enough.
-                        long alarmBefore = model.AlarmEventCounter;
-                        Flush(model, buffer, true, preferJobView);
-                        if (AbortedByAlarm(model, name, alarmBefore))
-                            return false;
-                        if (ShowMessage(string.Format("Run macro \"{0}\"?", name), "ioSender",
-                                MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
-                            return false;
-                    }
-                    continue;
-                }
-
-                if (IsDirective(raw, "MBOX"))
-                {
-                    // Snapshot BEFORE Flush - see AbortedByAlarm's own comment.
-                    long alarmBefore = model.AlarmEventCounter;
-                    Flush(model, buffer, true, preferJobView);
-                    // A burst just flushed above may have alarmed (e.g. a probe search that never triggered)
-                    // without WaitForIdle in the picture at all - Flush only waits for the burst to reach SOME
-                    // terminal StreamingState, it doesn't check WHICH one. Without this, the macro sailed
-                    // straight on to the next (MBOX) as if nothing had gone wrong (confirmed on real hardware
-                    // 2026-07-21: a failed spoilboard probe alarmed, then the very next prompt still popped up
-                    // asking to position the gauge block, with the controller sitting in Alarm the whole time).
-                    // Alarm-abort is checked even when unattended - this only skips the "are you ready" hold,
-                    // never a real safety gate.
-                    if (AbortedByAlarm(model, name, alarmBefore))
-                        return false;
-                    if (!unattended && !ShowMBox(name, raw))
-                        return false;   // Cancel / No - stop here
-                    continue;
-                }
-
-                if (IsDirective(raw, "WAITIDLE"))
-                {
-                    Flush(model, buffer, true, preferJobView);
-                    if (!WaitForIdle(model, sdJobPossible))
-                    {
-                        ShowMessage(string.Format("Macro \"{0}\" aborted: the controller did not return to idle (alarm or connection lost).", name),
-                            "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        return false;
-                    }
-                    continue;
-                }
-
-                string line = SanitizeComment(ApplySubstitutions(raw, fields));
-                buffer.Append(DryRunNeutralize(dryRunParser, line)).Append('\n');
-            }
-            Flush(model, buffer, false, preferJobView);   // final burst - fire and forget, same as always (don't block the caller on the physical run)
-
-            return true;
-        }
-
-        // Persist a copy of every macro/generated program to %AppData%\ioSender\Generated\<name>.macro,
-        // overwriting each run - a debugging aid so "what did Generate actually build" is always inspectable
-        // on disk, since the streamed program itself (StreamProgram/RunStreamedJobInPlace) never touches the
-        // filesystem. Best-effort: a write failure must never block the run itself. Public so a tab's own
-        // Generate button can call it directly at generate-time (not just when MacroProcessor.Run streams it) -
-        // the file is then on disk for post-mortem even if the run alarms out before completing, or the
-        // operator never presses Run at all.
-        public static void SaveGeneratedCopy(string name, string code)
-        {
-            try
-            {
-                var fileName = new string(name.ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '_').ToArray()) + ".macro";
-                System.IO.Directory.CreateDirectory(Resources.GeneratedFolder);
-                System.IO.File.WriteAllText(System.IO.Path.Combine(Resources.GeneratedFolder, fileName), code);
-            }
-            catch { /* best-effort - never let a diagnostic write block the actual run */ }
-        }
-
         // Common tail of every tab's Generate button: save the diagnostic copy, then hand the program text to
         // that tab's own preview ProgramView. Every Generate handler (Start Job, Auto square, Stepper
         // calibration, Surface spoilboard) builds its program text its own way - that part stays at the call
@@ -398,8 +187,10 @@ namespace CNC.Controls
         // four times. ensureProgramView/getProgramView are the caller's own lazy-init method/field (each tab
         // owns its ProgramView independently, so there's no shared base to hang a field on) - getProgramView is
         // read AFTER ensureProgramView() runs, so it sees the just-created instance on first call.
-        public static void PublishGenerated(string name, string program, System.Action ensureProgramView, System.Func<ProgramView> getProgramView)
+        public static void PublishGenerated(string name, string program, System.Action ensureProgramView, System.Func<ProgramView> getProgramView, string stats = null)
         {
+            ActiveProgramStats = stats;
+            ActiveProgramVersion++;
             SaveGeneratedCopy(name, program);
             ensureProgramView();
             var view = getProgramView();
@@ -407,353 +198,350 @@ namespace CNC.Controls
             view.Connect();
         }
 
-        // Shared by every generator that parks at G30 (StartJobView, StepperCalibrationProbeWizard, ...):
-        // lift to machine top, traverse to the G30 X/Y, then descend to G30 Z. #<_abs_x>/#<_abs_y> are grblHAL's
-        // own live current-machine-position named parameters; every G53 move NAMES both axes explicitly (never a
-        // bare "G53 G0 Z0") - a firmware bug sign-flips a homing-direction-inverted ($23) axis's parser base
-        // after a G53 move that leaves it "unmoved", producing a false Alarm:2. 'L' emits one line (a caller's
-        // own comment-sanitizing/line-numbering wrapper, or a plain StringBuilder.AppendLine).
-        public static void EmitGotoG30(System.Action<string> L)
-        {
-            // DO NOT wrap these in an o-word conditional. Tried 2026-08-02 to skip the lift-and-drop when
-            // already parked at G30; on real hardware the program streamed to completion - the g-code activity
-            // window scrolled normally - and the machine never moved at all, for the whole run.
-            //
-            // Cause: o-word FLOW CONTROL has never been streamed to a controller by this app. Every IF/WHILE
-            // here lives inside a .macro FILE on the controller (pcorner, tc, ...), which grblHAL can seek
-            // within; all 13 o-word sites in generated code are "O<name> CALL" into one of those files. A
-            // streamed program isn't seekable, so the IF was swallowed - and took the rest of the program's
-            // motion with it.
-            //
-            // If the redundant round trip is worth removing, decide it in C# at generate time - the caller
-            // already knows the live position via GrblViewModel.MachinePosition - and just don't emit these
-            // lines. Never by asking the controller to branch mid-stream.
-            L("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z0");   // lift Z to machine top, X/Y held at current
-            L("G53 G0 X[#5181] Y[#5182]");              // traverse to G30 X/Y at the top
-            L("G53 G0 X[#5181] Y[#5182] Z[#5183]");     // descend to G30 Z (X/Y named to avoid the unmoved-axis bug)
-        }
-
-        // grblHAL rejects a line over its receive-buffer size outright ("Max characters per line exceeded -
-        // Received command line was not executed") and the stream never recovers from the lost line - so an
-        // auto-generated comment with interpolated names (a probe/fixture name, say) can silently break an
-        // entire run. Unlike G-code content, a comment's exact wording doesn't matter to the controller, so a
-        // too-long PURE comment line ("(...)" with nothing before/after) gets its interior shortened rather
-        // than sent whole and rejected. 200 is a conservative margin under grblHAL's common 256-byte line buffer.
-        private const int MaxCommentLineLength = 200;
-
-        // grblHAL ends a g-code comment at the FIRST ')', so any '(' or ')' INSIDE a (comment) corrupts the
-        // block - the text after the inner ')' is parsed as g-code (e.g. "1 depth pass(es)" -> stray ", DOC...").
-        // Replace parens between the outer '(' .. ')' with '[' .. ']' so generated comments are always well-formed.
-        // Applied to every streamed line (directives are consumed earlier, so only comments / g-code reach here).
-        private static string SanitizeComment(string s)
-        {
-            int open = s.IndexOf('(');
-            int close = s.LastIndexOf(')');
-            if (open < 0 || close <= open + 1)
-                return s;
-
-            var sb = new StringBuilder(s.Length);
-            sb.Append(s, 0, open + 1);
-            for (int i = open + 1; i < close; i++)
-                sb.Append(s[i] == '(' ? '[' : s[i] == ')' ? ']' : s[i]);
-            sb.Append(s, close, s.Length - close);
-
-            string result = sb.ToString();
-            if (result.Length > MaxCommentLineLength && open == 0 && close == result.Length - 1)
-            {
-                int keep = MaxCommentLineLength - (open + 1) - 4;   // total = "(" + keep + "...)"
-                result = result.Substring(0, open + 1) + result.Substring(open + 1, keep) + "...)";
-            }
-            return result;
-        }
-
-        // Dry Run mode's spindle/coolant/tool-change suppression for THIS streamer - see the (WAITIDLE)
-        // header comment's own note above. parser is null when Dry Run isn't armed (the common case), so
-        // this is then a single null-check per line, not a parse. Best-effort when armed: a line the parser
-        // throws on (some macro syntax this streamer otherwise tolerates without ever inspecting it) is
-        // passed through unmodified rather than aborting the run - same as before this existed.
-        private static string DryRunNeutralize(GCodeParser parser, string line)
-        {
-            if (parser == null || line.Length == 0 || line[0] == '(')   // pure comment/directive - nothing to neutralise
-                return line;
-
-            try
-            {
-                int tokenStart = parser.Tokens.Count;
-                string toParse = line;
-                // quiet:true is a DIFFERENT, lighter mode (see GCodeParser.ParseBlock's own early-out) that
-                // validates a line is well-formed WITHOUT actually parsing words into Tokens at all - fine
-                // for JobControl's own modal-state-only use of it, but useless here: this needs the REAL
-                // tokens to inspect for M3/M4/M6/M7/M8, so it must be quiet:false. Root cause of a real
-                // hardware incident - the spindle turning on during an armed Dry Run - confirmed via
-                // [WO-DIAG] logging: IsDryRunMode really was True the whole way through and dryRunParser was
-                // genuinely non-null, but every ParseBlock(quiet:true) call below silently produced zero
-                // tokens, so this loop never matched anything and every line passed through unchanged.
-                if (!parser.ParseBlock(ref toParse, false))
-                    return line;
-
-                for (int i = tokenStart; i < parser.Tokens.Count; i++)
-                {
-                    var t = parser.Tokens[i];
-                    if (t is GCSpindleState && (t.Command == Commands.M3 || t.Command == Commands.M4))
-                        return "()";
-                    if (t is GCCoolantState && (t.Command == Commands.M7 || t.Command == Commands.M8))
-                        return "()";
-                    if (t.Command == Commands.M6)
-                        return "()";
-                }
-            }
-            catch
-            {
-                /* fail open - stream the line exactly as it would have been sent before Dry Run awareness existed */
-            }
-
-            return line;
-        }
-
-        // Send the accumulated g-code. EVERY burst - however small - goes through the flow-controlled job
-        // streamer, never the MDI path: MDI has no character-counting flow control, so a burst sent that way
-        // can overrun the controller's serial buffer (hanging it), blocks the UI thread while it goes out
-        // synchronously, and leaves Feed Hold/Stop queued BEHIND it instead of taking effect immediately.
-        // Reserving MDI for operator-typed text only also means a sender-side content filter (e.g. dry-run
-        // mode's spindle/coolant suppression, see GCodeBlock.HasSpindleOrCoolantOn) is a hard guarantee for
-        // every macro/wizard/probing run - it can't be bypassed by a burst that happens to look "too small
-        // to matter".
+        // --- The generated-program handoff: ONE mechanism for every Generate-first tab ------------------
         //
-        // 'wait': RunStreamedJobInPlace only KICKS OFF a burst (Cycle Start is deferred to a dispatcher tick,
-        // it does not run synchronously here) - it shares one RunControl.Source field across every burst, so a
-        // second Flush() before the first burst's deferred Cycle Start has even fired would silently overwrite
-        // it and drop the first burst entirely. Callers with more macro content still to come (before an
-        // MBOX/WAITIDLE/prompt gate) MUST pass wait=true so this burst genuinely finishes first - restoring the
-        // strict ordering the old MDI queue gave for free. The macro's FINAL burst passes wait=false (fire and
-        // forget) so a "Run" click doesn't block until the physical job completes.
-        private static void Flush(GrblViewModel model, StringBuilder buffer, bool wait, bool preferJobView = false)
+        // Every Generate-first tab (Work Order, Setup, and the three Calibration wizards) now ends its
+        // Generate the same way: the program it just built becomes THE LOADED JOB on the Job tab, the
+        // operator is taken there to look at it before anything moves, and the run bar keeps pointing back
+        // at the tab that built it. At the run's true terminal the borrowed program is popped, whatever was
+        // loaded before comes back, and the operator is returned to the tab they started from.
+        //
+        // This was three separate implementations - WorkOrderView.Generate/WatchForRunEnd, StartJobView's
+        // HandOffToJobTab/ReleaseBorrowedProgram/EndHandoff, and for the three wizards no handoff at all,
+        // just a floating preview that left the Job tab showing someone else's program. Two of the three
+        // had to learn the same two guards the hard way, and the third never did:
+        //
+        //   - never push a SECOND snapshot over a program that is already ours (observed live 2026-08-08:
+        //     "Push: depth now 2" with every watcher trace doubled);
+        //   - never pop when the loaded job is no longer ours - the operator generated, then loaded their
+        //     own file instead of running, and popping yanks it out from under them.
+        //
+        // Keeping the bookkeeping in ONE record is the point: "exactly one push is outstanding" becomes a
+        // thing that can be checked in one place rather than a property three copies each maintain.
+
+        // What a Generate-first tab has currently handed to the Job tab. Null name = nothing borrowed.
+        private static string _borrowedName;
+        private static ViewType _borrowedOrigin;
+        private static bool _borrowedWatcherArmed;
+        // True ONLY for the duration of HandOffToJobTab's own SwitchToTab call - see IsHandingOffFrom.
+        private static bool _handoffSwitching;
+        private static System.ComponentModel.PropertyChangedEventHandler _borrowedHandler;
+        // Filled in by Run() when the tab finally starts the borrowed program - the handoff watcher owns
+        // the terminal, so it is the one that has to make the caller's completion callback.
+        private static System.Action<bool> _borrowedOnDone;
+        // The originating tab's teardown for the moment the handoff is over - see HandOffToJobTab's own
+        // parameter docs. Held with the rest of the record so it is cleared by exactly the same paths.
+        private static System.Action _borrowedOnEnd;
+
+        /// <summary>The name a Generate-first tab's program is currently loaded under, or null when
+        /// nothing is borrowed.</summary>
+        public static string BorrowedProgramName { get { return _borrowedName; } }
+
+        /// <summary>
+        /// True when <paramref name="name"/> is a program a Generate-first tab handed to the Job tab AND it
+        /// is still the loaded job - i.e. reloading it in place is safe and pushing again is not. The LOADED
+        /// JOB is half the test on purpose: the record alone would still say "ours" after the operator
+        /// loaded a file of their own over it.
+        /// </summary>
+        public static bool IsHandedOff(GrblViewModel model, string name)
         {
-            if (buffer.Length == 0)
-                return;
-
-            string code = buffer.ToString();
-            buffer.Clear();
-
-            var lines = code.Replace("\r", string.Empty).Split('\n');
-
-            bool hasOwordOrExpr = false;
-            foreach (var l in lines)
-            {
-                string t = l.Trim();
-                if (t.Length == 0)
-                    continue;
-                if (t.IndexOf("O<", StringComparison.OrdinalIgnoreCase) >= 0 || t.IndexOf('#') >= 0)
-                    hasOwordOrExpr = true;
-            }
-
-            // O-word/#-expression lines can only be streamed verbatim when the controller evaluates
-            // expressions itself (GCodeJob's passthrough, unnumbered); a controller that doesn't report
-            // that support cannot be sent this content at all through ioSender - there is no safe fallback
-            // (MDI is reserved for typed text), so refuse outright rather than send it unfiltered.
-            if (hasOwordOrExpr && !GrblInfo.ExpressionsSupported)
-            {
-                ShowMessage("This macro uses O-word/parameter (#) syntax, which needs the controller to support NGC expressions (EXPR). This controller does not report that support, so ioSender cannot run it.",
-                    "ioSender", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            if (RunStreamedJobInPlace == null)
-            {
-                // No streamer wired - refuse rather than flood (Feed Hold / Stop would not work).
-                ShowMessage(string.Format("Cannot run this program safely: the job streamer is not available, so motion would be sent without flow control and {0} / Stop would be unresponsive.\r\n\r\nLoad the program in the Grbl tab and run it from there instead.", RunLabels.FeedHold),
-                    "ioSender", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            StreamProgram(model, lines, wait, preferJobView);
+            return _borrowedName != null && _borrowedName == name && model != null && model.FileName == name;
         }
 
-        // Hand a g-code burst to the host to stream with full flow control, into a ProgramView. By default
-        // WITHOUT touching the loaded job - a run flushes several bursts (a park move, then each O<...> CALL);
-        // every one takes this path, so a run never overwrites the loaded program or hijacks the Job tab.
-        // preferJobView opts a caller OUT of that guarantee - see RunStreamedJobInPlace's own comment.
-        private static void StreamProgram(GrblViewModel model, string[] lines, bool wait, bool preferJobView = false)
+        // These two look alike and are NOT interchangeable. They were ONE method for a day, and that bug is
+        // worth keeping written down: a tab used it to mean "this Activate(false) is my own handoff" while
+        // it actually answered "is a borrow outstanding". Those coincide only until the operator walks BACK
+        // to the tab - after which leaving it again for somewhere unrelated still looked like a handoff, so
+        // the tab skipped its teardown and went on owning the run bar from off-screen, borrowed program and
+        // all.
+
+        /// <summary>
+        /// TRANSIENT: true only while <see cref="HandOffToJobTab"/> is performing its own tab switch - so an
+        /// Activate(false) arriving right now is OUR OWN handoff switching away, not the operator leaving
+        /// the tab for good. False at every other moment, including the whole time the borrow is held.
+        /// </summary>
+        /// <remarks>
+        /// The window is exact because WPF tab selection is not deferred: the outgoing tab's Activate(false)
+        /// runs synchronously inside the SwitchToTab call this brackets. A Generate-first tab must not tear
+        /// down its run-bar registration or clear its own `program` field on that one deactivation - the bar
+        /// keeps pointing back at it across the handoff, which is the whole point: pressing Run on the Job
+        /// tab still runs the program AS that tab's run, with its confirmation, its completion hook and its
+        /// result parsing. (Clearing the field and reading it back across the switch is separately what
+        /// shipped a blank Job tab on 2026-08-11, 0c457451.)
+        /// </remarks>
+        public static bool IsHandingOffFrom(ViewType originTab)
         {
-            var code = new List<string>();
-            foreach (var l in lines)
-            {
-                string t = l.Trim();
-                if (t.Length > 0)
-                    code.Add(t);
-            }
-            if (code.Count == 0)
-                return;
-
-            bool done = false;
-            RunStreamedJobInPlace.Invoke(model, _streamName, code.ToArray(), !wait, preferJobView, () =>
-            {
-                done = true;
-                DebugLog.Write("macro", string.Format("StreamProgram: onDone fired, StreamingState={0} GrblState={1}",
-                    model.StreamingState, model.GrblState.State));
-            });
-
-            if (wait)
-                while (!done)
-                    EventUtils.DoEvents();
-
-            DebugLog.Write("macro", string.Format("StreamProgram: wait loop exited (wait={0}), StreamingState={1} GrblState={2}",
-                wait, model.StreamingState, model.GrblState.State));
+            return _handoffSwitching && _borrowedName != null && _borrowedOrigin == originTab;
         }
 
-        // Checked right after every Flush(wait:true) that precedes a (MBOX)/(PROMPT) dialog - a burst that
-        // just alarmed (e.g. a probe search that never triggered) or lost the connection must stop the
-        // macro here, not sail on to the next prompt as if the burst had succeeded. Same Alarm/Unknown check
-        // WaitForIdle already uses for the same reason, just reached from a different gate (WAITIDLE isn't
-        // the only place a burst's outcome needs checking - any MBOX/PROMPT right after G-code content does).
-        // alarmBefore: model.AlarmEventCounter captured BEFORE the burst that just ran (Flush) was sent - a
-        // latch, not a sampled value, so an alarm the operator already cleared (Reset+Unlock) faster than
-        // this check runs is still caught, instead of being silently missed the way sampling only the
-        // CURRENT GrblState.State would. See GrblViewModel.AlarmEventCounter's own comment - confirmed as a
-        // real bug 2026-08-01, same race class as the fix documented above this method's own call sites.
-        private static bool AbortedByAlarm(GrblViewModel model, string name, long alarmBefore)
+        /// <summary>
+        /// DURABLE: true for as long as <paramref name="originTab"/>'s generated program is the borrowed
+        /// loaded job - from its Generate until the run's terminal, a discard, or Esc. This is the one that
+        /// answers "is the run bar still mine", which stays true while the operator is over on the Job tab.
+        /// </summary>
+        public static bool HoldsHandoffFrom(ViewType originTab)
         {
-            if (model.AlarmEventCounter == alarmBefore && model.GrblState.State != GrblStates.Alarm && model.GrblState.State != GrblStates.Unknown)
+            return _borrowedName != null && _borrowedOrigin == originTab;
+        }
+
+        /// <summary>
+        /// Operator cancel: discard a generated program that was handed to the Job tab and never started,
+        /// give the previous program back and return to the tab that built it. Bound to Esc.
+        /// </summary>
+        /// <returns>
+        /// True when there was a handoff to cancel - the caller consumes the key. False otherwise, so Esc
+        /// falls through to whatever else wants it; a gesture that silently does nothing must not also
+        /// silently swallow the key.
+        /// </returns>
+        public static bool CancelHandoff(GrblViewModel model)
+        {
+            // A run in flight owns the program outright - its watcher is what pops, and Esc is not a Stop.
+            if (_borrowedName == null || model == null || model.IsJobRunning)
                 return false;
-            ShowMessage(string.Format("Macro \"{0}\" aborted: the controller alarmed (or the connection was lost) mid-run.", name),
-                "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+            string name = _borrowedName;
+            var origin = _borrowedOrigin;
+            DebugLog.Write("run", string.Format("CancelHandoff: Esc - discarding '{0}' and returning to {1}", name, origin));
+
+            ReleaseHandoff(model);          // pop the previous job back, disarm the watcher, clear the record
+            DiscardGenerated?.Invoke();     // the tab drops its own program text, so the bar reads "Generate"
+            SwitchToTab?.Invoke(origin);    // ...back where it was built
+            model.Message = string.Format("{0} discarded - the previous program is back.", name);
             return true;
         }
 
-        // The "Prompt to run" (confirm-before-run) gate. Shown by Run itself - not the call site -
-        // so it can be skipped when an input (PROMPT) dialog already gates the run.
-        private static bool ConfirmRun(string name)
+        /// <summary>
+        /// Generate's tail for every Generate-first tab: make <paramref name="program"/> the loaded job,
+        /// take the operator to the Job tab to look at it, and arm the watcher that gives the previous job
+        /// back and returns them to <paramref name="originTab"/> once the run is over.
+        /// </summary>
+        /// <param name="onHandoffEnd">
+        /// The originating tab's own teardown, run at the terminal just before <c>onDone</c>. It exists for
+        /// the ABORT path: a clean finish switches back to that tab and its Activate(true) re-registers
+        /// everything, but a stopped or alarmed run deliberately leaves the operator on the Job tab - and
+        /// the run bar would go on pointing at an off-screen tab, so the next Cycle Start over a file of
+        /// their own would run the generated program instead of it. Every implementation no-ops when its
+        /// tab is the active one, which is exactly the clean-finish case.
+        /// </param>
+        public static void HandOffToJobTab(GrblViewModel model, string name, string program, ViewType originTab,
+                                           string stats = null, System.Action onHandoffEnd = null)
         {
-            return ShowMessage(string.Format("Run {0} macro?", name), "ioSender",
-                MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
-        }
-
-        // The window macro dialogs (MBOX, prompts, error/abort notices) should be owned by, so they
-        // center on and stay above ioSender instead of popping up as an independent top-level window
-        // that can fall behind the main window. Returns null if the main window is not (yet) shown.
-        private static Window OwnerWindow()
-        {
-            if (Application.Current == null)
-                return null;
-
-            Window main = Application.Current.MainWindow != null && Application.Current.MainWindow.IsVisible
-                ? Application.Current.MainWindow
-                : null;
-
-            // Prefer a visible Topmost auxiliary window (e.g. the floating run-control panel) as the dialog
-            // owner: an owned dialog is forced ABOVE its owner, so this keeps message boxes from being hidden
-            // behind a Topmost window - a hidden modal box blocks the app and looks exactly like a hang.
-            foreach (Window w in Application.Current.Windows)
-                if (w != main && w.IsVisible && w.Topmost)
-                    return w;
-
-            return main;
-        }
-
-        // MessageBox.Show with the main window as owner when available (the owner overload requires a
-        // non-null window, so fall back to the ownerless overload before the main window exists).
-        private static MessageBoxResult ShowMessage(string text, string caption, MessageBoxButton buttons, MessageBoxImage icon)
-        {
-            var owner = OwnerWindow();
-            return owner != null ? AppDialogs.Show(owner, text, caption, buttons, icon)
-                                 : AppDialogs.Show(text, caption, buttons, icon);
-        }
-
-        // If 'code' is a single "@<path>" reference, replace it with the referenced file's current
-        // contents (re-read on every run). Relative paths resolve against the config folder.
-        // Returns false (after a message) if the file cannot be read.
-        private static bool ResolveFileReference(ref string code, string name)
-        {
-            // Extensionless @<path> defaults to ".macro" - normally already baked into the stored text
-            // by MacroCreateDialog, this is a safety net for references normalized before that existed.
-            code = MacroManagerDialog.NormalizeMacroReference(code);
-
-            string trimmed = code.TrimStart();
-            if (!trimmed.StartsWith("@"))
-                return true;
-
-            string path = trimmed.Substring(1);
-            int nl = path.IndexOfAny(new[] { '\r', '\n' });
-            if (nl >= 0)
-                path = path.Substring(0, nl);
-            path = path.Trim();
-
-            try
+            if (model == null || string.IsNullOrWhiteSpace(program))
             {
-                if (!Path.IsPathRooted(path))   // throws on a path with illegal characters
-                    path = Path.Combine(CNC.Core.Resources.ConfigPath ?? string.Empty, path);
-                code = File.ReadAllText(path);
-            }
-            catch (Exception ex)
-            {
-                ShowMessage(string.Format("Macro \"{0}\" references a file that could not be read:\r\n\r\n{1}\r\n\r\n{2}", name, path, ex.Message),
-                    "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return false;
+                // Handing off nothing used to be indistinguishable from a successful handoff, which is
+                // exactly how a blank Job tab shipped once already (2026-08-11, 0c457451).
+                DebugLog.Write("run", string.Format("HandOffToJobTab: REFUSED - nothing to hand off (model={0}, program={1} chars)",
+                    model == null ? "null" : "ok", program == null ? 0 : program.Length));
+                return;
             }
 
-            return true;
+            // Sanitize HERE, before anything else sees the text: the diagnostic copy, the Job tab's docked
+            // list and the run then all show the same program. Run sanitizes again on its way to the wire
+            // (harmless - it is idempotent), but by then this text has already been on screen, and a prompt
+            // that reads as gibberish in the list is one the operator distrusts before it is ever shown.
+            program = MacroRunner.SanitizeProgram(program);
+
+            ActiveProgramStats = stats;
+            ActiveProgramVersion++;
+            SaveGeneratedCopy(name, program);
+
+            // Capture BEFORE the switch. Selecting another tab runs the originating tab's Activate(false)
+            // SYNCHRONOUSLY (WPF tab selection is not deferred), and that is where a tab clears its own
+            // `program` field - reading it back across the switch is the trap that shipped the blank Job
+            // tab above. One read, here, and the local is what gets loaded.
+            string toLoad = program;
+            // Program_FileChanged clears IsDryRunMode by design on every load - re-arm it around LoadText.
+            bool dryRunArmed = model.IsDryRunMode;
+
+            // Decide this BEFORE overwriting the record, and set the record BEFORE the switch: the
+            // originating tab's own Activate(false), fired synchronously below, reads it to tell this
+            // handoff apart from a genuine tab-leave.
+            bool replacingOurOwn = IsHandedOff(model, name);
+            _borrowedName = name;
+            _borrowedOrigin = originTab;
+            _borrowedOnEnd = onHandoffEnd;
+
+            // Bracketed, not just called: the originating tab's Activate(false) runs synchronously inside
+            // this, and IsHandingOffFrom is how that tab tells this deactivation from a real tab-leave.
+            _handoffSwitching = true;
+            try { SwitchToTab?.Invoke(ViewType.GRBL); }   // the Job tab
+            finally { _handoffSwitching = false; }
+
+            // Don't push a SECOND slot over our own still-loaded program - a previous Generate the operator
+            // looked at and never ran. LoadText replaces it in place.
+            if (!replacingOurOwn)
+                GCode.File.Push();
+            GCode.File.LoadText(name, toLoad);
+            model.IsDryRunMode = dryRunArmed;
+
+            WatchHandoffEnd(model);
+
+            // The Esc half of this is not discoverable on its own - there is no button for it - so the one
+            // status line the operator is already reading is where it has to be said.
+            model.Message = string.Format("{0} loaded{1} - press Cycle Start when ready, or Esc to discard it.",
+                name, string.IsNullOrEmpty(stats) ? string.Empty : " (" + stats + ")");
+
+            DebugLog.Write("run", string.Format("HandOffToJobTab: '{0}' ({1} chars) is the loaded job; origin={2}, pushed={3}",
+                name, toLoad.Length, originTab, !replacingOurOwn));
         }
 
-        // A single (PROMPT ...) input field.
-        private class PromptField
+        /// <summary>
+        /// Hand the previous job back WITHOUT having run the borrowed program - an input changed, the tab
+        /// was left for good, or the run was refused up front. Everything that drops a generated program
+        /// has to come through here, or the pushed snapshot is stranded and the Job tab keeps showing a
+        /// program nothing will ever run.
+        /// </summary>
+        /// <remarks>
+        /// The LOADED JOB is the test, never the record on its own: after a real run the handoff watcher
+        /// has already popped by the time a tab's DiscardGenerated reaches here, so this correctly does
+        /// nothing. A run still in flight owns the pop outright - leave it to the watcher.
+        /// </remarks>
+        public static void ReleaseHandoff(GrblViewModel model)
         {
-            public string Inner;    // parameter name inside the brackets, e.g. "_probe_radius"
-            public string Label;    // text shown next to the input box
-            public string Value;    // default, then the value the user entered
+            if (_borrowedName == null)
+                return;
+            if (model != null && model.IsJobRunning)
+                return;
 
-            public string Param { get { return "#<" + Inner + ">"; } }
+            string name = _borrowedName;
+            _borrowedName = null;
+            _borrowedOnDone = null;
+            _borrowedOnEnd = null;
+            if (_borrowedHandler != null && model != null)
+            {
+                model.PropertyChanged -= _borrowedHandler;
+                _borrowedHandler = null;
+                _borrowedWatcherArmed = false;
+            }
+
+            if (model != null && model.FileName == name)
+            {
+                DebugLog.Write("run", string.Format("ReleaseHandoff: dropping '{0}' without running it - popping the previous job back", name));
+                GCode.File.Pop();
+            }
         }
 
-        // Parse "(PROMPT param, default [, label])" into a field. Returns null for a bare (PROMPT).
-        private static PromptField ParsePromptField(string raw)
+        /// <summary>
+        /// Pop the borrowed program back and return the operator to the tab that generated it, once the run
+        /// reaches its TRUE terminal (Idle/NoFile after a genuine Send of OUR program).
+        /// </summary>
+        /// <remarks>
+        /// Armed at GENERATE time, not at Run time. Cycle Start may be minutes away, and arming late is how
+        /// a work order once finished, parked at G30, and simply stayed loaded forever (2026-08-06): this
+        /// watcher only arms by OBSERVING a Send transition, so arriving after one has already gone past
+        /// means no terminal will ever fire it.
+        /// </remarks>
+        private static void WatchHandoffEnd(GrblViewModel model)
         {
-            string body = Body(raw, "PROMPT").Trim();
-            if (body.Length == 0)
-                return null;
+            if (_borrowedWatcherArmed)
+            {
+                DebugLog.Write("run", "WatchHandoffEnd: already armed - not arming a second watcher");
+                return;
+            }
+            _borrowedWatcherArmed = true;
+            // Captured at ARM time: a completed job is then detectable from the counter even if the
+            // JobFinished transition itself is never observed, which happens whenever the UI thread is busy
+            // long enough for JobFinished and Idle to coalesce - a modal dialog raised by the running
+            // program is enough. See GrblViewModel.JobFinishedSeq.
+            int finishedSeqAtArm = model.JobFinishedSeq;
+            bool started = false, jobFinished = false, sawError = false;
+            _borrowedHandler = (s, e) =>
+            {
+                if (e.PropertyName != nameof(GrblViewModel.StreamingState))
+                    return;
+                var st = model.StreamingState;
+                // Send ONLY (never SendMDI), and only OUR OWN program's Send. A single jog between Generate
+                // and Cycle Start reaches SendMDI then Idle; an unrelated macro run streams under its own
+                // name having pushed ours aside. Either one, latched, pops the program before it ever runs -
+                // both were live incidents, 2026-08-08.
+                if (st == StreamingState.Send && model.FileName == _borrowedName)
+                    started = true;
+                if (st == StreamingState.JobFinished || model.JobFinishedSeq != finishedSeqAtArm)
+                    jobFinished = true;
+                // Latch a failed run: the terminal only arrives at the Idle that follows the operator's
+                // reset/unlock, by which time StreamingState no longer says anything went wrong.
+                if (st == StreamingState.Error || st == StreamingState.Halted)
+                    sawError = true;
+                if (!started || (st != StreamingState.Idle && st != StreamingState.NoFile))
+                    return;
 
-            string[] parts = body.Split(new[] { ',' }, 3);
-            string inner = CanonInner(parts[0]);
-            if (inner == null)
-                return null;
+                model.PropertyChanged -= _borrowedHandler;
+                _borrowedHandler = null;
+                _borrowedWatcherArmed = false;
+                string name = _borrowedName;
+                var origin = _borrowedOrigin;
+                var onDone = _borrowedOnDone;
+                var onEnd = _borrowedOnEnd;
+                _borrowedName = null;
+                _borrowedOnDone = null;
+                _borrowedOnEnd = null;
 
-            string label = parts.Length > 2 ? parts[2].Trim() : string.Empty;
+                // Self-disarm without popping when the loaded job is no longer ours - the operator
+                // generated, then loaded a different file instead of running. Popping now would yank THEIR
+                // file out from under THEIR run. (The pushed slot is left unconsumed in that path -
+                // accepted; the alternative is worse.)
+                if (model.FileName != name)
+                    DebugLog.Write("run", string.Format("WatchHandoffEnd: terminal but loaded job is '{0}', not '{1}' - disarming without pop",
+                        model.FileName, name));
+                else
+                {
+                    // st is in the line because its absence once cost two passes over the same symptom:
+                    // "jobFinished=False" says the discard did not happen, never which terminal got there
+                    // first. JobFinished comes from OnProgramEnd (the controller's own "[MSG:Pgm End]"), so
+                    // a program whose final acks land before the motion finishes terminates on Idle instead.
+                    DebugLog.Write("run", string.Format("WatchHandoffEnd: '{0}' terminal={1} (jobFinished={2} sawError={3}) - popping the borrowed program",
+                        name, st, jobFinished, sawError));
+                    GCode.File.Pop();
+                }
 
-            return new PromptField {
-                Inner = inner,
-                Label = label.Length > 0 ? label : inner,
-                Value = parts.Length > 1 ? parts[1].Trim() : "0"
+                // A CLEAN finish has nothing actionable left to look at: drop the preview, drop the
+                // program, and put the operator back on the tab that built it.
+                //
+                // A FAILED run keeps the operator HERE on the Job tab, and keeps the originating tab's own
+                // program text so Run can re-run it without rebuilding. Note what it does NOT keep: the pop
+                // above is unconditional, so the previous program is back either way. That is not a
+                // contradiction - this terminal only arrives at the Idle FOLLOWING the operator's reset or
+                // unlock, so the failed program sits on screen with its stopped line marked for as long as
+                // the machine is alarmed, and gives way once they clear it. The switch-back is gated here
+                // for the same reason the discard is, and that is a deliberate change from Work Order's old
+                // unconditional switch-back, which moved you off the failure. (User decision 2026-09-14.)
+                if (!sawError)
+                {
+                    // NOT the loaded job's own view. GCode.File.Pop() above ends in RaiseFileChanged, which
+                    // reconnects jobProgramView SYNCHRONOUSLY (MainWindow.OnJobFileChanged) - so by the time we
+                    // reach here the active view IS the restored job, and disconnecting it detached the Job tab's
+                    // own view from the program it had just put back. What this line is for is a tool's TRANSIENT
+                    // preview; the loaded job is never that.
+                    if (ProgramView.Active != null && !ProgramView.Active.IsLoadedJob)
+                        ProgramView.Active.Disconnect();
+                    if (jobFinished && SupportsGenerateMode)
+                        DiscardGenerated?.Invoke();
+                    SwitchToTab?.Invoke(origin);
+                }
+
+                // BEFORE onDone, not after: a tab's onDone may queue follow-on work of its own (Setup's
+                // height-map pass), and that has to run against a tab whose run-bar ownership has already
+                // been settled one way or the other.
+                onEnd?.Invoke();
+                onDone?.Invoke(jobFinished);
             };
+            model.PropertyChanged += _borrowedHandler;
+
+            // The state AT ARM TIME is the one thing the handler above can never report afterwards - see
+            // the remark on arming early. "armed while already Send" identifies that fault immediately.
+            DebugLog.Write("run", string.Format("WatchHandoffEnd: armed for '{0}' (origin {1}) with StreamingState={2}",
+                _borrowedName, _borrowedOrigin, model.StreamingState));
         }
 
-        // Normalise a parameter name to the inside of a global named parameter reference, e.g.
-        // "#<_radius>" / "#_radius" / "_radius" / "radius" -> "_radius".
-        private static string CanonInner(string s)
-        {
-            s = s.Trim();
-            if (s.StartsWith("#"))
-                s = s.Substring(1).Trim();
-            if (s.StartsWith("<") && s.EndsWith(">"))
-                s = s.Substring(1, s.Length - 2).Trim();
-            if (s.Length == 0)
-                return null;
-            if (!s.StartsWith("_"))     // force global scope so the value survives the program / $F= files
-                s = "_" + s;
-
-            return s;
-        }
-
-        // Replace every #<_name> reference in the line with the value the user entered.
-        private static string ApplySubstitutions(string line, List<PromptField> fields)
-        {
-            foreach (var field in fields)
-                line = Regex.Replace(line, @"#<\s*" + Regex.Escape(field.Inner) + @"\s*>", field.Value, RegexOptions.IgnoreCase);
-
-            return line;
-        }
+        // NOTE: ConfirmRun and ShowMessage used to live here. Every message the engine raises now goes
+        // through CNC.Core.UserPrompt, which AppDialogs.RegisterCorePrompts routes back to this assembly -
+        // and since a10ce1e that path picks the same dialog owner ShowMessage used to, so nothing about
+        // where a macro's message boxes appear changed. Leaving the pair behind would have left two
+        // plausible-looking message paths where only one is live.
 
         // Show one dialog with an editable, numeric-validated input box per field.
         // Returns false if the user cancelled; on OK each field's Value holds the entry.
-        private static bool ShowPromptDialog(string title, List<PromptField> fields)
+        private static bool ShowPromptDialog(string title, List<MacroRunner.PromptField> fields)
         {
             var win = new Window {
                 Title = title,
@@ -764,7 +552,7 @@ namespace CNC.Controls
                 MinWidth = 300
             };
 
-            win.Owner = OwnerWindow();
+            win.Owner = AppDialogs.OwnerWindow();
             win.WindowStartupLocation = win.Owner != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen;
 
             var root = new StackPanel { Margin = new Thickness(12) };
@@ -838,240 +626,6 @@ namespace CNC.Controls
             return win.ShowDialog() == true;
         }
 
-        // Block (while keeping the UI pumped) until a controller-side job has started and then
-        // returned to Idle. Returns false if the controller alarms or the link appears lost.
-        // The wait runs on the UI thread, so it pumps the dispatcher the same way the rest of
-        // the app does (see Grbl.WaitForIdle) - background threads observe controller responses
-        // while EventUtils.DoEvents keeps status reports (and the UI) flowing.
-        // How long to allow for motion to be observed STARTING before concluding it already finished. Only a
-        // controller-side job ($F=) can begin moving after its ack, and only then is the long allowance
-        // justified; for everything else Flush(wait:true) has already returned on a real Idle detection, so
-        // the full 2s was dead time charged to every (WAITIDLE) - three of them in a Start Job program, which
-        // is most of the multi-second stalls seen between steps. The short value still spans two status
-        // reports at the usual ~200ms cadence.
-        private const int ObserveMotionStartMs = 400;
-        private const int ObserveMotionStartSdMs = 2000;
-
-        private static bool WaitForIdle(GrblViewModel model, bool sdJobPossible = false)
-        {
-            DebugLog.Write("macro", string.Format("WaitForIdle: enter, StreamingState={0} GrblState={1}",
-                model.StreamingState, model.GrblState.State));
-
-            // NOTE: this used to hard-fail immediately if model.StreamingState == StreamingState.Send on
-            // entry ("a (WAITIDLE) reached while a flow-controlled job is streaming is a program/structure
-            // error"). That check is gone: RunStreamedJobInPlace streams OUR OWN macro bursts through the
-            // exact same StreamingState machinery a real loaded-job run uses, and the two are indistinguishable
-            // from here. In practice, right after Flush(wait:true) returns, StreamingState can already be back
-            // to Send/GrblState=Run because the burst's own trailing motion (e.g. a G30 park rapid) resumed a
-            // moment after RestoreSourceOnEnd's Idle detection fired onDone - confirmed via DebugLog("macro")
-            // tracing + the raw comms log 2026-07-21 (StartJobView and StepperCalibrationProbeWizard both hit
-            // this). The polling below already handles that correctly by construction - it reads GrblState.State
-            // fresh on every incoming status report (not gated on a property VALUE change like a PropertyChanged
-            // subscription would be), waits for genuine motion to start, then requires two consecutive real Idle
-            // reports before trusting completion - so falling straight into it here just waits out that trailing
-            // window instead of aborting on it. A GENUINELY still-running unrelated job is still bounded by the
-            // stall/disconnect check below (2 consecutive silent report timeouts), so this can't hang forever.
-            var token = new CancellationToken();
-
-            // Snapshot the alarm latch before waiting - see GrblViewModel.AlarmEventCounter's own comment.
-            // Checked alongside (not instead of) the sampled GrblState.State below: the counter catches an
-            // alarm the operator already cleared (Reset+Unlock) faster than this loop happened to poll,
-            // which the sampled state alone would miss entirely - confirmed as a real bug 2026-08-01, where
-            // that exact race let a macro silently continue past a probe-failure alarm the operator had
-            // already manually cleared, moving on to its next step as if nothing had happened.
-            long alarmCountAtStart = model.AlarmEventCounter;
-
-            // A $F= job acks immediately and only then starts running, so first wait briefly for
-            // the controller to actually leave Idle before watching for it to return - otherwise
-            // the very first status report could still show the pre-run Idle and we would finish early.
-            var sw = Stopwatch.StartNew();
-            bool started = model.GrblState.State != GrblStates.Idle;
-
-            int observeStartMs = sdJobPossible ? ObserveMotionStartSdMs : ObserveMotionStartMs;
-
-            while (!started && sw.ElapsedMilliseconds < observeStartMs)
-            {
-                PumpForReport(model, token, 500);
-
-                if (model.AlarmEventCounter != alarmCountAtStart || model.GrblState.State == GrblStates.Alarm || model.GrblState.State == GrblStates.Unknown)
-                {
-                    DebugLog.Write("macro", string.Format("WaitForIdle: abort - alarm seen (or GrblState={0}) while waiting to observe motion start", model.GrblState.State));
-                    return false;
-                }
-
-                started = model.GrblState.State != GrblStates.Idle;
-            }
-
-            if (!started)
-            {
-                DebugLog.Write("macro", string.Format("WaitForIdle: never observed motion start within {0}ms - treating as already-finished", observeStartMs));
-                return true;    // job finished (or produced no motion) before we could observe it running
-            }
-
-            // Wait for completion. Require two consecutive Idle reports since the planner can briefly
-            // drain mid-job; bail out if status reports stop arriving (stalled or disconnected).
-            int idleStreak = 0, silentReports = 0;
-
-            while (true)
-            {
-                if (!PumpForReport(model, token, 5000))
-                {
-                    if (++silentReports >= 2)
-                    {
-                        DebugLog.Write("macro", "WaitForIdle: abort - 2 consecutive silent report timeouts (stalled/disconnected)");
-                        return false;
-                    }
-                    continue;
-                }
-                silentReports = 0;
-
-                if (model.AlarmEventCounter != alarmCountAtStart)
-                {
-                    DebugLog.Write("macro", "WaitForIdle: abort - alarm seen (latched) while waiting for completion");
-                    return false;
-                }
-
-                switch (model.GrblState.State)
-                {
-                    case GrblStates.Alarm:
-                    case GrblStates.Unknown:
-                        DebugLog.Write("macro", string.Format("WaitForIdle: abort - GrblState={0} while waiting for completion", model.GrblState.State));
-                        return false;
-
-                    case GrblStates.Idle:
-                        if (++idleStreak >= 2)
-                        {
-                            DebugLog.Write("macro", "WaitForIdle: success - 2 consecutive Idle reports");
-                            return true;
-                        }
-                        break;
-
-                    default:
-                        idleStreak = 0;
-                        break;
-                }
-            }
-        }
-
-        // Wait (pumping the UI) for the next response/status report from the controller.
-        // Returns true if one arrived within msTimeout, false on timeout.
-        private static bool PumpForReport(GrblViewModel model, CancellationToken token, int msTimeout)
-        {
-            bool? res = null;
-
-            new Thread(() =>
-            {
-                res = WaitFor.SingleEvent<string>(
-                    token,
-                    null,
-                    a => model.OnResponseReceived += a,
-                    a => model.OnResponseReceived -= a,
-                    msTimeout);
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
-
-            return res == true;
-        }
-
-        private static string EvalPrereq(GrblViewModel model, string cond)
-        {
-            switch (cond.ToLowerInvariant())
-            {
-                case "":
-                    return null;
-                case "homed":
-                    // Prefer the fresh $# [HOME:...] mask (grblHAL sys.homed.mask) - it survives a position-loss
-                    // alarm that leaves the cached HomedState stale. >0 = homed, 0 = unhomed. But if $# could not
-                    // be read (-1: timed out / no [HOME:] line) DON'T fail closed - fall back to the live homed
-                    // state, otherwise a homed machine is wrongly reported "not homed" (and every $#-derived
-                    // prereq - G28/G30/G59.3 - fails with it).
-                    if (GrblWorkParameters.HomedMask >= 0)
-                        return GrblWorkParameters.HomedMask > 0 ? null : "the machine is not homed";
-                    return model.HomedState == HomedState.Homed ? null : "the machine is not homed";
-                case "tlo":
-                case "tloref":
-                    return model.IsTloReferenceSet ? null : "the tool length offset reference is not set";
-                case "idle":
-                    return model.GrblState.State == GrblStates.Idle ? null : "the machine is not idle";
-                case "noalarm":
-                case "notalarm":
-                    return model.GrblState.State != GrblStates.Alarm ? null : "the machine is in an alarm state";
-                case "connected":
-                    return model.GrblState.State != GrblStates.Unknown ? null : "the controller is not connected";
-                default:
-                    // A coordinate-system code (case-insensitive)?
-                    string code = cond.ToUpperInvariant();
-                    if (CoordinateSystemCodes.Contains(code))
-                        return CoordinateSystemDefined(code) ? null : string.Format("{0} is not set", code);
-
-                    // Otherwise require it to be a controller $I build option (NEWOPT), matched
-                    // exactly and case-sensitively (e.g. EXPR, TC, THC).
-                    return BuildOptionPresent(cond) ? null : string.Format("the controller build option '{0}' is not present", cond);
-            }
-        }
-
-        // True if 'option' is one of the controller's $I build options (NEWOPT), matched exactly
-        // and case-sensitively (e.g. EXPR, TC, THC).
-        private static bool BuildOptionPresent(string option)
-        {
-            if (string.IsNullOrEmpty(GrblInfo.NewOptions))
-                return false;
-
-            foreach (var opt in GrblInfo.NewOptions.Split(','))
-                if (opt == option)
-                    return true;
-
-            return false;
-        }
-
-        // grbl stored positions / work coordinate systems that PREREQ can require.
-        private static readonly HashSet<string> CoordinateSystemCodes = new HashSet<string> {
-            "G28", "G30", "G92", "G54", "G55", "G56", "G57", "G58", "G59", "G59.1", "G59.2", "G59.3"
-        };
-
-        // A stored position/offset is treated as "set" if any axis is non-zero. grbl has no explicit
-        // "is defined" flag - these default to zero - so one deliberately left at machine zero would
-        // read as unset. Values come from the $# report (GrblWorkParameters) - call GrblWorkParameters.Get(model)
-        // first for a fresh read (Run's own PREREQ path does this once up front; a caller checking a stored
-        // position OUTSIDE a PREREQ string, e.g. StartJobView's G28 fixture, must fetch it itself). Public so
-        // callers besides Run's own PREREQ evaluator (e.g. StartJobView, deciding whether to prompt the operator
-        // to set G28 before Generate) can reuse the exact same "is it set" definition instead of duplicating it.
-        public static bool CoordinateSystemDefined(string code)
-        {
-            var cs = GrblWorkParameters.GetCoordinateSystem(code);
-            if (cs == null)
-                return false;
-
-            for (int i = 0; i < GrblInfo.NumAxes; i++)
-                if (!double.IsNaN(cs.Values[i]) && Math.Abs(cs.Values[i]) > 0.0001d)
-                    return true;
-
-            return false;
-        }
-
-        // Show the message box for an (MBOX...) line; returns false if the user cancelled (Cancel/No).
-        private static bool ShowMBox(string name, string line)
-        {
-            string body = Body(line, "MBOX").Trim();   // "OKCANCEL, message" or "message"
-            bool cancellable = false, yesNo = false;
-
-            int comma = body.IndexOf(',');
-            string head = (comma >= 0 ? body.Substring(0, comma) : body).Trim().ToUpperInvariant();
-            if (head == "OK" || head == "OKCANCEL" || head == "YESNO")
-            {
-                cancellable = head == "OKCANCEL" || head == "YESNO";
-                yesNo = head == "YESNO";
-                body = comma >= 0 ? body.Substring(comma + 1).Trim() : string.Empty;
-            }
-
-            if (body == string.Empty)
-                body = "(no message)";
-
-            return ShowHoldPrompt(name, body, cancellable, yesNo);
-        }
-
         // A modeless "hold" prompt: pauses the macro until the operator clicks, but - unlike a modal MessageBox -
         // leaves the MAIN window fully usable and does NOT steal keyboard focus, so the operator can jog (incl.
         // keyboard jog), change the jog step and zero the DRO while it is up (needed for "jog to the corner and
@@ -1090,8 +644,8 @@ namespace CNC.Controls
                 ShowInTaskbar = false,
                 ShowActivated = false,   // don't steal focus -> keyboard jogging stays live on the main window
                 Topmost = true,
-                Owner = OwnerWindow(),
-                WindowStartupLocation = OwnerWindow() != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen
+                Owner = AppDialogs.OwnerWindow(),
+                WindowStartupLocation = AppDialogs.OwnerWindow() != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen
             };
 
             var root = new StackPanel { Margin = new Thickness(16), MaxWidth = 480 };
@@ -1116,7 +670,7 @@ namespace CNC.Controls
             // it owns keyboard focus and the main window's jog forwarding never sees these keys (and the macro
             // may have been launched from a non-Job tab anyway, where that forwarding is disabled). Forward
             // jog-relevant keys straight to the keypress handler; leave Enter/Esc/Tab/Space for the buttons.
-            var kbd = CNC.Core.Grbl.GrblViewModel?.Keyboard;
+            var kbd = CNC.Core.Grbl.GrblViewModel?.Keyboard as KeypressHandler;
             Window mainForJog = Application.Current?.MainWindow;
             System.Windows.Input.KeyEventHandler forwardJog = null;
             if (kbd != null)
@@ -1151,7 +705,15 @@ namespace CNC.Controls
             }
 
             win.Show();
-            System.Windows.Threading.Dispatcher.PushFrame(frame);   // pumps the UI (jog/DRO live) until a button closes the frame
+
+            // This is the prompt an operator meets mid-job with their hands on the work - "jog to the
+            // corner, then click OK" - so it is the one the shutter remote most needs to reach. Registered
+            // rather than discovered; see RemoteActions.
+            using (RemoteActions.ShowingPrompt(
+                       () => okBtn.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)),
+                       cancellable ? (System.Action)(() => { result = false; frame.Continue = false; }) : null))
+                System.Windows.Threading.Dispatcher.PushFrame(frame);   // pumps the UI (jog/DRO live) until a button closes the frame
+
             if (forwardJog != null && mainForJog != null)
             {
                 mainForJog.PreviewKeyDown -= forwardJog;
@@ -1162,26 +724,609 @@ namespace CNC.Controls
             return result;
         }
 
-        // True if the trimmed line is the named directive, e.g. "(MBOX ...)" / "(PREREQ ...)".
-        private static bool IsDirective(string line, string keyword)
+        // --- The unified-engine entry (Step 7) ---------------------------------------------------------
+        // Run used to forward to CNC.Core.MacroRunner.Run - a second engine that interpreted directives
+        // itself and streamed transient bursts through RunStreamedJobInPlace, holding the caller in
+        // DoEvents wait loops (the proven 32-bit OOM allocator). Now a macro IS a job: push the loaded
+        // program aside, load the directive-bearing text as the job, and start it through the ordinary
+        // streaming path. The pump handles (WAITIDLE)/(MBOX)/bare-(PROMPT) inline and JobRunner.Run gates
+        // (PREREQ)/(PROMPT ...) up front - the same hardware-verified path Work Order runs on since Step 6.
+        // Deliberately silent presentation (user decision 2026-08-08): no tab switch, no floating run
+        // view - the operator stays where they are; the run bar drives Feed Hold/Stop from any tab and
+        // the docked Job list shows progress if they look. The previous job pops back at the terminal.
+
+        /// <summary>Run a macro through the unified streaming engine. Returns false if it was refused up
+        /// front (busy, prerequisite unmet, or user cancelled); true once the run has started (the run
+        /// itself is asynchronous - pass onDone to sequence work after it).</summary>
+        /// <param name="unattended">Skip every routine confirmation this macro would otherwise pop (the
+        /// confirm-before-run prompt, bare mid-body (PROMPT) run-confirmations, and (MBOX) holds - all
+        /// auto-answered OK/Yes) and take an unanswered (PROMPT param, default, ...) input's own default
+        /// rather than asking. For a "Generate and Run" action that a tab offers explicitly (see
+        /// SupportsGenerateAndRun) - NOT a general silencing knob. PREREQ failures still apply and still
+        /// stop the run; this only skips prompts that exist purely to ask "are you sure" / "ready?".</param>
+        /// <param name="onDone">Invoked on the UI thread at the run's true terminal, after the previous
+        /// job is restored. The argument is true only for a genuine program end (JobFinished) - false for
+        /// a Stop/alarm recovery. Not invoked when Run returns false (nothing started).</param>
+        /// <param name="startDelayMs">
+        /// Pause between loading the program and starting it. For callers that hand the operator off to
+        /// another tab first (see StartJobView's Run) - landing on the Job tab to find motion already
+        /// under way is not the same as being shown what is about to run.
+        /// </param>
+        /// <param name="alreadyPushed">
+        /// The caller has ALREADY pushed the loaded job aside and made this program the loaded one - a tab
+        /// whose Generate hands the program to the Job tab so the operator can look at it before pressing
+        /// Run (StartJobView since 2026-08-12; WorkOrderView.Generate does the same thing without coming
+        /// through here). Suppresses only the Push, never the LoadText: the text loaded at Generate time is
+        /// the raw build, and the comment sanitizing above happens HERE - reloading in place is what puts
+        /// the sanitized text on the wire. Exactly one push is then outstanding, so the watcher's pop and
+        /// the not-started pop below stay balanced. Pushing a second slot instead stacked snapshots and
+        /// doubled watchers when Work Order hit this same shape (observed live 2026-08-08).
+        /// </param>
+        public static bool Run(GrblViewModel model, string name, string code, bool confirm = false, bool unattended = false, System.Action<bool> onDone = null, int startDelayMs = 0, bool alreadyPushed = false)
         {
-            string t = line.TrimStart();
-            if (!t.StartsWith("("))
+            // Returning TRUE here said "ran fine" for doing nothing at all, and that is precisely how an
+            // empty program went unnoticed: a caller whose `program` field had been cleared by a tab switch
+            // got success, no log, no load, and a Job tab that came up blank with no error anywhere.
+            // Nothing to run is not a successful run.
+            if (model == null || string.IsNullOrEmpty(code))
+            {
+                DebugLog.Write("run", string.Format("Run: REFUSED - nothing to run (model={0}, code={1} chars)",
+                    model == null ? "null" : "ok", code?.Length ?? 0));
                 return false;
-            t = t.Substring(1).TrimStart();
-            return t.StartsWith(keyword, StringComparison.OrdinalIgnoreCase) &&
-                   (t.Length == keyword.Length || !char.IsLetter(t[keyword.Length]));
+            }
+
+            if (string.IsNullOrEmpty(name))
+                name = "Macro";
+
+            // Every exit from this method is logged. A run that declines to start is indistinguishable
+            // from one that never was asked to, unless it says which gate stopped it - and 2026-08-12 a
+            // Generate-and-Run stopped somewhere in here with nothing said at all.
+            DebugLog.Write("run", string.Format("Run: '{0}' confirm={1} unattended={2} delay={3}ms alreadyPushed={4} lines={5}",
+                name, confirm, unattended, startDelayMs, alreadyPushed, code.Split('\n').Length));
+
+            if (StartLoadedJob == null)
+            {
+                DebugLog.Write("run", "Run: REFUSED - no streamer wired (StartLoadedJob == null)");
+                // No streamer wired - refuse rather than flood (Feed Hold / Stop would not work).
+                UserPrompt.Show("Cannot run this program safely: the job streamer is not available, so motion would be sent without flow control and Feed Hold / Stop would be unresponsive.",
+                    "ioSender", PromptButtons.OK, PromptIcon.Error);
+                return false;
+            }
+
+            // Busy guard: a macro run means "load this as the job and press Cycle Start" - doing that
+            // while a job is streaming would collide with it, and doing it while held/jogging/tool-
+            // changing would make the programmatic Cycle Start a RESUME of that state instead of a
+            // start. The retired engine's deferred Background-priority start merely broke quietly in
+            // these states; the unified immediate start must refuse them explicitly.
+            var grblState = model.GrblState.State;
+            if (model.IsJobRunning || JobTimer.IsRunning || grblState == GrblStates.Run || grblState == GrblStates.Hold ||
+                grblState == GrblStates.Jog || grblState == GrblStates.Tool || grblState == GrblStates.Door)
+            {
+                DebugLog.Write("run", string.Format("Run: REFUSED - machine busy (state={0} IsJobRunning={1} JobTimer={2})",
+                    grblState, model.IsJobRunning, JobTimer.IsRunning));
+                UserPrompt.Show(string.Format("Cannot run macro \"{0}\": the machine is busy (a job is running, held or jogging). Let it finish or stop it first.", name),
+                    "ioSender", PromptButtons.OK, PromptIcon.Warning);
+                return false;
+            }
+
+            // A macro whose body is a single "@<path>" line is a reference to an external file - load and
+            // run that file's current contents (re-read every run, so the macro can be developed by
+            // editing the file - no copy/paste back into ioSender).
+            if (!MacroRunner.ResolveFileReference(ref code, name))
+                return false;
+
+            MacroRunner.SaveGeneratedCopy(name, code);
+
+            var lines = code.Replace("\r", string.Empty).Split('\n');
+
+            // O-word/#-expression lines can only be streamed verbatim when the controller evaluates
+            // expressions itself; there is no safe fallback (MDI is reserved for typed text), so refuse
+            // outright rather than send it unfiltered. Same rule the retired Flush applied per burst.
+            if (!GrblInfo.ExpressionsSupported)
+            {
+                foreach (var l in lines)
+                    if (l.IndexOf("O<", StringComparison.OrdinalIgnoreCase) >= 0 || l.IndexOf('#') >= 0)
+                    {
+                        DebugLog.Write("run", string.Format("Run: REFUSED - EXPR not reported and the program needs it (first offending line: {0})", l.Trim()));
+                        UserPrompt.Show("This macro uses O-word/parameter (#) syntax, which needs the controller to support NGC expressions (EXPR). This controller does not report that support, so ioSender cannot run it.",
+                            "ioSender", PromptButtons.OK, PromptIcon.Error);
+                        return false;
+                    }
+            }
+
+            // Sanitize comments per line - see MacroRunner.SanitizeProgram for the rule, and for why a
+            // directive row is exempt from the length limit but NOT from paren flattening. This loop used
+            // to live here and skipped directive rows outright, which is what garbled an (MBOX) prompt.
+            code = MacroRunner.SanitizeProgram(code);
+            lines = code.Replace("\r", string.Empty).Split('\n');
+
+            // Confirm-before-run - but an input prompt's OK/Cancel is itself the run confirmation, so
+            // when the macro has (PROMPT param, ...) fields the field dialog (shown by JobRunner.Run's
+            // up-front gate) does the confirming and a separate box here would be redundant. Same rule
+            // the retired engine applied.
+            if (confirm && !unattended && MacroRunner.CollectPromptFields(lines).Count == 0 &&
+                UserPrompt.Show(string.Format("Run {0} macro?", name), "ioSender",
+                    PromptButtons.YesNo, PromptIcon.Question) != PromptResult.Yes)
+            {
+                DebugLog.Write("run", "Run: declined - operator answered No to the run confirmation");
+                return false;
+            }
+
+            // Make the macro the loaded job, previous job pushed aside. Program_FileChanged clears
+            // IsDryRunMode by design on every load - re-arm it (Work Order's Generate idiom): the
+            // retired engine kept an armed dry run active across macro runs (per-line neutralisation
+            // only - the pump still applies exactly that; the Z-shift preamble is skipped for macro
+            // runs, see JobRunner.ArmMacroRun).
+            bool dryRunArmed = model.IsDryRunMode;
+            // Don't push a SECOND slot when the caller already made this program the loaded job at Generate
+            // time (see alreadyPushed) - the LoadText below replaces it in place, and its own pushed
+            // snapshot is the one the watcher pops. Gated on the loaded job actually still being ours, not
+            // on the caller's word alone: if something else was loaded in between, skipping the push would
+            // load over THAT file with nothing left to restore it. Pushing is the safe direction.
+            // A Generate-first tab whose Generate already handed this program to the Job tab is the same
+            // case, established from the shared record rather than the caller's word - see IsHandedOff.
+            // Its watcher, armed back at Generate time, owns the pop, the discard and the return to the
+            // originating tab, so this run must add neither a push nor a second watcher below.
+            bool handedOff = IsHandedOff(model, name);
+            if (handedOff || (alreadyPushed && model.FileName == name))
+                DebugLog.Write("run", string.Format("Run: '{0}' is already the loaded job{1} - reloading in place, not pushing a second slot",
+                    name, handedOff ? " (handed off from " + _borrowedOrigin + ")" : string.Empty));
+            else
+            {
+                if (alreadyPushed)
+                    DebugLog.Write("run", string.Format("Run: caller reported '{0}' already pushed, but the loaded job is '{1}' - pushing anyway", name, model.FileName));
+                GCode.File.Push();
+            }
+            // The (PROMPT) field dialog now fires inside LoadText (GCodeProgram.CollectLoadPrompts). An
+            // unattended run has no operator to ask - suppress it and the fields keep their declared
+            // defaults, the same contract JobRunner's own unattended path always had.
+            GCodeProgram.SuppressLoadPrompt = unattended;
+            try { GCode.File.LoadText(name, code); }
+            finally { GCodeProgram.SuppressLoadPrompt = false; }
+            model.IsDryRunMode = dryRunArmed;
+
+            // Watch the run to its TRUE terminal (Idle/NoFile after a genuine Send) and pop the borrowed
+            // job back - WorkOrderView.WatchForRunEnd's proven pattern, armed BEFORE the start below so
+            // even a run that finishes inside the start call's own event pumping cannot be missed.
+            // Left in place through an Error/Halted (alarm) on purpose: the pop then happens on the
+            // Idle that follows the operator's reset/unlock, so they can see what failed first.
+            // Captured at ARM time: a completed job is then detectable from the counter even if the
+            // JobFinished transition itself is never observed, which happens whenever the UI thread is busy
+            // long enough for JobFinished and Idle to coalesce - a modal dialog raised by the running
+            // program is enough. See GrblViewModel.JobFinishedSeq.
+            int finishedSeqAtArm = model.JobFinishedSeq;
+            bool started = false, jobFinished = false, sawError = false;
+            System.ComponentModel.PropertyChangedEventHandler handler = null;
+            handler = (s, e) =>
+            {
+                if (e.PropertyName != nameof(GrblViewModel.StreamingState))
+                    return;
+                var st = model.StreamingState;
+                // Only THIS macro's Send latches the watcher (same gate, same incident class as
+                // WorkOrderView.WatchForRunEnd): a refused start (e.g. PREREQ) leaves this armed, and
+                // without the FileName gate the next unrelated run would latch it and burn the watcher
+                // on a foreign terminal - disarming without popping this macro's pushed slot.
+                if (st == StreamingState.Send && model.FileName == name)
+                    started = true;
+                if (st == StreamingState.JobFinished || model.JobFinishedSeq != finishedSeqAtArm)
+                    jobFinished = true;
+                // Latch a failed run: this watcher only completes at the Idle/NoFile that follows the
+                // operator's reset/unlock, so without the latch an alarmed run would be treated exactly
+                // like a clean one by the view-dismissal below.
+                if (st == StreamingState.Error || st == StreamingState.Halted)
+                    sawError = true;
+                if (!started || (st != StreamingState.Idle && st != StreamingState.NoFile))
+                    return;
+                model.PropertyChanged -= handler;
+                // A handed-off program's teardown belongs to the handoff watcher, which was armed first and
+                // has therefore already run by the time this fires: it popped, dismissed the view, discarded
+                // the program, switched back, and made our own onDone call (Run passed it along below).
+                // Everything past this point would be a second helping of exactly that.
+                if (handedOff)
+                {
+                    DebugLog.Write("run", string.Format("Run watcher: '{0}' terminal={1} - the handoff watcher owns the teardown", name, st));
+                    return;
+                }
+                // Self-disarm without popping if the loaded job is no longer ours (a different file got
+                // loaded before the terminal was seen) - popping would yank that file out from under the
+                // operator. Same guard as WatchForRunEnd.
+                if (model.FileName != name)
+                    DebugLog.Write("macro", string.Format("Run watcher: terminal but loaded job is '{0}', not '{1}' - disarming without pop", model.FileName, name));
+                else
+                {
+                    // st is in here because it was not, and its absence cost two passes over the same
+                    // symptom: "jobFinished=False" says the discard did not happen, never which terminal
+                    // got there first. JobFinished comes from OnProgramEnd (the controller's own
+                    // "[MSG:Pgm End]"), so a program whose final acks land before the motion finishes
+                    // terminates on Idle instead and the discard is silently skipped.
+                    DebugLog.Write("macro", string.Format("Run watcher: '{0}' terminal={1} (jobFinished={2}) - popping the borrowed program", name, st, jobFinished));
+                    GCode.File.Pop();
+                }
+                // The run is over and there is nothing actionable left to look at: dismiss the expanded
+                // program view rather than leaving it sitting open showing wherever the last executed
+                // line happened to land - RestoreSourceOnEnd's old clean-finish behavior, found missing
+                // on the first Step 7 hardware test (Setup ran fine, its preview overlay stayed up).
+                // Works uniformly for a tool's own preview pane (Setup, Stepper Calibration, ...) - all
+                // go through the same ProgramView.Active/Disconnect mechanism. On a failed run (see the
+                // sawError latch above) the view is left up on purpose, so the operator can see
+                // where/what failed - same polarity as the old code's Error/Halted branch.
+                // NOT the loaded job's own view. GCode.File.Pop() above ends in RaiseFileChanged, which
+                // reconnects jobProgramView SYNCHRONOUSLY (MainWindow.OnJobFileChanged) - so by the time we
+                // reach here the active view IS the restored job, and disconnecting it detached the Job tab's
+                // own view from the program it had just put back. What this line is for is a tool's TRANSIENT
+                // preview; the loaded job is never that.
+                if (!sawError && ProgramView.Active != null && !ProgramView.Active.IsLoadedJob)
+                    ProgramView.Active.Disconnect();
+                // A Generate-first tool tab's run just finished cleanly: drop the in-memory program and
+                // revert the Run bar to "Generate" - the operator re-generates for the next job rather
+                // than re-running a stale program. RestoreSourceOnEnd's clean-finish behavior, preserved
+                // with its exact condition: NOT on error/halt or a Feed Hold + Stop (jobFinished false),
+                // so the operator can still inspect/resume the SAME generated program.
+                if (jobFinished && SupportsGenerateMode)
+                    DiscardGenerated?.Invoke();
+                onDone?.Invoke(jobFinished);
+            };
+            model.PropertyChanged += handler;
+            // The handoff watcher reaches the terminal first (it subscribed back at Generate time) and is
+            // the one that pops, so it is also the one that has to make this call - handing it over here
+            // rather than letting the handler above do it is what keeps onDone firing exactly once, AFTER
+            // the previous job is back.
+            if (handedOff)
+                _borrowedOnDone = onDone;
+
+            // Give the operator a beat before motion when the caller has just moved them to another tab.
+            // The program is already loaded and drawn by this point, so the pause is spent looking at the
+            // toolpath that is about to be run rather than at an empty view - and it is the difference
+            // between arriving on the Job tab and finding a probe cycle already under way. Pumped rather
+            // than slept: the load, the 3D view and the block list all still need the UI thread.
+            if (startDelayMs > 0)
+            {
+                model.Message = string.Format("{0} loaded - starting in {1} s...", name, (startDelayMs + 999) / 1000);
+                var until = DateTime.Now.AddMilliseconds(startDelayMs);
+                while (DateTime.Now < until)
+                    EventUtils.DoEvents();
+            }
+
+            DebugLog.Write("run", string.Format("Run: calling StartLoadedJob(unattended={0}) - loaded '{1}', {2} block(s)",
+                unattended, model.FileName, GCode.File.Data?.Count ?? -1));
+
+            StartLoadedJob(unattended);
+
+            DebugLog.Write("run", string.Format("Run: StartLoadedJob returned - started={0} StreamingState={1} GrblState={2}",
+                started, model.StreamingState, model.GrblState.State));
+
+            // JobRunner.Run's own up-front gates (PREREQ unmet, the field dialog's Cancel) return without
+            // starting anything - no terminal will ever fire the watcher, so detect it here: no Send seen
+            // means nothing started. Undo the push and report the refusal. (A macro so short it already
+            // FINISHED inside the start call still set 'started' on its way through Send - the watcher
+            // has then popped and completed normally, and this is not taken.)
+            if (!started)
+            {
+                model.PropertyChanged -= handler;
+                // A handed-off program's slot belongs to the handoff record - popping it directly would
+                // leave that record claiming a borrow it no longer has, and the still-armed handoff watcher
+                // waiting for a terminal that will never come. ReleaseHandoff is the one undo for both.
+                if (handedOff)
+                    ReleaseHandoff(model);
+                else
+                    GCode.File.Pop();
+                DebugLog.Write("macro", string.Format("Run: '{0}' did not start (gate refused/cancelled) - popped the borrowed program", name));
+                return false;
+            }
+
+            return true;
         }
 
-        // The text inside the parentheses after the keyword (and the following comma/space), e.g.
-        // "(MBOX, OKCANCEL, hi)" -> "OKCANCEL, hi".
-        private static string Body(string line, string keyword)
+        // --- The frame every generated program is built inside -----------------------------------------
+        //
+        // Nine builders across five tabs (Work Order, Setup x4, both stepper-calibration wizards, Auto
+        // Square) each open and close a program the same way, and each had written it out longhand. The
+        // duplication was not harmless: the modal line was spelled in two different orders for no reason,
+        // Work Order hand-rolled the Z lift that EmitGotoG30 exists to own, and Auto Square simply forgot
+        // to park at all - it finished over the last hole it drilled, which is the post-condition class
+        // that destroyed a toolsetter on 2026-09-14.
+        //
+        // Three methods rather than one "emit the whole prologue", because the ORDER is not shared. Setup
+        // and the probe wizard put the modal line straight after the gate and park much later, after a
+        // pile of parameter assignments; Work Order puts its tool declarations in between; the scratch
+        // wizard parked BEFORE establishing units at all. Folding those into one call would silently
+        // reorder machine-moving g-code, which a refactor does not get to do. Each piece goes in at the
+        // position its caller already uses.
+
+        /// <summary>
+        /// A program's opening: its identifying comment(s), then the prerequisite gate.
+        /// </summary>
+        /// <param name="prereq">
+        /// The condition list INSIDE <c>(PREREQ, ...)</c>. Deliberately passed whole rather than assembled
+        /// from flags: "connected, homed" is the only condition all nine share, and the rest genuinely
+        /// differ per program (EXPR, noalarm, tlo, G30, G59.3, ATC=1, a named WCS). A builder that needs a
+        /// condition states it; nothing is added behind its back.
+        /// </param>
+        public static void EmitProgramHeader(System.Action<string> L, string prereq, params string[] comments)
         {
-            string t = line.Trim();
-            int close = t.LastIndexOf(')');
-            string inner = (close >= 1 ? t.Substring(1, close - 1) : t.Substring(1)).TrimStart();
-            inner = inner.Substring(Math.Min(keyword.Length, inner.Length));   // drop the keyword
-            return inner.TrimStart(' ', ',');
+            foreach (var c in comments)
+                if (!string.IsNullOrEmpty(c))
+                    L(c.StartsWith("(") ? c : "(" + c + ")");
+            L("(PREREQ, " + prereq + ")");
+        }
+
+        /// <summary>
+        /// The modal state every generated program establishes before it moves: millimetres, absolute
+        /// distance, feed per minute, XY plane.
+        /// </summary>
+        /// <param name="cancelToolOffset">
+        /// Emit <c>G49</c> as well. NOT the default, and not a tidy-up: on this machine a tool length
+        /// offset is what makes one work Z0 mean the same thing for every tool (tc.macro applies a G43.1 on
+        /// every M6, against the machine-wide baseline), so cancelling it leaves Z0 referenced to whatever
+        /// tool last had an offset. See the scratch wizard, which says at length why it does NOT pass this.
+        /// </param>
+        public static void EmitModalDefaults(System.Action<string> L, bool cancelToolOffset = false)
+        {
+            // One spelling. The two that existed - "G21 G90 G94 G17" and "G90 G94 G17 G21" - are the same
+            // four modal groups in a different order, so this settles a cosmetic split, not a behavioural one.
+            L("G21 G90 G94 G17");
+            if (cancelToolOffset)
+                L("G49");
+        }
+
+        /// <summary>
+        /// A program's close: stop the spindle, park, end.
+        /// </summary>
+        /// <param name="parkAtG30">
+        /// Park at G30 rather than finishing wherever the last cut left the tool. Effectively always true -
+        /// a program must hand the machine back somewhere the NEXT one expects to find it, and every
+        /// hardware failure in the 2026-09-13/14 run was a program that did not. It stays a parameter only
+        /// because a caller must be able to say so deliberately.
+        /// </param>
+        /// <param name="endWord">
+        /// <c>M30</c> or <c>M2</c>. NOT unified - M30 rewinds and resets modal state where M2 does not, so
+        /// which one a program ends with is the program's business, not the frame's.
+        /// </param>
+        public static void EmitProgramFooter(System.Action<string> L, bool stopSpindle, bool parkAtG30, string endWord)
+        {
+            if (stopSpindle)
+                L("M5");
+            // The park has to be the last thing that MOVES, and it has to move at all. A program whose
+            // final lines are non-motion (a parameter assignment, a PRINT, M30) reaches Idle before the
+            // controller's own "[MSG:Pgm End]" arrives, and the run watcher has unsubscribed 49 ms before
+            // JobFinished turns up - measured 2026-09-14 11:15:43.251 vs .300. The program then never gets
+            // discarded and the Run bar stays stuck on "Run".
+            if (parkAtG30)
+                EmitGotoG30(L);
+            L(endWord);
+        }
+
+        public static void SaveGeneratedCopy(string name, string code)
+        {
+            MacroRunner.SaveGeneratedCopy(name, code);
+        }
+
+        public static void EmitGotoG30(System.Action<string> L)
+        {
+            MacroRunner.EmitGotoG30(L);
+        }
+
+        /// <summary>
+        /// Emit a <c>G10 L2</c> write against the ACTIVE coordinate system, then repair the parser position
+        /// it corrupts. Use this for every such write - never the bare G10 L2 line.
+        /// </summary>
+        /// <remarks>
+        /// grblHAL (gcode.c, NonModal_Settings ~4259-4280) converts gc_state.position machine -> work, applies
+        /// the new coordinate data, then converts work -> machine. The two halves are guarded INDEPENDENTLY
+        /// when they have to be paired:
+        ///
+        ///     to-work    runs if OLD rotation != 0 AND old != new
+        ///     to-machine runs if NEW rotation != 0
+        ///
+        /// so whenever the active system carries a rotation, some write runs one half alone and the parser is
+        /// left holding coordinates in the wrong frame. The next move that leaves an axis UNNAMED then holds
+        /// that axis at the corrupted value - and a "G53 G0 Z0" lift is exactly that.
+        ///
+        /// It is NOT only rotation writes. Observed on hardware 2026-09-16 by the Squareness (probe) tool:
+        /// "G10 L2 P1 X0 Y0 Z0" - no R word at all - against a G54 holding a 0.10 deg rotation left the
+        /// rotation untouched (old == new != 0), so only the to-machine half ran. The machine was standing at
+        /// 20.001,-20.003 with WCO 128.392,-662.315; the very next line, a bare "G53 G0 Z0", rapided to
+        /// 148.4,-682.3 - MPos + WCO to a thousandth of a millimetre, 662 mm of unplanned Y at 16824 mm/min,
+        /// with a probe in the spindle. That commit (860656e5) repaired the rotation-write door; this is the
+        /// offset-write door beside it, and every "G10 L2 P1 X0 Y0 Z0" in the app was standing in it.
+        ///
+        /// The repair: after the write, command an ABSOLUTE move that NAMES X and Y, so the parser's position
+        /// is overwritten with a target rather than carried forward. Naming them from #&lt;_abs_x&gt;/#&lt;_abs_y&gt; is
+        /// what makes it self-correcting - those read the STEPPER position (ngc_params.c _absolute_pos), not
+        /// the parser's, so they are true however corrupt gc_state.position is.
+        ///
+        /// The G4 P0 is load-bearing, not politeness: those parameters are read at PARSE time, which runs
+        /// ahead of motion, so mid-stream they would answer with a position the machine has not reached yet
+        /// and the "no-op" move would drive BACKWARDS to it. mc_dwell calls protocol_buffer_synchronize
+        /// unconditionally, so after G4 P0 parse time == real position.
+        ///
+        /// Z IS NAMED TOO, since 2026-09-18. It was not, on the reasoning that "only the plane axes are
+        /// corrupted, and naming Z here would turn a repair into a plunge". The first half of that is wrong
+        /// and the second half only applies to naming Z with a value that could be wrong.
+        ///
+        /// What the firmware converts is the whole POSITION, machine to work and back - and a work position
+        /// differs from a machine one in Z by the coordinate system's Z offset, rotation or no rotation. So
+        /// half-repairing left the parser holding a work Z it believed was a machine Z, off by exactly that
+        /// offset, and the next move that computed a Z target from it was working from a number 100 mm out.
+        ///
+        /// Caught on hardware 2026-09-18, and the arithmetic matches to the millimetre. A height map probed
+        /// its first point at machine Z-88.729 with a G54 Z offset of -103.702; work Z was therefore +14.97,
+        /// and the parser believed that WAS machine Z. The next line - a G91 "G0Z10" retract - asked for
+        /// +24.97, above the machine's Z maximum of 0, and grblHAL refused it with ALARM:2 soft limit. The
+        /// run died on its first retract having captured one point of seventy-seven, and the message the
+        /// operator got said only that the map could not be built.
+        ///
+        /// Naming Z from #&lt;_abs_z&gt; is not a plunge: like X and Y it reads the STEPPER position, so the
+        /// move is to where the machine already is. It is the same self-correcting trick, applied to the
+        /// axis that was left out of it.
+        ///
+        /// The real fix belongs in the firmware (pair the guards) and is tracked separately.
+        /// </remarks>
+        public static void EmitWcsWrite(System.Action<string> L, string g10Line)
+        {
+            L(g10Line);
+            L("G4 P0");                                            // drain the queue - #<_abs_*> are read at parse time
+            L("G53 G0 X[#<_abs_x>] Y[#<_abs_y>] Z[#<_abs_z>]");    // no-op move; resyncs the parser from the steppers
+        }
+
+        // ---- tool length offset for the tool ALREADY in the spindle ------------------------------------
+        //
+        // Moved here from StartJobView 2026-09-14, unchanged, so the stepper-calibration wizards can use the
+        // same sequence instead of growing a second copy of it. Setup is the proven caller; these three are
+        // its implementation, not a reimplementation of it.
+        //
+        // The three are a SET and are used in order - baseline, reference, restore. What they solve is
+        // "the right bit is already fitted, so no M6 will run, so nothing gives it a tool length offset".
+        // That is not a theoretical gap: per StartJobView's own account it cut a spoilboard on 2026-08-06,
+        // when a second run with the same endmill already fitted emitted no M6, nothing re-applied the
+        // offset, and the job rapided to a work Z0 15.432mm inside the material. The offset was never
+        // stale - it was discarded.
+
+        /// <summary>
+        /// Load the machine-wide TLO baseline, saving whatever <c>#&lt;_tlo_ref&gt;</c> held.
+        /// </summary>
+        /// <remarks>
+        /// <paramref name="tloAlreadyReferenced"/> comes from the controller's own $TLR report
+        /// (GrblViewModel.IsTloReferenceSet) and is decided in C#, NOT with an O-word IF in the streamed
+        /// program: a bare ELSE/ENDIF line is silently dropped by the streaming pipeline, leaving the
+        /// controller's o-word engine waiting for an ENDIF that never comes - it keeps acking lines and
+        /// stops queuing motion for the rest of the session. Confirmed on real hardware 2026-08-01.
+        /// </remarks>
+        public static void EmitTloBaseline(System.Action<string> L, bool tloAlreadyReferenced, double baseline)
+        {
+            L(tloAlreadyReferenced ? "#<_tlo_saved> = #<_tlo_ref>" : "#<_tlo_saved> = 0");
+            L(string.Format("#<_tlo_ref> = {0}", N(baseline)));
+        }
+
+        /// <summary>
+        /// Give the tool currently in the spindle a tool length offset by touching the puck - no tool
+        /// change, so no operator prompt and no swap.
+        /// </summary>
+        /// <summary>
+        /// Give the tool currently in the spindle a tool length offset by touching the puck - no tool
+        /// change, so no operator prompt and no swap.
+        /// </summary>
+        /// <param name="toolId">
+        /// What is in the spindle. 8 is the 3D probe stylus, which probes the MAIN input because it must
+        /// not bear down on the puck; anything else is a rigid cutting tool and pushes the puck's own
+        /// switch on the TOOLSETTER input. tlo.macro makes that choice - do not pre-decide it here.
+        /// </param>
+        /// <remarks>
+        /// This USED to emit the whole sequence inline, as a copy of tc.macro's puck section. The copy had
+        /// drifted: it probed Z-80 where the macro had been raised to Z-90 after a short V-bit threw
+        /// Alarm:5 five mm short of the puck on real hardware; it restored a hardcoded G54 where the macro
+        /// restores the caller's own WCS and says in as many words that it must not be hardcoded; and it
+        /// selected the toolsetter input unconditionally where the macro branches three ways.
+        ///
+        /// The last two could never have been right in a streamed program - both need o-word branching, and
+        /// o-word flow control cannot be streamed to grblHAL (a bare ELSE/ENDIF is dropped by the line
+        /// pipeline and wedges the controller's o-word engine). So the copy was not merely at risk of
+        /// drifting, it was structurally incapable of matching. It is a CALL now, like pcorner.
+        ///
+        /// G92.2/G92.3 are tlo.macro's own, so a caller needs no coordinate-frame ceremony around this.
+        ///
+        /// LEAVES THE MACHINE PARKED AT G30, IN <paramref name="returnWcs"/>. That is a guarantee, not a
+        /// convenience: tlo.macro itself ends standing on the puck in G59.3, and a caller that continues
+        /// from there in a work frame drives into the toolsetter. Do not "optimise away" either line.
+        /// </remarks>
+        public static void EmitTloReference(System.Action<string> L, int toolId, string returnWcs)
+        {
+            L("(--- reference the loaded tool at the puck - see tlo.macro ---)");
+            L(string.Format("#<_tlo_toolid> = {0}", toolId));
+            // BOTH of tlo.macro's inputs, every call. #<_tc_touchplate> is the one this used to leave to
+            // chance, and tlo.macro's own header is where the trap was written down: "Set by tc.macro's own
+            // header; read here so both callers see one rule" - true of the READ, and only one of the two
+            // callers was setting it. Named parameters do not survive a controller reset, so a generated
+            // program that called tlo before any tool change this boot hit "o150 IF [#<_tc_touchplate> EQ 1]"
+            // against an UNDEFINED parameter: grblHAL error 2, "Missing the expected G-code word value".
+            //
+            // It hid for as long as it did because a tool change earlier in the same session leaves the
+            // parameter set, so only the FIRST reference after a reboot fails - and on 2026-09-14 that was a
+            // Setup run 90 seconds after a reset, which is exactly the sequence nobody tries twice.
+            //
+            // Two ways to be in touch-plate mode, and the second one was missing.
+            //
+            // The obvious one: the controller reports no toolsetter hardware, so there is no toolsetter
+            // input to select and everything probes on the main one.
+            //
+            // The one that was wrong: a machine that HAS a toolsetter fitted can still be using a touch
+            // plate at G59.3 - that is the operator's choice, made in Machine Setup step 5, and it is a
+            // fact about what is bolted to the table that GrblInfo cannot answer. A plate has no switch;
+            // it closes the circuit through the tool, and in practice every plate is wired together onto
+            // the one main probe input. Selecting the toolsetter input for it gives a probe move that can
+            // never trigger, which does not stop at the plate - it drives into it.
+            bool touchPlateMode = !GrblInfo.HasToolSetter || ProbeDefinitions.TloTargetIsTouchPlate;
+            L(string.Format("#<_tc_touchplate> = {0}", touchPlateMode ? 1 : 0));
+            L("O<tlo> CALL");
+            // Immediately after the CALL, before anything else this caller emits. The program streams as ONE
+            // job, so without a sync point here a puck probe that alarms does not actually stop it - the
+            // controller halts and the sender keeps feeding lines that quietly error. Same reason Setup has
+            // one after every corner probe.
+            L("(WAITIDLE)");
+
+            // ---- SAFE POST-CONDITION, AND IT IS NOT THE CALLER'S TO REMEMBER --------------------------
+            // This emitter leaves the machine PARKED AT G30 IN THE CALLER'S OWN WCS. Both halves are here
+            // because both were got wrong on 2026-09-14 and each cost real hardware:
+            //
+            // The WCS. tlo.macro selects G59.3 to reach the puck and restores the caller's frame from
+            // #5220 on the way out. On this machine that restore did not take - the wire log has WCS:G59.3
+            // from the moment tlo.macro first ran and never anything else again - so the next program line
+            // that was not a G53 addressed the puck's frame instead of the job's. pcorner's face seek is
+            // exactly such a line, and it asked for a target 816mm outside travel: Alarm:2. Naming the WCS
+            // here does not replace the macro's restore, it makes the macro's restore not load-bearing.
+            //
+            // The park. tlo.macro deliberately ends AT THE PUCK, lifted 10mm, and I made that a documented
+            // post-condition and then removed the caller-side G30 from a program as "a pointless round
+            // trip". It was the only thing standing the spindle off the puck. What followed was S18000 M3
+            // and a G0 to a WORK Z that sits far below the puck, so a 60-degree V-bit at 15000 rpm was
+            // driven into the toolsetter and destroyed it. A few seconds of travel is not a cost worth
+            // weighing against that, and no caller should have to know it is standing on the puck.
+            if (!string.IsNullOrEmpty(returnWcs))
+                L(returnWcs);
+            EmitGotoG30(L);
+            L("(WAITIDLE)");
+        }
+
+        /// <summary>
+        /// Re-apply the measured offset and put <c>#&lt;_tlo_ref&gt;</c> back.
+        /// </summary>
+        /// <remarks>
+        /// G43.1 sets the offset absolutely, so re-emitting it costs nothing if it somehow survived - and
+        /// it does not survive a pcorner call, whose absolute G53 moves need true machine coordinates and
+        /// so cancel it. Only covers a CLEAN finish; an aborted run leaves #&lt;_tlo_ref&gt; at the baseline
+        /// this run loaded rather than the true prior value - safe, since the baseline is itself a trusted
+        /// reference, just not a perfect restore. Known, accepted gap.
+        /// </remarks>
+        public static void EmitTloRestore(System.Action<string> L)
+        {
+            L("(--- restore the tool length offset the probe measured ---)");
+            L("G43.1 Z[#<_probe_z> - #<_tlo_ref>]");
+            L("(PRINT, LS_TLO_RESTORED tlo=[#<_probe_z> - #<_tlo_ref>])");
+            L("#<_tlo_ref> = #<_tlo_saved>");
+        }
+
+        private static string N(double v) { return v.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture); }
+
+        public static bool CoordinateSystemDefined(string code)
+        {
+            return MacroRunner.CoordinateSystemDefined(code);
+        }
+
+        public static string StoredPositionUnreachable(string code)
+        {
+            return MacroRunner.StoredPositionUnreachable(code);
+        }
+
+        /// <summary>
+        /// Point the engine's operator seams at this assembly's dialogs. Called once at startup, same idiom
+        /// as AppDialogs.RegisterCorePrompts. Without it the engine still runs - it just takes each (PROMPT)
+        /// field's declared default and treats every (MBOX) as acknowledged, which is what an unattended run
+        /// does on purpose.
+        /// </summary>
+        public static void RegisterPrompts()
+        {
+            MacroRunner.FieldPrompt = ShowPromptDialog;
+            MacroRunner.HoldPrompt = ShowHoldPrompt;
         }
     }
 }

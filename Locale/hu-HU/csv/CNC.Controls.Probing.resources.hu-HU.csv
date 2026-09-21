@@ -79,8 +79,6 @@ CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,hdr_preview:System.W
 CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,lbl_addOffset:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Eltolás hozzáadása
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,lbl_addOffset:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,"Determine X0,Y0 for right angled workpiece"
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,lbl_addOffset:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Adds a probe point on the left edge.
-CNC.Controls.Probing.g.en-US.resources:configcontrol.baml,lbl_chkProbeConnected:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Egy párbeszédpanel jelenik meg mindaddig, amíg a szondát érvényesítik vagy a párbeszédpanelt meg nem szakítják."
-CNC.Controls.Probing.g.en-US.resources:configcontrol.baml,lbl_chkProbeConnected:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,A szonda manuális ellenőrzése csatlakoztatva van
 CNC.Controls.Probing.g.en-US.resources:configcontrol.baml,lbl_chkProbeStatus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"A vezérlő riasztást generál, ha nincs engedélyezve, és a szonda érvényesül."
 CNC.Controls.Probing.g.en-US.resources:configcontrol.baml,lbl_chkProbeStatus:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,Indítás előtt ellenőrizze a szonda állapotát (G59.3)
 CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,lbl_clearToolOffset:System.Windows.Controls.ContentControl.Content,Button,True,True,,Tiszta szerszámhossz-eltolás
@@ -161,7 +159,6 @@ CNC.Controls.Probing.g.en-US.resources:probingview.baml,str_jogActive:System.Str
 CNC.Controls.Probing.g.en-US.resources:probingview.baml,str_jogDisabled:System.String.$Content,None,True,True,,Billentyűzet kocogás letiltva
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_macroChangedSave:System.String.$Content,None,True,True,,"Macro was changed, save?"
 CNC.Controls.Probing.g.en-US.resources:centerfindercontrol.baml,str_positionsRequired:System.String.$Content,None,True,True,,{0} szondapozíció szükséges.
-CNC.Controls.Probing.g.en-US.resources:probeverify.baml,str_probeVerify:System.Windows.Controls.ContentControl.Content,Label,True,True,,Állítsd a szondát a kapcsolat ellenőrzéséhez.
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probing:System.String.$Content,None,True,True,,Szondázás...
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingDistanceError:System.String.$Content,None,True,True,,"A tapintó távolságnak nagyobbnak kell lennie, mint az XY hézag + ½ tapintó/szerszám átmérő."
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingFailedAlarm:System.String.$Content,None,True,True,,"A szondázás nem sikerült riasztással, törölje a Grbl lapon."
@@ -173,11 +170,9 @@ CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingLatchDistanceE
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingNoPos:System.String.$Content,None,True,True,,"A tapintás nem sikerült, nem sikerült megállapítani a gép aktuális pozícióját."
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingNoProbe:System.String.$Content,None,True,True,,"A szondázás sikertelen, a szonda nincs csatlakoztatva."
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingNotIdle:System.String.$Content,None,True,True,,"A tapintás nem sikerült, a Grbl nincs tétlen vagy szerszámcsere állapotban."
-CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingNoVerifyContinue:System.String.$Content,None,True,True,,"A szonda kapcsolatának ellenőrzése nem történt meg, mégis folytatja?"
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingProbeAsserted:System.String.$Content,None,True,True,,"A szondázás sikertelen, a szonda jele érvényesül."
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingProbingAtX0Y0:System.String.$Content,None,True,True,,Probing @X0Y0...
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingRadiusArcs:System.String.$Content,None,True,True,,"A GCode XZ vagy YZ síkban íveket tartalmaz (G18/19), transzformáció nem alkalmazható. Használat &apos;Arcs to Lines&apos; ha tényleg szüksége van erre."
-CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingVerifyStart:System.String.$Content,None,True,True,,Nyomja meg újra a [Start] gombot a tapintás megkezdéséhez.
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,str_rotationCompleted:System.String.$Content,None,True,True,,A szondázás befejeződött.
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,str_rotationFailed:System.String.$Content,None,True,True,,A szondázás nem sikerült
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,str_rotationInitFailed:System.String.$Content,None,True,True,,Szög: {0} fok
@@ -241,3 +236,4 @@ CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,str_rotationDescript
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,txt_warning:System.Windows.Documents.Run.Text,Text,True,True,,Warning! Use with care - incorrect parameters may damage your probe!
 CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,str_toolLengthDescription:System.Windows.Documents.Run.Text,Text,True,True,,"Use after a tool change, or to set a tool-length reference, so the controller knows the current tool's length. Probes Z down onto a toolsetter or touch plate. Probe fixture @ G59.3 measures against a fixed toolsetter at a known machine position, so a new tool re-measures to the same reference (applied as G43.1). Establish reference offset stores the master-tool baseline other tools measure against; Clear removes the active offset (G49). Tick 'Also set work origin' to instead set work Z0 from a touch-off on the job. Probe: toolsetter / Z touch plate."
 CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,txt_warning:System.Windows.Documents.Run.Text,Text,True,True,,Warning! Use with care - incorrect parameters may damage your probe!
+CNC.Controls.Probing.g.en-US.resources:edgefinderintcontrol.baml,str_edgeIntFinderOffsetWarning:System.String.$Content,None,True,True,,Offset is less than XY Clearance + ½ Probe/tool diameter.\nUse Offset as clearance and run anyway?.

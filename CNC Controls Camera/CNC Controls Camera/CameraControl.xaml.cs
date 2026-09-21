@@ -46,7 +46,8 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AForge.Video.DirectShow;
-using CNC.Core;
+using CNC.Core;     // CameraMoveMode (CNC.Controls assembly) - NOT the CNC Core assembly, which this project no longer references
+using CNC.Client;   // MachineViewModel / MachineClient / Position - the wire-fed twin
 using System.Windows.Input;
 using System;
 
@@ -202,7 +203,7 @@ namespace CNC.Controls.Camera
 
         public System.Windows.Point CrosshairPos { get; set; } = crosshairCenter;
 
-        public GrblViewModel grbl {  get { return Grbl.GrblViewModel;  } }
+        public MachineViewModel grbl {  get { return MachineClient.Model;  } }
 
         public double XOffset
         {
@@ -325,12 +326,12 @@ namespace CNC.Controls.Camera
 
         private void btnPublish_Click(object sender, RoutedEventArgs e)
         {
-            Position pos = new Position(Grbl.GrblViewModel.MachinePosition, Grbl.GrblViewModel.UnitFactor);
+            Position pos = new Position(grbl.MachinePosition, grbl.UnitFactor);
 
             pos.X += XOffset;
             pos.Y += YOffset;
 
-            Grbl.GrblViewModel.CameraProbed(pos);
+            grbl.CameraProbed(pos);
         }
 
         private void cbxCamera_SelectionChanged(object sender, SelectionChangedEventArgs e)

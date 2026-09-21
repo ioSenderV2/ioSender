@@ -85,7 +85,11 @@ namespace CNC.Controls.Viewer
 
         public void Setup(UIViewModel model, AppConfig profile)
         {
-            model.ConfigControls.Add(new ConfigControl());
+            // The GCode Viewer settings page used to be added here. It drove THIS renderer, which nothing
+            // in the UI can reach any more, so every option on it was inert: the 3D view in the Job tab
+            // never read a single one of them. The four that the carve view actually honours now live on
+            // the view itself, behind its View options button. Page and its control deleted, not hidden -
+            // a settings page that silently does nothing is worse than no page.
         }
 
         public void Open(List<GCodeToken> tokens)

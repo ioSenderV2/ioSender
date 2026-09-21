@@ -115,6 +115,16 @@ namespace CNC.Controls
         private GrblViewModel model = null;
         private bool _subscribed = false;
         private bool _restoringSelection = false;   // suppress persisting while we drive the dropdowns in code
+
+        // True while LoadCurrentSettings/BuildAxes are driving the fields from the controller, so the
+        // PropertyChanged storm they cause is not mistaken for the operator typing.
+        private bool _loading = false;
+        // True once the operator has actually changed something on this page. The refresh below refuses to
+        // discard their work, and this is the only trustworthy test for that: Changes.Count is NOT, because a
+        // stale table makes Changes non-empty all by itself - which is exactly the state we need to refresh
+        // out of.
+        private bool _userEdited = false;
+        private bool _settingsHookAttached = false;
         private Window _fwInfoWindow = null;
         private FirmwareUpdateManager.ReleaseInfo _pendingFwRelease = null;
         private string _lastFirmwareKey = null;   // GrblInfo.Version+"|"+DriverSha as last shown - see Model_PropertyChanged
@@ -278,14 +288,13 @@ namespace CNC.Controls
         // Drill into a setup step from a "Tab.MachineSetup.*" keyboard shortcut (via the host's ITabBindingHost).
         // Returns false (no change) when the step tab is not present.
         // ---- navigation pages (docs/Architecture-Settings-Nav-Overhaul.md) ----------------------
-        // The wizard's step tabs (and the Calibration step's own two sub-tabs) are nodes in the Machine
-        // Setup tree now. The wizard is NOT taken apart: it stays one control with every x:Name and every
-        // selection hook intact, and ShowPage() just drives the underlying TabControls - so
-        // Steps_SelectionChanged / Calibration_SelectionChanged keep firing exactly as before.
-
-        // Must match the Calibration page's own Key exactly - the host looks the parent up by key, and a
-        // near-miss fails silently by dropping the children at top level instead of under the heading.
-        public const string CalibrationCategoryKey = "Tab.MachineSetup.Calibration";
+        // The wizard's step tabs are nodes in the Machine Setup tree now. The wizard is NOT taken apart:
+        // it stays one control with every x:Name and every selection hook intact, and ShowPage() just
+        // drives the underlying TabControl - so Steps_SelectionChanged keeps firing exactly as before.
+        //
+        // The Calibration step and its sub-wizards left this file on 2026-09-13 - they are the top-level
+        // Calibration view now (see CalibrationView), because all three are Generate-first tools and this
+        // wizard opens in a window where the shared Run bar that drives them does not exist.
 
         // The nav key of whatever step is selected right now, so the host can mirror a selection the
         // wizard made itself (GoToStep from the startup setup gate) back into the tree.
@@ -303,9 +312,6 @@ namespace CNC.Controls
             if (tab == tabStepFixtures) return "Tab.MachineSetup.Fixtures";
             if (tab == tabStepMacros) return "Tab.MachineSetup.Macros";
             if (tab == tabStepSimulator) return "Tab.MachineSetup.Simulator";
-            if (tab == tabStepCalibration)
-                return tabCalibration?.SelectedItem == tabCalSquareness
-                     ? "Tab.MachineSetup.CalSquareness" : "Tab.MachineSetup.CalStepper";
             return null;
         }
 
@@ -349,11 +355,6 @@ namespace CNC.Controls
                 new SettingsSubPage("Tab.MachineSetup.Probes", HeaderText(tabStepProbes), this) { IndexRoot = tabStepProbes.Content as FrameworkElement, Status = () => hdrProbes.Foreground },
                 new SettingsSubPage("Tab.MachineSetup.Fixtures", HeaderText(tabStepFixtures), this) { IndexRoot = tabStepFixtures.Content as FrameworkElement, Status = () => hdrFixtures.Foreground },
                 new SettingsSubPage("Tab.MachineSetup.Macros", HeaderText(tabStepMacros), this) { IndexRoot = tabStepMacros.Content as FrameworkElement, Status = () => hdrMacros.Foreground },
-                new SettingsSubPage("Tab.MachineSetup.Calibration", HeaderText(tabStepCalibration), null) { Status = () => hdrCalibration.Foreground },
-                new SettingsSubPage("Tab.MachineSetup.CalStepper", Localized("SettingsPageCalStepper", "Stepper"), this)
-                    { IndexRoot = tabCalStepper.Content as FrameworkElement, Parent = CalibrationCategoryKey, IsAvailable = () => tabCalStepper.IsEnabled },
-                new SettingsSubPage("Tab.MachineSetup.CalSquareness", HeaderText(tabCalSquareness), this)
-                    { IndexRoot = tabCalSquareness.Content as FrameworkElement, Parent = CalibrationCategoryKey },
                 new SettingsSubPage("Tab.MachineSetup.Simulator", HeaderText(tabStepSimulator), this)
                     { IndexRoot = tabStepSimulator.Content as FrameworkElement, Status = () => hdrSimulator.Foreground, IsAvailable = () => tabStepSimulator.Visibility == Visibility.Visible }
             };
@@ -362,15 +363,6 @@ namespace CNC.Controls
 
         public void ShowPage(string key)
         {
-            // Calibration's children select the Calibration step AND the matching sub-tab. Order matters:
-            // set the sub-tab first, so entering the step activates the right wizard rather than the
-            // previously selected one and then immediately switching.
-            if (key == "Tab.MachineSetup.CalStepper" || key == "Tab.MachineSetup.CalSquareness")
-            {
-                tabCalibration.SelectedItem = key == "Tab.MachineSetup.CalStepper" ? tabCalStepper : tabCalSquareness;
-                tabSteps.SelectedItem = tabStepCalibration;
-                return;
-            }
             SelectSubTab(key);
         }
 
@@ -391,7 +383,6 @@ namespace CNC.Controls
                 case "Tab.MachineSetup.Probes": target = tabStepProbes; break;
                 case "Tab.MachineSetup.Fixtures": target = tabStepFixtures; break;
                 case "Tab.MachineSetup.Macros": target = tabStepMacros; break;
-                case "Tab.MachineSetup.Calibration": target = tabStepCalibration; break;
                 case "Tab.MachineSetup.Simulator": target = tabStepSimulator; break;
                 default: target = null; break;
             }
@@ -433,7 +424,6 @@ namespace CNC.Controls
             SetStepColor(hdrProbes, StepStatusOf(5));
             SetStepColor(hdrFixtures, StepState.Complete);
             SetStepColor(hdrMacros, StepStatusOf(7));
-            SetStepColor(hdrCalibration, StepState.Complete);
             SetStepColor(hdrSimulator, StepState.Complete);
 
             StepStatusChanged?.Invoke(this, EventArgs.Empty);
@@ -516,8 +506,15 @@ namespace CNC.Controls
                 grdProbes.ItemsSource = ProbeDefinitions.Items;
                 grdFixtures.ItemsSource = Fixtures.Items;
 
+                // Step 5's three questions all read live state - the probe library, the chosen tool-length
+                // probe, and the controller's own stored G30/G59.3 - so they are refreshed on activation
+                // rather than bound once.
+                LoadTloProbeChoices();
+                UpdateReferencePositions();
+
                 BuildAxes();
                 LoadCurrentSettings();
+                LoadWorkSurface();   // board extent - config, not controller settings (see WorkSurface.cs)
 
                 // Machine choice is required input - restore the last machine the user picked (persisted across
                 // runs), else default to a generic 3-axis CNC. Restoring only re-selects the dropdowns; it does
@@ -526,14 +523,23 @@ namespace CNC.Controls
                 if (cbxManufacturer.SelectedItem == null)
                     RestoreOrDefaultMachine();
 
+                // Same reason as Reload's: everything above drove the fields from the controller / the saved
+                // machine pick, none of it is the operator editing. Clear it here so the page starts each
+                // activation genuinely "unedited" and the refresh below stays armed.
+                _userEdited = false;
+
                 if (!_subscribed && model != null)
                 {
                     model.PropertyChanged += Model_PropertyChanged;
                     _subscribed = true;
                 }
+                if (!_settingsHookAttached)
+                {
+                    GrblSettings.SettingsReloaded += OnSettingsReloaded;
+                    _settingsHookAttached = true;
+                }
                 UpdateLimitState();
                 UpdateApplyState();
-                UpdateCalibrationStepAvailability();
                 // Deferred (2026-07-19 - "Machine Setup tab permanently unresponsive" investigation): this
                 // Activate(true) runs from MainWindow.TabMode_SelectionChanged, DURING the tab-switch's own
                 // layout pass (the newly-selected tab's content is being measured/arranged right now).
@@ -546,6 +552,22 @@ namespace CNC.Controls
                 // switch finished - explaining why the tab looked selected-but-frozen and never recovered on
                 // its own (a mid-layout-pass exception doesn't reliably self-heal the visual tree).
                 Dispatcher.BeginInvoke((System.Action)RefreshMacroStatus, System.Windows.Threading.DispatcherPriority.Background);
+
+                // Ask the controller what it actually holds, rather than trusting the cached copy. Everything
+                // else here only learns about a change ioSender itself saw go out; a setting altered by a
+                // pendant, another sender, a controller-side macro, or any session not running this build
+                // leaves the cache confidently wrong with nothing on the wire to say so. Opening this page is
+                // the right moment to ask - it is the page whose numbers get written back to the machine, and
+                // a $$ is one cheap round trip.
+                //
+                // Real case: $130/$131 diverged from 860/846 to 889/889 during a window with no ioSender
+                // session at all, and this page went on offering 889 as a pending change afterwards.
+                //
+                // DEFERRED at Background priority for exactly the reason RefreshMacroStatus above is: this
+                // runs during the tab-switch's own layout pass, and Load() pumps the dispatcher waiting for
+                // the controller's reply - doing that mid-layout throws and leaves the tab frozen.
+                Dispatcher.BeginInvoke((System.Action)ReloadSettingsFromController, System.Windows.Threading.DispatcherPriority.Background);
+
                 UpdateSimulatorStepVisibility();
                 RefreshFirmwareVersion();
             }
@@ -555,6 +577,13 @@ namespace CNC.Controls
                 {
                     model.PropertyChanged -= Model_PropertyChanged;
                     _subscribed = false;
+                }
+                if (_settingsHookAttached)
+                {
+                    // A static event holds a strong reference to this view - unsubscribing is what stops a
+                    // menu-hosted instance being kept alive (and refreshed) after the operator has left it.
+                    GrblSettings.SettingsReloaded -= OnSettingsReloaded;
+                    _settingsHookAttached = false;
                 }
                 if (_fwInfoWindow != null)
                     _fwInfoWindow.Close();
@@ -667,7 +696,124 @@ namespace CNC.Controls
             AppConfig.Settings.Save();
         }
 
+        // Set by LoadCurrentSettingsCore when any value it wanted had not arrived yet.
+        private bool settingsIncomplete;
+
+        // How many times a load may reschedule itself before giving up. Bounded so a controller that never
+        // answers cannot leave a timer running for the life of the session.
+        private int settingsRetries;
+
         private void LoadCurrentSettings()
+        {
+            _loading = true;
+            settingsIncomplete = false;
+            try { LoadCurrentSettingsCore(); }
+            finally { _loading = false; _userEdited = false; }   // fields now mirror the controller again
+
+            if (settingsIncomplete)
+                ScheduleSettingsReload();
+            else
+                settingsRetries = 0;
+        }
+
+        /// <summary>
+        /// Come back for the settings that had not arrived.
+        ///
+        /// The page reads GrblSettings synchronously on activation, and a $$ reply can land after that -
+        /// measured at 441ms on real hardware. There is a SettingsReloaded event for exactly this, but it
+        /// did not repair the case above, and a page showing invented numbers for the machine's travel is
+        /// not something to leave resting on one mechanism.
+        ///
+        /// Gives up rather than retrying for ever, and never runs over the operator's own typing.
+        /// </summary>
+        private void ScheduleSettingsReload()
+        {
+            if (settingsRetries >= 6)
+            {
+                CNC.Core.DebugLog.Write("setup", "settings still incomplete after 6 attempts - giving up; fields left as they were");
+                return;
+            }
+
+            settingsRetries++;
+
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400d) };
+            timer.Tick += (s2, e2) =>
+            {
+                timer.Stop();
+
+                // Same guards the SettingsReloaded handler applies: not if the page has been left, and never
+                // over edits the operator has made in the meantime.
+                if (!_settingsHookAttached || _userEdited)
+                    return;
+
+                CNC.Core.DebugLog.Write("setup", string.Format("re-reading settings (attempt {0})", settingsRetries));
+                BuildAxes();
+                LoadCurrentSettings();
+                BuildReview();
+                UpdateApplyState();
+                RefreshStepColors();
+            };
+            timer.Start();
+        }
+
+        // Re-read the controller's settings into the page when they change underneath it - the wizard used to
+        // read them once per activation and then show that snapshot for as long as it stayed open, so a $130
+        // written from the MDI (or by any other view) left a table claiming the old envelope. Cosmetic it is
+        // not: Apply diffs the on-screen values against the LIVE settings, so the stale number comes back as a
+        // pending change and gets written to the machine.
+        //
+        // Refuses to run over the operator's own edits - their typing is not something an event from the
+        // controller may discard. In that case the page keeps what they typed and the pending-change list
+        // (which compares against live values) still shows them the truth before anything is written.
+        // Re-read $$ on page open (see the call site in Activate for why). Refuses in the three cases where
+        // asking would cost more than the staleness it prevents:
+        //
+        //   - not connected: nothing to ask, and Load() would just fail.
+        //   - a job is running: a $$ is ~100 lines of reply competing with the stream for the link.
+        //   - unsaved setting edits exist anywhere (the grbl settings page shares this collection): a reload
+        //     overwrites values from the controller, which would silently discard someone's typing on
+        //     ANOTHER page. GrblConfigControl.ReloadSettings pairs Load() with ClearPendingEdits precisely
+        //     because that is a deliberate, operator-initiated discard - this one is not.
+        //
+        // Load() raises SettingsReloaded on success, so the page refresh happens through the same path as
+        // every other change; there is nothing to repopulate here.
+        private void ReloadSettingsFromController()
+        {
+            if (!_settingsHookAttached)
+                return;                                   // left the page during the deferral
+            if (Comms.com == null || !Comms.com.IsOpen)
+                return;
+            if (model != null && model.IsJobRunning)
+                return;
+            if (GrblSettings.HasChanges())
+                return;
+
+            try { GrblSettings.Load(); }
+            catch (Exception ex) { CNC.Core.DebugLog.Write("config", "Machine Setup: $$ refresh failed - " + ex.Message); }
+        }
+
+        private void OnSettingsReloaded(object sender, EventArgs e)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke((System.Action)(() => OnSettingsReloaded(sender, e)));
+                return;
+            }
+
+            // _settingsHookAttached doubles as "the view is active" - it is subscribed on activate and
+            // dropped on deactivate - and still matters after the CheckAccess hop, which can land after the
+            // operator has left the page.
+            if (!_settingsHookAttached || _userEdited)
+                return;
+
+            BuildAxes();
+            LoadCurrentSettings();
+            BuildReview();
+            UpdateApplyState();
+            RefreshStepColors();
+        }
+
+        private void LoadCurrentSettingsCore()
         {
             // The travel field shows physical travel, which is the stored soft-limit travel plus the pull-off
             // clearance reserved at each end (see BuildTargets). $22 is a bit-field on grblHAL (bit0 enable,
@@ -698,12 +844,39 @@ namespace CNC.Controls
 
             foreach (var axis in Setup.Axes)
             {
+                // NaN means the setting has not arrived, which is NOT the same as a machine with no travel -
+                // and overwriting a good value with 0 because the answer is still in flight is how this page
+                // came to show a "trashed" setup while the controller was perfectly fine.
+                //
+                // Observed 2026-08-20: the page read $130-$132 at 00:55:46.328 and the controller's reply
+                // landed at 00:55:46.769, 441ms later. The read is synchronous, the dump is not.
+                //
+                // So an absent value leaves the field ALONE. Whatever was there - a real value from a
+                // previous load, or the untouched default - is a better answer than a fabricated zero,
+                // because zero is a number the operator cannot distinguish from a measurement.
                 double stored = GrblSettings.GetDouble(GrblSetting.MaxTravelBase + axis.Index);
-                axis.MaxTravel = stored > 0d ? stored : 0d;   // table value IS $13x (max travel); no pull-off fudge
+
+                if (double.IsNaN(stored))
+                {
+                    settingsIncomplete = true;
+                    CNC.Core.DebugLog.Write("setup", string.Format(
+                        "axis {0} (index {1}): ${2} has not arrived yet - field left as it was, re-read scheduled",
+                        axis.Letter, axis.Index, (int)(GrblSetting.MaxTravelBase + axis.Index)));
+                }
+                else
+                    axis.MaxTravel = stored > 0d ? stored : 0d;   // table value IS $13x (max travel); no pull-off fudge
+
                 double rate = GrblSettings.GetDouble(GrblSetting.MaxFeedRateBase + axis.Index);
-                axis.MaxRate = rate > 0d ? rate : axis.DefaultMaxRate;   // keep an existing rate, else a stepper-friendly default
+                if (double.IsNaN(rate))
+                    settingsIncomplete = true;
+                else
+                    axis.MaxRate = rate > 0d ? rate : axis.DefaultMaxRate;   // keep an existing rate, else a stepper-friendly default
+
                 double steps = GrblSettings.GetDouble(GrblSetting.TravelResolutionBase + axis.Index);
-                axis.StepsPerMm = steps > 0d ? steps : 0d;   // 0 = unknown; a preset (or the calibration tab) can fill it
+                if (double.IsNaN(steps))
+                    settingsIncomplete = true;
+                else
+                    axis.StepsPerMm = steps > 0d ? steps : 0d;   // 0 = unknown; a preset (or the calibration tab) can fill it
                 axis.InvertDirection = (dirMask & axis.Bit) != 0;
                 axis.LimitNormallyClosed = (limitMask & axis.Bit) != 0;
                 axis.HomeAtMin = (homeMask & axis.Bit) != 0;
@@ -799,6 +972,78 @@ namespace CNC.Controls
         #endregion
 
         #region Home corner picker
+
+        // ---- work surface (spoilboard extent) ----
+        //
+        // Deliberately NOT expressed by shrinking $130/$131: the machine really can reach past the board to
+        // the toolsetter, and must keep being allowed to or tc.macro can never drive there. See WorkSurface.cs.
+
+        private bool loadingWorkSurface = false;
+
+        private void LoadWorkSurface()
+        {
+            var ws = WorkSurface.Current;
+            loadingWorkSurface = true;
+            chkWorkSurfaceDefined.IsChecked = ws.Defined;
+            txtWsMinX.Text = ws.MinX.ToString("0.###", CultureInfo.InvariantCulture);
+            txtWsMaxX.Text = ws.MaxX.ToString("0.###", CultureInfo.InvariantCulture);
+            txtWsMinY.Text = ws.MinY.ToString("0.###", CultureInfo.InvariantCulture);
+            txtWsMaxY.Text = ws.MaxY.ToString("0.###", CultureInfo.InvariantCulture);
+            loadingWorkSurface = false;
+            ShowWorkSurfaceSummary();
+        }
+
+        private static double ParseOr(string text, double fallback)
+        {
+            double v;
+            return double.TryParse((text ?? string.Empty).Trim(), NumberStyles.Float | NumberStyles.AllowLeadingSign,
+                                   CultureInfo.InvariantCulture, out v) ? v : fallback;
+        }
+
+        private void WorkSurface_Changed(object sender, RoutedEventArgs e)
+        {
+            if (loadingWorkSurface)
+                return;
+
+            var ws = WorkSurface.Current;
+            ws.Defined = chkWorkSurfaceDefined.IsChecked == true;
+            ws.MinX = ParseOr(txtWsMinX.Text, ws.MinX);
+            ws.MaxX = ParseOr(txtWsMaxX.Text, ws.MaxX);
+            ws.MinY = ParseOr(txtWsMinY.Text, ws.MinY);
+            ws.MaxY = ParseOr(txtWsMaxY.Text, ws.MaxY);
+            AppConfig.Settings.Save();
+            ShowWorkSurfaceSummary();
+        }
+
+        /// <summary>
+        /// State what the numbers actually mean once clamped, rather than echoing them back. A board typed
+        /// larger than the machine is silently held inside the travel limits (WorkSurface.UsableMin/Max), and
+        /// an operator who cannot see that would be left believing an extent that will not be used.
+        /// </summary>
+        private void ShowWorkSurfaceSummary()
+        {
+            if (txtWorkSurfaceSummary == null)
+                return;
+
+            var ws = WorkSurface.Current;
+            string text = ws.Summary;
+
+            if (ws.Defined && (ws.UsableSpan(0) <= 0d || ws.UsableSpan(1) <= 0d))
+                text = "These numbers do not describe a usable area - check that 'from' is less than 'to' on both axes.";
+
+            txtWorkSurfaceSummary.Text = text;
+        }
+
+        /// <summary>Fill the near corner from the spindle's current machine position - jog there, then click.</summary>
+        private void WorkSurfaceHere_Click(object sender, RoutedEventArgs e)
+        {
+            if (model == null)
+                return;
+
+            txtWsMinX.Text = model.MachinePosition.X.ToString("0.###", CultureInfo.InvariantCulture);
+            txtWsMinY.Text = model.MachinePosition.Y.ToString("0.###", CultureInfo.InvariantCulture);
+            WorkSurface_Changed(sender, e);
+        }
 
         private void Corner_Click(object sender, RoutedEventArgs e)
         {
@@ -905,9 +1150,18 @@ namespace CNC.Controls
             // round-trip compounded across re-applies and silently shrank $13x (e.g. 120 -> 110 -> 100).
             foreach (var axis in Setup.Axes)
             {
-                double stored = Math.Max(0d, axis.MaxTravel);
-                targets[GrblSetting.MaxTravelBase + axis.Index] = stored.ToInvariantString();
-                targets[GrblSetting.MaxFeedRateBase + axis.Index] = axis.MaxRate.ToInvariantString();
+                // Only write travel when it is KNOWN, exactly as steps/mm below already did. 0 is not a
+                // travel, it is the absence of one: LoadCurrentSettingsCore stores 0 whenever $13x reads
+                // back non-positive, so an unloaded/unavailable setting was indistinguishable from a real
+                // value here and Apply would write $130=0 $131=0 $132=0 - a machine with soft limits enabled
+                // and a zero envelope, where every move is out of bounds.
+                //
+                // Found 2026-08-19 with the Axis table displaying zeros while the controller held 860/840/135;
+                // the guard was already three lines below for steps/mm and had simply never been extended up.
+                if (axis.MaxTravel > 0d)
+                    targets[GrblSetting.MaxTravelBase + axis.Index] = axis.MaxTravel.ToInvariantString();
+                if (axis.MaxRate > 0d)      // same reasoning - a zero max rate is not a rate either
+                    targets[GrblSetting.MaxFeedRateBase + axis.Index] = axis.MaxRate.ToInvariantString();
                 if (axis.StepsPerMm > 0d)   // only write steps/mm when known (current value or a preset) - never clobber with 0
                     targets[GrblSetting.TravelResolutionBase + axis.Index] = axis.StepsPerMm.ToInvariantString();
             }
@@ -994,6 +1248,9 @@ namespace CNC.Controls
         // Apply only when there is something to write.
         private void OnSetupChanged(object sender, PropertyChangedEventArgs e)
         {
+            if (!_loading)
+                _userEdited = true;   // a real edit, not us filling the fields from the controller
+
             if (e.PropertyName == nameof(AxisSetup.HomeAtMin))
                 UpdateHomeCornerText();   // keep the home-corner picture in sync when a checkbox is toggled
             UpdateApplyState();
@@ -1037,6 +1294,10 @@ namespace CNC.Controls
             RestoreOrDefaultMachine();
             Changes.Clear();
             txtStatus.Text = "Reloaded from controller.";
+            // LAST, after the machine re-apply: re-selecting the dropdowns drives the fields and so trips the
+            // edit flag. Leaving it set would quietly disable the settings-reloaded refresh for the rest of
+            // the session - the page would go stale again and nothing would say so.
+            _userEdited = false;
             UpdateApplyState();
         }
 
@@ -1061,12 +1322,568 @@ namespace CNC.Controls
         {
             bool sel = grdProbes.SelectedItem is ProbeDefinition;
             btnProbeEdit.IsEnabled = btnProbeDelete.IsEnabled = sel;
+
+            // Everything below this grid reads the library - the tool-length picker's contents, which probe
+            // the TLO step will use, and whether the 3D-probe question applies at all - so adding, editing
+            // or removing a probe has to reach them. Cheap, and it catches every one of those paths without
+            // each of them having to remember.
+            LoadTloProbeChoices();
+            UpdateTloRefControls();
         }
 
         private void Probes_DoubleClick(object sender, MouseButtonEventArgs e)
         {
             if (grdProbes.SelectedItem is ProbeDefinition)
                 EditSelectedProbe();
+        }
+
+        // ---- Step 5: the two reference positions, and what sits at G59.3 -------------------------------
+
+        /// <summary>
+        /// Show what G30 and G59.3 currently hold. "Not set" is a real answer here and has to look like
+        /// one: both default to all-zero in the controller, and zero is a position - it is just never the
+        /// one anybody meant, so a machine that has never been told either reads as configured.
+        /// </summary>
+        private void UpdateReferencePositions()
+        {
+            if (txtG30Value == null)
+                return;
+
+            txtG30Value.Text = DescribeStoredPosition("G30");
+            txtG593Value.Text = DescribeStoredPosition("G59.3");
+
+            // The surface only matters when a PLATE is doing the measuring: a dedicated toolsetter triggers
+            // on its own switch, so where the table is underneath it changes nothing. Hidden rather than
+            // shown-and-ignored, so a toolsetter owner is not asked to go and measure something irrelevant.
+            bool needSurface = ProbeDefinitions.TloTargetIsTouchPlate;
+            var surfaceVis = needSurface ? Visibility.Visible : Visibility.Collapsed;
+            lblTloSurface.Visibility = txtTloSurfaceDesc.Visibility = txtTloSurfaceValue.Visibility =
+                btnSetTloSurface.Visibility = surfaceVis;
+
+            // Number what is actually on screen. With a toolsetter the surface row is gone, so the two
+            // that remain are steps 1 and 2 - a list that starts at 2 reads as though something has been
+            // missed rather than as though it never applied.
+            int step = 1;
+            if (needSurface)
+                lblTloSurface.Text = (step++) + ". Target surface:";
+            lblG593.Text = (step++) + ". G59.3 - tool length:";
+            lblG30.Text = step + ". G30 - tool swap:";
+
+            double surface = AppConfig.Settings.Base.TloSurfaceZ;
+            txtTloSurfaceValue.Text = surface == 0d ? "not set" : "Z" + surface.ToString("0.0", CultureInfo.CurrentCulture);
+
+            // Placing G30 relative to G59.3 needs G59.3 to exist.
+            var g593known = GrblWorkParameters.GetCoordinateSystem("G59.3");
+            bool haveG593 = g593known != null && g593known.Values.Length >= 3 &&
+                            !double.IsNaN(g593known.Values[0]) && !double.IsNaN(g593known.Values[1]);
+            btnG30Left.IsEnabled = btnG30Right.IsEnabled = haveG593;
+
+            // Say what the numbers add up to, so a search that will fall short is visible here rather than
+            // discovered as an alarm partway down. "Fixed 90 mm" is the honest label for the fallback.
+            double search = ComputeTloSearchDistance(ProbeDefinitions.TloTarget);
+            if (txtTloSearchValue != null)
+                txtTloSearchValue.Text = search > 0d
+                    ? string.Format(CultureInfo.CurrentCulture,
+                        "Tool-length probe searches up to {0:0.#} mm down - far enough to reach the target, stopping 2 mm above the surface if nothing triggers.", search)
+                    : "Tool-length probe searches a fixed 90 mm down. Set the target surface above and it becomes a real limit instead of a guess.";
+        }
+
+        private static string DescribeStoredPosition(string code)
+        {
+            var cs = GrblWorkParameters.GetCoordinateSystem(code);
+            if (cs == null)
+                return "not read";
+
+            // Same "any axis non-zero" test MacroRunner.CoordinateSystemDefined uses - grbl has no explicit
+            // "is defined" flag, so all-zero is how never-been-set looks. One deliberately left at machine
+            // zero would read as unset, which is a known and accepted false negative there and here.
+            bool any = false;
+            var sb = new StringBuilder();
+            for (int i = 0; i < GrblInfo.NumAxes && i < cs.Values.Length; i++)
+            {
+                double v = cs.Values[i];
+                if (!double.IsNaN(v) && v != 0d)
+                    any = true;
+                sb.Append(i == 0 ? "" : " ").Append(AxisLetterAt(i)).Append(v.ToString("0.0", CultureInfo.CurrentCulture));
+            }
+            return any ? sb.ToString() : "not set";
+        }
+
+        private static string AxisLetterAt(int i)
+        {
+            string letters = GrblInfo.AxisLetters;
+            return i >= 0 && i < letters.Length ? letters.Substring(i, 1) : "?";
+        }
+
+        /// <summary>
+        /// Store the machine's current position as G30. No motion: G30.1 takes no coordinates, it captures
+        /// wherever the machine physically is - which is why the instruction is "jog there first", the same
+        /// workflow the Offsets tab settled on.
+        /// </summary>
+        private void SetG30_Click(object sender, RoutedEventArgs e)
+        {
+            if (model == null)
+                return;
+
+            if (AppDialogs.Show(Window.GetWindow(this),
+                    "Store the machine's CURRENT position as G30, the tool-swap park?\r\n\r\n" +
+                    "Nothing moves - this records where the machine is standing right now. Jog it to the park position first if it isn't there.",
+                    "Set G30", MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+                return;
+
+            Comms.com.WriteCommand("G30.1");
+            RefreshStoredPositionsAfterWrite();
+        }
+
+        /// <summary>
+        /// Store the machine's current position as the G59.3 origin.
+        ///
+        /// Goes through MacroProcessor.EmitWcsWrite rather than writing G10 on its own, and that is not
+        /// ceremony: an offset write against a coordinate system that holds a rotation leaves the firmware's
+        /// parser holding a corrupted position, and the next move that leaves an axis unnamed flies to it.
+        /// The helper's own remarks carry the hardware incident. Every G10 L2/L20 in this app goes through
+        /// it; this one is no exception just because it is being issued from a settings page.
+        /// </summary>
+        private void SetG593_Click(object sender, RoutedEventArgs e)
+        {
+            if (model == null)
+                return;
+
+            if (AppDialogs.Show(Window.GetWindow(this),
+                    "Store the machine's CURRENT position as the G59.3 origin - the approach position over whatever measures tool length?\r\n\r\n" +
+                    "Jog over the toolsetter or plate first, centred on it, at a height your LONGEST tool clears.\r\n\r\n" +
+                    "The machine will make one no-op move to itself afterwards, which is what keeps the controller's parser in step with the new offset.",
+                    "Set G59.3", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+                return;
+
+            var b = new StringBuilder();
+            b.AppendLine("(Machine Setup - set G59.3 from the current position)");
+            b.AppendLine("(PREREQ, connected, homed, noalarm)");
+            b.AppendLine("G21 G90 G94 G17");
+            MacroProcessor.EmitWcsWrite(l => b.AppendLine(l), "G10 L20 P9 X0 Y0 Z0");
+
+            if (MacroProcessor.Run(model, "Set G59.3", b.ToString(), true))
+                RefreshStoredPositionsAfterWrite();
+        }
+
+        /// <summary>
+        /// Place G30 a fixed distance to one side of G59.3 and store it there.
+        ///
+        /// Unlike the other two buttons on this row, this one MOVES the machine: G30.1 captures wherever
+        /// the machine physically is and takes no coordinates, so the only way to store a computed position
+        /// is to go to it first. Said plainly in the confirmation, because every other button here is a
+        /// read.
+        ///
+        /// 100 mm to one side keeps the tool change near the measuring point - the gap between G30 and
+        /// G59.3 is travelled twice per tool change - without the spindle parking over the toolsetter or
+        /// plate while both your hands are on a collet.
+        /// </summary>
+        private void PlaceG30_Click(object sender, RoutedEventArgs e)
+        {
+            if (model == null)
+                return;
+
+            int sign = (sender as FrameworkElement)?.Tag as string == "-1" ? -1 : 1;
+            const double offset = 100d, safeZ = -5d;
+
+            GrblWorkParameters.Get(model);
+            var cs = GrblWorkParameters.GetCoordinateSystem("G59.3");
+            if (cs == null || cs.Values.Length < 2 || double.IsNaN(cs.Values[0]) || double.IsNaN(cs.Values[1]))
+            {
+                AppDialogs.Show(Window.GetWindow(this), "Set G59.3 first - G30 is placed relative to it.",
+                    "Set G30", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            double x = cs.Values[0] + sign * offset, y = cs.Values[1];
+
+            // Refuse a target outside the machine rather than let the controller alarm partway there.
+            double travelX = GrblSettings.GetDouble(GrblSetting.MaxTravelBase);
+            if (!double.IsNaN(travelX) && travelX > 0d && (x > 0d || x < -travelX))
+            {
+                AppDialogs.Show(Window.GetWindow(this),
+                    string.Format(CultureInfo.CurrentCulture,
+                        "100 mm that way from G59.3 is X {0:0.0}, which is outside this machine's travel. Try the other side, or jog to a park position and use \"Set from here\".", x),
+                    "Set G30", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (AppDialogs.Show(Window.GetWindow(this),
+                    string.Format(CultureInfo.CurrentCulture,
+                        "THE MACHINE WILL MOVE.\r\n\r\nIt will lift Z to {0:0.0}, travel to X {1:0.0} Y {2:0.0}, and store that as G30.\r\n\r\n" +
+                        "Make sure that path is clear. Unlike the other buttons here, this one does not just read the current position.",
+                        safeZ, x, y),
+                    "Set G30", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+                return;
+
+            var b = new StringBuilder();
+            b.AppendLine("(Machine Setup - place G30 beside G59.3)");
+            b.AppendLine("(PREREQ, connected, homed, noalarm)");
+            b.AppendLine("G21 G90 G94 G17");
+            b.AppendLine(string.Format(CultureInfo.InvariantCulture, "G53 G0 Z{0}", safeZ.ToInvariantString("0.0##")));
+            b.AppendLine(string.Format("G53 G0 X{0} Y{1}", x.ToInvariantString("0.0##"), y.ToInvariantString("0.0##")));
+            b.AppendLine("G30.1");
+
+            if (MacroProcessor.Run(model, "Set G30", b.ToString(), true))
+                RefreshStoredPositionsAfterWrite();
+        }
+
+        /// <summary>
+        /// Capture the machine Z of the surface the tool-length target stands on. No motion - like G30 it
+        /// records where the machine is standing, so the instruction is to jog a tool down until it just
+        /// touches the spoilboard beside the target, then click.
+        /// </summary>
+        private void SetTloSurface_Click(object sender, RoutedEventArgs e)
+        {
+            if (model == null)
+                return;
+
+            // MachinePosition, not Position minus the work offset. The model reports machine position
+            // directly, so deriving it was doing arithmetic on two numbers to arrive at one that was
+            // already there - and it would have been wrong the moment the DRO was showing something other
+            // than what that subtraction assumed.
+            double z = model.MachinePosition.Z;
+
+            if (AppDialogs.Show(Window.GetWindow(this),
+                    string.Format("Record machine Z {0:0.0##} as the surface the tool-length target stands on?\r\n\r\n" +
+                                  "Jog a tool down until it just touches the spoilboard beside the toolsetter or plate first. " +
+                                  "Nothing moves - this only reads the current position.\r\n\r\n" +
+                                  "It is used with the target's height to work out how far the tool-length probe has to search.", z),
+                    "Set target surface", MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+                return;
+
+            AppConfig.Settings.Base.TloSurfaceZ = z;
+            AppConfig.Settings.Save();
+            UpdateReferencePositions();
+        }
+
+        /// <summary>
+        /// How far the tool-length probe should search downward from the G59.3 origin, or 0 to say "cannot
+        /// work it out - use the caller's own default".
+        ///
+        /// search = (G59.3 origin Z) - (surface Z) - standoff
+        ///
+        /// A FLOOR, not a prediction of where the target top is. That distinction is the whole design, and
+        /// the first version got it wrong.
+        ///
+        /// The tempting arithmetic is "surface + the target's height = where the top is, probe to just past
+        /// that". It is exact, and it is exact only for the tool that was in the spindle when the surface
+        /// was captured. Every stored Z here is the machine's AXIS position, and the tip hangs a
+        /// tool-length below it - so the same physical surface reads 30 mm lower with a bit 30 mm shorter.
+        /// Predicting the target top therefore mis-predicts by the tool-length difference, and the error
+        /// can point either way.
+        ///
+        /// As a floor it cannot. The probe is allowed to travel to just above the SURFACE and no further:
+        ///   - a tool long enough to reach touches the target well before the floor and stops there;
+        ///   - a tool too short to reach runs out of travel in AIR and alarms.
+        /// Both are survivable, and neither depends on knowing which tool is fitted - which is the property
+        /// that matters, since this firmware has no tool table to ask.
+        ///
+        /// The target's height is not used here any more. It is still worth knowing, and the row shows what
+        /// it implies, but it is no longer load-bearing.
+        /// </summary>
+        internal static double ComputeTloSearchDistance(ProbeDefinition p)
+        {
+            if (p == null)
+                return 0d;
+
+            double surface = AppConfig.Settings.Base.TloSurfaceZ;
+            if (surface == 0d)
+                return 0d;                       // never captured - see the remarks
+
+            var cs = GrblWorkParameters.GetCoordinateSystem("G59.3");
+            if (cs == null || cs.Values.Length < 3 || double.IsNaN(cs.Values[2]))
+                return 0d;
+
+            double originZ = cs.Values[2];
+
+            // How far above the surface the probe is allowed to get. Small: it is the gap left when
+            // NOTHING triggers, so it is the only thing between a disconnected plate and the spoilboard.
+            const double standoff = 2d;
+            double search = originZ - surface - standoff;
+
+            // Backwards means the G59.3 origin is at or below the surface, which is not a search-distance
+            // problem - it is a G59.3 that has been set wrong. Say nothing and let the literal apply.
+            if (search <= 0d)
+                return 0d;
+
+            // Never ask for more Z than the machine has below the start point, whatever the arithmetic
+            // says. Soft limits would refuse it anyway; this turns that into a shorter search rather than
+            // an alarm partway through one.
+            double travel = GrblSettings.GetDouble(GrblSetting.MaxTravelBase + 2);
+            if (!double.IsNaN(travel) && travel > 0d)
+            {
+                double available = originZ + travel;     // origin is negative, travel positive
+                if (available > 0d && search > available)
+                    search = available;
+            }
+
+            return search;
+        }
+
+        /// <summary>
+        /// Re-read $# and repaint. The stored positions live in the controller, so the display is only as
+        /// current as the last query - without this the row still says "not set" straight after setting it,
+        /// which reads as the button having done nothing.
+        /// </summary>
+        private void RefreshStoredPositionsAfterWrite()
+        {
+            GrblWorkParameters.Get(model);
+            UpdateReferencePositions();
+        }
+
+        /// <summary>
+        /// A row in the tool-length probe picker: a probe definition the operator has already described,
+        /// labelled the way they would recognise it rather than by type alone.
+        /// </summary>
+        private class TloProbeChoice
+        {
+            public string Name { get; set; }
+            public string Label { get; set; }
+        }
+
+        /// <summary>
+        /// Fill the picker from the probes actually defined. Only a toolsetter or a touch plate can do this
+        /// job - a 3D probe measures the WORK, not the tool in the spindle, and an edge finder has no Z at
+        /// all - so offering either would be offering a choice that cannot work.
+        /// </summary>
+        private void LoadTloProbeChoices()
+        {
+            if (cbxTloProbe == null)
+                return;
+
+            // The Name already carries the type (Renumber derives it from TypeName), so it reads as
+            // "Touch plate (corner)" on its own - no need to append the type a second time.
+            //
+            // A corner plate gets told what choosing it MEANS, though. This picker only ever asks one
+            // question - which of these measures tool length - and the answer for a corner plate is "that
+            // one, turned over". Said on every corner-plate row rather than only the selected one, so it
+            // reads as a property of the choice while the list is open, which is when it is useful.
+            //
+            // Label only. Name is what gets stored (SelectedValuePath), so the two must not be conflated -
+            // decorating the stored value would break the lookup the moment the wording changed.
+            var choices = ProbeDefinitions.Items
+                .Where(p => p.ProbeType == ProbeType.ToolSetter || p.ProbeType == ProbeType.TouchPlate)
+                .Select(p => new TloProbeChoice
+                {
+                    Name = p.Name,
+                    Label = p.Name + (p.ProbeType == ProbeType.TouchPlate && p.CanProbeCorner
+                                        ? "  -  used upside down"
+                                        : string.Empty)
+                })
+                .ToList();
+
+            bool wasLoading = _loading;
+            _loading = true;
+            cbxTloProbe.ItemsSource = choices;
+
+            // Keep the stored choice if it still resolves; otherwise fall back the same way the TLO step
+            // itself does, rather than leaving the box blank and the setting naming a probe that is gone.
+            string want = AppConfig.Settings.Base.TloProbeName;
+            var sel = choices.FirstOrDefault(c => c.Name == want)
+                      ?? choices.FirstOrDefault(c => c.Name.StartsWith("Tool setter", StringComparison.OrdinalIgnoreCase))
+                      ?? choices.FirstOrDefault();
+            cbxTloProbe.SelectedValue = sel?.Name;
+            _loading = wasLoading;
+
+            UpdateTloTargetAdvice();
+        }
+
+        private void TloProbe_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loading)
+                return;
+
+            AppConfig.Settings.Base.TloProbeName = (cbxTloProbe.SelectedValue as string) ?? string.Empty;
+            UpdateTloTargetAdvice();
+            UpdateTloRefControls();
+            // The rows below depend on this answer too - whether the surface row applies at all, and how
+            // the remaining steps are numbered. Without this they were only re-evaluated on tab
+            // activation, so choosing a plate left the surface row hidden until you left and came back.
+            UpdateReferencePositions();
+        }
+
+        // ---- $65 bit 3, "Auto select toolsetter" -------------------------------------------------------
+        //
+        // grblHAL re-routes any G38.2 starting within TOOLSETTER_RADIUS (5 mm) of G59.3 to the toolsetter
+        // INPUT when this bit is set - whatever input the program just selected with G65 P5. That is a
+        // convenience for a dedicated toolsetter and a guaranteed crash for a touch plate, which sits at
+        // that very position and is wired to the MAIN input along with every other plate and the 3D probe.
+        // The probe then cannot trigger, so the tool does not stop at the plate, it is driven into it.
+        //
+        // Which means the setting is not an independent preference: it follows from what the operator has
+        // said is at G59.3, and step 5 is where they say it. It is an OUTPUT of this page.
+        private const int ToolsetterAutoSelectBit = 8;
+
+        /// <summary>
+        /// What $65 bit 3 SHOULD be, given the chosen tool-length probe - or null when there is nothing to
+        /// say (no probe chosen). True for a toolsetter, false for a touch plate.
+        /// </summary>
+        private static bool? WantToolsetterAutoSelect()
+        {
+            var p = ProbeDefinitions.TloTarget;
+            if (p == null)
+                return null;
+            if (p.ProbeType == ProbeType.ToolSetter)
+                return true;
+            if (p.ProbeType == ProbeType.TouchPlate)
+                return false;
+            return null;
+        }
+
+        /// <summary>
+        /// The current $65, or -1 when it could not be read. -1 is NOT "the bit is clear": firmware that
+        /// predates this setting has no auto-select behaviour at all, and a lookup can also simply miss on
+        /// a live machine. Either way the honest answer is "unknown", and callers must not turn that into
+        /// a reassurance - the one thing a guard like this must never do is fail open while looking green.
+        /// </summary>
+        private static int ReadProbingFlags()
+        {
+            return GrblSettings.GetInteger(grblHALSetting.ProbingFlags);
+        }
+
+        /// <summary>
+        /// True when the setting actively contradicts the chosen probe - a touch plate at G59.3 with
+        /// auto-select ON, which is the combination that crashes. Unknown ($65 unreadable) is not a
+        /// conflict: there is nothing to act on and refusing would block a machine whose firmware has no
+        /// such feature.
+        /// </summary>
+        private static bool ToolsetterAutoSelectConflicts()
+        {
+            bool? want = WantToolsetterAutoSelect();
+            int flags = ReadProbingFlags();
+            if (want == null || flags < 0)
+                return false;
+            bool isSet = (flags & ToolsetterAutoSelectBit) != 0;
+            return isSet && want == false;
+        }
+
+        /// <summary>Write $65 with bit 3 forced to <paramref name="on"/>, leaving every other bit alone.</summary>
+        private bool ApplyToolsetterAutoSelect(bool on)
+        {
+            int flags = ReadProbingFlags();
+            if (flags < 0)
+                return false;
+
+            int wanted = on ? (flags | ToolsetterAutoSelectBit) : (flags & ~ToolsetterAutoSelectBit);
+            if (wanted == flags)
+                return true;
+
+            // Read-modify-write on the whole bitfield: the other bits are the operator's (feed override,
+            // soft limits during probing, probe protection) and none of them are ours to change.
+            Comms.com.WriteCommand(string.Format(CultureInfo.InvariantCulture, "${0}={1}", (int)grblHALSetting.ProbingFlags, wanted));
+            // Re-read so the row below reflects what the controller now holds rather than what we asked for.
+            GrblSettings.Load();
+            UpdateTloRefControls();
+            return true;
+        }
+
+        /// <summary>
+        /// Say what $65 bit 3 is and what the chosen probe needs it to be. Visible rather than silent,
+        /// because this is a controller setting the operator may well have set deliberately - the page
+        /// states the consequence and offers the change; it does not reach in behind them.
+        /// </summary>
+        private void UpdateProbingFlagsRow()
+        {
+            if (txtProbingFlags == null)
+                return;
+
+            bool? want = WantToolsetterAutoSelect();
+            int flags = ReadProbingFlags();
+
+            if (want == null)
+            {
+                txtProbingFlags.Text = string.Empty;
+                btnFixProbingFlags.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            // The label says what the CHOSEN PROBE needs, not what the current state happens to be - so it
+            // reads the same whether or not the setting already agrees, and the operator can see what the
+            // right answer is rather than inferring it from a button that only appears when something is
+            // wrong. Disabled when there is nothing to do; visible either way.
+            btnFixProbingFlags.Visibility = Visibility.Visible;
+            btnFixProbingFlags.Content = want.Value ? "Turn it on" : "Turn it off";
+
+            if (flags < 0)
+            {
+                // Unknown, said as unknown. See ReadProbingFlags. Nothing to act on either - a
+                // read-modify-write needs the value we could not read.
+                txtProbingFlags.Text = "Probe input: could not read $65, so whether the controller auto-selects the toolsetter is unknown.";
+                btnFixProbingFlags.IsEnabled = false;
+                btnFixProbingFlags.ToolTip = "$65 could not be read from the controller.";
+                return;
+            }
+
+            bool isSet = (flags & ToolsetterAutoSelectBit) != 0;
+            btnFixProbingFlags.IsEnabled = isSet != want.Value;
+
+            if (isSet == want.Value)
+            {
+                txtProbingFlags.Text = want.Value
+                    ? "Probe input: $65 auto-selects the toolsetter near G59.3, which is right for a toolsetter."
+                    : "Probe input: $65 leaves the probe input alone, which is right for a touch plate.";
+                btnFixProbingFlags.ToolTip = "Already set correctly for the probe chosen above.";
+                return;
+            }
+
+            txtProbingFlags.Text = want.Value
+                ? "Probe input: $65 does NOT auto-select the toolsetter near G59.3. With a dedicated toolsetter that is usually wanted."
+                : "Probe input: $65 auto-selects the TOOLSETTER input near G59.3 - but a touch plate is on the main input, so the probe would never trigger and the tool would be driven into the plate.";
+            btnFixProbingFlags.ToolTip = "Change bit 3 of $65 on the controller, leaving its other bits alone.";
+        }
+
+        private void FixToolsetterAutoSelect_Click(object sender, RoutedEventArgs e)
+        {
+            bool? want = WantToolsetterAutoSelect();
+            if (want == null)
+                return;
+
+            if (!ApplyToolsetterAutoSelect(want.Value))
+                AppDialogs.Show(Window.GetWindow(this),
+                    "Could not read $65 from the controller, so it was not changed.",
+                    "Probing options", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+
+        /// <summary>The probe definition chosen for tool length, or null if the choice no longer resolves.</summary>
+        private static ProbeDefinition SelectedTloProbe()
+        {
+            string name = AppConfig.Settings.Base.TloProbeName;
+            return string.IsNullOrEmpty(name) ? null : ProbeDefinitions.Items.FirstOrDefault(p => p.Name == name);
+        }
+
+        /// <summary>
+        /// The advice that depends on WHICH probe was chosen. A puck is bolted down and needs nothing said.
+        /// A plate is a loose object, and a loose object at the tool-length position is the one mistake here
+        /// that does not announce itself: put it back a few tenths out and every tool is a few tenths out
+        /// with it, in the finished part, with nothing on screen to say so.
+        /// </summary>
+        private void UpdateTloTargetAdvice()
+        {
+            if (brdTloFixedWarn == null)
+                return;
+
+            var p = SelectedTloProbe();
+            if (p == null || p.ProbeType != ProbeType.TouchPlate)
+            {
+                brdTloFixedWarn.Visibility = Visibility.Collapsed;
+                UpdateProbingFlagsRow();
+                return;
+            }
+
+            UpdateProbingFlagsRow();
+
+            brdTloFixedWarn.Visibility = Visibility.Visible;
+            txtTloFixedWarn.Text =
+                "Give this plate a home it cannot miss. Tool length is worked out by comparing today's probe against the stored " +
+                "baseline, so the plate has to sit in exactly the same place every time - a few tenths out and every tool is a few " +
+                "tenths out with it, with nothing on screen to say so.\r\n\r\n" +
+                "A shallow pocket cut into the spoilboard that the plate drops into is the usual answer: it registers the plate in " +
+                "X and Y by itself, and you can see at a glance whether it is seated." +
+                (p.CanProbeCorner
+                    // Only worth saying for the plate that has lips. On a flat plate there is nothing to avoid.
+                    ? "\r\n\r\nThis is a corner plate, so upside down its lips point up - probe in the middle, clear of them."
+                    : string.Empty);
         }
 
         private void ProbeAdd_Click(object sender, RoutedEventArgs e)
@@ -1080,7 +1897,6 @@ namespace CNC.Controls
                 ProbeDefinitions.Save();
                 grdProbes.SelectedItem = def;
                 RefreshStepColors();
-                UpdateCalibrationStepAvailability();
             }
         }
 
@@ -1104,7 +1920,7 @@ namespace CNC.Controls
                 ProbeDefinitions.Renumber(ProbeDefinitions.Items);   // type may have changed
                 ProbeDefinitions.Save();
                 grdProbes.Items.Refresh();
-                UpdateCalibrationStepAvailability();
+                RefreshStepColors();
             }
         }
 
@@ -1118,7 +1934,6 @@ namespace CNC.Controls
                 ProbeDefinitions.Renumber(ProbeDefinitions.Items);
                 ProbeDefinitions.Save();
                 RefreshStepColors();
-                UpdateCalibrationStepAvailability();
             }
         }
 
@@ -1207,68 +2022,6 @@ namespace CNC.Controls
 
             if (e.OriginalSource == tabSteps && tabSteps.SelectedItem == tabStepSimulator)
                 Dispatcher.BeginInvoke((System.Action)RefreshSimulatorStep, System.Windows.Threading.DispatcherPriority.Background);
-
-            // Calibration step: activate/deactivate whichever of its two sub-tabs (stepper cal / squareness)
-            // is currently selected, mirroring how ToolsView used to Activate() its own sub-tabs. Deferred for
-            // the same reason as the macro/simulator refreshes above - these wizards pump the dispatcher.
-            if (e.OriginalSource == tabSteps)
-            {
-                if (e.RemovedItems.Count == 1 && e.RemovedItems[0] == tabStepCalibration)
-                {
-                    calibrationStepActive = false;
-                    ActivateSelectedCalibrationChild(false);
-                }
-                if (tabSteps.SelectedItem == tabStepCalibration)
-                {
-                    calibrationStepActive = true;
-                    UpdateCalibrationStepAvailability();
-                    Dispatcher.BeginInvoke((System.Action)(() => ActivateSelectedCalibrationChild(true)), System.Windows.Threading.DispatcherPriority.Background);
-                }
-            }
-        }
-
-        // True only while the Calibration step itself is the selected outer step - guards Calibration_
-        // SelectionChanged from activating a sub-tab on startup/layout before the user has ever navigated here.
-        private bool calibrationStepActive = false;
-
-        private void ActivateSelectedCalibrationChild(bool activate)
-        {
-            var tab = tabCalibration?.SelectedItem as TabItem;
-            if (tab == tabCalStepper)
-                calStepperWizard.Activate(activate);
-            else if (tab == tabCalSquareness)
-                calSquarenessWizard.Activate(activate);
-        }
-
-        // Switching between Stepper calibration / Squareness within the Calibration step - deactivate the
-        // outgoing sub-tab, activate the incoming one. Ignored while the Calibration step itself isn't the
-        // active outer step (this event also bubbles up to Steps_SelectionChanged, which filters it out there
-        // via e.OriginalSource, same pattern as the macros/simulator checks above).
-        private void Calibration_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (e.OriginalSource != tabCalibration || !calibrationStepActive)
-                return;
-
-            if (e.RemovedItems.Count == 1)
-            {
-                var removed = e.RemovedItems[0] as TabItem;
-                if (removed == tabCalStepper)
-                    calStepperWizard.Activate(false);
-                else if (removed == tabCalSquareness)
-                    calSquarenessWizard.Activate(false);
-            }
-            Dispatcher.BeginInvoke((System.Action)(() => ActivateSelectedCalibrationChild(true)), System.Windows.Threading.DispatcherPriority.Background);
-        }
-
-        // Stepper calibration (probe) needs a real 3D probe to do anything useful - grey its sub-tab out
-        // (not just its own Generate/Save buttons) when none is configured. Re-checked whenever the
-        // Calibration step is shown and whenever a probe is added/edited/deleted, so it reflects changes
-        // made on the Probe definitions step in the same session (mirrors ToolsView's old
-        // UpdateStepperCalProbeAvailability).
-        private void UpdateCalibrationStepAvailability()
-        {
-            if (tabCalStepper != null)
-                tabCalStepper.IsEnabled = ProbeDefinitions.Items.Any(p => p.ProbeType == ProbeType.ThreeDProbe);
         }
 
         private void RefreshMacroStatus()
@@ -1292,13 +2045,19 @@ namespace CNC.Controls
         // Install/update the controller-side macros - delegates to the SD Card view's proven path, then refresh.
         private void InstallMacros_Click(object sender, RoutedEventArgs e)
         {
-            if (SDCardView.Instance != null)
-            {
-                SDCardView.Instance.InstallAtcMacros(Window.GetWindow(this));
-                RefreshMacroStatus();
-            }
-            else
-                AppDialogs.Show(Window.GetWindow(this), "The SD Card view is not available.", "Controller macros", MessageBoxButton.OK, MessageBoxImage.Information);
+            // SDCardView.Instance is set in that view's CONSTRUCTOR. It used to be constructed at app startup
+            // with every other tab, so it was always there; since the SD Card view moved off the tab bar into
+            // a menu-hosted window (2026-08-03) it is not constructed until the operator actually opens that
+            // window - so this refused with "The SD Card view is not available." purely because they had never
+            // visited it. Same class as the getTab(ViewType.X)-returns-null trap the menu-hosting change
+            // introduced elsewhere.
+            // Constructing one here is enough and is safe: the ctor only does InitializeComponent, sets
+            // ctxMenu.DataContext and assigns Instance - no comms, no event wiring. Provisioning explicitly
+            // does not need the view REALIZED either; ProvisionAtcMacros says so itself and deliberately reads
+            // Grbl.GrblViewModel rather than the view's own (still-null) DataContext.
+            var sdCard = SDCardView.Instance ?? new SDCardView();
+            sdCard.InstallAtcMacros(Window.GetWindow(this));
+            RefreshMacroStatus();
         }
 
         // Picks up (PRINT, TLOREF_Z=..) below - same (PRINT, TAG=value) idiom StartJobView.rxResult already
@@ -1310,6 +2069,40 @@ namespace CNC.Controls
         {
             double v = AppConfig.Settings.Base.TloRefBaseline;
             txtTloRefValue.Text = v == 0d ? "Never referenced" : string.Format("Baseline: {0:0.0##} mm", v);
+            UpdateTloRefControls();
+        }
+
+        /// <summary>
+        /// The "3D probe is in the spindle now" question only makes sense against a PUCK - it chooses between
+        /// the toolsetter input and the main one. A touch plate is always the main input, so on a machine
+        /// with no toolsetter defined the checkbox is hidden rather than left sitting there inviting an
+        /// answer that changes nothing.
+        /// </summary>
+        private void UpdateTloRefControls()
+        {
+            if (chkTloRef3dProbe == null)
+                return;
+
+            // Which probe will actually be used - the operator's choice if they made one, else the same
+            // fallback ReferenceTlo_Click applies. Read it the same way, so the tooltip and the button
+            // cannot describe different probes.
+            var chosen = SelectedTloProbe()
+                         ?? ProbeDefinitions.Items.FirstOrDefault(x => x.ProbeType == ProbeType.ToolSetter)
+                         ?? ProbeDefinitions.Items.FirstOrDefault(x => x.ProbeType == ProbeType.TouchPlate);
+
+            bool isSetter = chosen != null && chosen.ProbeType == ProbeType.ToolSetter;
+            chkTloRef3dProbe.Visibility = isSetter ? Visibility.Visible : Visibility.Collapsed;
+
+            if (btnReferenceTlo != null)
+            {
+                btnReferenceTlo.IsEnabled = chosen != null;
+                btnReferenceTlo.ToolTip = chosen == null
+                    ? "Define a tool setter or a touch plate above first."
+                    : string.Format(isSetter
+                        ? "Probe the toolsetter ({0}) at G59.3 and store the result as this machine's tool-length baseline."
+                        : "Probe the touch plate ({0}) at G59.3 and store the result as this machine's tool-length baseline.",
+                        chosen.Name);
+            }
         }
 
         // Machine-wide TLO baseline (see the XAML comment on this section) - probes the puck exactly like
@@ -1323,31 +2116,118 @@ namespace CNC.Controls
             if (model == null)
                 return;
 
-            var p = ProbeDefinitions.Items.FirstOrDefault(x => x.ProbeType == ProbeType.ToolSetter);
+            // A toolsetter if there is one, otherwise the touch plate. Not a refusal: a machine with no
+            // toolsetter is the common hobby case, and the rest of the app already expects it - tc.macro and
+            // tlo.macro carry a touch-plate mode (#<_tc_touchplate>, set from GrblInfo.HasToolSetter) whose
+            // whole premise is a fixed plate block sitting where the puck would be. This step was the one
+            // place that still insisted on a puck, so the baseline those macros need could not be taken.
+            //
+            // ANY touch plate qualifies, corner-capable or not: this is a straight-down Z touch, which is
+            // the one thing a flat plate is for.
+            // The operator's own answer first - step 5 asks which probe sits at G59.3, and a machine can
+            // hold a toolsetter AND plates, all of which could do this. Falling back only when they have
+            // not said, which is what this did before the question existed.
+            var p = SelectedTloProbe()
+                    ?? ProbeDefinitions.Items.FirstOrDefault(x => x.ProbeType == ProbeType.ToolSetter)
+                    ?? ProbeDefinitions.Items.FirstOrDefault(x => x.ProbeType == ProbeType.TouchPlate);
             if (p == null)
             {
-                AppDialogs.Show(Window.GetWindow(this), "Define a Tool setter probe first (above).", "Reference TLO", MessageBoxButton.OK, MessageBoxImage.Information);
+                AppDialogs.Show(Window.GetWindow(this), "Define a tool setter or a touch plate first (above).", "Reference TLO", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            bool probeInSpindle = chkTloRef3dProbe.IsChecked == true;
+            bool usingPlate = p.ProbeType == ProbeType.TouchPlate;
+
+            // The firmware has the last word on which probe input is used, and with $65 bit 3 set it will
+            // overrule the G65 P5 Q0 below: any G38.2 starting within 5 mm of G59.3 is re-routed to the
+            // TOOLSETTER input. The plate is not on that input, so the probe cannot trigger and the tool is
+            // driven into it. Refuse rather than start - and offer the one-line fix, since the correct value
+            // is not a matter of opinion once the operator has said a plate is what is at G59.3.
+            if (ToolsetterAutoSelectConflicts())
+            {
+                if (AppDialogs.Show(Window.GetWindow(this),
+                        "This would drive the tool into the plate.\r\n\r\n" +
+                        "$65 has \"Auto select toolsetter\" switched on, so the controller re-routes any probe starting near G59.3 to the toolsetter input - whatever this program asks for. " +
+                        "Your touch plate is wired to the main probe input, so it would never trigger and the probe would not stop at it.\r\n\r\n" +
+                        "Turn that option off now and carry on?",
+                        "Reference TLO", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.OK) != MessageBoxResult.OK)
+                    return;
+
+                if (!ApplyToolsetterAutoSelect(false) || ToolsetterAutoSelectConflicts())
+                {
+                    AppDialogs.Show(Window.GetWindow(this),
+                        "$65 could not be changed, so nothing has been run. Clear bit 3 (value 8) of $65 by hand and try again.",
+                        "Reference TLO", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+            }
+
+            // Where G59.3 actually is, in machine coordinates, read fresh - the program below drives to it
+            // with G53 rather than selecting it, so these numbers ARE the move. Refuse rather than move if
+            // they cannot be read: an unanswered $# would otherwise become a rapid to 0,0,0.
+            GrblWorkParameters.Get(model);
+            var g593cs = GrblWorkParameters.GetCoordinateSystem("G59.3");
+            if (g593cs == null || g593cs.Values.Length < 3 ||
+                double.IsNaN(g593cs.Values[0]) || double.IsNaN(g593cs.Values[1]) || double.IsNaN(g593cs.Values[2]))
+            {
+                AppDialogs.Show(Window.GetWindow(this),
+                    "Could not read where G59.3 is. Set it above first, and make sure the controller has answered.",
+                    "Reference TLO", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            var g593 = new { X = g593cs.Values[0], Y = g593cs.Values[1], Z = g593cs.Values[2] };
+
+            // The plate is a loose object, and the baseline is only worth anything if every later
+            // tool-length probe finds it in the SAME place - tlo.macro goes to G59.3 and probes straight
+            // down, exactly as this does. Say so before moving, because getting it wrong does not fail, it
+            // silently shifts every tool length by however far the plate moved.
+            if (usingPlate && AppDialogs.Show(Window.GetWindow(this),
+                    "No tool setter is defined, so the baseline will be taken against the touch plate.\r\n\r\n" +
+                    "Put the plate where it permanently lives - at the G59.3 position, which is where the tool-length macro will go looking for it every time.\r\n\r\n" +
+                    "The machine will move to G59.3 and probe down. Ready?",
+                    "Reference TLO", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+                return;
+
+            // Which probe input. A plate has no switch of its own - it closes the circuit through the tool on
+            // the MAIN input, the same choice tlo.macro makes in touch-plate mode, so the checkbox below
+            // (which only ever asked "rigid tool or self-triggering 3D probe?") does not apply to it.
+            bool probeInSpindle = !usingPlate && chkTloRef3dProbe.IsChecked == true;
             string searchF = p.ProbeFeedRate.ToInvariantString("0.0##"), latchF = p.LatchFeedRate.ToInvariantString("0.0##");
 
             var b = new StringBuilder();
-            b.AppendLine("(Machine Setup - reference TLO at the puck)");
+            b.AppendLine(usingPlate ? "(Machine Setup - reference TLO at the touch plate)" : "(Machine Setup - reference TLO at the puck)");
             b.AppendLine("(PREREQ, connected, homed, noalarm, ATC=1, G30, G59.3)");
             b.AppendLine("G21 G90 G94 G17");
             b.AppendLine("G49");
             b.AppendLine("G53 G0 Z-5");
-            b.AppendLine("G59.3");
-            b.AppendLine("G0 X0 Y0");
-            b.AppendLine("G0 Z0");
-            // Main probe input (Q0) if a self-triggering 3D probe is actually in the spindle, else the
-            // toolsetter input (Q1) for a rigid/cutting tool relying on continuity through the puck - same
-            // convention tc.macro's own T8-vs-not branch uses.
-            b.AppendLine(string.Format(GrblCommand.ProbeSelect, probeInSpindle ? 0 : 1));
+            // MACHINE COORDINATES, not "G59.3 then G0 X0 Y0".
+            //
+            // This used to SELECT G59.3 to get to it, and never put the operator's own coordinate system
+            // back - so running Reference TLO once left G59.3 as the active WCS for everything afterwards.
+            // tlo.macro does the same selection but restores the caller's WCS at the end, and its header
+            // says in as many words that the restore must not be hardcoded; this inline copy took the
+            // selection and left the restore behind.
+            //
+            // The fix is not to add a restore but to stop selecting anything. Nothing this page does needs
+            // a work coordinate system: the approach is a fixed machine position and the probe itself runs
+            // in G91, so machine coordinates express all of it, and there is then no state to put back and
+            // nothing to get wrong. Resolved in C# because a streamed program cannot branch - an o-word
+            // ELSE/ENDIF is dropped by the line pipeline and wedges the controller's o-word engine.
+            b.AppendLine(string.Format("G53 G0 X{0} Y{1}", g593.X.ToInvariantString("0.0##"), g593.Y.ToInvariantString("0.0##")));
+            b.AppendLine(string.Format("G53 G0 Z{0}", g593.Z.ToInvariantString("0.0##")));
+            // Main probe input (Q0) for a plate - it has no switch, it closes the circuit through the tool -
+            // or for a self-triggering 3D probe actually in the spindle; else the toolsetter input (Q1) for
+            // a rigid/cutting tool pushing the puck's own switch. The same three-way choice tlo.macro's
+            // o150 makes, and it has to agree with it: the baseline and the probes later measured against
+            // it are subtracted from one another, so they must come off the same input and the same object.
+            b.AppendLine(string.Format(GrblCommand.ProbeSelect, (usingPlate || probeInSpindle) ? 0 : 1));
             b.AppendLine("G91");
-            b.AppendLine(string.Format("G38.2 Z-90 F{0}", searchF));
+            // Computed from the surface, the target's height and where G59.3 sits; the literal 90 only
+            // applies when one of those is missing. The old constant is too short for a plate low on the
+            // table - the case that sent me looking - and needlessly far for a tall puck.
+            double search = ComputeTloSearchDistance(p);
+            string searchZ = (search > 0d ? search : 90d).ToInvariantString("0.0##");
+            b.AppendLine(string.Format("G38.2 Z-{0} F{1}", searchZ, searchF));
             b.AppendLine("G0 Z2");
             b.AppendLine(string.Format("G38.2 Z-5 F{0}", latchF));
             b.AppendLine("#<_probe_z> = #5063");

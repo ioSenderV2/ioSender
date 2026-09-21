@@ -1,4 +1,4 @@
-/*
+﻿/*
  * StartJobControl.xaml.cs - part of CNC Probing library
  *
  * Load Stock: probe a corner-referenced workpiece to set the work origin at the front-left corner
@@ -76,9 +76,6 @@ namespace CNC.Controls.Probing
                 probing.PreviewText += "\n; Post XY probe\n" + probing.Program.ToString().Replace("G53", string.Empty);
                 return;
             }
-
-            if (!probing.VerifyProbe())
-                return;
 
             if (!probing.Program.Init())
                 return;
@@ -170,7 +167,7 @@ namespace CNC.Controls.Probing
                     if ((ok = !isCancelled && probing.GotoMachinePosition(pz, axisflags)))
                     {
                         ok = !isCancelled && probing.WaitForResponse(probing.FastProbe + "Z-" + probing.Depth.ToInvariantString());
-                        ok = ok && !isCancelled && probing.WaitForResponse(probing.RapidCommand + "Z" + probing.LatchDistance.ToInvariantString());
+                        ok = ok && !isCancelled && probing.WaitForResponse("G0Z" + probing.LatchDistance.ToInvariantString());
                         ok = ok && !isCancelled && probing.RemoveLastPosition();
                         if ((ok = ok && !isCancelled && probing.WaitForResponse(probing.SlowProbe + "Z-" + probing.Depth.ToInvariantString())))
                         {

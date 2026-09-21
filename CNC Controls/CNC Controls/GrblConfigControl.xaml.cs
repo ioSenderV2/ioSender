@@ -1,4 +1,4 @@
-/*
+﻿/*
  * GrblConfigControl.xaml.cs - part of CNC Controls library for Grbl
  *
  * v0.46 / 2025-05-23 / Io Engineering (Terje Io)
@@ -199,6 +199,21 @@ namespace CNC.Controls
             if(GrblSettings.Backup(string.Format("{0}settings.txt", Core.Resources.ConfigPath)))
                 model.Message = string.Format((string)FindResource("SettingsWritten"), "settings.txt");
             GrblWorkParameters.Backup(string.Format("{0}offsets.nc", Core.Resources.ConfigPath));
+
+            // ...and a VERSIONED pair, so pressing this button actually creates a restore point.
+            //
+            // The two files above are written to the config root under FIXED names with no history, and the
+            // Restore dialog lists only the timestamped Backups\<Weekday>\ snapshots - which until now were
+            // written on connect and nowhere else. So "Save settings", then break something, then Restore
+            // offered nothing from the moment the operator had deliberately saved. That is the obvious
+            // reading of a button called Save, and it was the one thing it did not do.
+            //
+            // Written back to back so they land inside RestorePoint's 90 s PairWindow and show up as one
+            // moment rather than two rows offering half of it each. Each refuses to write when there is
+            // nothing to capture, so a press against a controller holding nothing cannot manufacture an
+            // empty restore point that the dialog would then sort to the top.
+            GrblSettings.WriteSnapshot();
+            GrblWorkParameters.WriteSnapshot();
         }
 
         // Restore controller $ settings to firmware defaults ($RST=$), then reload. Public: shared footer's
@@ -275,7 +290,7 @@ namespace CNC.Controls
             retval = string.Empty;
             error = null;
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -283,10 +298,7 @@ namespace CNC.Controls
                     a => model.OnResponseReceived += a,
                     a => model.OnResponseReceived -= a,
                     400, () => Comms.com.WriteCommand(scmd));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             if (retval != string.Empty)
             {
@@ -375,7 +387,12 @@ namespace CNC.Controls
 
             if (summary.Count == 0)
             {
-                AppDialogs.Show((string)FindResource("SettingsRestoreNoChanges"), "ioSender", MessageBoxButton.OK, MessageBoxImage.Information);
+                // Captioned for WHICH restore this is about. A restore point can carry machine settings, work
+                // offsets and the app configuration, and this message concerns only the first of the three -
+                // captioned "ioSender" it read as "the restore did nothing", which on a run that was also
+                // putting work offsets back is simply wrong.
+                AppDialogs.Show((string)FindResource("SettingsRestoreNoChanges"), "Restore machine settings",
+                                MessageBoxButton.OK, MessageBoxImage.Information);
                 return false;
             }
 
@@ -403,7 +420,7 @@ namespace CNC.Controls
                 res = null;
                 retval = string.Empty;
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                         cancellationToken,
@@ -411,10 +428,7 @@ namespace CNC.Controls
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         400, () => Comms.com.WriteCommand(cmd));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
                 if (retval != string.Empty)
                 {
@@ -466,19 +480,163 @@ namespace CNC.Controls
                 retval = data;
         }
 
-        // Restore settings from a chosen restore point / backup file. Public: shared footer.
+        // Restore from a chosen restore point. Public: shared footer.
+        //
+        // A restore point is a MOMENT, and may carry the controller's settings, ioSender's own
+        // configuration, or both - the dialog shows which and lets the operator pick what to put back. See
+        // RestorePoint.cs for why the two were paired back together.
         public void RestoreSettings()
         {
-            // Pick a restore point (auto-snapshot written on each Save), newest first; the dialog's
-            // Browse... button falls back to choosing an arbitrary backup file.
             RestorePointDialog dlg = new RestorePointDialog { Owner = Window.GetWindow(this) };
 
-            if (dlg.ShowDialog() == true && !string.IsNullOrEmpty(dlg.SelectedFile))
+            if (dlg.ShowDialog() != true)
+                return;
+
+            // Controller settings first: it is the part that takes effect immediately and without a
+            // restart, so if the operator declines the restart below they still have the machine back.
+            if (!string.IsNullOrEmpty(dlg.SelectedFile))
             {
                 using (new UIUtils.WaitCursor())
-                {
                     LoadFile(dlg.SelectedFile);
-                }
+            }
+
+            // Work offsets next. Split deliberately into the half that writes and the half that moves:
+            // G54-G59.3 and the tool table are G10 writes with no motion at all, and that is the part a
+            // controller wipe actually loses, so it is applied here and now like any other setting. G28 and
+            // G30 cannot be written - the firmware only teaches them from where the machine is standing, so
+            // the snapshot drives to each position and issues G28.1/G30.1 - and that half is opened as a
+            // program for the operator to run, with its own warning and M0 already in the file.
+            if (!string.IsNullOrEmpty(dlg.SelectedOffsetsFile))
+                RestoreWorkOffsets(dlg.SelectedOffsetsFile, dlg.RestoreOffsetPositions);
+
+            if (string.IsNullOrEmpty(dlg.SelectedConfigFile))
+                return;
+
+            if (!AppConfig.StageConfigRestore(dlg.SelectedConfigFile))
+            {
+                AppDialogs.Show("The app configuration could not be staged for restore, so it has been left alone." +
+                                (string.IsNullOrEmpty(dlg.SelectedFile) ? "" : " The machine settings were restored."),
+                                "Restore", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // Say what has and has not happened yet BEFORE asking about the restart, so declining it leaves
+            // the operator knowing exactly where they stand rather than guessing which half took.
+            if (AppDialogs.Show((string.IsNullOrEmpty(dlg.SelectedFile)
+                                    ? "The app configuration will be restored when ioSender restarts."
+                                    : "The machine settings have been restored.\n\nThe app configuration will be restored when ioSender restarts.") +
+                                "\n\nRestart now?",
+                                "Restore", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes) == MessageBoxResult.Yes)
+                GrblConfigView.DoRestart();
+        }
+
+        /// <summary>
+        /// Put the work offsets back from an Offsets_*.nc snapshot.
+        /// </summary>
+        /// <param name="path">The snapshot to restore from.</param>
+        /// <param name="includePositions">
+        /// True to also restore G28/G30, which needs motion and so opens the file as a program instead.
+        /// </param>
+        /// <remarks>
+        /// The offset lines are lifted out and run as a macro rather than the whole file being streamed. The
+        /// file is a mixture: G10 L1/L2 writes that move nothing, and - behind a warning and an M0 - rapids
+        /// to the G28 and G30 positions so the firmware can be taught them from where the machine stands.
+        /// Running the lot to recover a work zero would demand the operator be at the machine for something
+        /// that moves no axis, and running it unattended would be the kind of surprise this codebase has
+        /// been bitten by before.
+        /// </remarks>
+        private void RestoreWorkOffsets(string path, bool includePositions)
+        {
+            List<OffsetRestoreRow> rows;
+            try
+            {
+                rows = OffsetRestoreDialog.Parse(System.IO.File.ReadAllLines(path));
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show("The work offsets could not be read: " + ex.Message, "Restore work offsets",
+                                MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (rows.Count == 0)
+            {
+                AppDialogs.Show("That snapshot holds no work offsets to restore.", "Restore work offsets",
+                                MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // The G28/G30 rows are always SHOWN - what a snapshot holds is worth seeing even when you did not
+            // ask for it - but they start ticked only if the operator did ask. Present and unticked is
+            // information; present and ticked without being asked for would be a machine move nobody chose.
+            foreach (var r in rows.Where(r => r.MovesMachine))
+                r.Restore = includePositions;
+
+            var dlg = new OffsetRestoreDialog(rows) { Owner = Window.GetWindow(this) };
+            if (dlg.ShowDialog() != true)
+                return;
+
+            string writes = OffsetRestoreDialog.BuildWrites(dlg.Selected);
+            string program = OffsetRestoreDialog.BuildPositionProgram(dlg.Selected);
+
+            // SEQUENCE THESE, do not just call them in order. MacroProcessor.Run is ASYNCHRONOUS - it starts
+            // the macro and returns immediately - so loading the program on the next line loaded it while the
+            // G10 writes were still streaming. The Job tab then came up mid-run: Start disabled, Stop
+            // enabled, and the operator had to press Stop before they could press Start. onDone is the run's
+            // true terminal and fires on the UI thread, which is what it is there for.
+            if (!string.IsNullOrEmpty(writes))
+            {
+                MacroProcessor.Run(model, "Restore work offsets", writes,
+                                   onDone: ok => { if (!string.IsNullOrEmpty(program)) HandOffPositions(program); });
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(program))
+                HandOffPositions(program);
+        }
+
+        /// <summary>
+        /// Write the G28/G30 half out as a program, open it in the Job tab and get out of the way.
+        /// </summary>
+        /// <remarks>
+        /// Never run from here. The snapshot's own warning and M0 are kept, now listing the positions it
+        /// will actually drive to - the numbers the review table just let the operator change.
+        /// </remarks>
+        private void HandOffPositions(string program)
+        {
+            try
+            {
+                // A named file rather than a temp one: it is inspectable afterwards, and overwritten next
+                // time rather than accumulating.
+                string file = System.IO.Path.Combine(Core.Resources.ConfigPath, "restore-positions.nc");
+                System.IO.File.WriteAllText(file, program);
+                GCode.File.Load(file);
+
+                // Put the operator where the program is. Loading it and leaving them on the settings tab
+                // means the one thing they now have to do is somewhere they cannot see - the same idiom the
+                // macro runner already uses to hand off to the Job tab.
+                MacroProcessor.SwitchToTab?.Invoke(ViewType.GRBL);
+
+                AppDialogs.Show("The G28 / G30 positions have been opened as a program in the Job tab.\n\n" +
+                                "They cannot be written - the controller only learns them from where the machine is " +
+                                "standing - so this drives to each one and teaches it. Read it, make sure the machine " +
+                                "is homed and the path is clear, then press Start.",
+                                "Restore work offsets", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+                // Close the settings window if that is what we are in - the cast is the guard, because when
+                // the Grbl config is an ordinary TAB this is the MAIN window and closing it would shut the
+                // application. Deferred so the close does not tear down the visual tree holding this control
+                // while we are still inside its own event handler.
+                var host = Window.GetWindow(this) as ViewHostWindow;
+                if (host != null)
+                    // System.Action fully qualified: CNC.Core.Action is a different type of the same name.
+                    Dispatcher.BeginInvoke(new System.Action(() => host.Close()),
+                                           System.Windows.Threading.DispatcherPriority.Background);
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show("The positions could not be opened as a program: " + ex.Message,
+                                "Restore work offsets", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 

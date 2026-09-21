@@ -2,8 +2,10 @@
   "_comment": [
     "This project's inputs to the shared turn-loop hooks in claude-hub/hooks/.",
     "The mechanism lives in the hub; every string specific to ioSender lives here.",
-    "Layered over hub defaults.json - `denies` merge by name, so 'push' below only retunes the",
-    "hub's rule where it differs. Canonical doc: docs/playbooks/turn_workflow_loop.md."
+    "Layered over hub defaults.json - `denies` merge by name, and a named entry REPLACES the hub's",
+    "whole rule, freezing its regex at today's version. So only 'testserver' lives here: it is this",
+    "project's own. 'push' is deliberately absent - it is the hub's rule and stays the hub's rule.",
+    "Canonical doc: docs/playbooks/turn_workflow_loop.md."
   ],
 
   "project": "ioSender",
@@ -31,13 +33,6 @@
         "message": "BLOCKED: -testserver without -simulator.\n\nEven when requested, the test server may only ever drive the simulator - never the real controller. Add -simulator, and confirm the target with GET /state/lbl_connectionTarget before any MDI, motion, homing or reset call."
       },
       "message": "BLOCKED: -testserver was not requested in this turn's prompt.\n\nThe rule (docs/playbooks/turn_workflow_loop.md, Hard rules): never reach for -testserver on your own initiative, only when the user asks for it in THIS turn, and even then only against -simulator. On 2026-07-21 an unrequested testserver run sent MDI commands to the real controller mid-homing.\n\nBuild and hand off instead - the user tests. If you believe you need it, ask."
-    },
-    {
-      "name": "push",
-      "enabled": true,
-      "match": "\\bgit\\s+push\\b|push-all\\.ps1|\\bgh\\s+release\\s+create\\b",
-      "allowWhenPromptMatches": "\\bpush\\b|\\brelease\\b|\\bship\\b|\\bpublish\\b|wrap.?up|end.?of.?session|create.{0,20}\\brepo|\\bremote\\b|\\bgithub\\b",
-      "message": "BLOCKED: push/release is not part of a turn.\n\nThe rule (docs/playbooks/turn_workflow_loop.md, Hard rules): pushing to v2/master fires the release CI. That belongs to end_of_session_wrapup.md at actual session end, not to finishing a work item.\n\nCommit locally and hand off. The user will say when it is time to push."
     }
   ],
 

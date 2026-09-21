@@ -1,0 +1,142 @@
+﻿<UserControl x:Class="CNC.Controls.UiRemoteConfigControl"
+             x:Uid="ctl_uiRemoteConfig"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+    <!-- Settings > User Interface > Remote. The enable lived only on the Height map tab, which is where it
+         was first needed (place the plate, press Continue, sixteen times, laptop across the shop) - but a
+         press now means something during any prompt, any running job and any hold, so the setting belongs
+         with the other input settings rather than inside one feature. The Height map checkbox binds the
+         same property and stays in step. -->
+    <GroupBox x:Uid="grp_uiRemote" Header="Remote" Margin="5">
+        <StackPanel Margin="5">
+            <CheckBox x:Uid="lbl_shutterRemoteEnabled" Content="A shutter remote drives the machine (volume keys)"
+                      Margin="5,0,0,0" IsChecked="{Binding Path=ShutterRemoteEnabled, Mode=TwoWay}"
+                      ToolTip="Lets a cheap Bluetooth camera shutter remote act as a one-button pendant, so you can answer a prompt or hold the machine with your hands on the work instead of at the keyboard. Pair the remote to Windows as an ordinary keyboard first - ioSender does not pair to it itself. Off by default: it listens using a system-wide keyboard hook, and nobody who has not asked for that should get it."/>
+
+            <!-- Binding status. Ticking the box arms a one-shot bind; this is what says so, and what
+                 reports the result. Without it the whole thing happens silently apart from a chime, and
+                 an operator has no way to tell "waiting for your press" from "not working". -->
+            <Border x:Uid="bdr_remoteBinding" Margin="5,10,0,0" Padding="8,6" CornerRadius="3"
+                    BorderThickness="1" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Uid="lbl_remoteBindStatus" x:Name="txtBindStatus" VerticalAlignment="Center"
+                               TextWrapping="Wrap" Text="Not bound"/>
+                    <Button x:Uid="btn_remoteRebind" x:Name="btnRebind" Content="Rebind" Margin="12,0,0,0"
+                            Padding="10,2" VerticalAlignment="Center" Click="btnRebind_Click"
+                            ToolTip="Forget the bound remote and listen for the next button press. Use this after replacing the remote."/>
+                </StackPanel>
+            </Border>
+
+            <CheckBox x:Uid="lbl_remoteSwapButtons" Content="Swap the two buttons" Margin="5,8,0,0"
+                      IsChecked="{Binding Path=ShutterRemoteSwapButtons, Mode=TwoWay}"
+                      ToolTip="Which physical button is the primary one. Set for you when you bind - the button you press becomes the primary - so you only need this if you want the other one to be OK/Start instead."/>
+
+            <TextBlock x:Uid="lbl_remoteWhatKeysDo" Margin="5,10,0,0" TextWrapping="Wrap" Opacity="0.75"
+                       Text="The remote's two buttons are not marked, and which one sends which media key is not something anyone should have to know - on the PICO the larger top button is the one that sends volume DOWN. So the button you press when binding becomes the PRIMARY one, and the other is the secondary. Swap them below if you change your mind."/>
+
+            <!-- Each row can be switched off on its own: a behaviour someone dislikes should be turnable
+                 off, not a reason to stop using the remote. The top two ANSWER SOMETHING ALREADY ON
+                 SCREEN, so they are on/off only - the button is saying yes to a question, and what else
+                 it might mean is not an open question. The three that depend only on machine state are
+                 assignable. -->
+            <Grid Margin="24,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock x:Uid="lbl_remoteHdrOn" Grid.Row="0" Grid.Column="0" Text="On" FontWeight="Bold" Margin="0,0,10,4"/>
+                <TextBlock x:Uid="lbl_remoteHdrWhen" Grid.Row="0" Grid.Column="1" Text="When" FontWeight="Bold" Margin="0,0,18,4"/>
+                <TextBlock x:Uid="lbl_remoteHdrUp" Grid.Row="0" Grid.Column="2" Text="Primary button" FontWeight="Bold" Margin="0,0,18,4"/>
+                <TextBlock x:Uid="lbl_remoteHdrDown" Grid.Row="0" Grid.Column="3" Text="Secondary button" FontWeight="Bold" Margin="0,0,0,4"/>
+
+                <CheckBox  x:Uid="chk_remoteOnPrompt" Grid.Row="1" Grid.Column="0" Margin="0,0,10,3" VerticalAlignment="Center"
+                           IsChecked="{Binding Path=RemoteOnPrompt, Mode=TwoWay}"
+                           ToolTip="Let the remote answer message boxes and the &quot;move the plate&quot; prompts."/>
+                <TextBlock x:Uid="lbl_remoteRowPrompt" Grid.Row="1" Grid.Column="1" Text="A prompt is on screen" Margin="0,0,18,3" VerticalAlignment="Center"/>
+                <TextBlock x:Uid="lbl_remoteRowPromptUp" Grid.Row="1" Grid.Column="2" Text="OK / Yes" Margin="0,0,18,3" VerticalAlignment="Center"/>
+                <TextBlock x:Uid="lbl_remoteRowPromptDown" Grid.Row="1" Grid.Column="3" Text="Cancel / No" Margin="0,0,0,3" VerticalAlignment="Center"/>
+
+                <CheckBox  x:Uid="chk_remoteOnHeightMap" Grid.Row="2" Grid.Column="0" Margin="0,0,10,3" VerticalAlignment="Center"
+                           IsChecked="{Binding Path=RemoteOnHeightMap, Mode=TwoWay}"
+                           ToolTip="Let the remote release each height-map point. This is what the remote was bought for."/>
+                <TextBlock x:Uid="lbl_remoteRowMap" Grid.Row="2" Grid.Column="1" Text="Height map is waiting" Margin="0,0,18,3" VerticalAlignment="Center"/>
+                <TextBlock x:Uid="lbl_remoteRowMapUp" Grid.Row="2" Grid.Column="2" Text="Continue" Margin="0,0,18,3" VerticalAlignment="Center"/>
+                <TextBlock x:Uid="lbl_remoteRowMapDown" Grid.Row="2" Grid.Column="3" Text="Continue" Margin="0,0,0,3" VerticalAlignment="Center"/>
+
+                <CheckBox  x:Uid="chk_remoteOnRun" Grid.Row="3" Grid.Column="0" Margin="0,0,10,3" VerticalAlignment="Center"
+                           IsChecked="{Binding Path=RemoteOnRun, Mode=TwoWay}"
+                           ToolTip="Let the remote act while a job is running."/>
+                <TextBlock x:Uid="lbl_remoteRowRun" Grid.Row="3" Grid.Column="1" Text="A job is running" Margin="0,0,18,3" VerticalAlignment="Center"/>
+                <ComboBox  x:Uid="cbo_remoteRunPrimary" Grid.Row="3" Grid.Column="2" Margin="0,0,18,3" MinWidth="150"
+                           ItemsSource="{Binding Source={x:Static local:RemoteFunctions.Items}}"
+                           DisplayMemberPath="Label" SelectedValuePath="Id"
+                           SelectedValue="{Binding Path=RemoteRunPrimary, Mode=TwoWay}"/>
+                <ComboBox  x:Uid="cbo_remoteRunSecondary" Grid.Row="3" Grid.Column="3" Margin="0,0,0,3" MinWidth="150"
+                           ItemsSource="{Binding Source={x:Static local:RemoteFunctions.Items}}"
+                           DisplayMemberPath="Label" SelectedValuePath="Id"
+                           SelectedValue="{Binding Path=RemoteRunSecondary, Mode=TwoWay}"/>
+
+                <CheckBox  x:Uid="chk_remoteOnHold" Grid.Row="4" Grid.Column="0" Margin="0,0,10,3" VerticalAlignment="Center"
+                           IsChecked="{Binding Path=RemoteOnHold, Mode=TwoWay}"
+                           ToolTip="Let the remote act while the machine is held."/>
+                <TextBlock x:Uid="lbl_remoteRowHold" Grid.Row="4" Grid.Column="1" Text="The machine is holding" Margin="0,0,18,3" VerticalAlignment="Center"/>
+                <ComboBox  x:Uid="cbo_remoteHoldPrimary" Grid.Row="4" Grid.Column="2" Margin="0,0,18,3" MinWidth="150"
+                           ItemsSource="{Binding Source={x:Static local:RemoteFunctions.Items}}"
+                           DisplayMemberPath="Label" SelectedValuePath="Id"
+                           SelectedValue="{Binding Path=RemoteHoldPrimary, Mode=TwoWay}"/>
+                <ComboBox  x:Uid="cbo_remoteHoldSecondary" Grid.Row="4" Grid.Column="3" Margin="0,0,0,3" MinWidth="150"
+                           ItemsSource="{Binding Source={x:Static local:RemoteFunctions.Items}}"
+                           DisplayMemberPath="Label" SelectedValuePath="Id"
+                           SelectedValue="{Binding Path=RemoteHoldSecondary, Mode=TwoWay}"/>
+
+                <CheckBox  x:Uid="chk_remoteOnIdle" Grid.Row="5" Grid.Column="0" Margin="0,0,10,3" VerticalAlignment="Center"
+                           IsChecked="{Binding Path=RemoteOnIdle, Mode=TwoWay}"
+                           ToolTip="Let the remote act when the machine is idle and nothing is waiting. Both buttons start as Nothing - a pendant that acts when nudged on a bench is a trap."/>
+                <TextBlock x:Uid="lbl_remoteRowIdle" Grid.Row="5" Grid.Column="1" Text="The machine is idle" Margin="0,0,18,3" VerticalAlignment="Center"/>
+                <ComboBox  x:Uid="cbo_remoteIdlePrimary" Grid.Row="5" Grid.Column="2" Margin="0,0,18,3" MinWidth="150"
+                           ItemsSource="{Binding Source={x:Static local:RemoteFunctions.Items}}"
+                           DisplayMemberPath="Label" SelectedValuePath="Id"
+                           SelectedValue="{Binding Path=RemoteIdlePrimary, Mode=TwoWay}"/>
+                <ComboBox  x:Uid="cbo_remoteIdleSecondary" Grid.Row="5" Grid.Column="3" Margin="0,0,0,3" MinWidth="150"
+                           ItemsSource="{Binding Source={x:Static local:RemoteFunctions.Items}}"
+                           DisplayMemberPath="Label" SelectedValuePath="Id"
+                           SelectedValue="{Binding Path=RemoteIdleSecondary, Mode=TwoWay}"/>
+
+                <CheckBox  x:Uid="chk_remoteOnAlarm" Grid.Row="6" Grid.Column="0" Margin="0,0,10,3" VerticalAlignment="Center"
+                           IsChecked="{Binding Path=RemoteOnAlarm, Mode=TwoWay}"
+                           ToolTip="Let the remote act while the machine is in alarm. On by default, because the recovery is always the same and your hands are usually on the work."/>
+                <TextBlock x:Uid="lbl_remoteRowAlarm" Grid.Row="6" Grid.Column="1" Text="The machine is in alarm" Margin="0,0,18,3" VerticalAlignment="Center"/>
+                <ComboBox  x:Uid="cbo_remoteAlarmPrimary" Grid.Row="6" Grid.Column="2" Margin="0,0,18,3" MinWidth="150"
+                           ItemsSource="{Binding Source={x:Static local:RemoteFunctions.Items}}"
+                           DisplayMemberPath="Label" SelectedValuePath="Id"
+                           SelectedValue="{Binding Path=RemoteAlarmPrimary, Mode=TwoWay}"/>
+                <ComboBox  x:Uid="cbo_remoteAlarmSecondary" Grid.Row="6" Grid.Column="3" Margin="0,0,0,3" MinWidth="150"
+                           ItemsSource="{Binding Source={x:Static local:RemoteFunctions.Items}}"
+                           DisplayMemberPath="Label" SelectedValuePath="Id"
+                           SelectedValue="{Binding Path=RemoteAlarmSecondary, Mode=TwoWay}"/>
+            </Grid>
+
+            <TextBlock x:Uid="lbl_remoteNoCancel" Margin="24,6,0,0" TextWrapping="Wrap" Opacity="0.75"
+                       Text="When a prompt has no Cancel button - as the &quot;move the plate to the next corner&quot; prompt does not - both buttons mean OK. There is nothing else the secondary button could mean there, and a button that did nothing would just be one you have to remember not to press."/>
+
+            <TextBlock x:Uid="lbl_remoteFallthrough" Margin="5,10,0,0" TextWrapping="Wrap" Opacity="0.75"
+                       Text="Once bound, the remote's buttons belong to ioSender: a press that means nothing at that moment beeps and is discarded, never reaching the volume control. Every other device is ignored and behaves exactly as before, so your keyboard's own volume keys are untouched. Both buttons mean Feed Hold while a job runs on purpose - a hand reaching for the remote mid-cut wants the machine to stop, not to pick the right button of two."/>
+        </StackPanel>
+    </GroupBox>
+</UserControl>

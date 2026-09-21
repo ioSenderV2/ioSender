@@ -1,0 +1,63 @@
+﻿<Window x:Class="CNC.Controls.OffsetRestoreDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:local="clr-namespace:CNC.Controls"
+        mc:Ignorable="d"
+        d:DesignHeight="560" d:DesignWidth="860"
+        x:Uid="wnd_offsetRestore" Title="Restore work offsets" Height="560" Width="860" MinWidth="700" MinHeight="420"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Icon="App.ico">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Uid="txt_offsetRestoreIntro" Grid.Row="0" Margin="0,0,0,6" TextWrapping="Wrap"
+                   Text="Everything the snapshot holds. Untick anything you do not want put back, and edit any value before it goes in - nothing is written until you press Restore."/>
+
+        <!-- Values are editable on purpose. A snapshot is a record of what WAS, not a promise that it is
+             still sensible: a stored G28 sitting at machine zero, or a Z of -90, is restored exactly as
+             faithfully as a good one. Being able to correct a number here is the difference between an
+             informed restore and a surprise. -->
+        <DataGrid x:Uid="dgr_offsetRows" x:Name="dgrRows" Grid.Row="1" AutoGenerateColumns="False"
+                  CanUserAddRows="False" CanUserDeleteRows="False" CanUserReorderColumns="False"
+                  CanUserResizeRows="False" HeadersVisibility="Column" GridLinesVisibility="All"
+                  SelectionMode="Single" SelectionUnit="Cell">
+            <DataGrid.Columns>
+                <!-- A tick rather than a delete button: it is the same choice, and it can be undone if you
+                     untick the wrong row. Removing rows outright means reopening the dialog to get one back. -->
+                <DataGridCheckBoxColumn x:Uid="col_offRestore" Header="Restore" Binding="{Binding Restore, UpdateSourceTrigger=PropertyChanged}" Width="Auto"/>
+                <DataGridTextColumn x:Uid="col_offItem" Header="Item" Binding="{Binding Item}" IsReadOnly="True" Width="Auto"/>
+                <DataGridTextColumn x:Uid="col_offX" Header="X" Binding="{Binding X, StringFormat=0.###}" Width="Auto"/>
+                <DataGridTextColumn x:Uid="col_offY" Header="Y" Binding="{Binding Y, StringFormat=0.###}" Width="Auto"/>
+                <DataGridTextColumn x:Uid="col_offZ" Header="Z" Binding="{Binding Z, StringFormat=0.###}" Width="Auto"/>
+                <!-- Rotation has a column of its own because it is NOT X, Y or Z and a table that quietly
+                     dropped it would rewrite a rotated work frame as square - the exact bug the exporter
+                     carried until e64d6967. Blank for rows that cannot have one. -->
+                <DataGridTextColumn x:Uid="col_offRot" Header="Rotation" Binding="{Binding Rotation, StringFormat=0.####}" Width="Auto"/>
+                <DataGridTextColumn x:Uid="col_offNote" Header="" Binding="{Binding Note}" IsReadOnly="True" Width="*">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="#B00020"/>
+                            <Setter Property="Margin" Value="4,0,0,0"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Text and colour are set by UpdateFooter from the current ticks - see there for why this is not
+             a fixed sentence. Left empty here so a stale line can never be shown before the first update. -->
+        <TextBlock x:Name="txtWarn" Grid.Row="2" Margin="0,8,0,0" TextWrapping="Wrap"/>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button x:Uid="btn_offNone" x:Name="btnNone" Content="Untick all" MinWidth="90" Margin="0,0,8,0" Click="btnNone_Click"/>
+            <Button x:Uid="btn_offRestore" x:Name="btnRestore" Content="Restore" MinWidth="90" Margin="0,0,8,0" IsDefault="True" Click="btnRestore_Click"/>
+            <Button x:Uid="btn_offCancel" x:Name="btnCancel" Content="Cancel" MinWidth="90" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

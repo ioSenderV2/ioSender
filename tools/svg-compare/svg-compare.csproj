@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Compares the portable CNC.Svg importer against the WPF one it replaced. See Program.cs for what
+    is compared and why the comparison is geometric rather than textual.
+
+    net462 + UseWPF because LegacySvgOutlines.cs is the ORIGINAL implementation, verbatim, and it
+    calls Geometry.Parse / GetFlattenedPathGeometry. That is the whole point - there is no way to
+    check the replacement against the real thing without running the real thing.
+
+    Why the CNC.Svg sources are COMPILED IN rather than referenced as a DLL:
+
+    build.ps1 -Scratch redirects every project's OutputPath, so a <Reference HintPath> into
+    bin\Debug is empty after a scratch build and stale after anything else. A comparison harness
+    that silently tests a week-old DLL would report agreement it has not verified - and this repo
+    has a documented family of bugs that are exactly that shape (a cache that stopped matching its
+    source). Compiling the sources means the harness always tests the working tree.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net462</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <LangVersion>7.3</LangVersion>            <!-- match what the app's own projects accept -->
+    <AssemblyName>svg-compare</AssemblyName>
+    <RootNamespace>SvgCompare</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Point2D / Point3D / OutlineContour, and the #<s_line> parameter names the emitter uses. -->
+    <Compile Include="..\..\CNC Common\Geometry.cs" Link="shared\Geometry.cs" />
+    <Compile Include="..\..\CNC Common\NgcConstants.cs" Link="shared\NgcConstants.cs" />
+    <!-- The assembly under test. -->
+    <Compile Include="..\..\CNC Svg\*.cs" Link="cnc-svg\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

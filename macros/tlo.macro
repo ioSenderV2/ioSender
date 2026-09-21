@@ -1,0 +1,195 @@
+; tlo.macro - reference the tool ALREADY IN THE SPINDLE against the toolsetter puck.
+; Upload-rate fix verified against this file: 2026-09-14 (see PollGrbl.ClaimLink).
+;
+; Extracted from tc.macro on 2026-09-14, unchanged in behaviour, because a SECOND copy of this
+; sequence had grown in the sender (StartJobView.EmitTloReference, emitted inline into generated
+; g-code) and had already drifted from it in three ways:
+;
+;   - it probed "G38.2 Z-80" where this had been raised to -90 after a short V-bit threw Alarm:5
+;     five mm short of the puck on real hardware, 2026-07-27;
+;   - it restored a hardcoded G54 where this restores the CALLER'S WCS, which tc.macro's own comment
+;     says explicitly must not be hardcoded;
+;   - it selected the toolsetter input unconditionally where this branches three ways.
+;
+; The last two could never have been right in a streamed program: they need o-word branching, and
+; o-word flow control cannot be streamed to grblHAL - a bare ELSE/ENDIF is dropped by the line
+; pipeline and leaves the controller's o-word engine waiting for an ENDIF that never arrives. So the
+; copy was not merely at risk of drifting, it was structurally incapable of matching. That is the
+; reason this lives on the controller and is CALLED, exactly as pcorner.macro is.
+;
+; ---------------------------------------------------------------------------------------------
+; Inputs - globals set before a NO-ARG call (the pcorner convention: grblHAL's O-word CALL does not
+; take multiple bracketed args reliably, it parses the extra brackets as g-code):
+;
+;   #<_tlo_toolid>     tool in the spindle. 8 = the 3D probe stylus, which is sensitive and must not
+;                      bear down on the puck, so it probes the MAIN input and triggers on first
+;                      touch. Anything else = a rigid cutting tool with no electrical sensing, which
+;                      pushes the puck's own NC switch on the TOOLSETTER input.
+;   #<_tc_touchplate>  1 = no toolsetter hardware exists; every tool probes the main input.
+;                      REQUIRED FROM EVERY CALLER, exactly like #<_tlo_toolid> above. This line
+;                      used to read 'set by tc.macro's own header', which described the machine
+;                      rather than the contract - and MacroProcessor.EmitTloReference, the other
+;                      caller, duly did not set it. Named parameters do not survive a reset, so
+;                      the o150 IF below read an UNDEFINED parameter on the first generated-program
+;                      call after any reboot: grblHAL error 2. A tool change earlier in the same
+;                      session leaves it set, which is why only the FIRST one ever failed.
+;   #<_tlo_ref>        the machine-wide baseline. 0 (or unset) = this tool BECOMES the reference and
+;                      no G43.1 is applied. Non-zero = apply G43.1 relative to it.
+;
+; Outputs:
+;   #<_probe_z>        the probed machine Z of this tool against the puck.
+;   G43.1 applied (or #<_tlo_ref> set), and $TLR sent either way.
+;
+; 🔴 LEAVES THE MACHINE STANDING ON THE PUCK, lifted 10mm, and may leave G59.3 active (see the
+; instrumented capture below). BOTH are lethal to a caller that just carries on:
+;
+;   - a 60 degree V-bit was driven into this very toolsetter and destroyed it, 2026-09-14, because the
+;     calling program went straight to "S18000 M3" then "G0 Z15" - a WORK Z, far below the puck - after
+;     someone (me) removed the caller's G30 park as "a pointless round trip". It was the only thing
+;     standing the spindle off the puck.
+;   - and pcorner's face seek is not a G53 move, so with G59.3 still active it asked for a target
+;     816mm outside travel: Alarm:2.
+;
+; So a caller MUST get itself somewhere safe and name its own WCS afterwards. tc.macro returns to G30
+; on its own. Generated programs go through MacroProcessor.EmitTloReference, which now does both for
+; every caller by construction - read its remarks before changing anything here.
+; ---------------------------------------------------------------------------------------------
+
+(PRINT, TLO01 ENTER tool=#<_tlo_toolid> ref=#<_tlo_ref> touchplate=#<_tc_touchplate>)
+
+; Save the CALLER's active WCS before selecting G59.3 below - restored (never hardcoded to G54) at the
+; end, so a tool referenced mid-program under any other WCS comes back to the RIGHT origin. #5220 is
+; grblHAL's own active-coordinate-system parameter (1=G54 .. 6=G59, 7=G59.1, 8=G59.2, 9=G59.3).
+; Confirmed on real hardware 2026-07-27: hardcoding G54 on return left Pocket's finishing pass running
+; under the wrong WCS after its own mid-program tool change - its first move, computed in G59 and
+; executed under G54, landed outside travel and hit a soft limit.
+#<_tlo_wcs> = #5220
+; INSTRUMENTED 2026-09-14. On this machine the o120 restore below did NOT take: the wire log shows
+; WCS:G59.3 from the moment this macro first ran and never anything else again, which put every later
+; non-G53 move in the puck's frame (pcorner's face seek then asked for a target 816mm outside travel).
+; #5220 is real - ngc_params.c returns gc_state.modal.g5x_offset.id + 1, and CoordinateSystem_G54 is 0,
+; so G54 must read as exactly 1. Printing what was actually captured rather than theorising about it.
+; The callers no longer DEPEND on this restore (they name their own WCS after the CALL), so this print
+; is here to explain the failure, not to paper over it.
+(PRINT, TLO01b captured wcs=#<_tlo_wcs>)
+
+; Suspend any active G92 for the duration, restored at the end. WCO = G5x + G92 + TLO, so a leftover
+; G92 shifts every non-G53 move here - including the "G0 Z0" over the puck, which is NOT a machine
+; move however much it reads like one. Confirmed on real hardware 2026-08-16: a persistent G92 of
+; Z+37 made that target machine Z+37 against an envelope topping out at 0 -> ALARM:2 before the probe.
+; G92.2/G92.3 (not G92.1): this runs mid-job and a job may legitimately be working under a G92;
+; destroying it would move every remaining cut. Idempotent, so a caller that already suspended its
+; own G92 loses nothing by this pair.
+; WARNING: G92.3 restores from NVS, so it depends on G92 persistence being ENABLED ($384=0, the
+; default and this machine's setting). With $384=1 revisit this pair.
+G92.2
+
+; --- Rapid to G59.3 (over the puck) ---
+; Safe-Z goto rather than a coordinated "G0 X0 Y0 Z0", which would move Z while traversing.
+; Traversing at machine -5 does not rely on G59.3's own Z being set high enough to clear the puck.
+G53 G0 Z-5
+G59.3
+G0 X0 Y0
+G0 Z0
+(PRINT, TLO02 at G59.3)
+
+; --- Select the probe input for what is actually in the spindle ---
+; G65 P5 Q<id>: Q0 = Probe_Default (main), Q1 = Probe_Toolsetter (probe.h:40).
+o150 IF [#<_tc_touchplate> EQ 1]
+  G65 P5 Q0
+  (PRINT, TLO03 main probe selected (touch-plate mode))
+o150 ELSEIF [#<_tlo_toolid> EQ 8]
+  G65 P5 Q0
+  (PRINT, TLO03 main probe selected for T8)
+o150 ELSE
+  G65 P5 Q1
+  (PRINT, TLO03 toolsetter selected for T#<_tlo_toolid>)
+o150 ENDIF
+
+G91
+; -90mm (was -80mm): a short V-bit (chamfer) sits well above the puck at G59.3's park height, which is
+; calibrated for the LONGEST tool in use - confirmed on real hardware 2026-07-27, Alarm 5 (probe fail,
+; no contact within programmed travel) landing 5mm short of the puck for the V-bit specifically.
+G38.2 Z-90 F500
+; --- Seek/latch agreement check: is this probe result REAL? ---
+; A probe cycle is two independent triggers - a fast seek, a 2 mm back-off, a slow latch. On a real
+; surface they land a fixed distance apart, because the only difference between them is the overshoot
+; at F500 versus F25. Measured across every toolsetter cycle in the log history: 0.100 to 0.143 mm,
+; nine cycles over six days, and 0.047 mm once the probe wiring was fixed.
+;
+; A FALSE trigger stops the seek at a random point in mid-air. The back-off and latch then fire at
+; ANOTHER random point, so the gap stops being the overshoot and becomes noise. 2026-09-21, real
+; hardware, bare foil shield shorting the probe input intermittently: 0.411 mm and 1.375 mm - 3x and
+; 10x outside the healthy band, on two cycles that BOTH reported success and applied a tool offset
+; 65 mm wrong. The second one then fed a corner probe that drove into the touch plate.
+;
+; Nothing inside a single trigger can tell true from false; the two triggers disagreeing can. This
+; needs no stored history, no knowledge of the tool, and no extra probing - just the two numbers the
+; cycle already produces and threw away.
+;
+; No G4 P0 needed before reading #5063 here: mc_probe_cycle() calls protocol_buffer_synchronize()
+; itself (motion_control.c), so unlike a queued G0/G1 the parser cannot race past a G38.2. That is
+; why the existing read below has always worked. Do NOT copy this reasoning to a read that follows
+; ordinary motion - see pcorner.macro's probe-release gate for what happens then.
+#<_tlo_seek_z> = #5063
+G0 Z2
+G38.2 Z-5 F25
+#<_probe_z> = #5063
+; 0.3 mm: above the worst healthy gap measured (0.143) by 2x, below the best false one (0.411) by 1.4x.
+o160 IF [ABS[[#<_probe_z> - #<_tlo_seek_z>]] GT 0.3]
+  (PRINT, TLO05 PROBE REJECTED seek=#<_tlo_seek_z> latch=#<_probe_z>)
+  (ABORT, Toolsetter probe rejected - the fast and slow probes disagree, so at least one was a false trigger and the tool offset would be wrong. Check the probe wiring before retrying. The tool is left at the probe point.)
+o160 ENDIF
+G0 Z10
+G90
+G65 P5 Q0
+
+; Restore the caller's own WCS - see #<_tlo_wcs> above for why this must NOT be a hardcoded G54.
+(PRINT, TLO04b restoring wcs=#<_tlo_wcs>)
+o120 IF [#<_tlo_wcs> EQ 1]
+  G54
+o120 ELSEIF [#<_tlo_wcs> EQ 2]
+  G55
+o120 ELSEIF [#<_tlo_wcs> EQ 3]
+  G56
+o120 ELSEIF [#<_tlo_wcs> EQ 4]
+  G57
+o120 ELSEIF [#<_tlo_wcs> EQ 5]
+  G58
+o120 ELSEIF [#<_tlo_wcs> EQ 6]
+  G59
+o120 ELSEIF [#<_tlo_wcs> EQ 7]
+  G59.1
+o120 ELSEIF [#<_tlo_wcs> EQ 8]
+  G59.2
+o120 ELSE
+  G59.3
+o120 ENDIF
+; The caller's G92 offset back, alongside the WCS just restored - the two together are the coordinate
+; frame this macro borrowed, and they are handed back as a pair.
+G92.3
+(PRINT, TLO04 probe_z=#<_probe_z>)
+
+o199 IF [EXISTS[#<_tlo_ref>]]
+o199 ELSE
+  #<_tlo_ref> = 0
+o199 ENDIF
+o200 IF [#<_tlo_ref> EQ 0]
+  #<_tlo_ref> = #<_probe_z>
+  (PRINT, TLO05 TLO REF SET ref=#<_tlo_ref>)
+o200 ELSE
+  G43.1 Z[#<_probe_z> - #<_tlo_ref>]
+  (PRINT, TLO06 TLO APPLIED tlo=[#<_probe_z> - #<_tlo_ref>])
+o200 ENDIF
+
+; $TLR - the REAL grblHAL system command that commits the tool length reference to the controller's
+; own native TLR flag (GrblViewModel.IsTloReferenceSet / the status report's TLR: field), the same one
+; the Probing tab's Tool Length flow uses. #<_tlo_ref> above is a SEPARATE, older, script-only
+; convention that never touched the native flag - confirmed on real hardware 2026-07-27: every PREREQ
+; gate checking "tlo" could never pass even after a successful reference.
+; Sent EVERY time, both branches above, not just the first-ever reference: a caller's G49 (tc.macro
+; cancels the old tool's TLO before probing the new one) clears the native flag as a side effect on
+; every real tool swap, so a job with multiple tool changes would otherwise see TLR go false after the
+; FIRST swap and never come back - confirmed on real hardware 2026-07-27.
+$TLR
+(PRINT, TLO07 EXIT)

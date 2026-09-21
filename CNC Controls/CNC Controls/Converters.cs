@@ -114,6 +114,26 @@ namespace CNC.Controls
             });
     }
 
+    // Program-outline group header -> that section's estimated run time, e.g. "~4 min".
+    //
+    // Two inputs on purpose: the section NAME (what to look up) and GCodeRunTimeIndex.Version (WHEN to
+    // look). The estimate is computed off the UI thread after the load, so it does not exist when these
+    // headers are first built; bumping Version is what brings the visible ones back to re-read it. The
+    // second value is deliberately unused beyond that.
+    public class SectionRunTimeConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            string section = values != null && values.Length > 0 ? values[0] as string : null;
+            return GCodeRunTimeIndex.Instance.Lookup(section);
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     // Adapted from: https://stackoverflow.com/questions/4353186/binding-observablecollection-to-a-textbox/8847910#8847910
     public class StringCollectionToTextConverter : IMultiValueConverter
     {
@@ -314,12 +334,49 @@ namespace CNC.Controls
 
     public class GrblStateToColorConverter : IValueConverter
     {
+        // Ported verbatim from GrblViewModel, where the colour used to be computed into GrblState.Color
+        // as the state was parsed. Which colour represents a machine state is presentation policy, so it
+        // belongs here rather than in the machine model - CNC.Core no longer references System.Windows.Media.
+        public static Color ForState(GrblState state)
+        {
+            switch (state.State)
+            {
+                case GrblStates.Run:
+                    return Colors.LightGreen;
+
+                case GrblStates.Alarm:
+                    return Colors.Red;
+
+                case GrblStates.Jog:
+                    return Colors.Yellow;
+
+                case GrblStates.Tool:
+                    return Colors.LightSalmon;
+
+                case GrblStates.Hold:
+                    return Colors.LightSalmon;
+
+                case GrblStates.Door:
+                    return state.Substate == 0 ? Colors.LightSalmon : (state.Substate == 1 ? Colors.Red : Colors.Beige);
+
+                case GrblStates.Home:
+                case GrblStates.Sleep:
+                    return Colors.LightSkyBlue;
+
+                case GrblStates.Check:
+                    return Colors.White;
+
+                default:
+                    return Colors.White;
+            }
+        }
+
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             Brush result = Brushes.White;
 
             if (value is GrblState)
-                result = new SolidColorBrush(((GrblState)value).Color);
+                result = new SolidColorBrush(ForState((GrblState)value));
 
             return result;
         }
@@ -542,18 +599,24 @@ namespace CNC.Controls
             if (string.IsNullOrEmpty(wcs) || values.Length < 2 || !(values[1] is double offset))
                 return null;
 
-            string line2;
-            if (values.Length <= 2)
-                line2 = string.Format(CultureInfo.CurrentCulture, "({0} + G92 combined)", wcs);
-            else
-            {
-                double? tlo = values[2] is double t && !double.IsNaN(t) ? t : (double?)null;
-                line2 = tlo.HasValue
-                    ? string.Format(CultureInfo.CurrentCulture, "({0} + G92 + TLO {1:0.000} combined)", wcs, tlo.Value)
-                    : string.Format(CultureInfo.CurrentCulture, "({0} + G92 + TLO combined)", wcs);
-            }
+            // What the offset is MADE OF. TLO is named only where it is actually tracked (the Z binding
+            // supplies it): naming it on an axis whose component list does not include it is how this
+            // tooltip came to contradict itself.
+            string parts = wcs + " + G92";
+            if (values.Length > 3 && values[3] is double tlo && !double.IsNaN(tlo))
+                parts += string.Format(CultureInfo.CurrentCulture, " + TLO {0:0.000}", tlo);
 
-            return string.Format(CultureInfo.CurrentCulture, "Total {0} offset: {1:0.000}\n{2}", parameter, offset, line2);
+            string components = string.Format(CultureInfo.CurrentCulture, "Offset {0:0.000} = {1}", offset, parts);
+
+            // "Total X offset: 148.341" on its own never said what it was an offset OF, and it is not the
+            // number in the box - it is what gets SUBTRACTED from the machine position to produce that
+            // number (GrblViewModel: Position.Set(MachinePosition - WorkPositionOffset)). Show the whole
+            // sum with the live values so the readout and the offset visibly reconcile.
+            if (values.Length > 2 && values[2] is double mpos && !double.IsNaN(mpos))
+                return string.Format(CultureInfo.CurrentCulture, "{0} {1:0.000} = machine {2:0.000} - offset {3:0.000}\n{4}",
+                                      parameter, mpos - offset, mpos, offset, components);
+
+            return components;
         }
         public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         {

@@ -55,7 +55,11 @@ namespace CNC.Controls
         // Rectangle perimeter centered at (cx,cy), half-width hw, half-height hh, starting at the
         // front-left corner, CCW, closed (last point == first). Edges are subdivided so no segment exceeds
         // maxSegmentLength - keeps a tab window's boundary landing close to where it's meant to.
-        public static List<double[]> RectPoints(double cx, double cy, double hw, double hh, double maxSegmentLength)
+        //
+        // dogboneReach > 0 adds a CORNER RELIEF at each corner: on arriving at the corner the path pokes
+        // OUTWARD along that corner's diagonal by dogboneReach on each axis, then comes straight back
+        // before turning down the next edge. See DogboneReachFor for what to pass.
+        public static List<double[]> RectPoints(double cx, double cy, double hw, double hh, double maxSegmentLength, double dogboneReach = 0d)
         {
             var corners = new[] {
                 new[] { cx - hw, cy - hh }, new[] { cx + hw, cy - hh },
@@ -64,9 +68,42 @@ namespace CNC.Controls
             };
             var pts = new List<double[]>();
             for (int i = 0; i < corners.Length - 1; i++)
+            {
                 Subdivide(pts, corners[i], corners[i + 1], maxSegmentLength);
+
+                // The relief belongs to the corner this edge ENDS at, and is emitted before turning onto
+                // the next edge. Subdivide leaves its end point off, so the corner itself is added here -
+                // out to the relief and back - rather than by the next Subdivide's start.
+                if (dogboneReach > 0d)
+                {
+                    var c = corners[i + 1];
+                    // Outward = away from the rectangle's centre on both axes, which for an inset wall
+                    // path is the direction of the material still standing in the corner.
+                    double ox = c[0] > cx ? dogboneReach : -dogboneReach;
+                    double oy = c[1] > cy ? dogboneReach : -dogboneReach;
+                    pts.Add(new[] { c[0], c[1] });
+                    pts.Add(new[] { c[0] + ox, c[1] + oy });
+                }
+            }
             pts.Add(corners[corners.Length - 1]);
             return pts;
+        }
+
+        // How far a dogbone must poke out of a corner, per axis, for a cutter of radius toolRadius running
+        // an outline inset by `inset` from the true wall.
+        //
+        // The relief is done when the cutter's CIRCLE passes through the true corner point C. That puts the
+        // cutter centre at C + (toolRadius/sqrt2) on each axis towards the interior - distance toolRadius
+        // from C, along the diagonal. The path corner sits at C + inset on each axis, so the poke is the
+        // difference. With the usual inset == toolRadius that is toolRadius*(1 - 1/sqrt2) per axis
+        // (~0.293r), a diagonal travel of r*(sqrt2 - 1) (~0.414r), and it overcuts each wall by ~0.293r.
+        //
+        // Note this comes out right for ANY inset, not just inset == toolRadius: the reach is measured from
+        // wherever the path corner actually is, so the cutter still lands the same distance from the true
+        // corner. Returns 0 when the path is already at or inside that point, i.e. nothing to relieve.
+        public static double DogboneReachFor(double toolRadius, double inset)
+        {
+            return Math.Max(0d, inset - toolRadius / Math.Sqrt(2d));
         }
 
         private static void Subdivide(List<double[]> pts, double[] a, double[] b, double maxSegmentLength)
@@ -86,6 +123,80 @@ namespace CNC.Controls
         // sample is inserted exactly at each window edge so the Z step lands at the right XY (no ramp - a
         // short vertical face at each tab edge, same as a typical no-ramp CAM tab). numTabs <= 0 or
         // tabHeight <= 0 returns the path unchanged at floorZ (no tabs).
+        /// <summary>
+        /// Split a polyline into dashes measured along it: pieces <paramref name="dash"/> long separated
+        /// by <paramref name="gap"/>. Closed paths (last point == first) get a whole number of periods, the
+        /// pitch stretched or shrunk by under half a period so the last gap meets the first dash without a
+        /// stub; open paths start and end with a dash. Dashes run through corners - they are lengths along
+        /// the path, not per segment. Each returned piece is an open polyline with the dash's endpoints
+        /// interpolated exactly.
+        /// </summary>
+        public static List<List<double[]>> Dashes(List<double[]> path, bool closed, double dash, double gap)
+        {
+            var result = new List<List<double[]>>();
+            if (path == null || path.Count < 2 || dash <= 0d)
+                return result;
+            if (gap < 0d)
+                gap = 0d;
+
+            var seg = new List<double>(path.Count);   // cumulative length at each vertex
+            double total = 0d;
+            seg.Add(0d);
+            for (int i = 1; i < path.Count; i++)
+            {
+                double dx = path[i][0] - path[i - 1][0], dy = path[i][1] - path[i - 1][1];
+                total += Math.Sqrt(dx * dx + dy * dy);
+                seg.Add(total);
+            }
+            if (total <= dash)
+            {
+                result.Add(new List<double[]>(path));
+                return result;
+            }
+
+            double pitch = dash + gap;
+            int n;
+            double dashLen;
+            if (closed)
+            {
+                n = Math.Max(1, (int)Math.Round(total / pitch));
+                pitch = total / n;
+                dashLen = Math.Min(dash, pitch);
+            }
+            else
+            {
+                // Dashes at both ends: n dashes, n-1 gaps. Fit the gap so the pattern spans the length.
+                n = Math.Max(2, (int)Math.Round((total + gap) / pitch));
+                dashLen = Math.Min(dash, total / n);
+                pitch = n > 1 ? (total - dashLen) / (n - 1) : total;
+            }
+
+            for (int k = 0; k < n; k++)
+            {
+                double s0 = k * pitch, s1 = Math.Min(total, s0 + dashLen);
+                var piece = new List<double[]>();
+                piece.Add(PointAt(path, seg, s0));
+                for (int i = 1; i < path.Count; i++)
+                    if (seg[i] > s0 && seg[i] < s1)
+                        piece.Add(path[i]);
+                piece.Add(PointAt(path, seg, s1));
+                result.Add(piece);
+            }
+            return result;
+        }
+
+        private static double[] PointAt(List<double[]> path, List<double> seg, double s)
+        {
+            int i = 1;
+            while (i < seg.Count - 1 && seg[i] < s)
+                i++;
+            double len = seg[i] - seg[i - 1];
+            double t = len > 1e-12 ? (s - seg[i - 1]) / len : 0d;
+            t = t < 0d ? 0d : t > 1d ? 1d : t;
+            return new[] { path[i - 1][0] + t * (path[i][0] - path[i - 1][0]),
+                           path[i - 1][1] + t * (path[i][1] - path[i - 1][1]) };
+        }
+
         public static List<double[]> ApplyTabs(List<double[]> path, double floorZ, double tabHeight, int numTabs, double tabWidth)
         {
             var outPts = new List<double[]>();
