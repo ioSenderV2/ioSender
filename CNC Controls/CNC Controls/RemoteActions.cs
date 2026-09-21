@@ -8,6 +8,7 @@
  * ---- The policy ----
  *
  *   a prompt is on screen   vol up = OK / Yes        vol down = Cancel / No
+ *                           ...and when the prompt has NO Cancel button, both keys mean OK
  *   the machine is RUNning  either key = Feed Hold
  *   the machine is HOLDing  vol up = Start / resume  vol down = Stop
  *   anything else           nothing - the key goes to Windows and the volume changes as usual
@@ -72,8 +73,9 @@ namespace CNC.Controls
         /// the scope removes itself, so a using() block cannot leak one.
         /// </summary>
         /// <param name="ok">Press OK/Yes. Never null.</param>
-        /// <param name="cancel">Press Cancel/No, or null when the prompt has no such button - the down key
-        /// then does nothing, rather than quietly meaning OK.</param>
+        /// <param name="cancel">Press Cancel/No, or null when the prompt has no such button - in which
+        /// case BOTH keys mean OK, because on a prompt whose only button is OK there is nothing else the
+        /// down key could mean. See Resolve.</param>
         public static IDisposable ShowingPrompt(System.Action ok, System.Action cancel)
         {
             var scope = new PromptScope { Ok = ok, Cancel = cancel };
@@ -92,7 +94,21 @@ namespace CNC.Controls
             if (prompts.Count > 0)
             {
                 var prompt = prompts[prompts.Count - 1];
-                return volumeUp ? prompt.Ok : prompt.Cancel;
+
+                // No Cancel button => BOTH keys mean OK. This used to return the null Cancel, so on the
+                // commonest prompt of all - "move the plate to the next corner, then click OK", which has
+                // no Cancel - a remote in ANDROID mode did nothing whatsoever and the press went to the
+                // volume control instead. Confirmed on real hardware 2026-09-21: MBOX armed at 12:02:34,
+                // the operator's press logged at 12:02:55 as "nothing was waiting on it", and the prompt
+                // finally answered with the mouse at 12:02:59.
+                //
+                // It is the same argument this file already makes for the Run state, and it was wrong to
+                // stop short of it here: which key a remote sends depends on the mode it happens to be in
+                // (the PICO sends VOLUME UP in iOS mode and VOLUME DOWN in Android mode), so a press that
+                // does nothing because of a mode setting is the worst outcome of reaching for it. Where
+                // there are two real answers the two keys still differ; where there is only one, both keys
+                // give it.
+                return volumeUp || prompt.Cancel == null ? prompt.Ok : prompt.Cancel;
             }
 
             // A view waiting for the operator (the Height Map's per-point hold) takes BOTH keys as "carry
@@ -163,7 +179,7 @@ namespace CNC.Controls
                 lastLogged = on;
                 DebugLog.Write("remote", on
                     ? "shutter remote: ENABLED - the volume keys will act where a press means something"
-                    : "shutter remote: disabled - tick 'A shutter remote drives the machine' on the Height map tab");
+                    : "shutter remote: disabled - tick 'A shutter remote drives the machine' under Settings > User Interface > Remote");
             }
 
             if (on)

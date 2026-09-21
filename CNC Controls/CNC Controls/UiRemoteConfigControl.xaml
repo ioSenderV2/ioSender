@@ -55,6 +55,9 @@
                 <TextBlock x:Uid="lbl_remoteRowHoldDown" Grid.Row="4" Grid.Column="2" Text="Stop" Margin="0,0,0,2"/>
             </Grid>
 
+            <TextBlock x:Uid="lbl_remoteNoCancel" Margin="24,6,0,0" TextWrapping="Wrap" Opacity="0.75"
+                       Text="When a prompt has no Cancel button - as the &quot;move the plate to the next corner&quot; prompt does not - both keys mean OK. There is nothing else the down key could mean there, and a press that did nothing because the remote was in the other mode is the worst outcome of reaching for it."/>
+
             <TextBlock x:Uid="lbl_remoteFallthrough" Margin="5,10,0,0" TextWrapping="Wrap" Opacity="0.75"
                        Text="At any other time the key is passed straight to Windows and the volume changes as usual, so enabling this does not take your volume keys away. Both keys mean Feed Hold while a job runs on purpose: a hand reaching for the remote mid-cut wants the machine to stop, and a press that did nothing because the remote was in the other mode is the worst outcome of that reach."/>
         </StackPanel>
