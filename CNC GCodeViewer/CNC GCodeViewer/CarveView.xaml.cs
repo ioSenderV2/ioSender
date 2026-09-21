@@ -159,6 +159,15 @@ namespace CNC.Controls.Viewer
             // the envelope: data the scene needs, landing after the scene was built, with nothing asking
             // for a redraw. Watching the collection covers both the late arrival and a later re-teach.
             GrblWorkParameters.CoordinateSystems.CollectionChanged += CoordinateSystems_Changed;
+
+            // The view options apply live while their dialog is open, so the effect of a toggle is visible
+            // at the moment it is made rather than on the next rebuild for some other reason.
+            AppConfig.Settings.CarveView.PropertyChanged += ViewOptions_Changed;
+        }
+
+        private void ViewOptions_Changed(object sender, PropertyChangedEventArgs e)
+        {
+            ScheduleBuild();
         }
 
         private void CoordinateSystems_Changed(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
@@ -197,6 +206,7 @@ namespace CNC.Controls.Viewer
         {
             GrblSettings.SettingsReloaded -= Settings_Reloaded;
             GrblWorkParameters.CoordinateSystems.CollectionChanged -= CoordinateSystems_Changed;
+            AppConfig.Settings.CarveView.PropertyChanged -= ViewOptions_Changed;
             if (wpos != null)
                 wpos.PropertyChanged -= Wpos_PropertyChanged;
             if (model != null)
@@ -362,14 +372,18 @@ namespace CNC.Controls.Viewer
 
             // Homing too: it decides whether machine zero is a place worth marking, and a controller that
             // turns it on without changing a travel limit would otherwise leave the signature identical
-            // and the home dot missing for the rest of the session.
+            // and the home dot missing for the rest of the session. Same argument for the view options -
+            // a toggle changes nothing else here, so without them the rebuild they request is discarded
+            // as redundant and the checkbox does nothing.
+            var opt = AppConfig.Settings.CarveView;
             return string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "{0}|{1}|{2:F3},{3:F3},{4:F3},{5:F3},{6:F3},{7:F3}|{8}|{9}|{10}",
+                "{0}|{1}|{2:F3},{3:F3},{4:F3},{5:F3},{6:F3},{7:F3}|{8}|{9}|{10}|{11}{12}{13}{14}",
                 cnt, name,
                 EnvMin(0) - Wco(0), EnvMax(0) - Wco(0),
                 EnvMin(1) - Wco(1), EnvMax(1) - Wco(1),
                 EnvMin(2) - Wco(2), EnvMax(2) - Wco(2),
-                stockSig, marks, GrblInfo.HomingEnabled);
+                stockSig, marks, GrblInfo.HomingEnabled,
+                opt.ShowRapids, opt.ShowStock, opt.ShowGrid, opt.ShowStoredPositions);
         }
 
         private void BuildScene()
@@ -443,36 +457,50 @@ namespace CNC.Controls.Viewer
             // exactly one thing the grid does not: the Z ceiling, as twelve grey lines drawn across
             // everything else. Headroom is not a question this view is asked.
 
+            var options = AppConfig.Settings.CarveView;
+
             // bed grid at the envelope floor
-            viewport.Children.Add(new GridLinesVisual3D
+            if (options.ShowGrid)
             {
-                Center = new Point3D((xmin + xmax) / 2d, (ymin + ymax) / 2d, zmin),
-                LengthDirection = new Vector3D(1, 0, 0),
-                Normal = new Vector3D(0, 0, 1),
-                Length = xs,
-                Width = ys,
-                MinorDistance = 50d,
-                MajorDistance = 100d,
-                Thickness = 0.6d,
-                Fill = Brushes.Gray
-            });
+                viewport.Children.Add(new GridLinesVisual3D
+                {
+                    Center = new Point3D((xmin + xmax) / 2d, (ymin + ymax) / 2d, zmin),
+                    LengthDirection = new Vector3D(1, 0, 0),
+                    Normal = new Vector3D(0, 0, 1),
+                    Length = xs,
+                    Width = ys,
+                    MinorDistance = 50d,
+                    MajorDistance = 100d,
+                    Thickness = 0.6d,
+                    Fill = Brushes.Gray
+                });
+            }
 
             // stored-position markers, inside the envelope they are measured against
-            int marked = AddPositionMarkers(zmin);
-            if (DebugLog.Enabled)
-                DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                    "markers drawn={0} of {1} | coordinateSystems={2}",
-                    marked, MarkedPositions.Length, GrblWorkParameters.CoordinateSystems.Count));
+            if (options.ShowStoredPositions)
+            {
+                int marked = AddPositionMarkers(zmin);
+                if (DebugLog.Enabled)
+                    DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "markers drawn={0} of {1} | coordinateSystems={2}",
+                        marked, MarkedPositions.Length, GrblWorkParameters.CoordinateSystems.Count));
 
-            AddHomeMarker();
+                AddHomeMarker();
+            }
 
             // stock: the solid carve mesh (deforms as the cutter passes) when a program is loaded; otherwise a
             // plain default block. Only one of them is shown so there is no z-fighting/see-through.
+            //
+            // BuildToolpath runs either way - it also produces the segment list that playback and the stock
+            // sizing depend on, so skipping it to hide a block would take the program's motion with it.
             BuildToolpath();
-            if (carveVisual != null)
-                viewport.Children.Add(carveVisual);
-            else
-                AddStock();
+            if (options.ShowStock)
+            {
+                if (carveVisual != null)
+                    viewport.Children.Add(carveVisual);
+                else
+                    AddStock();
+            }
 
             // tool cone - tip at the cutter, widening upward
             toolCone = new TruncatedConeVisual3D
@@ -664,7 +692,9 @@ namespace CNC.Controls.Viewer
                 framed = false;    // re-frame the camera to the new program/stock on the next build
             }
 
-            if (rapidLines != null)
+            // The rapids are still BUILT when hidden - they are part of the segment list playback walks, and
+            // they size the stock. Only the lines are left out of the scene.
+            if (rapidLines != null && AppConfig.Settings.CarveView.ShowRapids)
                 viewport.Children.Add(rapidLines);
             if (cutLines != null)
                 viewport.Children.Add(cutLines);
@@ -1249,7 +1279,9 @@ namespace CNC.Controls.Viewer
         private void SetToolpathVisible(bool show)
         {
             SetChild(cutLines, show);
-            SetChild(rapidLines, show);
+            // "Show again after playback" must not override the option that says not to: this runs on every
+            // Stop, so without the check the rapids would come back the first time a replay ended.
+            SetChild(rapidLines, show && AppConfig.Settings.CarveView.ShowRapids);
         }
 
         private void SetChild(System.Windows.Media.Media3D.Visual3D v, bool show)
@@ -1348,7 +1380,7 @@ namespace CNC.Controls.Viewer
             }
         }
 
-        private void Reset_Click(object sender, RoutedEventArgs e)
+        private void ResetView()
         {
             // Restore the default orientation (the XAML iso view) so Reset always lands in the same place,
             // even after switching to a side/top view, then zoom to fit.
@@ -1358,6 +1390,19 @@ namespace CNC.Controls.Viewer
                 cam.UpDirection = new Vector3D(0d, 0d, 1d);
             }
             viewport.ZoomExtents(0);
+        }
+
+        /// <summary>
+        /// The view's own options, on the view. They used to live in Settings -> App -> G Code -> GCode
+        /// Viewer, three levels from the picture they describe - and worse, that page drove the OLD
+        /// renderer, so changing anything on it did nothing at all to what you were looking at.
+        /// </summary>
+        private void ViewOptions_Click(object sender, RoutedEventArgs e)
+        {
+            new ViewOptionsDialog(AppConfig.Settings.CarveView, ResetView)
+            {
+                Owner = Window.GetWindow(this)
+            }.ShowDialog();
         }
     }
 }

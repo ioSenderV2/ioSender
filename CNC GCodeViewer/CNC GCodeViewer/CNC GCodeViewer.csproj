@@ -61,9 +61,6 @@
     <Compile Include="CarveView.xaml.cs">
       <DependentUpon>CarveView.xaml</DependentUpon>
     </Compile>
-    <Compile Include="ConfigControl.xaml.cs">
-      <DependentUpon>ConfigControl.xaml</DependentUpon>
-    </Compile>
     <Compile Include="IToolpathView.cs" />
     <Compile Include="RenderControl.xaml.cs">
       <DependentUpon>RenderControl.xaml</DependentUpon>
@@ -77,15 +74,18 @@
     <Compile Include="Viewer.xaml.cs">
       <DependentUpon>Viewer.xaml</DependentUpon>
     </Compile>
+    <Compile Include="ViewOptionsDialog.xaml.cs">
+      <DependentUpon>ViewOptionsDialog.xaml</DependentUpon>
+    </Compile>
+    <Page Include="ViewOptionsDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="CarveView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="ColorPicker.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="ConfigControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

@@ -36,7 +36,8 @@
                 <ComboBoxItem Content="5x"/>
                 <ComboBoxItem Content="10x"/>
             </ComboBox>
-            <Button x:Uid="btn_carveReset" Content="Reset view" Padding="6,2" Margin="12,0,0,0" Focusable="False" Click="Reset_Click"/>
+            <Button x:Uid="btn_carveViewOptions" Content="View options" Padding="6,2" Margin="12,0,0,0" Focusable="False" Click="ViewOptions_Click"
+                    ToolTip="What this view draws - and Reset view."/>
         </StackPanel>
     </Grid>
 </UserControl>

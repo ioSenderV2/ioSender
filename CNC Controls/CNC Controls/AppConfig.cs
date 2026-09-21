@@ -187,6 +187,26 @@ namespace CNC.Controls
         public string ObsAppFilter { get { return _obsAppFilter; } set { _obsAppFilter = value; IsDirty = true; OnPropertyChanged(); } }
     }
 
+    /// <summary>
+    /// What the 3D view draws. Deliberately NOT <see cref="GCodeViewerConfig"/>: that belongs to the old
+    /// renderer, carries three dozen settings including a colour for every kind of motion, and lived on a
+    /// Settings page the carve view never read - so changing anything there appeared to do nothing.
+    ///
+    /// Four toggles, reached from a button on the view itself rather than from a settings tree three
+    /// levels deep, and every one of them hides something the view otherwise always draws. Options about
+    /// a picture belong next to the picture.
+    /// </summary>
+    [Serializable]
+    public class CarveViewConfig : ViewModelBase
+    {
+        private bool _showRapids = true, _showStock = true, _showGrid = true, _showStoredPositions = true;
+
+        public bool ShowRapids { get { return _showRapids; } set { _showRapids = value; OnPropertyChanged(); } }
+        public bool ShowStock { get { return _showStock; } set { _showStock = value; OnPropertyChanged(); } }
+        public bool ShowGrid { get { return _showGrid; } set { _showGrid = value; OnPropertyChanged(); } }
+        public bool ShowStoredPositions { get { return _showStoredPositions; } set { _showStoredPositions = value; OnPropertyChanged(); } }
+    }
+
     [Serializable]
     public class GCodeViewerConfig : ViewModelBase
     {
@@ -685,6 +705,7 @@ namespace CNC.Controls
         public LatheConfig Lathe { get; set; } = new LatheConfig();
         public CameraConfig Camera { get; set; } = new CameraConfig();
         public GCodeViewerConfig GCodeViewer { get; set; } = new GCodeViewerConfig();
+        public CarveViewConfig CarveView { get; set; } = new CarveViewConfig();
         public ProbeConfig Probing { get; set; } = new ProbeConfig();
     }
 
@@ -1048,6 +1069,7 @@ namespace CNC.Controls
         public CameraConfig Camera { get { return Base == null ? null : Base.Camera; } }
         public LatheConfig Lathe { get { return Base == null ? null : Base.Lathe; } }
         public GCodeViewerConfig GCodeViewer { get { return Base == null ? null : Base.GCodeViewer; } }
+        public CarveViewConfig CarveView { get { return Base == null ? null : Base.CarveView; } }
         public ProbeConfig Probing { get { return Base == null ? null : Base.Probing; } }
 
         public bool Save(string filename)

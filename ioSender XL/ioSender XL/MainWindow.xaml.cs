@@ -860,7 +860,10 @@ namespace GCode_Sender
             // Publish the present tabs to the Edit Main Page > Tabs editor, then apply the saved order/visibility.
             PublishAndApplyTabs();
 
-            UIViewModel.ConfigControls.Add(new CNC.Controls.Viewer.ConfigControl());
+            // The GCode Viewer settings page was added here. It configured the OLD renderer, which the UI
+            // no longer has a way to reach, so nothing on it affected the 3D view in the Job tab - every
+            // option was inert. The four the carve view honours now live on the view itself, behind its
+            // View options button, next to the picture they describe.
 
             sidebarTabs.ItemsSource = UIViewModel.SidebarItems;
 
