@@ -31,8 +31,12 @@
                 </StackPanel>
             </Border>
 
+            <CheckBox x:Uid="lbl_remoteSwapButtons" Content="Swap the two buttons" Margin="5,8,0,0"
+                      IsChecked="{Binding Path=ShutterRemoteSwapButtons, Mode=TwoWay}"
+                      ToolTip="Which physical button is the primary one. Set for you when you bind - the button you press becomes the primary - so you only need this if you want the other one to be OK/Start instead."/>
+
             <TextBlock x:Uid="lbl_remoteWhatKeysDo" Margin="5,10,0,0" TextWrapping="Wrap" Opacity="0.75"
-                       Text="These remotes send a media key, not a letter, and Windows never delivers one to an ordinary window. The remote's two buttons send different keys - on the PICO the Android button sends volume up and the iOS button volume down - so both are accepted."/>
+                       Text="The remote's two buttons are not marked, and which one sends which media key is not something anyone should have to know - on the PICO the larger top button is the one that sends volume DOWN. So the button you press when binding becomes the PRIMARY one, and the other is the second. Swap them below if you change your mind."/>
 
             <Grid Margin="24,8,0,0">
                 <Grid.ColumnDefinitions>
@@ -49,8 +53,8 @@
                 </Grid.RowDefinitions>
 
                 <TextBlock x:Uid="lbl_remoteHdrWhen" Grid.Row="0" Grid.Column="0" Text="When" FontWeight="Bold" Margin="0,0,18,4"/>
-                <TextBlock x:Uid="lbl_remoteHdrUp" Grid.Row="0" Grid.Column="1" Text="Volume up" FontWeight="Bold" Margin="0,0,18,4"/>
-                <TextBlock x:Uid="lbl_remoteHdrDown" Grid.Row="0" Grid.Column="2" Text="Volume down" FontWeight="Bold" Margin="0,0,0,4"/>
+                <TextBlock x:Uid="lbl_remoteHdrUp" Grid.Row="0" Grid.Column="1" Text="Primary button" FontWeight="Bold" Margin="0,0,18,4"/>
+                <TextBlock x:Uid="lbl_remoteHdrDown" Grid.Row="0" Grid.Column="2" Text="Second button" FontWeight="Bold" Margin="0,0,0,4"/>
 
                 <TextBlock x:Uid="lbl_remoteRowPrompt" Grid.Row="1" Grid.Column="0" Text="A prompt is on screen" Margin="0,0,18,2"/>
                 <TextBlock x:Uid="lbl_remoteRowPromptUp" Grid.Row="1" Grid.Column="1" Text="OK / Yes" Margin="0,0,18,2"/>

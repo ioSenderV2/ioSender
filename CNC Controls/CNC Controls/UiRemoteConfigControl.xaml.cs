@@ -119,7 +119,8 @@ namespace CNC.Controls
             // The name Windows itself shows, when we have it. Falling back to the path is not a failure
             // worth announcing - it just means the remote was not answering when it was bound.
             string friendly = config.ShutterRemoteName;
-            txtBindStatus.Text = "Bound to " + (string.IsNullOrEmpty(friendly) ? Short(device) : friendly);
+            txtBindStatus.Text = "Bound to " + (string.IsNullOrEmpty(friendly) ? Short(device) : friendly)
+                               + " - the button you pressed is the primary one.";
         }
 
         /// <summary>

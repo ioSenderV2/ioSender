@@ -7,10 +7,10 @@
  *
  * ---- The policy ----
  *
- *   a prompt is on screen   vol up = OK / Yes        vol down = Cancel / No
- *                           ...and when the prompt has NO Cancel button, both keys mean OK
- *   the machine is RUNning  either key = Feed Hold
- *   the machine is HOLDing  vol up = Start / resume  vol down = Stop
+ *   a prompt is on screen   primary = OK / Yes       second = Cancel / No
+ *                           ...and when the prompt has NO Cancel button, both buttons mean OK
+ *   the machine is RUNning  either button = Feed Hold
+ *   the machine is HOLDing  primary = Start / resume second = Stop
  *   anything else           nothing - the key goes to Windows and the volume changes as usual
  *
  * Both keys mean Feed Hold while running on purpose. The remote's two BUTTONS send different keys (on
@@ -89,7 +89,10 @@ namespace CNC.Controls
         /// What this press means right now, or null when it means nothing - in which case ShutterRemote
         /// lets the key through to Windows and the volume changes as it always would.
         /// </summary>
-        public static System.Action Resolve(bool volumeUp)
+        /// <param name="isPrimary">Was this the PRIMARY button - the one pressed when the remote was
+        /// bound? The remote's buttons carry no up/down marking, so which key each sends is settled at
+        /// binding and translated by ShutterRemote before it gets here (RemoteDevices.IsPrimary).</param>
+        public static System.Action Resolve(bool isPrimary)
         {
             if (prompts.Count > 0)
             {
@@ -107,7 +110,7 @@ namespace CNC.Controls
                 // a button that did nothing would just be one they have to remember not to press. Where a
                 // prompt has two real answers the two buttons still differ; where it has only one, both
                 // give it.
-                return volumeUp || prompt.Cancel == null ? prompt.Ok : prompt.Cancel;
+                return isPrimary || prompt.Cancel == null ? prompt.Ok : prompt.Cancel;
             }
 
             // A view waiting for the operator (the Height Map's per-point hold) takes BOTH keys as "carry
@@ -127,7 +130,7 @@ namespace CNC.Controls
                     return Press(HoldButton);
 
                 case GrblStates.Hold:
-                    return volumeUp ? Press(StartButton) : Press(StopButton);
+                    return isPrimary ? Press(StartButton) : Press(StopButton);
             }
 
             return null;

@@ -226,6 +226,8 @@ namespace CNC.Controls
             // pressed the button to identify the device, not to answer whatever was on screen at the time.
             if (RemoteDevices.PressJustBound())
             {
+                // The same press settles which button is which: the one used to bind is the primary one.
+                RemoteDevices.SetPrimaryFromBindPress(vk == VK_VOLUME_UP);
                 _swallowed = true;
                 try { System.Media.SystemSounds.Asterisk.Play(); } catch { }
                 DebugLog.Write("remote", "shutter remote: that press bound the device - not acted on");
@@ -246,8 +248,11 @@ namespace CNC.Controls
             // What it means is decided HERE, synchronously, because the answer also decides whether the key
             // is swallowed - and that has to be settled before returning from the hook. Only the action it
             // hands back is posted; nothing slow runs on the hook.
+            // Asked in terms of PRIMARY, not volume up: which physical button sends which key is the
+            // remote's business and was settled at binding, and nothing above this line should have to
+            // know that the bigger button happens to send volume down.
             var resolve = Resolve;
-            System.Action action = resolve == null ? null : resolve(vk == VK_VOLUME_UP);
+            System.Action action = resolve == null ? null : resolve(RemoteDevices.IsPrimary(vk == VK_VOLUME_UP));
 
             if (action == null)
             {

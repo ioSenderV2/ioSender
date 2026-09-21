@@ -359,6 +359,7 @@ namespace CNC.Controls
         private bool _shutterRemote = false;
         private string _shutterRemoteDevice = string.Empty;
         private string _shutterRemoteName = string.Empty;
+        private bool _shutterRemoteSwap = false;
         private int _statusWindowAutoCloseSeconds = 10;
         private double _jobSplitRatio = 0.5d;
         // Serial is the default transport (2026-08-12). Off means a serial/USB link is left alone; a user
@@ -563,6 +564,15 @@ namespace CNC.Controls
         // and the settings page is most often opened when it is not. Cosmetic: empty just means the
         // status line falls back to the device path.
         public string ShutterRemoteName { get { return _shutterRemoteName; } set { if (_shutterRemoteName != value) { _shutterRemoteName = value ?? string.Empty; OnPropertyChanged(); } } }
+        // Which of the remote's two buttons is the PRIMARY one - the one that says OK, Continue, Start.
+        //
+        // The buttons are not labelled up and down. On the operator's PICO the iOS button is the larger
+        // one and sits on top, so it reads as "up" to a hand, while the key it actually sends is VOLUME
+        // DOWN. Asking anyone to know that is absurd, so the app learns it instead: the button pressed
+        // during binding becomes the primary one, and this records whether that meant inverting.
+        //
+        // false = volume up is primary (the common case), true = the two are swapped.
+        public bool ShutterRemoteSwapButtons { get { return _shutterRemoteSwap; } set { if (_shutterRemoteSwap != value) { _shutterRemoteSwap = value; OnPropertyChanged(); } } }
         // Where the splitter sits, as the program view's share of the split (0..1). Persisted so a layout
         // the operator has dragged to suit their screen survives a restart, like every other placement here.
         public double JobSplitRatio { get { return _jobSplitRatio < 0.1d || _jobSplitRatio > 0.9d ? 0.5d : _jobSplitRatio; } set { _jobSplitRatio = value; } }

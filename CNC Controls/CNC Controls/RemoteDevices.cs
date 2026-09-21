@@ -354,6 +354,33 @@ namespace CNC.Controls
             return ElapsedMs - boundAt <= MatchWindowMs;
         }
 
+        /// <summary>
+        /// The binding press also settles WHICH BUTTON IS WHICH. The two are not labelled up and down -
+        /// on the operator's PICO the iOS button is the bigger one on top, so it reads as "up" while
+        /// sending VOLUME DOWN - so the button used to bind becomes the primary one and the mapping is
+        /// derived from that rather than assumed. Called by the hook, which is the only thing that knows
+        /// the key.
+        /// </summary>
+        public static void SetPrimaryFromBindPress(bool wasVolumeUp)
+        {
+            if (AppConfig.Settings?.Base == null)
+                return;
+
+            AppConfig.Settings.Base.ShutterRemoteSwapButtons = !wasVolumeUp;
+            DebugLog.Write("remote", "primary button = the one just pressed (" +
+                                      (wasVolumeUp ? "volume up" : "volume down") + ")");
+        }
+
+        /// <summary>
+        /// Is this key the primary button? Everything above the hook is written in terms of primary and
+        /// second, never up and down, because up and down are not written on the remote.
+        /// </summary>
+        public static bool IsPrimary(bool volumeUp)
+        {
+            bool swapped = AppConfig.Settings?.Base != null && AppConfig.Settings.Base.ShutterRemoteSwapButtons;
+            return volumeUp != swapped;
+        }
+
         private static double boundAt = double.NegativeInfinity;
 
         /// <summary>
