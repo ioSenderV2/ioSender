@@ -170,9 +170,17 @@ namespace CNC.Controls
             {
                 ShutterRemote.Resolve = Resolve;
                 ShutterRemote.Start();
+
+                // Which DEVICE sent the key. Measurement only for now - it changes nothing about what a
+                // press does - but it is the plumbing per-device binding would need, and the question it
+                // answers first is whether that binding is possible at all. See RemoteDevices.
+                RemoteDevices.Start();
             }
             else
+            {
                 ShutterRemote.Stop();
+                RemoteDevices.Stop();
+            }
         }
     }
 }

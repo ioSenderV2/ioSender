@@ -58,6 +58,7 @@
  */
 
 using System;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
 using CNC.Core;
@@ -182,6 +183,14 @@ namespace CNC.Controls
             if (vk != VK_VOLUME_UP && vk != VK_VOLUME_DOWN)
                 return CallNextHookEx(_hook, nCode, wParam, lParam);
 
+            // Stamped here, against RemoteDevices' clock, so the hook and the raw-input listener can be
+            // ordered against each other afterwards - the question being whether a raw-input event arrives
+            // at all for a key this hook swallows, and if so on which side of this callback. See
+            // RemoteDevices' header. Measurement only; nothing below reads it.
+            if (DebugLog.Enabled)
+                DebugLog.Write("remote", string.Format(CultureInfo.InvariantCulture,
+                    "HOOK      t={0:F3}ms  vk=0x{1:X2} {2}", RemoteDevices.ElapsedMs, vk, up ? "up" : "down"));
+
             // The key-up is what ends a press. Until it arrives, every key-down for this key is the SAME
             // press auto-repeating, whatever has changed in the meantime.
             if (up)
@@ -218,6 +227,7 @@ namespace CNC.Controls
                 // press stays marked active, so if something starts waiting while the button is still down
                 // it is the NEXT press that acts on it, not this one.
                 _last = DateTime.MinValue;   // a press that passed through must not debounce the next real one
+                DebugLog.Write("remote", "shutter remote: passed to Windows - nothing was waiting on it");
                 return CallNextHookEx(_hook, nCode, wParam, lParam);
             }
 
