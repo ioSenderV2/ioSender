@@ -663,6 +663,23 @@ namespace CNC.Core
         public int Id { get; private set; }
 
         /// <summary>
+        /// True when this entry is a work offset an operator may SELECT - G54 through G59.3.
+        ///
+        /// The collection these live in is everything the controller's parameter report mentions, which
+        /// also includes G28, G30 and G92. Those are STORED POSITIONS, not coordinate systems, and the
+        /// difference is not cosmetic: sending "G54" selects an offset, while sending "G28" RAPIDS THE
+        /// MACHINE to the stored G28 position. Anything that offers this collection as a list of work
+        /// offsets to pick from has to filter on this, or it is offering a move disguised as a setting.
+        ///
+        /// Lives here rather than in either piece of UI that needs it, because two copies of the list
+        /// would be two chances to get it wrong, and only one of the two mistakes moves a machine.
+        /// </summary>
+        public bool IsSelectableWcs
+        {
+            get { return _code.Length > 2 && _code.StartsWith("G5") && _code != "G53"; }
+        }
+
+        /// <summary>
         /// This coordinate system's rotation, in DEGREES - as the controller reports it in $# and as the R
         /// word writes it. Stated because it was not: one writer (GCodeEmulator's G10 handler) stored
         /// radians into this same field, and the reader that mattered treated every value as radians, so a

@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using CNC.Core;
@@ -87,6 +88,18 @@ namespace CNC.Controls
             //    cbxTool.SelectedItem = cbxTool.Text;
             //    cbxTool_TextChanged(cbxTool, null);
             //}
+        }
+
+        /// <summary>
+        /// Keep G28, G30 and G92 out of the offset picker. They arrive in the same collection as the work
+        /// offsets - the parameter report lists them together - but they are stored POSITIONS, and this
+        /// combo sends the selected entry's code to the controller verbatim. Picking "G28" would not select
+        /// anything; it would rapid the machine to the stored G28 position, from a dropdown sitting next to
+        /// the tool selector.
+        /// </summary>
+        private void Offsets_Filter(object sender, FilterEventArgs e)
+        {
+            e.Accepted = !(e.Item is CoordinateSystem cs) || cs.IsSelectableWcs;
         }
 
         private void cbxOffset_SelectionChanged(object sender, SelectionChangedEventArgs e)
