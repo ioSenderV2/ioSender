@@ -217,27 +217,10 @@ namespace CNC.Controls.Viewer
 
         private void Wpos_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            posEvents++;
-
-            // Logged HERE, not in UpdateTool, and that distinction is the whole point. UpdateTool has
-            // four early returns before its own log line, so its silence during a move proves nothing:
-            // it cannot tell "called 44 times and bailed" from "not called until the end". This handler
-            // has no guards, so its timestamps are the arrival times of the notifications themselves.
-            //
-            // The previous instrument was in the wrong place for exactly that reason - it was placed
-            // where the answer was already filtered.
-            if (DebugLog.Enabled)
-                DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                    "posEvent #{0} prop={1} pos=({2:0.###},{3:0.###},{4:0.###}) state={5}",
-                    posEvents, e.PropertyName, wpos.X, wpos.Y, wpos.Z, model?.GrblState.State));
 
             UpdateTool();
         }
 
-        // How many position notifications have actually arrived. The cone updating only when the scene is
-        // rebuilt looks identical to the cone updating on every report, if you cannot see the difference
-        // between "the handler ran" and "the handler exists".
-        private int posEvents;
 
         // ---- IToolpathView ----
 
@@ -964,13 +947,6 @@ namespace CNC.Controls.Viewer
         // The cone follows the live work position when not simulating; playback owns it while playing.
         private void UpdateTool()
         {
-            // Entry log, before ANY guard. The instrument has now been wrong twice by sitting downstream
-            // of the thing it was meant to characterise: the calls that return early are exactly the ones
-            // worth seeing, and a probe placed after a return can only ever report the survivors.
-            if (DebugLog.Enabled)
-                DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                    "UpdateTool ENTRY playing={0} coneNull={1} wposNull={2} jobRunning={3} visible={4} state={5}",
-                    playing, toolCone == null, wpos == null, model?.IsJobRunning, IsVisible, model?.GrblState.State));
 
             if (playing || toolCone == null || wpos == null)
                 return;
@@ -981,7 +957,20 @@ namespace CNC.Controls.Viewer
             // here competes with it, the controller's planner buffer drains, and motion stutters. Freeze the whole
             // view for the duration of the job; it resumes on the next report once the job ends. The Play button
             // still gives the full offline carve simulation.
-            if (model != null && model.IsJobRunning)
+            // ...but a JOG is not a streaming job, and the flag does not distinguish them: IsJobRunning
+            // reads true while jogging (logged on hardware 2026-09-21 - 57 position notifications arrived
+            // across an 11-second jog, every one of them with jobRunning=True, and every one bailed here).
+            // So the cone froze during exactly the motion it exists to show, then jumped to the
+            // destination when the machine went Idle and the guard let go.
+            //
+            // The condition this guard actually wants is "the sender is pumping program lines", and
+            // during a jog it is not - there is no file streaming, nothing to starve. Excluding Jog
+            // restores live tracking without weakening the protection a real job gets.
+            //
+            // NOT fixed by changing IsJobRunning itself, though it is arguably wrong there too: that flag
+            // is read by the filesystem-listing guard, the Home button and the Peek gate among others, and
+            // narrowing a shared safety flag is not a change to make from a symptom in a viewer.
+            if (model != null && model.IsJobRunning && model.GrblState.State != GrblStates.Jog)
             {
                 haveLast = false;        // resume cleanly later - no false cut from a stale last position
                 return;
@@ -995,16 +984,6 @@ namespace CNC.Controls.Viewer
             var p = new Point3D(x, y, z);
             toolCone.Origin = p;         // track the live cutter (cheap) when idle
 
-            // Reported 2026-09-21: the cone does not move during a go-to, it jumps to the destination when
-            // the move finishes. Two very different causes and the screen cannot tell them apart - either
-            // this runs once (the model is not notifying during motion) or it runs many times and nothing
-            // repaints. One line per call, with the position and the machine state, answers which.
-            if (DebugLog.Enabled)
-                DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                    "UpdateTool cone=({0:0.###},{1:0.###},{2:0.###}) state={3} visible={4} posEvents={5} sameObj={6} wpos#{7} model.Position#{8}",
-                    x, y, z, model?.GrblState.State, IsVisible, posEvents,
-                    ReferenceEquals(wpos, model?.Position),
-                    wpos?.GetHashCode(), model?.Position?.GetHashCode()));
 
             // Live material removal (CarveTo mutates the stock mesh, PushMesh re-publishes it) is the expensive
             // part - only do it when the view is actually on screen.
