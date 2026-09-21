@@ -58,3 +58,9 @@ CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_stored:System.Wi
 CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_reset:System.Windows.Controls.ContentControl.Content,Button,True,True,,Reset view
 CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_reset:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Zoom and centre so the whole scene fits.
 CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_close:System.Windows.Controls.ContentControl.Content,Button,True,True,,Close
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_colours:System.Windows.Controls.TextBlock.Text,Text,True,True,,COLOURS
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_lblCut:System.Windows.Controls.TextBlock.Text,Text,True,True,,Cut moves
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_lblRapid:System.Windows.Controls.TextBlock.Text,Text,True,True,,Rapid moves
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_lblStock:System.Windows.Controls.TextBlock.Text,Text,True,True,,Stock
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_defaults:System.Windows.Controls.ContentControl.Content,Button,True,True,,Default colours
+CNC.Controls.Viewer.g.en-US.resources:viewoptionsdialog.baml,vo_defaults:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Put the three colours back to the shipped palette.
