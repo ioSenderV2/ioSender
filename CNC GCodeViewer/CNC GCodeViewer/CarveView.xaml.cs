@@ -217,8 +217,14 @@ namespace CNC.Controls.Viewer
 
         private void Wpos_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
+            posEvents++;
             UpdateTool();
         }
+
+        // How many position notifications have actually arrived. The cone updating only when the scene is
+        // rebuilt looks identical to the cone updating on every report, if you cannot see the difference
+        // between "the handler ran" and "the handler exists".
+        private int posEvents;
 
         // ---- IToolpathView ----
 
@@ -974,8 +980,10 @@ namespace CNC.Controls.Viewer
             // repaints. One line per call, with the position and the machine state, answers which.
             if (DebugLog.Enabled)
                 DebugLog.Write("carve", string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                    "UpdateTool cone=({0:0.###},{1:0.###},{2:0.###}) state={3} visible={4}",
-                    x, y, z, model?.GrblState.State, IsVisible));
+                    "UpdateTool cone=({0:0.###},{1:0.###},{2:0.###}) state={3} visible={4} posEvents={5} sameObj={6} wpos#{7} model.Position#{8}",
+                    x, y, z, model?.GrblState.State, IsVisible, posEvents,
+                    ReferenceEquals(wpos, model?.Position),
+                    wpos?.GetHashCode(), model?.Position?.GetHashCode()));
 
             // Live material removal (CarveTo mutates the stock mesh, PushMesh re-publishes it) is the expensive
             // part - only do it when the view is actually on screen.
