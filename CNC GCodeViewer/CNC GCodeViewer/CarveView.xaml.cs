@@ -1,7 +1,7 @@
 /*
  * CarveView.xaml.cs - part of CNC GCodeViewer
  *
- * A live 3D machine view with local g-code playback, in WORK coordinates: the work envelope, a stock
+ * A live 3D machine view with local g-code playback, in WORK coordinates: the bed, a stock
  * block sized to the loaded program, the program's toolpath, and a cone at the tool position - following
  * the live work position, or, on Play, a local simulation of the program (no controller motion). Phase 2
  * of the carve view (see docs/3D-Carve-View-Design.md); real-time material removal is added in Phase 3.
@@ -9,8 +9,9 @@
  *
  * Coordinates: everything is in WORK coordinates so the toolpath, playback, stock and live cone all align.
  * The toolpath/playback are the program's own (work) coordinates; the live cone uses Position (the live
- * WORK position - NOT WorkPosition, see the subscription); the machine envelope ($130-$132) is drawn
- * shifted by the work offset (WorkPositionOffset) into work space.
+ * WORK position - NOT WorkPosition, see the subscription); the machine envelope ($130-$132), which sizes
+ * the bed grid and bounds the stored-position markers, is shifted by the work offset (WorkPositionOffset)
+ * into work space.
  */
 
 using System;
@@ -434,12 +435,10 @@ namespace CNC.Controls.Viewer
             double zmin = EnvMin(2) - Wco(2), zmax = EnvMax(2) - Wco(2);
             double xs = Math.Max(xmax - xmin, 1d), ys = Math.Max(ymax - ymin, 1d), zs = Math.Max(zmax - zmin, 1d);
 
-            viewport.Children.Add(new BoundingBoxWireFrameVisual3D
-            {
-                BoundingBox = new Rect3D(xmin, ymin, zmin, xs, ys, zs),
-                Color = Colors.DimGray,
-                Thickness = 1d
-            });
+            // No wireframe box around the envelope. The grid below is built from these same numbers and so
+            // already carries the footprint - the floor and the XY extent - which left the box contributing
+            // exactly one thing the grid does not: the Z ceiling, as twelve grey lines drawn across
+            // everything else. Headroom is not a question this view is asked.
 
             // bed grid at the envelope floor
             viewport.Children.Add(new GridLinesVisual3D
