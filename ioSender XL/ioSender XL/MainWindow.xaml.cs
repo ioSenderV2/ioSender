@@ -968,8 +968,13 @@ namespace GCode_Sender
             gvm.ResponseLogVerbose = AppConfig.Settings.Base.ConsoleVerbose;
             gvm.ResponseLogFilterRT = AppConfig.Settings.Base.ConsoleFilterRT;
             gvm.ResponseLogShowRTAll = AppConfig.Settings.Base.ConsoleShowRTAll;
+            // showConsole(), NOT openConsole() - that is a TOGGLE. This block runs on every connect AND
+            // on the re-initialisation a SOFT RESET triggers, so with the console already up it hid it:
+            // press the remote's Reset-and-unlock, or hit reset any other way, and the console you were
+            // reading vanished. The MDI button's own comment has warned about this toggle since
+            // 2026-08-13; this call site was simply missed.
             if (AppConfig.Settings.Base.ConsoleWindowOpen)
-                openConsole();
+                showConsole();
 
             hookWindowKeyHandlers();
             // Jog keys AND keyboard shortcuts, for every window in the application including dialogs opened
@@ -3763,6 +3768,19 @@ namespace GCode_Sender
         public void OpenConsoleWindow()
         {
             openConsole();
+        }
+
+        /// <summary>
+        /// Show the console, creating it if need be, and NEVER hide it. For the callers that mean "make
+        /// sure it is up" rather than "flip it" - restoring the preserved open state, most of all, which
+        /// runs again on every re-initialisation and must be idempotent.
+        /// </summary>
+        private void showConsole()
+        {
+            if (UIViewModel.Console == null)
+                openConsole();          // creates it shown
+            else
+                UIViewModel.Console.Show();
         }
 
         private void openConsole()
