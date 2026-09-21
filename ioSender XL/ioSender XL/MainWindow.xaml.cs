@@ -3788,6 +3788,18 @@ namespace GCode_Sender
             if (UIViewModel.Console == null)
             {
                 UIViewModel.Console = new ConsoleWindow();
+
+                // OWNED by the main window, which is what stops it getting BURIED. It is a separate
+                // top-level window, and without an owner it is just another window in the z-order: a soft
+                // reset runs the whole connect-time re-initialisation, that does UI work which brings the
+                // main window forward, and the console dropped behind it. It read exactly like the console
+                // closing itself, and it is not - the visibility handler never fired once, which is what
+                // finally told us nothing was hiding anything.
+                //
+                // An owned window always floats above its owner, so this cannot happen again whatever the
+                // main window does. It also minimises and restores with it, which is the right behaviour
+                // for a tool window anyway.
+                UIViewModel.Console.Owner = this;
                 UIViewModel.Console.DataContext = DataContext;
                 UIViewModel.Console.IsVisibleChanged += Console_IsVisibleChanged;
                 // The same window-level key handler on the console window, so shortcuts still work while the
@@ -3807,12 +3819,6 @@ namespace GCode_Sender
 
         private void Console_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
-            // TEMPORARY. The console vanishes on a soft reset and two readings of the code found the wrong
-            // culprit, so let the app name it: this fires on every visibility change, and the stack says
-            // who asked. Remove once answered.
-            if (CNC.Core.DebugLog.Enabled && !(bool)e.NewValue)
-                CNC.Core.DebugLog.Write("ui", "CONSOLE HIDDEN by:" + Environment.NewLine + Environment.StackTrace);
-
             // Preserve the floating console window open state for the next session
             if (AppConfig.Settings.Base != null)
             {

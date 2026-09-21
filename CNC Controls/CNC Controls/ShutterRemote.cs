@@ -96,7 +96,6 @@ namespace CNC.Controls
         private static HookProc _proc;
         private static Dispatcher _dispatcher;
         private static DateTime _last = DateTime.MinValue;
-        private static int _traced = 0;   // see the TEMPORARY TRACE in Callback
 
         // When the HOOK last acted on a press, so the raw-input path below does not act on the same one
         // twice. Both can deliver the same press on a machine where the hook does see media keys.
@@ -259,21 +258,6 @@ namespace CNC.Controls
                 return CallNextHookEx(_hook, nCode, wParam, lParam);
 
             int vk = Marshal.ReadInt32(lParam);
-
-            // TEMPORARY TRACE. The remote's HID events were arriving and Windows was changing the volume,
-            // yet no HOOK line appeared for them - and with the log only written for 0xAE/0xAF there is no
-            // way to tell "the hook never fired" from "the key is not the one we filter for". Logging every
-            // key the hook sees settles it: ordinary typing appearing proves the hook is alive, and a
-            // remote press then either shows up with some other vk or does not show up at all.
-            //
-            // Capped so it cannot flood a long session, and behind the usual gate. Remove once the answer
-            // is in - it is a question, not an instrument worth keeping.
-            if (DebugLog.Enabled && _traced < 400)
-            {
-                _traced++;
-                DebugLog.Write("remote", string.Format(CultureInfo.InvariantCulture,
-                    "HOOKSAW   vk=0x{0:X2} {1}", vk, up ? "up" : "down"));
-            }
 
             if (vk != VK_VOLUME_UP && vk != VK_VOLUME_DOWN)
                 return CallNextHookEx(_hook, nCode, wParam, lParam);
