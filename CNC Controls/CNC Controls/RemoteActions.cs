@@ -11,6 +11,7 @@
  *                           ...and when the prompt has NO Cancel button, both buttons mean OK
  *   the machine is RUNning  either button = Feed Hold
  *   the machine is HOLDing  primary = Start / resume secondary = Stop
+ *   the machine is in ALARM the operator's choice - Reset and unlock by default
  *   anything else           nothing - the key goes to Windows and the volume changes as usual
  *
  * Both keys mean Feed Hold while running on purpose. The remote's two BUTTONS send different keys (on
@@ -148,6 +149,11 @@ namespace CNC.Controls
                     if (cfg == null || !cfg.RemoteOnIdle)
                         return null;
                     return Perform(isPrimary ? cfg.RemoteIdlePrimary : cfg.RemoteIdleSecondary);
+
+                case GrblStates.Alarm:
+                    if (cfg == null || !cfg.RemoteOnAlarm)
+                        return null;
+                    return Perform(isPrimary ? cfg.RemoteAlarmPrimary : cfg.RemoteAlarmSecondary);
             }
 
             return null;

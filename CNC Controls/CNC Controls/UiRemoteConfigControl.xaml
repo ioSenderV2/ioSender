@@ -57,6 +57,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <TextBlock x:Uid="lbl_remoteHdrOn" Grid.Row="0" Grid.Column="0" Text="On" FontWeight="Bold" Margin="0,0,10,4"/>
@@ -116,6 +117,19 @@
                            ItemsSource="{Binding Source={x:Static local:RemoteFunctions.Items}}"
                            DisplayMemberPath="Label" SelectedValuePath="Id"
                            SelectedValue="{Binding Path=RemoteIdleSecondary, Mode=TwoWay}"/>
+
+                <CheckBox  x:Uid="chk_remoteOnAlarm" Grid.Row="6" Grid.Column="0" Margin="0,0,10,3" VerticalAlignment="Center"
+                           IsChecked="{Binding Path=RemoteOnAlarm, Mode=TwoWay}"
+                           ToolTip="Let the remote act while the machine is in alarm. On by default, because the recovery is always the same and your hands are usually on the work."/>
+                <TextBlock x:Uid="lbl_remoteRowAlarm" Grid.Row="6" Grid.Column="1" Text="The machine is in alarm" Margin="0,0,18,3" VerticalAlignment="Center"/>
+                <ComboBox  x:Uid="cbo_remoteAlarmPrimary" Grid.Row="6" Grid.Column="2" Margin="0,0,18,3" MinWidth="150"
+                           ItemsSource="{Binding Source={x:Static local:RemoteFunctions.Items}}"
+                           DisplayMemberPath="Label" SelectedValuePath="Id"
+                           SelectedValue="{Binding Path=RemoteAlarmPrimary, Mode=TwoWay}"/>
+                <ComboBox  x:Uid="cbo_remoteAlarmSecondary" Grid.Row="6" Grid.Column="3" Margin="0,0,0,3" MinWidth="150"
+                           ItemsSource="{Binding Source={x:Static local:RemoteFunctions.Items}}"
+                           DisplayMemberPath="Label" SelectedValuePath="Id"
+                           SelectedValue="{Binding Path=RemoteAlarmSecondary, Mode=TwoWay}"/>
             </Grid>
 
             <TextBlock x:Uid="lbl_remoteNoCancel" Margin="24,6,0,0" TextWrapping="Wrap" Opacity="0.75"

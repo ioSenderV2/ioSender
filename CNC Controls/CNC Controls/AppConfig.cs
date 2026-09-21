@@ -365,6 +365,8 @@ namespace CNC.Controls
         private string _remoteRunPrimary = "FeedHold", _remoteRunSecondary = "FeedHold";
         private string _remoteHoldPrimary = "CycleStart", _remoteHoldSecondary = "Stop";
         private string _remoteIdlePrimary = "None", _remoteIdleSecondary = "None";
+        private bool _remoteOnAlarm = true;
+        private string _remoteAlarmPrimary = "ResetUnlock", _remoteAlarmSecondary = "None";
         private int _statusWindowAutoCloseSeconds = 10;
         private double _jobSplitRatio = 0.5d;
         // Serial is the default transport (2026-08-12). Off means a serial/USB link is left alone; a user
@@ -609,6 +611,15 @@ namespace CNC.Controls
         public string RemoteHoldSecondary { get { return _remoteHoldSecondary; } set { if (_remoteHoldSecondary != value) { _remoteHoldSecondary = value ?? "None"; OnPropertyChanged(); } } }
         public string RemoteIdlePrimary { get { return _remoteIdlePrimary; } set { if (_remoteIdlePrimary != value) { _remoteIdlePrimary = value ?? "None"; OnPropertyChanged(); } } }
         public string RemoteIdleSecondary { get { return _remoteIdleSecondary; } set { if (_remoteIdleSecondary != value) { _remoteIdleSecondary = value ?? "None"; OnPropertyChanged(); } } }
+
+        // ALARM. The state a crashed or soft-limited machine sits in, and the one where the operator most
+        // wants a button rather than a mouse - hands are usually on the work, and the recovery is always
+        // the same. Defaults to Reset and unlock on the primary, which is what anyone does next anyway and
+        // which moves nothing: the machine is already stopped. That is why this row defaults to ACTING
+        // where Idle defaults to Nothing.
+        public bool RemoteOnAlarm { get { return _remoteOnAlarm; } set { if (_remoteOnAlarm != value) { _remoteOnAlarm = value; OnPropertyChanged(); } } }
+        public string RemoteAlarmPrimary { get { return _remoteAlarmPrimary; } set { if (_remoteAlarmPrimary != value) { _remoteAlarmPrimary = value ?? "None"; OnPropertyChanged(); } } }
+        public string RemoteAlarmSecondary { get { return _remoteAlarmSecondary; } set { if (_remoteAlarmSecondary != value) { _remoteAlarmSecondary = value ?? "None"; OnPropertyChanged(); } } }
         // Where the splitter sits, as the program view's share of the split (0..1). Persisted so a layout
         // the operator has dragged to suit their screen survives a restart, like every other placement here.
         public double JobSplitRatio { get { return _jobSplitRatio < 0.1d || _jobSplitRatio > 0.9d ? 0.5d : _jobSplitRatio; } set { _jobSplitRatio = value; } }
