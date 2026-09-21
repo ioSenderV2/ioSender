@@ -136,7 +136,7 @@
                        Text="When a prompt has no Cancel button - as the &quot;move the plate to the next corner&quot; prompt does not - both buttons mean OK. There is nothing else the secondary button could mean there, and a button that did nothing would just be one you have to remember not to press."/>
 
             <TextBlock x:Uid="lbl_remoteFallthrough" Margin="5,10,0,0" TextWrapping="Wrap" Opacity="0.75"
-                       Text="Once bound, the remote's buttons belong to ioSender: a press that means nothing at that moment beeps and is discarded, never reaching the volume control. Every other device is ignored and behaves exactly as before, so your keyboard's own volume keys are untouched. Both buttons mean Feed Hold while a job runs on purpose - a hand reaching for the remote mid-cut wants the machine to stop, not to pick the right button of two."/>
+                       Text="Once bound, the remote's buttons belong to ioSender: a press that means nothing at that moment beeps and is discarded rather than acted on. Every other device is ignored and behaves exactly as before, so your keyboard's own volume keys are untouched. The system volume will usually still move, though - ioSender can suppress that only where Windows also delivers the press as a keystroke, and these remotes generally arrive as raw HID input, which can be read but not intercepted. Turn the machine's volume down and ignore the on-screen bar. Both buttons mean Feed Hold while a job runs on purpose - a hand reaching for the remote mid-cut wants the machine to stop, not to pick the right button of two."/>
         </StackPanel>
     </GroupBox>
 </UserControl>
