@@ -83,7 +83,8 @@ namespace CNC.Controls
         private void Config_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(Config.ShutterRemoteEnabled) ||
-                 e.PropertyName == nameof(Config.ShutterRemoteDevice))
+                 e.PropertyName == nameof(Config.ShutterRemoteDevice) ||
+                 e.PropertyName == nameof(Config.ShutterRemoteName))
                 RefreshStatus();
         }
 
@@ -115,7 +116,10 @@ namespace CNC.Controls
                 return;
             }
 
-            txtBindStatus.Text = "Bound to " + Short(device);
+            // The name Windows itself shows, when we have it. Falling back to the path is not a failure
+            // worth announcing - it just means the remote was not answering when it was bound.
+            string friendly = config.ShutterRemoteName;
+            txtBindStatus.Text = "Bound to " + (string.IsNullOrEmpty(friendly) ? Short(device) : friendly);
         }
 
         /// <summary>

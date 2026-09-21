@@ -358,6 +358,7 @@ namespace CNC.Controls
         private bool _showJobSplitView = false;
         private bool _shutterRemote = false;
         private string _shutterRemoteDevice = string.Empty;
+        private string _shutterRemoteName = string.Empty;
         private int _statusWindowAutoCloseSeconds = 10;
         private double _jobSplitRatio = 0.5d;
         // Serial is the default transport (2026-08-12). Off means a serial/USB link is left alone; a user
@@ -557,6 +558,11 @@ namespace CNC.Controls
         // Empty is not a failure state: nothing is bound, so any device's volume keys act, exactly as
         // before this existed. Fail OPEN - a remote that cannot be identified must not stop working.
         public string ShutterRemoteDevice { get { return _shutterRemoteDevice; } set { if (_shutterRemoteDevice != value) { _shutterRemoteDevice = value ?? string.Empty; OnPropertyChanged(); } } }
+        // The name Windows shows for the bound remote ("PICO V0.1:079B5C11FFF"), captured at bind time.
+        // Stored rather than resolved on demand because it can only be read while the device is PRESENT,
+        // and the settings page is most often opened when it is not. Cosmetic: empty just means the
+        // status line falls back to the device path.
+        public string ShutterRemoteName { get { return _shutterRemoteName; } set { if (_shutterRemoteName != value) { _shutterRemoteName = value ?? string.Empty; OnPropertyChanged(); } } }
         // Where the splitter sits, as the program view's share of the split (0..1). Persisted so a layout
         // the operator has dragged to suit their screen survives a restart, like every other placement here.
         public double JobSplitRatio { get { return _jobSplitRatio < 0.1d || _jobSplitRatio > 0.9d ? 0.5d : _jobSplitRatio; } set { _jobSplitRatio = value; } }

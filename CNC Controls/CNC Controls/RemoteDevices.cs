@@ -92,6 +92,61 @@ namespace CNC.Controls
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         private static extern int GetRawInputDeviceInfo(IntPtr hDevice, int command, StringBuilder data, ref int size);
 
+        // The friendly name. GetRawInputDeviceInfo gives the interface PATH - a wall of braces and hex
+        // that means nothing to anyone - while Windows' own Bluetooth list shows "PICO V0.1:079B5C11FFF".
+        // That string is the HID PRODUCT STRING, and the raw-input device name IS an interface path, so
+        // it can be opened and asked.
+        //
+        // Opened with dwDesiredAccess ZERO on purpose. A HID keyboard is held by the class driver and
+        // cannot be opened for read or write, but a zero-access handle is still good for metadata - which
+        // is the documented way to get at product and manufacturer strings for a device in use.
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern IntPtr CreateFile(string name, uint access, uint share, IntPtr security,
+                                                uint disposition, uint flags, IntPtr template);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr handle);
+        [DllImport("hid.dll", CharSet = CharSet.Unicode)]
+        private static extern bool HidD_GetProductString(IntPtr handle, StringBuilder buffer, int length);
+
+        private const uint FILE_SHARE_READ_WRITE = 3;
+        private const uint OPEN_EXISTING = 3;
+        private static readonly IntPtr INVALID_HANDLE = new IntPtr(-1);
+
+        /// <summary>
+        /// The name Windows shows for this device, or null when it cannot be read - which is an ordinary
+        /// outcome, not a failure: the remote may be asleep, unpaired or simply not answering, and the
+        /// caller falls back to the path. Never throws.
+        /// </summary>
+        public static string ProductName(string devicePath)
+        {
+            if (string.IsNullOrEmpty(devicePath))
+                return null;
+
+            IntPtr h = INVALID_HANDLE;
+            try
+            {
+                h = CreateFile(devicePath, 0, FILE_SHARE_READ_WRITE, IntPtr.Zero, OPEN_EXISTING, 0, IntPtr.Zero);
+                if (h == INVALID_HANDLE)
+                    return null;
+
+                var sb = new StringBuilder(256);
+                if (!HidD_GetProductString(h, sb, sb.Capacity * 2))
+                    return null;
+
+                string name = sb.ToString().Trim();
+                return name.Length == 0 ? null : name;
+            }
+            catch
+            {
+                return null;   // a cosmetic label must never take the app down
+            }
+            finally
+            {
+                if (h != INVALID_HANDLE && h != IntPtr.Zero)
+                    CloseHandle(h);
+            }
+        }
+
         // RAWINPUTHEADER is dwType + dwSize (4 each) then hDevice + wParam (pointer-sized), so its length
         // differs between 32- and 64-bit. Computed rather than declared, because getting it wrong reads
         // the keyboard payload from the wrong offset and produces plausible nonsense rather than a crash.
@@ -174,7 +229,10 @@ namespace CNC.Controls
             armed = false;
             lastDevice = null;
             if (AppConfig.Settings?.Base != null)
+            {
                 AppConfig.Settings.Base.ShutterRemoteDevice = string.Empty;
+                AppConfig.Settings.Base.ShutterRemoteName = string.Empty;
+            }
             DebugLog.Write("remote", "binding cleared");
         }
 
@@ -327,9 +385,18 @@ namespace CNC.Controls
                     {
                         armed = false;
                         boundAt = at;
+
+                        // Resolved and STORED now, not looked up when the settings page happens to be
+                        // shown: the name can only be read while the device is present, and the page is
+                        // most often opened when it is not.
+                        string friendly = ProductName(name);
+
                         if (AppConfig.Settings?.Base != null)
+                        {
                             AppConfig.Settings.Base.ShutterRemoteDevice = name;
-                        DebugLog.Write("remote", "BOUND to " + name);
+                            AppConfig.Settings.Base.ShutterRemoteName = friendly ?? string.Empty;
+                        }
+                        DebugLog.Write("remote", "BOUND to " + (friendly ?? "(unnamed)") + "  " + name);
                         var handler = BoundTo;
                         if (handler != null)
                             handler(name);
