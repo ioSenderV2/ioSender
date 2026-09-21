@@ -3807,6 +3807,12 @@ namespace GCode_Sender
 
         private void Console_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
+            // TEMPORARY. The console vanishes on a soft reset and two readings of the code found the wrong
+            // culprit, so let the app name it: this fires on every visibility change, and the stack says
+            // who asked. Remove once answered.
+            if (CNC.Core.DebugLog.Enabled && !(bool)e.NewValue)
+                CNC.Core.DebugLog.Write("ui", "CONSOLE HIDDEN by:" + Environment.NewLine + Environment.StackTrace);
+
             // Preserve the floating console window open state for the next session
             if (AppConfig.Settings.Base != null)
             {
