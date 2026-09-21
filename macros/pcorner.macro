@@ -323,9 +323,19 @@ O<pcorner> SUB
     (ABORT, Probe is still triggered before the top seek - it did not release. Check the probe, its wiring and $6/$I inversion.)
   o14 ENDIF
   G38.2 Z[#<_bottom> + 1] F[#<_ls_searchf>]        ; refuse to seek below the caller's material floor
+  #<_z_seek> = #5063                               ; seek trigger - see the agreement check below
   G91 G1 Z2 F1000
   G38.2 Z-5 F[#<_ls_latchf>]
   #<_z_top> = #5063
+  ; --- Seek/latch agreement check - see tlo.macro for the full reasoning and the measured bands ---
+  ; Two independent triggers that must land a fixed overshoot apart on a real surface (0.100-0.143 mm
+  ; measured). A false trigger makes the gap random: 0.411 and 1.375 mm on 2026-09-21, both reported
+  ; as successes. This is the stock top - every later decision in this macro is measured from it, and
+  ; #<_safe_z> below becomes a BARE RAPID height, so a wrong value here crashes rather than misreads.
+  o60 IF [ABS[[#<_z_top> - #<_z_seek>]] GT 0.3]
+    (PRINT, PC PROBE REJECTED axis=Z seek=#<_z_seek> latch=#<_z_top>)
+    (ABORT, Top probe rejected - the fast and slow probes disagree, so at least one was a false trigger. The measured stock top would be wrong and everything below it is derived from it. Check the probe wiring before retrying.)
+  o60 ENDIF
   #<_safe_z> = [#<_z_top> + 5]      ; safe travel height now known: 5 mm above this corner's top
   ; Repositioning within this corner (the X-face and Y-face retreats, and the exit retreat below) prefer the
   ; CALLER'S trusted #<maxz> (e.g. the operator-set Corner travel margin, or the vise's own centre probe) over
@@ -415,6 +425,14 @@ O<pcorner> SUB
   G1 X[#<x_c1> - [4 * #<sx>]] F1000                    ; back off so the deflecting ball RELEASES before the slow re-probe (G1: gentle, no rapid-accel jerk)
   G38.2 X[#<x_c1> + [6 * #<sx>]] F[#<_ls_latchf>]      ; slow re-probe (2 mm back-off left it stuck triggered -> Alarm:4; 4 mm clears it)
   #<x_trig> = #5061
+  ; MEASURED, NOT GATED - on purpose. The Z probes above reject a disagreeing pair against a band of
+  ; nine real cycles; there is no equivalent history for a FACE probe, whose back-off is 4 mm rather
+  ; than 2 and whose contact is a deflecting ball, so the healthy gap is not known to be the same.
+  ; Inventing a threshold here is exactly how a guard ends up aborting healthy probes - the warning
+  ; this file already carries above its probe-release gate. Log the number now, set the limit once a
+  ; few real runs have established the band.
+  #<x_gap> = [ABS[[#<x_trig> - #<x_c1>]]]
+  (PRINT, PC GAP axis=X seek=#<x_c1> latch=#<x_trig> gap=#<x_gap>)
   G1 X[#<x_trig> - [10 * #<sx>]] F1000
   G90
   (PRINT, PC x_trig=#<x_trig>)
@@ -461,6 +479,8 @@ O<pcorner> SUB
   G1 Y[#<y_c1> - [4 * #<sy>]] F1000                    ; back off before the slow re-probe (G1: gentle, no rapid-accel jerk)
   G38.2 Y[#<y_c1> + [6 * #<sy>]] F[#<_ls_latchf>]      ; slow re-probe
   #<y_trig> = #5062
+  #<y_gap> = [ABS[[#<y_trig> - #<y_c1>]]]
+  (PRINT, PC GAP axis=Y seek=#<y_c1> latch=#<y_trig> gap=#<y_gap>)   ; measured, not gated - see the X face above
   G1 Y[#<y_trig> - [10 * #<sy>]] F1000
   G90
   (PRINT, PC y_trig=#<y_trig>)

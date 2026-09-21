@@ -111,9 +111,35 @@ G91
 ; calibrated for the LONGEST tool in use - confirmed on real hardware 2026-07-27, Alarm 5 (probe fail,
 ; no contact within programmed travel) landing 5mm short of the puck for the V-bit specifically.
 G38.2 Z-90 F500
+; --- Seek/latch agreement check: is this probe result REAL? ---
+; A probe cycle is two independent triggers - a fast seek, a 2 mm back-off, a slow latch. On a real
+; surface they land a fixed distance apart, because the only difference between them is the overshoot
+; at F500 versus F25. Measured across every toolsetter cycle in the log history: 0.100 to 0.143 mm,
+; nine cycles over six days, and 0.047 mm once the probe wiring was fixed.
+;
+; A FALSE trigger stops the seek at a random point in mid-air. The back-off and latch then fire at
+; ANOTHER random point, so the gap stops being the overshoot and becomes noise. 2026-09-21, real
+; hardware, bare foil shield shorting the probe input intermittently: 0.411 mm and 1.375 mm - 3x and
+; 10x outside the healthy band, on two cycles that BOTH reported success and applied a tool offset
+; 65 mm wrong. The second one then fed a corner probe that drove into the touch plate.
+;
+; Nothing inside a single trigger can tell true from false; the two triggers disagreeing can. This
+; needs no stored history, no knowledge of the tool, and no extra probing - just the two numbers the
+; cycle already produces and threw away.
+;
+; No G4 P0 needed before reading #5063 here: mc_probe_cycle() calls protocol_buffer_synchronize()
+; itself (motion_control.c), so unlike a queued G0/G1 the parser cannot race past a G38.2. That is
+; why the existing read below has always worked. Do NOT copy this reasoning to a read that follows
+; ordinary motion - see pcorner.macro's probe-release gate for what happens then.
+#<_tlo_seek_z> = #5063
 G0 Z2
 G38.2 Z-5 F25
 #<_probe_z> = #5063
+; 0.3 mm: above the worst healthy gap measured (0.143) by 2x, below the best false one (0.411) by 1.4x.
+o160 IF [ABS[[#<_probe_z> - #<_tlo_seek_z>]] GT 0.3]
+  (PRINT, TLO05 PROBE REJECTED seek=#<_tlo_seek_z> latch=#<_probe_z>)
+  (ABORT, Toolsetter probe rejected - the fast and slow probes disagree, so at least one was a false trigger and the tool offset would be wrong. Check the probe wiring before retrying. The tool is left at the probe point.)
+o160 ENDIF
 G0 Z10
 G90
 G65 P5 Q0
