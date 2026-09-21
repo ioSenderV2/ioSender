@@ -8,8 +8,9 @@
  * Registered as the Job tab's "3D View" center component.
  *
  * Coordinates: everything is in WORK coordinates so the toolpath, playback, stock and live cone all align.
- * The toolpath/playback are the program's own (work) coordinates; the live cone uses WorkPosition; the
- * machine envelope ($130-$132) is drawn shifted by the work offset (WorkPositionOffset) into work space.
+ * The toolpath/playback are the program's own (work) coordinates; the live cone uses Position (the live
+ * WORK position - NOT WorkPosition, see the subscription); the machine envelope ($130-$132) is drawn
+ * shifted by the work offset (WorkPositionOffset) into work space.
  */
 
 using System;
@@ -125,7 +126,17 @@ namespace CNC.Controls.Viewer
             if (model != null || !(DataContext is GrblViewModel m))
                 return;
             model = m;
-            wpos = model.WorkPosition;
+            // model.Position, NOT model.WorkPosition - and the names are the whole trap.
+            //
+            // Position IS the live work position: on a controller that reports MPos (which grblHAL does),
+            // GrblViewModel sets Position.Set(ToWorkFrame(MachinePosition)) on every status report, which
+            // also undoes the WCS rotation. WorkPosition is only written on the other branch - when the
+            // controller reports WPos directly - so on this hardware it is an object that never changes.
+            //
+            // Subscribing to it meant the cone sat wherever it was first drawn and only moved during
+            // playback, which owns it separately. Reported 2026-09-21: "when I'm jogging around it don't
+            // move, it just sits there on the origin of the stock".
+            wpos = model.Position;
             if (wpos != null)
                 wpos.PropertyChanged += Wpos_PropertyChanged;
             model.PropertyChanged += Model_PropertyChanged;
