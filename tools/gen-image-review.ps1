@@ -76,6 +76,17 @@ $Wanted = [ordered]@{
     'heightmap-surface.png' = "Height Map's Surface Map pane with its legend. Replaces the deleted heightmap.png, which showed the pre-rebuild panel. SHOOT: Height Map, Surface Map pane, with a probed map loaded so the legend has numbers."
     'work-order-drawing.png'= 'A Save Drawing PDF page - the dimensioned sheet a work order produces (M8). SHOOT: Save Drawing from a work order, then shoot a page of the PDF.'
     'calibration-tabs.png'  = "The Calibration view's four sub-tabs: Stepper (probe), Stepper (scratch), Squareness (pins), Squareness (probe). SHOOT: Tools > Calibration, framed so all four sub-tabs are readable."
+
+    # --- added 2026-09-21, from the setup + 3D-view wave and the shutter-remote work. Each of these has a
+    #     shot-todo placeholder waiting for it in index.html, so a landed file becomes a figure rather than
+    #     an orphan. Ordered lead-figure-first within each topic.
+    'settings-remote.png'   = 'The lead figure for #remote, which currently has none. Wants a BOUND remote so the status line reads "Bound to ... - the button you pressed is the primary one" rather than "Waiting"; a page shot with the status line still armed teaches the wrong thing. SHOOT: Settings > User Interface > Remote, whole page - enable tick, bound status line, Rebind, swap tick, and all six function rows with their dropdowns.'
+    'settings-keyboard.png' = 'Settings'' Keyboard page has never had a figure, and it just gained the paragraph explaining that a bound shortcut in that panel FINDS itself instead of firing. SHOOT: Settings > User Interface > Keyboard - the help block at the top including the find-by-key line, with the grouped tree below it and a group or two expanded.'
+    'machine-setup-probes.png' = 'Machine Setup step 5 is now a three-question interview and has no figure at all. The old step-5 screen it replaced was never shot either. SHOOT: Step 5 whole - the probe list, the tool-length dropdown with its $65 line visible underneath, and the reference positions showing captured values (so the computed search-distance line reads as a real number, not the fixed-90 mm fallback).'
+    'probe-definition.png'  = 'The probe edit dialog gained the Plate type radios and their note - the one thing in step 5 that is hard to describe without a picture, since the choice changes which fields exist. SHOOT: Edit a touch plate. Corner (two lips) selected, so the note about turning it upside down shows AND Lip width is present.'
+    'probe-motion-params.png' = 'Motion parameters lost Travel speed entirely, and hides Edge standoff and Drop to side for a flat plate. The absence is the point, so it needs a FLAT plate to show it. SHOOT: Edit a plate declared Flat (Z only), then Edit motion params - framed so the whole (shorter) field list is visible.'
+    'dro-offset-menu.png'   = 'The DRO title is a dropdown of the work offsets now, and nothing in the manual shows it. The hover tooltip is half the feature - it is what lets you choose between two offsets without selecting one to read it. SHOOT: Click the DRO (G54) title so the menu opens, then hover an entry so its X/Y/Z and R tooltip is captured with it.'
+    'jog-goto-menu.png'     = 'The jog pad''s Go to button and its menu. Wants a config with real targets - at least one positioned fixture plus G30 and G59.3 - so the grouping and separators are visible rather than a one-line menu. SHOOT: Open Go to from the jog pad and hover an entry, so the machine-coordinate tooltip and the "Z is NOT driven to" wording are both in frame.'
 }
 
 # Files that exist and are referenced, but show UI that has since changed.
@@ -90,6 +101,12 @@ $Reshoot = [ordered]@{
     'start-job-panel.png'        = 'Setup grew a Verify skew / Touch corners / V-bit picker / Scribe square row (#362, #365, #367) - the row that had to be made to wrap. Needed by the Scribe square text anyway. SHOOT: The Setup tab with the actions row visible, including Scribe square.'
     'work-order-composition.png' = 'The tree now carries Text, SVG and Indirect geometries plus group headers, and the operations list grew five kinds. SHOOT: A work order whose tree has a Text and an SVG toolpath plus a group header.'
     'machine-setup-calibration.png'= 'Depicts Calibration as Machine Setup step 8, which it is not (#332). This should become a CALIBRATION VIEW shot instead - retire the filename rather than re-file the same name, and repoint the figure in #machine-setup. SHOOT: Tools > Calibration, Stepper (probe) page, saved under a NEW name.'
+
+    # --- added 2026-09-21. #gcode-viewer was REWRITTEN from scratch against the shipping carve view, so its
+    #     figure is the one most out of step with its own topic now. settings-grbl.png is the only shot of
+    #     the settings tree, and the tree changed shape.
+    'gcode-viewer.png'           = 'Shows the OLD RENDERER: a Reset view button on the toolbar, the machine-envelope wireframe box, and none of what the topic now describes. The whole topic was rewritten around the carve view, so this figure contradicts every paragraph under it. Its caption admits it. SHOOT: Job tab, 3D view, a file loaded (macros/sample_stock_40x400.nc) and PLAY run partway so the carve trail shows - framed to include the View options button, the bed grid, the P and TS signs on the bed, and the green dot at machine zero.'
+    'settings-grbl.png'          = 'The navigation tree gained a Remote node between Keyboard and Controller, and the G Code category LOST its GCode Viewer page (#360a8976). This is the manual''s only picture of the tree, so both changes are invisible until it is reshot. SHOOT: Settings with the tree fully expanded enough to show User Interface > Keyboard / Remote / Controller and G Code with its single page, Grbl selected on the right as now.'
 }
 
 # Shots that must be taken on a DEFAULT CONFIG - they show what a fresh install looks like, and none of
@@ -108,7 +125,17 @@ $DefaultConfigShots = @(
     'errors-dialog.png'             # a Help-menu reference dialog
     'gcode-viewer.png'              # needs a loaded file (macros/sample_stock_40x400.nc), not a config
     'job-runscreen.png'             # also needs the SIMULATOR and a file with three tool changes
+    'settings-keyboard.png'         # the bindings all start unbound, which is exactly what to show
+    'probe-definition.png'          # a fresh install ships ONE generic touch plate - edit that one
+    'probe-motion-params.png'       # same dialog, same plate, switched to Flat (Z only)
 )
+
+# Shots that need something a default config CANNOT have, recorded so the question is not re-asked:
+#   settings-remote.png        a BOUND remote - the status line is the point of the shot
+#   machine-setup-probes.png   captured G59.3/G30 and a target surface, or the page reads all "not set"
+#   dro-offset-menu.png        work offsets with real values, and a rotation worth showing
+#   jog-goto-menu.png          a positioned fixture plus G30/G59.3, or the menu has nothing in it
+#   gcode-viewer.png           a connection, so the cone and the machine-zero dot are placed
 
 # Orphans: referenced by nothing. The default note says only that; anything here replaces it, which is
 # where a "checked, and here is the verdict" goes. Source: audit section 6, "Four orphans".

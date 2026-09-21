@@ -579,14 +579,25 @@ The DRO and the jog pad are documented in **`#jogging`**, so that is where the d
       machine** from a dropdown next to the tool selector. If the manual documents that list,
       correct it and say why.
 
-### Screenshots to reshoot
-- [ ] **Machine Setup step 5** — entirely new; the old shot shows a screen that no longer exists.
-- [ ] **Probe definition dialog** — plate-kind radios, inversion note, lip field only for corner.
-- [ ] **Probe motion parameters** — Travel speed gone; two fields hidden for a flat plate.
-- [ ] **The DRO panel**, both places — the title is now a dropdown affordance.
-- [ ] **The jog pad**, both places — the 3-o'clock square is no longer empty.
-- [ ] **The 3D view** — signs on the bed, green dot, no wireframe box, **View options** button.
-- [ ] **Settings → App → G Code** — and any shot of the settings tree showing a GCode Viewer page.
+### Screenshots to reshoot — **NOW ON THE REVIEW BOARD 2026-09-21**
+
+All of these are entries in **`tools/gen-image-review.ps1`** with a filename, a SHOOT instruction and a
+default-config-or-yours call, and each has a `shot-todo` placeholder waiting in `index.html` so a landed file
+becomes a figure rather than an orphan. **Shoot from `docs/manual/_image-review-pages.html`, not from this
+list** — regenerate with `tools\gen-image-review.ps1 -Pages`.
+- [ ] `machine-setup-probes.png` — step 5 whole. **Wants captured positions**, or the computed
+      search-distance line reads as the fixed-90 mm fallback.
+- [ ] `probe-definition.png` — the plate editor, **Corner** selected, so the note and Lip width both show.
+- [ ] `probe-motion-params.png` — motion params on a **Flat** plate: the absence of Edge standoff, Drop to
+      side and Travel speed is the whole point of the shot.
+- [ ] `dro-offset-menu.png` — the title dropdown open **with an entry hovered**, so the X/Y/Z + R tooltip is
+      in frame. One shot covers both places the DRO appears; they are one control.
+- [ ] `jog-goto-menu.png` — the Go to menu open, hovered. **Needs real targets** (a positioned fixture plus
+      G30/G59.3) or the menu has nothing in it.
+- [ ] `gcode-viewer.png` — **reshoot.** Now the figure most out of step with its own topic: the whole topic
+      was rewritten against the carve view and this shot is the old renderer.
+- [ ] `settings-grbl.png` — **reshoot.** The only picture of the settings tree, and the tree both gained
+      **Remote** and lost **GCode Viewer**. That covers the G Code item; there is no separate G Code figure.
 
 ### Not manual debt, recorded so it is not mistaken for debt
 - The link gate (`7d7568b3`), the cone/envelope/marker late-arrival fixes and the remote debounce
@@ -655,16 +666,16 @@ beeps. Unbound bare keys still navigate the list as before.
 The panel carries a one-line explanation on screen, so the manual mainly needs to not contradict it. If
 the manual anywhere implies shortcuts work normally while the settings page is open, fix that line.
 
-### Screenshots to reshoot / add
-- [ ] **NEW: Settings → App → User Interface → Remote** — the whole page: enable tick, binding status line
-      showing a bound device name, Rebind button, swap tick, and the six-row function table with its
-      dropdowns. This is the lead figure for the remote topic.
-- [ ] **Settings → App → User Interface → Keyboard** — any existing shot is now missing the new paragraph
-      in the help block at the top.
-- [ ] **Height map tab** — the shutter-remote tick is still there and still works, but the setting now has
-      a second home; a caption pointing at the Remote page would save a hunt.
-- [ ] **The settings navigation tree** — it has a new **Remote** node between Keyboard and Controller, so
-      any shot of the tree is stale.
+### Screenshots to reshoot / add — **NOW ON THE REVIEW BOARD 2026-09-21**
+- [ ] `settings-remote.png` — the lead figure for `#remote`. **Bind a remote first**: the status line
+      reading "Waiting" teaches the wrong thing.
+- [ ] `settings-keyboard.png` — the Keyboard page has never had a figure at all. Shoot it on a **default
+      config**: everything starting unbound is exactly what to show.
+- [x] ~~**Height map tab**~~ — **dissolved 2026-09-21.** The duplicate tick was removed from that tab
+      (`00d5c5d2`), so there is nothing there to caption. The Remote page is the only place it is set up, and
+      `#heightmap` points at it in words.
+- [x] **The settings navigation tree** — folded into the `settings-grbl.png` reshoot in the section above,
+      rather than tracked twice. That is the manual's only picture of the tree.
 
 ### Not manual debt, recorded so it is not mistaken for debt
 - The pcorner/tlo travel-height clamp, the seek-to-latch probe guard, `ReachableLimit`'s force-set-origin

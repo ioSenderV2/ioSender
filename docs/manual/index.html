@@ -706,6 +706,8 @@
       <a href="#job">run strip</a>'s compact copy. That is the point of it living on the readout itself: the run
       strip is reachable when the Job tab is not.</li>
     </ul>
+    <div class="shot-todo">screenshot: dro-offset-menu.png — the DRO title dropdown open, one entry
+    hovered so its X/Y/Z and rotation tooltip shows</div>
 
     <h3>Two ways to jog</h3>
     <p><strong>On-screen jog pad</strong> — arrow buttons for each axis, with:</p>
@@ -737,6 +739,8 @@
       the current Z and stop. <code>G28</code> is not in the drive-Z list either: nothing in ioSender writes
       it, so its Z is whatever a previous owner of the machine left there. When Z is driven it happens
       <em>last</em>, as its own move — up, across, then down, never a diagonal into a park.</div>
+    <div class="shot-todo">screenshot: jog-goto-menu.png — the jog pad's Go to menu open, showing the
+    grouping and one entry's machine-coordinate tooltip</div>
     <div class="callout note"><span class="k">The pad targets the machine, not the job</span><br>
       Centre and the four corners are the <em>machine envelope</em> — they don't follow the loaded program's
       bounding box. That way they mean the same thing whether or not a file is loaded.</div>
@@ -2392,6 +2396,9 @@
     <p>Step 5 is not a list of checkboxes; it is three questions, asked in the order they can actually be
     answered. The second cannot be asked before the first — there would be nothing to choose from — and the
     third reads better after both, because it can then name the thing you have just said is sitting there.</p>
+    <div class="shot-todo">screenshot: machine-setup-probes.png — Machine Setup step 5 whole, showing all
+    three questions: the probe list, the tool-length dropdown with its <code>$65</code> line, and the
+    reference positions with their captured values</div>
 
     <h4 class="subh">1 · What probes does this machine have?</h4>
     <ul>
@@ -2417,6 +2424,8 @@
       near the middle, clear of them. If you own one plate, that is how it does both jobs — and it is the
       answer to "I have no toolsetter": the app says as much when you pick a corner plate to measure tool
       length.</div>
+    <div class="shot-todo">screenshot: probe-definition.png — the probe edit dialog on a touch plate:
+    the Plate type radios, the note under them, and Lip width present for a corner plate</div>
     <p><strong>Edit motion params…</strong> holds how a probe <em>moves</em>: approach speed, re-touch speed,
     max search distance, back-off distance, edge standoff, drop to side, and the probe tip's offset from the
     spindle centre in X and Y. Two of those only mean anything when probing <em>sideways</em>, so
@@ -2425,6 +2434,8 @@
       <strong>Travel speed</strong> and <strong>Target height</strong> are no longer part of a probe
       definition. Nothing in the app ever read either of them, so they were two more numbers to get wrong for
       no effect. If you remember setting them, you were not imagining it — they are gone, not hidden.</div>
+    <div class="shot-todo">screenshot: probe-motion-params.png — the motion parameters dialog for a
+    <em>flat</em> plate, so Edge standoff and Drop to side are absent</div>
 
     <h4 class="subh">2 · Which one measures tool length?</h4>
     <p>A dropdown over the probes you just defined, asked <em>after</em> they exist. Tool length is measured at
@@ -2923,6 +2934,8 @@
       it means you can sweep a keyboard for collisions without homing the machine by accident. A combination
       with modifiers that is <em>not</em> bound beeps and does nothing. Unbound bare keys still walk the list
       as they always did. The page says as much on screen, above the tree.</div>
+    <div class="shot-todo">screenshot: settings-keyboard.png — Settings → User Interface → Keyboard: the
+    help block at the top including the find-by-key line, and the grouped binding tree below it</div>
 
     <h3>Keeping ioSender up to date</h3>
     <p><strong>Help → Support → Check for updates...</strong> checks GitHub for a newer released version and
