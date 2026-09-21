@@ -2066,3 +2066,5 @@ CNC.Controls.WPF.g.en-US.resources:uiremoteconfigcontrol.baml,chk_remoteOnIdle:S
 CNC.Controls.WPF.g.en-US.resources:uiremoteconfigcontrol.baml,lbl_remoteRowIdle:System.Windows.Controls.TextBlock.Text,Text,True,True,,The machine is idle
 CNC.Controls.WPF.g.en-US.resources:uiremoteconfigcontrol.baml,chk_remoteOnAlarm:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Let the remote act while the machine is in alarm. On by default, because the recovery is always the same and your hands are usually on the work."
 CNC.Controls.WPF.g.en-US.resources:uiremoteconfigcontrol.baml,lbl_remoteRowAlarm:System.Windows.Controls.TextBlock.Text,Text,True,True,,The machine is in alarm
+CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,lbl_keyFindHint:System.Windows.Controls.TextBlock.Text,Text,True,True,,Press any shortcut to jump to it
+CNC.Controls.WPF.g.en-US.resources:keymapeditor.baml,lbl_keyFindHint:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"With the list focused, pressing a bound shortcut scrolls to it and selects it instead of running it. Keys you use to move around the list still work normally."

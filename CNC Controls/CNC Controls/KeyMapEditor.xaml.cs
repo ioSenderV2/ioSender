@@ -222,7 +222,10 @@ namespace CNC.Controls
         private void KeyMapEditor_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (capturing == null)
+            {
+                FindByShortcut(e);
                 return;
+            }
 
             Key key = e.Key == Key.System ? e.SystemKey : e.Key;
             if (modifierKeys.Contains(key))
@@ -237,6 +240,74 @@ namespace CNC.Controls
             capturing = null;
 
             UpdateConflicts();
+        }
+
+        /// <summary>
+        /// Not capturing, and a key was pressed with the list focused: JUMP TO THE ROW that shortcut is
+        /// bound to, rather than running it.
+        ///
+        /// Two things this is for. A bindings list is the one place you want to ask "what does this key
+        /// already do?", and answering it by pressing the key is the obvious way - scrolling a grouped
+        /// list of a hundred rows hunting for a combo is not. And running the real thing from in here was
+        /// never anybody's intent: press a bound key while editing bindings and the machine started,
+        /// peeked, or ran a macro. Gamepad dispatch has been paused while this tab is visible since it was
+        /// written, for exactly that reason (see the class header); the keyboard never got the same care.
+        ///
+        /// WHAT IT DELIBERATELY DOES NOT TOUCH: any key that is not bound and carries no modifier. Tab,
+        /// the arrows, Enter, Space, Home/End, PageUp/Down are how this list is navigated without a mouse,
+        /// and on the jog tab the arrows and numpad ARE the bindings - so swallowing everything would make
+        /// the panel mouse-only and the jog tab unusable. Unbound bare keys therefore fall straight
+        /// through and behave exactly as they always did.
+        ///
+        /// An unbound combo that DOES carry a modifier (or is a function key) beeps: those are never
+        /// navigation, so saying "nothing is bound to that" costs nothing and answers the question.
+        /// </summary>
+        private void FindByShortcut(KeyEventArgs e)
+        {
+            Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (modifierKeys.Contains(key))
+                return;                       // a modifier on its own is not a shortcut yet
+
+            if (Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase)
+                return;                       // typing in a field, not asking a question
+
+            ModifierKeys mods = Keyboard.Modifiers;
+
+            // Jog rows bind an unmodified key, so match them on the key alone - the same asymmetry the
+            // capture above applies when it stores one (Modifiers = None for a jog row).
+            var hit = rows.FirstOrDefault(r => r.Model.Key == key &&
+                                                (r.IsJog ? mods == ModifierKeys.None : r.Model.Modifiers == mods));
+
+            if (hit != null)
+            {
+                e.Handled = true;
+                ShowRow(hit);
+                return;
+            }
+
+            // Nothing bound. Only say so for something that could not possibly be navigation.
+            bool couldNotBeNavigation = mods != ModifierKeys.None || (key >= Key.F1 && key <= Key.F24);
+            if (couldNotBeNavigation)
+            {
+                e.Handled = true;
+                try { System.Media.SystemSounds.Beep.Play(); } catch { }
+            }
+        }
+
+        /// <summary>Bring a row into view and select it, so the answer is visible at once.</summary>
+        private void ShowRow(BindingRow row)
+        {
+            // The keyboard grid only - rows holds the keyboard bindings, and the Controller tab's entries
+            // are gamepad buttons, which no keypress can match anyway.
+            //
+            // Deferred to Loaded: the row may be inside a collapsed group, and ScrollIntoView before the
+            // layout pass that expands it does nothing at all. The same trap the grouped program list hit.
+            Dispatcher.BeginInvoke((System.Action)(() =>
+            {
+                grid.SelectedItem = row;
+                grid.ScrollIntoView(row);
+                grid.Focus();
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
         private void Binding_Click(object sender, RoutedEventArgs e)

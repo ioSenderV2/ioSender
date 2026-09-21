@@ -255,6 +255,12 @@
         </TabControl>
 
         <DockPanel x:Name="conflictBar" Grid.Row="1" Margin="0,8,0,0">
+            <!-- Says that keys behave differently here. Without it this is an invisible mode: a shortcut
+                 stops doing its job and jumps the list instead, with nothing on screen to explain why. -->
+            <TextBlock x:Uid="lbl_keyFindHint" x:Name="lblFindHint" DockPanel.Dock="Right" VerticalAlignment="Center"
+                       Margin="12,0,0,0" Opacity="0.75" TextWrapping="Wrap"
+                       Text="Press any shortcut to jump to it"
+                       ToolTip="With the list focused, pressing a bound shortcut scrolls to it and selects it instead of running it. Keys you use to move around the list still work normally."/>
             <TextBlock x:Name="lblConflict" VerticalAlignment="Center"
                        Foreground="#FFCF222E" TextWrapping="Wrap"/>
         </DockPanel>
