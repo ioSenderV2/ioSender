@@ -793,7 +793,7 @@ namespace CNC.Controls
                 var coords = new Position(fx.Coords);
                 coords.X = model.MachinePosition.X;
                 coords.Y = model.MachinePosition.Y;
-                fx.Coords = coords.ToString();
+                fx.Coords = Fixtures.CoordsCsv(coords);   // NOT coords.ToString() - see CoordsCsv
 
                 // The measurement happened - say so explicitly. The offsets are now always 0.000, so they
                 // could never have carried "was this measured?" even by accident.

@@ -325,13 +325,29 @@ namespace CNC.Controls
             double x = coords.X + fx.CornerOffsetX, y = coords.Y + fx.CornerOffsetY;
             coords.X = x;
             coords.Y = y;
-            fx.Coords = coords.ToString();
+            fx.Coords = CoordsCsv(coords);
 
             CNC.Core.DebugLog.Write("fixture", string.Format(System.Globalization.CultureInfo.InvariantCulture,
                 "Fixture [{0}]: folded the saved corner correction X{1:0.0###} Y{2:0.0###} into Coords -> X{3:0.0###} Y{4:0.0###}",
                 fx.Name, fx.CornerOffsetX, fx.CornerOffsetY, x, y));
 
             fx.CornerOffsetX = fx.CornerOffsetY = 0d;
+        }
+
+        /// <summary>
+        /// A Position as the stored-coords CSV - the same shape <see cref="CurrentCoordsCsv"/> writes and
+        /// Position.Parse reads back.
+        ///
+        /// This exists because Position has NO override of object.ToString() - only ToString(AxisFlags, ...)
+        /// overloads - so coords.ToString() quietly returns the TYPE NAME. Parse makes nothing of that and
+        /// leaves the position at zero. It cost the operator both fixtures on 2026-09-22, and the reason it
+        /// got through review is worth remembering: the debug line printed the right numbers one statement
+        /// EARLIER, so the log said the fold had worked while the value written was garbage.
+        /// </summary>
+        internal static string CoordsCsv(CNC.Core.Position pos)
+        {
+            var idx = GrblInfo.AxisFlags.ToIndices().ToList();
+            return string.Join(",", idx.Select(i => pos.Values[i].ToInvariantString("F3")));
         }
 
         // The enabled axes' current machine position as an invariant CSV (the stored-coords format), or null
