@@ -1632,15 +1632,37 @@ namespace CNC.Controls
             if (AppDialogs.Show(Window.GetWindow(this),
                     "Store the machine's CURRENT position as the G59.3 origin - the approach position over whatever measures tool length?\r\n\r\n" +
                     "Jog over the toolsetter or plate first, centred on it, at a height your LONGEST tool clears.\r\n\r\n" +
+                    "The machine position is what gets stored, so whichever work offset is selected and whatever tool length is active make no difference to it.\r\n\r\n" +
                     "The machine will make one no-op move to itself afterwards, which is what keeps the controller's parser in step with the new offset.",
                     "Set G59.3", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK)
                 return;
 
+            // L2 with the raw MACHINE position, not L20 with zeros.
+            //
+            // The rule is already written down in OffsetFlyout.btnSet_Click, which does this correctly:
+            // G54-G59 are WORK ORIGINS and take G10 L20 ("make here read zero"), while G59.1-.3 are MACHINE
+            // LOCATIONS - G59.3 is conventionally the toolsetter - and take G10 L2 with the raw machine
+            // position, because a tool length offset has no business entering one. This page was the place
+            // that broke that rule.
+            //
+            // L20 stores MPos - G92 - TLO (grblHAL gcode.c, the L20 case), so every offset live at the
+            // moment of capture gets folded in. Reported from the machine 2026-09-21 after teaching the
+            // positions with a tool measured: G59.3 came out at Z +94 - above machine zero, out in space,
+            // outside soft limits - and the next tool change was refused. The operator reasonably suspected
+            // the active G54; it was not that. L20 writes P9 whichever WCS is selected, and setup must never
+            // clear an operator's work offset anyway. It was the tool length.
+            //
+            // Axis-count driven and F3-formatted to match the flyout exactly, so the two ways of setting
+            // G59.3 cannot drift apart again.
+            var sb = new StringBuilder("G10 L2 P9");
+            for (int i = 0; i < GrblInfo.NumAxes; i++)
+                sb.Append(" " + GrblInfo.AxisIndexToLetter(i) + model.MachinePosition.Values[i].ToInvariantString("F3"));
+
             var b = new StringBuilder();
-            b.AppendLine("(Machine Setup - set G59.3 from the current position)");
+            b.AppendLine("(Machine Setup - set G59.3 from the current machine position)");
             b.AppendLine("(PREREQ, connected, homed, noalarm)");
             b.AppendLine("G21 G90 G94 G17");
-            MacroProcessor.EmitWcsWrite(l => b.AppendLine(l), "G10 L20 P9 X0 Y0 Z0");
+            MacroProcessor.EmitWcsWrite(l => b.AppendLine(l), sb.ToString());
 
             if (MacroProcessor.Run(model, "Set G59.3", b.ToString(), true))
                 RefreshStoredPositionsAfterWrite();
