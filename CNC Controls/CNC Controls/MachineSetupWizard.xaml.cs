@@ -125,6 +125,7 @@ namespace CNC.Controls
         // out of.
         private bool _userEdited = false;
         private bool _settingsHookAttached = false;
+        private bool _positionsHookAttached = false;
         private Window _fwInfoWindow = null;
         private FirmwareUpdateManager.ReleaseInfo _pendingFwRelease = null;
         private string _lastFirmwareKey = null;   // GrblInfo.Version+"|"+DriverSha as last shown - see Model_PropertyChanged
@@ -409,12 +410,22 @@ namespace CNC.Controls
         // the gate's own query and left the header uncolored until independently re-queried by tab-visit.
         private static System.Collections.Generic.List<AtcMacros.MacroStatusRow> _macroStatus;
 
-        // Colour every graded step tab from its current state. Fixtures (6) and Build simulator (8) are
-        // optional/non-gating - they can never block setup completion - so they're always coloured green
-        // ("passed its gate" because there IS no gate) rather than left uncoloured like Overview. Leaving
-        // them blank read as an unexplained inconsistency (every OTHER step has a colour) rather than the
-        // intended "this step doesn't block you" signal. Cheap (no filesystem query) - step 7 uses the
-        // cached macro status, so this can be called freely (e.g. on every Setup edit).
+        // Colour every graded step tab from its current state. Build simulator (8) is optional and has
+        // nothing to measure, so it stays green ("passed its gate" because there IS no gate) rather than
+        // left uncoloured like Overview - blank read as an unexplained inconsistency rather than as the
+        // intended "this step doesn't block you".
+        //
+        // Fixtures (6) used to be green that way too, and probes (5) were green the moment ANY probe
+        // existed - which a fresh install satisfies with its seeded touch plate. So a brand-new
+        // configuration showed both steps green before the operator had defined a probe they own, chosen
+        // what measures tool length, taught G30/G59.3, or described any workholding. Colour is the only
+        // thing pointing at where the work is on first run, and it was pointing away from it (2026-09-21).
+        //
+        // Step 6 is still NOT gating - FirstIncompleteStep skips it deliberately, because fixtures are not
+        // needed to run a machine. Red here is guidance, not a barrier.
+        //
+        // Cheap (no filesystem query) - step 7 uses the cached macro status, so this can be called freely
+        // (e.g. on every Setup edit).
         private void RefreshStepColors()
         {
             SetStepColor(hdrMachine, StepStatusOf(1));
@@ -422,7 +433,7 @@ namespace CNC.Controls
             SetStepColor(hdrAxis, StepStatusOf(3));
             SetStepColor(hdrHoming, StepStatusOf(4));
             SetStepColor(hdrProbes, StepStatusOf(5));
-            SetStepColor(hdrFixtures, StepState.Complete);
+            SetStepColor(hdrFixtures, StepStatusOf(6));
             SetStepColor(hdrMacros, StepStatusOf(7));
             SetStepColor(hdrSimulator, StepState.Complete);
 
@@ -435,6 +446,43 @@ namespace CNC.Controls
         {
             if (hdr != null)
                 hdr.Foreground = st == StepState.Complete ? StepGreen : (st == StepState.NeedsAttention ? StepOrange : StepRed);
+        }
+
+        /// <summary>
+        /// Whether a stored machine position has actually been taught.
+        ///
+        /// All-zero means never set: grbl has no "is defined" flag for these, so that is what untaught
+        /// looks like - the same convention the 3D view's position signs and the jog pad's go-to menu both
+        /// apply. NaN means the value has not been read back yet, which is also not a taught position.
+        /// </summary>
+        private static bool PositionTaught(string code)
+        {
+            var cs = GrblWorkParameters.GetCoordinateSystem(code);
+            if (cs == null || cs.Values == null)
+                return false;
+
+            // Indexed rather than foreach: CoordinateValues<double> is not enumerable.
+            for (int i = 0; i < cs.Values.Length; i++)
+                if (!double.IsNaN(cs.Values[i]) && cs.Values[i] != 0d)
+                    return true;
+
+            return false;
+        }
+
+        /// <summary>
+        /// The controller's stored positions changed underneath the page - re-read what step 5 shows and
+        /// re-grade its colour. Never touches the operator's edits; these are read-only displays.
+        /// </summary>
+        private void OnCoordinateSystemsChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke((System.Action)(() => OnCoordinateSystemsChanged(sender, e)));
+                return;
+            }
+
+            UpdateReferencePositions();
+            RefreshStepColors();
         }
 
         private StepState StepStatusOf(int step)
@@ -466,8 +514,46 @@ namespace CNC.Controls
                     case 4: // Homing & limits: some protection configured
                         return (Setup.SoftLimitsEnable || Setup.HasLimitSwitches || Setup.HomingEnable) ? StepState.Complete : StepState.NotStarted;
 
-                    case 5: // Probes: at least one defined
-                        return (ProbeDefinitions.Items?.Count ?? 0) > 0 ? StepState.Complete : StepState.NotStarted;
+                    case 5: // Probes, the tool-length probe, and the reference positions - the page's three questions
+                    {
+                        // "At least one probe exists" was the old test, and a fresh install ships a seeded
+                        // generic touch plate, so this step was green before the operator had answered
+                        // anything on it.
+                        bool haveProbe = (ProbeDefinitions.Items?.Count ?? 0) > 0;
+
+                        // Question 2, asked of the STORED NAME rather than of ProbeDefinitions.TloTarget.
+                        // TloTarget falls back to the first toolsetter, else the first touch plate, so it
+                        // answers non-null on a config where nothing was ever chosen - the same "a default
+                        // that looks like an answer" that let step 1 record a machine nobody picked.
+                        bool tloChosen = !string.IsNullOrEmpty(AppConfig.Settings?.Base?.TloProbeName);
+
+                        // Question 3. The target surface is only asked when a PLATE does the measuring -
+                        // a toolsetter triggers on its own switch - so it is only required then, exactly as
+                        // the page hides the row (see UpdateReferencePositions).
+                        bool needSurface = ProbeDefinitions.TloTargetIsTouchPlate;
+                        bool haveSurface = !needSurface || AppConfig.Settings?.Base?.TloSurfaceZ != 0d;
+                        bool havePositions = PositionTaught("G59.3") && PositionTaught("G30") && haveSurface;
+
+                        if (!haveProbe)
+                            return StepState.NotStarted;
+                        if (tloChosen && havePositions)
+                            return StepState.Complete;
+                        // Nothing but the seeded probe is a step not started; anything further is in progress.
+                        return (tloChosen || havePositions) ? StepState.NeedsAttention : StepState.NotStarted;
+                    }
+
+                    case 6: // Fixtures: at least one with a captured position. NOT gating - see RefreshStepColors.
+                    {
+                        int placed = 0;
+                        foreach (var fx in Fixtures.Items)
+                            if (fx.HasPosition)
+                                placed++;
+                        if (placed > 0)
+                            return StepState.Complete;
+                        // Defined but never positioned is half an answer: Setup cannot probe against a
+                        // fixture whose machine coordinates were never captured.
+                        return Fixtures.Items.Count > 0 ? StepState.NeedsAttention : StepState.NotStarted;
+                    }
 
                     case 7: // Controller macros: all installed = green, some outdated = orange, any missing = red
                         if (_macroStatus != null && _macroStatus.Count > 0)
@@ -538,6 +624,18 @@ namespace CNC.Controls
                     GrblSettings.SettingsReloaded += OnSettingsReloaded;
                     _settingsHookAttached = true;
                 }
+                if (!_positionsHookAttached)
+                {
+                    // Step 5 is graded partly on whether G30 and G59.3 have been taught, and those arrive
+                    // from $# - which can land AFTER this page has already coloured itself. Without this the
+                    // step would sit red on a machine that has had both taught for months, because nothing
+                    // else here ever asks again: correct at startup and stale for ever after.
+                    //
+                    // It also self-heals the values shown on step 5 itself when a position is re-taught from
+                    // somewhere else while this page is open.
+                    GrblWorkParameters.CoordinateSystems.CollectionChanged += OnCoordinateSystemsChanged;
+                    _positionsHookAttached = true;
+                }
                 UpdateLimitState();
                 UpdateApplyState();
                 // Deferred (2026-07-19 - "Machine Setup tab permanently unresponsive" investigation): this
@@ -584,6 +682,11 @@ namespace CNC.Controls
                     // menu-hosted instance being kept alive (and refreshed) after the operator has left it.
                     GrblSettings.SettingsReloaded -= OnSettingsReloaded;
                     _settingsHookAttached = false;
+                }
+                if (_positionsHookAttached)
+                {
+                    GrblWorkParameters.CoordinateSystems.CollectionChanged -= OnCoordinateSystemsChanged;
+                    _positionsHookAttached = false;
                 }
                 if (_fwInfoWindow != null)
                     _fwInfoWindow.Close();

@@ -2369,6 +2369,24 @@
       <tr><td><strong>8 · Build simulator</strong></td><td>Build a grblHAL simulator matching this machine's axes, probe and options — detected automatically, no picks needed — so you can test jobs offline (see <a href="#connect">Connect</a>).</td><td>—</td></tr>
     </table>
 
+    <div class="callout note"><span class="k">What the step colours mean</span><br>
+      Each step in the tree carries a dot: <strong>red</strong> not started, <strong>orange</strong> part
+      answered, <strong>green</strong> done. On a fresh install <strong>5 &middot; Probe definitions</strong>
+      and <strong>6 &middot; Fixture definitions</strong> both start <strong>red</strong>, because neither has
+      been answered yet &mdash; the single generic touch plate a new install ships is a starting point, not
+      your probe.
+      <ul>
+        <li><strong>5</strong> turns orange once you have chosen what measures tool length <em>or</em> taught
+        the reference positions, and green when both are done &mdash; <code>G59.3</code> and <code>G30</code>
+        taught, plus the target surface if a plate does the measuring.</li>
+        <li><strong>6</strong> turns orange for a fixture that has been defined but never positioned (Setup
+        cannot probe against one whose machine coordinates were never captured) and green once at least one
+        has a position.</li>
+      </ul>
+      <strong>Step 6 never blocks you.</strong> Fixtures are not needed to run a machine, so its dot is
+      guidance and nothing more &mdash; it is deliberately left out of the check that decides whether setup
+      is finished.</div>
+
     <div class="callout note"><span class="k">Calibration has moved out</span><br>
     It used to be step 8 here. It is now its own
     view at <a href="#calibration"><strong>Tools → Calibration</strong></a>, holding four pages: <strong>Stepper calibration (probe)</strong>
