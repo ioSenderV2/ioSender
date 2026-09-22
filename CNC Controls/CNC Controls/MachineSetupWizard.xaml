@@ -464,6 +464,11 @@
                             </StackPanel>
                         </Grid>
                         <TextBlock x:Name="txtTloSearchValue" x:Uid="txt_tloSearchValue" TextWrapping="Wrap" Margin="10,4,0,0" FontSize="11" Foreground="#FF1F3A5F" FontStyle="Italic"/>
+                        <!-- What the probe will actually do, and where its one limit comes from. The limit
+                             lives on the PROBE, not on this page, so an operator looking at this row has no
+                             way to know what bounds the descent unless it is said here. Filled in by
+                             UpdateReferencePositions with the selected probe's own number. -->
+                        <TextBlock x:Name="txtTloProbePlan" x:Uid="txt_tloProbePlan" TextWrapping="Wrap" Margin="10,6,0,0" FontSize="11" Foreground="#FF5A5A5A"/>
                         <TextBlock x:Uid="txt_refPosAdjacent" TextWrapping="Wrap" Margin="10,4,0,8" FontSize="11" Foreground="#FF5A5A5A"
                                    Text="Put them next to each other. Every tool change travels G30 → G59.3 and back, so the gap between them is paid twice per tool, every job."/>
 

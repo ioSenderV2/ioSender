@@ -1581,6 +1581,19 @@ namespace CNC.Controls
 
             // Say what the numbers add up to, so a search that will fall short is visible here rather than
             // discovered as an alarm partway down. "Fixed 90 mm" is the honest label for the fallback.
+            // Say what "Probe it" will do and where its limit comes from. The limit is a property of the
+            // PROBE, edited two dialogs away, so nothing on this row would otherwise tell the operator what
+            // bounds a descent that starts from wherever they happen to have jogged to.
+            if (txtTloProbePlan != null)
+            {
+                var tp = ProbeDefinitions.TloTarget;
+                txtTloProbePlan.Text = tp == null
+                    ? "Choose what measures tool length above, and this will say how far the probe may travel."
+                    : string.Format(CultureInfo.CurrentCulture,
+                        "Probe it descends from wherever the machine is standing and stops after {0:0.#} mm if nothing is touched - that is {1}'s own Max search distance, on its Edit motion params. Jog to within that of the target before pressing it.",
+                        tp.ProbeDistance > 0d ? tp.ProbeDistance : 90d, tp.Name);
+            }
+
             double search = ComputeTloSearchDistance(ProbeDefinitions.TloTarget);
             if (txtTloSearchValue != null)
                 txtTloSearchValue.Text = search > 0d
