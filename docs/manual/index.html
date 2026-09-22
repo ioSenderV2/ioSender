@@ -2359,7 +2359,7 @@
     <p>An <strong>Overview</strong> page lists them; each is a numbered entry in the tree that you complete in order.</p>
     <table class="reftab">
       <tr><th>Step</th><th>What you set</th><th>grbl settings</th></tr>
-      <tr><td><strong>1 · Machine</strong></td><td>Start from your machine — pick your machine so the later steps begin from sensible defaults instead of blanks.</td><td>—</td></tr>
+      <tr><td><strong>1 · Machine</strong></td><td>Say which machine this is. It is mostly a label — it does <em>not</em> overwrite settings read from your controller. See below.</td><td>—</td></tr>
       <tr><td><strong>2 · Home position</strong></td><td>The corner your machine homes to (front-left / front-right / back-left / back-right). Must match where your limit switches actually are — this is also machine origin.</td><td><code>$23</code></td></tr>
       <tr><td><strong>3 · Axis information</strong></td><td>Per axis: travel, max rate, steps/mm, invert direction, limit-switch type and home direction. A <em>Live</em> column shows the controller's current value as you edit. Also <strong>Work surface (spoilboard)</strong> — see below.</td><td><code>$3</code> <code>$5</code> <code>$23</code> <code>$1nn</code></td></tr>
       <tr><td><strong>4 · Homing &amp; limits</strong></td><td>Enable limit switches, homing, force-origin and soft limits; set pull-off, locate/seek feed rates and debounce.</td><td><code>$27</code> <code>$24</code> <code>$25</code> <code>$26</code></td></tr>
@@ -2395,6 +2395,27 @@
       <a href="#heightmap">Height Map</a>'s <strong>Full work surface</strong> mode. Left undeclared on a
       machine where it isn't true, both run the cutter through open air at one end.</li>
     </ul>
+
+    <h3>Picking your machine (step 1), and what it does not do</h3>
+    <p>Choose your manufacturer, product and model. On a machine ioSender is connected to, that is
+    <strong>all</strong> it does: the pick is recorded, any note about the model is shown, and
+    <strong>nothing on the later steps changes</strong>.</p>
+    <p>That is deliberate. The catalogue holds what a model <em>typically</em> ships with; your controller
+    holds what this machine is <em>actually</em> set to. The second is the better fact by a wide margin — it
+    may have been tuned, re-geared, or had its travel trimmed to clear a fixture — and a label should not
+    overwrite a measurement. Everything you see on steps 2 to 4 was read off the controller when ioSender
+    connected.</p>
+    <p><strong>When there is nothing to overwrite, it fills the fields in.</strong> If ioSender could not
+    reach a controller, or the settings did not come back, the catalogue is the only thing there is, so it
+    seeds as much as it knows: steps/mm, max rate and travel for X, Y and Z, plus homing and the home
+    corner.</p>
+    <div class="callout tip"><span class="k">Apply catalogue values — the deliberate version</span><br>
+      Next to the model dropdown. It puts the catalogue's typical values into the fields
+      <em>over</em> what the controller reported, and asks first. This is for the case where the real
+      settings are gone — a reflashed controller, cleared settings, a board swap — and you need a sane
+      starting point to work from. It sends <strong>nothing</strong> to the controller: the values land as
+      pending changes, and <strong>Apply</strong> is still what writes them, with its own count and a
+      tooltip listing exactly what will go.</div>
 
     <h3>Probes and the reference positions (step 5)</h3>
     <p>Step 5 is not a list of checkboxes; it is three questions, asked in the order they can actually be

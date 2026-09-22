@@ -106,6 +106,15 @@
                                       SelectionChanged="Manufacturer_Changed"/>
                             <ComboBox x:Uid="cbxProduct" x:Name="cbxProduct" MinWidth="180" Margin="0,0,6,4" MinHeight="22" SelectionChanged="Product_Changed"/>
                             <ComboBox x:Uid="cbxModel" x:Name="cbxModel" MinWidth="240" Margin="0,0,0,4" MinHeight="22" SelectionChanged="Model_Changed"/>
+                            <!-- The deliberate version of what picking a model used to do on its own. Selecting
+                                 a machine no longer overwrites settings read from the controller - those are
+                                 what this machine IS, and a catalogue holds what the model TYPICALLY is. This
+                                 button is for the case where the real ones are gone: a reflashed controller,
+                                 a cleared NVRAM, a board swap. See ApplyCatalogValues_Click. -->
+                            <Button x:Uid="btn_applyCatalog" x:Name="btnApplyCatalog" Content="Apply catalogue values"
+                                    MinWidth="150" MinHeight="22" Margin="6,0,0,4" Click="ApplyCatalogValues_Click"
+                                    IsEnabled="False"
+                                    ToolTip="Put this model's typical values into the fields below, replacing what was read from the controller. Use it when the controller's own settings have been lost or reset - otherwise they are the better source. Nothing is sent until you press Apply."/>
                         </WrapPanel>
                         <TextBlock Text="{Binding PresetNote, RelativeSource={RelativeSource AncestorType={x:Type local:MachineSetupWizard}}}"
                                    TextWrapping="Wrap" Foreground="#FFB45309" Margin="0,2,0,0"/>

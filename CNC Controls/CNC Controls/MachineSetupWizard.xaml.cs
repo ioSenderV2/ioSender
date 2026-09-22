@@ -910,6 +910,12 @@ namespace CNC.Controls
 
         private void Model_Changed(object sender, SelectionChangedEventArgs e)
         {
+            // Set before the restore guard below: clearing the model (which Manufacturer_Changed and
+            // Product_Changed both do) comes through here too, and the button must not stay live pointing at
+            // a model that is no longer selected.
+            if (btnApplyCatalog != null)
+                btnApplyCatalog.IsEnabled = cbxModel.SelectedItem is MachineModel m && m.Grbl;
+
             // A real user pick seeds catalog starting values; a restore only re-selects the machine and keeps
             // the controller's actual settings (its real NVRAM) loaded by LoadCurrentSettings. The pick is
             // remembered (LastMachine) only once the user commits it with Apply - see Apply_Click.
@@ -924,10 +930,28 @@ namespace CNC.Controls
             UpdateApplyState();
         }
 
+        /// <summary>
+        /// Whether the controller has actually told us its settings.
+        ///
+        /// Asked as "did the collection get populated", not "what is $130" - an absent setting reads back as
+        /// a value rather than as an absence, and keying off one setting is how a live machine with no $20
+        /// silently lost its soft-limit guard. Empty is also exactly what the $ES handshake race produced
+        /// (see GrblHandshake), which is the case this is here to catch: no settings means the catalogue is
+        /// the only thing we have, and seeding from it is help rather than harm.
+        /// </summary>
+        private static bool HaveControllerSettings { get { return GrblSettings.Settings.Count > 0; } }
+
         // Seed the wizard fields from a catalog model (X/Y/Z only). Everything stays editable and the user
         // still confirms each value. The travel field is PHYSICAL travel, so add back the 2x pull-off the stored
         // $130-$132 reserves; the home corner is only a suggestion (most hobby machines home front-left).
-        private void ApplyPreset(MachineModel p)
+        //
+        // It does NOT seed over settings read from the controller. The catalogue holds typical values for a
+        // model; the controller holds what this machine is actually set to, which is the better fact by a
+        // wide margin - it may have been tuned, re-geared, or had its travel trimmed round a fixture. Picking
+        // your machine here is mostly documentation, and documentation should not overwrite a measurement.
+        // Seeding still happens when there is nothing to overwrite, and the Apply catalogue values button
+        // (force: true) is how you ask for it on purpose.
+        private void ApplyPreset(MachineModel p, bool force = false)
         {
             if (p == null)
                 return;
@@ -937,6 +961,9 @@ namespace CNC.Controls
                 return;
             }
             PresetNote = p.Note ?? string.Empty;
+
+            if (!force && HaveControllerSettings)
+                return;     // the pick is recorded and noted; the controller's own values stand
 
             foreach (var axis in Setup.Axes)
             {
@@ -967,6 +994,36 @@ namespace CNC.Controls
                     z.HomeAtMin = false;   // Z homes at top
                 UpdateHomeCornerText();
             }
+        }
+
+        /// <summary>
+        /// Put the catalogue's values into the fields on purpose, over whatever the controller reported.
+        ///
+        /// This is the deliberate version of what selecting a model used to do by itself: the restore case,
+        /// for a machine whose settings have been lost, scrambled, or flashed back to firmware defaults. It
+        /// is a button rather than a side effect of the dropdown because it overwrites measurements with
+        /// typical values, and that should be something you asked for.
+        ///
+        /// It writes nothing to the controller - the values land as pending changes, and Apply is still what
+        /// sends them, with its own count and its list of what will go.
+        /// </summary>
+        private void ApplyCatalogValues_Click(object sender, RoutedEventArgs e)
+        {
+            var model = cbxModel.SelectedItem as MachineModel;
+            if (model == null)
+                return;
+
+            if (HaveControllerSettings && AppDialogs.Show(
+                    "Replace the values on this page with the catalogue's typical values for "
+                        + model.Name + "?" + Environment.NewLine + Environment.NewLine +
+                    "The settings read from your controller are the better source unless they have been lost or reset. " +
+                    "Nothing is written to the controller until you press Apply.",
+                    "Apply catalogue values", MessageBoxButton.YesNo, MessageBoxImage.Warning,
+                    MessageBoxResult.No, "machinesetup.applycatalog") != MessageBoxResult.Yes)
+                return;
+
+            ApplyPreset(model, force: true);
+            UpdateApplyState();
         }
 
         #endregion
