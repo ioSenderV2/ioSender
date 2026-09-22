@@ -3184,8 +3184,10 @@ namespace GCode_Sender
                 // instead - a wider cap than a tight cached estimate, but still a real, probe-guarded search.
                 L(string.Format("#<_bottom> = {0}",
                     N(GrblInfo.MaxTravel.Z > 0d ? -(GrblInfo.MaxTravel.Z) + 10.0d : -9999d)));
-                L(string.Format("#<_ls_topx> = {0}", N(fx.CornerOffsetX + cornerInsetMm)));
-                L(string.Format("#<_ls_topy> = {0}", N(fx.CornerOffsetY + cornerInsetMm)));
+                // Coords IS the probed corner now (Test position writes it there), so the anchor is
+                // simply the inset - there is no separate correction left to add.
+                L(string.Format("#<_ls_topx> = {0}", N(cornerInsetMm)));
+                L(string.Format("#<_ls_topy> = {0}", N(cornerInsetMm)));
                 // Known-safe travel height for THIS call, same #<_ls_maxz> mechanism corners 2-4 use below -
                 // fed from the puck touch EmitTloReference just ran (#<_probe_z>, still readable - neither it
                 // nor tc.macro's own M6 T8 path clear it afterward), not from any cached spoilboard value. The

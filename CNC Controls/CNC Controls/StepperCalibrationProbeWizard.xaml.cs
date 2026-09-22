@@ -4,8 +4,8 @@
  * Steps/mm calibration by probing a reference block of ALREADY-KNOWN true size (a precision square,
  * larger is better) against a validated Corner Fence fixture - instead of V-bit scratch marks measured
  * by hand with calipers (StepperCalibrationScratchWizard). Reuses the same pcorner.macro corner-probing
- * StartJobView.BuildProgram uses, including its corner-1 single-probe optimization (Fixture.CornerOffsetX/
- * Y/SpoilboardZ) - see the "double probe of corner 1" backlog item this shares its plumbing with.
+ * StartJobView.BuildProgram uses, including its corner-1 single-probe optimization (the corner probed
+ * into Fixture.Coords) - see the "double probe of corner 1" backlog item this shares its plumbing with.
  *
  * Only X (corner 1 -> 2, FrontLeft -> FrontRight) and Y (corner 1 -> 3, FrontLeft -> BackLeft) are probed -
  * a single measurement per axis against a block whose true size is already precisely known, not a
@@ -890,8 +890,9 @@ namespace CNC.Controls
             b.AppendLine("#<_ls_corner> = 1");
             b.AppendLine(string.Format("#<_ls_refx> = {0}", refX));
             b.AppendLine(string.Format("#<_ls_refy> = {0}", refY));
-            b.AppendLine(string.Format("#<_ls_topx> = {0}", (fx.CornerOffsetX + insetMm).ToInvariantString("0.0##")));
-            b.AppendLine(string.Format("#<_ls_topy> = {0}", (fx.CornerOffsetY + insetMm).ToInvariantString("0.0##")));
+            // Coords IS the probed corner now, so the anchor is just the inset - no correction to add.
+            b.AppendLine(string.Format("#<_ls_topx> = {0}", insetMm.ToInvariantString("0.0##")));
+            b.AppendLine(string.Format("#<_ls_topy> = {0}", insetMm.ToInvariantString("0.0##")));
             b.AppendLine("#<_ls_startz> = 0");
             // ---------------------------------------------------------------------------------------------
             // CRASHED THE MACHINE 2026-09-14. This was "#<_ls_maxz> = 0", which pcorner.macro reads as "the

@@ -580,6 +580,12 @@ namespace CNC.Controls
         //
         // false = volume up is primary (the common case), true = the two are swapped.
         public bool ShutterRemoteSwapButtons { get { return _shutterRemoteSwap; } set { if (_shutterRemoteSwap != value) { _shutterRemoteSwap = value; OnPropertyChanged(); } } }
+
+        // One-shot marker for the 2026-09-22 fixture migration (see ApplyOneTimeFixups). Not a preference
+        // and never shown: it records that a data change has been applied, which is the only honest way to
+        // do it in a method that runs on every launch.
+        private bool _fixtureCornersFolded = false;
+        public bool FixtureCornersFolded { get { return _fixtureCornersFolded; } set { if (_fixtureCornersFolded != value) { _fixtureCornersFolded = value; OnPropertyChanged(); } } }
         // The HID report code of the PRIMARY button - the one held down when the remote was bound.
         //
         // Not a virtual key. Windows' translation of this remote's consumer usage into a keystroke turned
@@ -1786,31 +1792,40 @@ namespace CNC.Controls
                 CNC.Core.DebugLog.Write("config", string.Format(
                     "ApplyOneTimeFixups: removed {0} shortcut(s) for withdrawn second-level tab targets", deadShortcuts));
 
-            // 2026-08-15: seed Fixture.CornerLocated for fixtures saved before that flag existed.
+            // 2026-09-22: the probed corner moved INTO Coords, and CornerOffsetX/Y are gone.
             //
-            // This REPLACES a check that ran here every launch (not once, despite the method name) and
-            // said "either offset exactly 0 => never probed => clear PositionValidated". That premise was
-            // wrong - Test position parks the machine AT the true corner, so an operator who sets the
-            // reference from there gets a legitimate 0.000 - and it would have silently un-validated a
-            // freshly probed fence on the NEXT restart, which is a nastier symptom than the refusal that
-            // exposed it (Generate blocked a validated Large Fence with Y offset exactly 0).
+            // A fixture saved before this carried the eyeballed reference in Coords and the probe's
+            // correction in the offset. Deleting the offset without saying anything would leave Coords
+            // pointing at the guess, and corner 1 would aim its 5 mm inset from there - a quiet positional
+            // error of exactly however far the operator's eye was out, on a fixture still showing a
+            // validated tick. The operator's own Large Fence was 0.369 mm out in X.
             //
-            // The heuristic below is the same shape, and that is fine HERE and only here: this is a
-            // one-shot migration of existing data, where a rare wrong guess costs one re-run of Test
-            // position. As a standing runtime gate it was simply wrong. A pre-flag fixture has both
-            // offsets at their 0d default; any fixture with a non-zero offset was measured under the
-            // scheme, so its flag can be set with confidence.
-            foreach (var fx in Fixtures.Items)
+            // There is no way to tell such a fixture from one probed under the new scheme - both have
+            // CornerLocated set and a plausible Coords - so the flags are cleared once and Test position
+            // has to be re-run. ONCE, on a marker, because this method runs on every launch despite its
+            // name: the check it replaced was written as a standing gate and silently un-validated freshly
+            // probed fences on the next restart.
+            if (Base != null && !Base.FixtureCornersFolded)
             {
-                if (fx.CornerLocated || !FixtureKinds.ProbesEdges(fx.Kind) || !fx.Implemented)
-                    continue;
-                if (fx.PositionValidated && (fx.CornerOffsetX != 0d || fx.CornerOffsetY != 0d))
-                    fx.CornerLocated = true;
-                else if (fx.PositionValidated)
-                    // Both offsets 0 AND validated: genuinely indistinguishable from a pre-flag fixture,
-                    // so this one really does need Test position re-run - clear the checkmark that says
-                    // otherwise, exactly as the old fixup did.
+                int stale = 0;
+                foreach (var fx in Fixtures.Items)
+                {
+                    if (!FixtureKinds.ProbesEdges(fx.Kind) || !fx.Implemented)
+                        continue;
+                    if (!fx.CornerLocated && !fx.PositionValidated)
+                        continue;
+                    fx.CornerLocated = false;
                     fx.PositionValidated = false;
+                    stale++;
+                }
+
+                Base.FixtureCornersFolded = true;
+                if (stale > 0)
+                {
+                    Fixtures.Save();
+                    CNC.Core.DebugLog.Write("config", string.Format(
+                        "ApplyOneTimeFixups: {0} edge-probing fixture(s) need Test position re-run - the probed corner now lives in Coords", stale));
+                }
             }
 
             // 2026-07-20 (later still): LayoutKeys.StepperCalProbe (new Tools sub-tab) was added to

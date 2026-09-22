@@ -927,7 +927,7 @@ namespace CNC.Controls
                 return;
             }
             // The explicit flag, not "either offset is 0" - 0 is a legitimate measurement (see
-            // Fixture.CornerOffsetX). Same guard StartJobView.Generate_Click uses.
+            // the corner probed into Fixture.Coords). Same guard StartJobView.Generate_Click uses.
             if (!fx.CornerLocated)
             {
                 txtWarnings.Text = "This fixture's corner position hasn't been located yet - run Test position again in Machine Setup > Fixture definitions.";
@@ -1109,8 +1109,9 @@ namespace CNC.Controls
             b.AppendLine("#<_ls_corner> = 1");
             b.AppendLine(string.Format("#<_ls_refx> = {0}", refX));
             b.AppendLine(string.Format("#<_ls_refy> = {0}", refY));
-            b.AppendLine(string.Format("#<_ls_topx> = {0}", (fx.CornerOffsetX + insetMm).ToInvariantString("0.0##")));
-            b.AppendLine(string.Format("#<_ls_topy> = {0}", (fx.CornerOffsetY + insetMm).ToInvariantString("0.0##")));
+            // Coords IS the probed corner now, so the anchor is just the inset - no correction to add.
+            b.AppendLine(string.Format("#<_ls_topx> = {0}", insetMm.ToInvariantString("0.0##")));
+            b.AppendLine(string.Format("#<_ls_topy> = {0}", insetMm.ToInvariantString("0.0##")));
             b.AppendLine("#<_ls_startz> = 0");
             // NOT "0": that is pcorner's sentinel for "the caller has no trusted safe height", and its
             // fallback rapids to #<_bottom> + thickness + plateoffset + 10 - a formula that treats #<_bottom>

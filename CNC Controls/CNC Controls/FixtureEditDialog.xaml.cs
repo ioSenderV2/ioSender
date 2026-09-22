@@ -297,11 +297,10 @@ namespace CNC.Controls
                 fx.Name, coords, model.GrblState.State, model.HomedState));
 
             fx.Coords = coords;
-            // A stale CornerOffsetX/Y is meaningless once the reference it was measured from moves - clear it
+            // A stale corner is meaningless once the reference moves - CornerLocated is what says the
+            // corner in Coords was probed, so clear that.
             // here (the one place a re-jog genuinely happens), not in the Coords setter itself (see the
             // setter's own comment for why that broke on real hardware).
-            fx.CornerOffsetX = 0d;
-            fx.CornerOffsetY = 0d;
             fx.CornerLocated = false;
             UpdatePositionDisplay();
             UpdateTestPositionEnabled();
@@ -495,7 +494,7 @@ namespace CNC.Controls
         // Run the REAL spoilboard probe search (the same 12 mm-capped G38.2 pcorner.macro's DISCOVER phase
         // uses) from the saved position, right now - so a bad Z capture (too far above the spoilboard for the
         // capped search to reach) is caught here, before it aborts a real Start Job run. For edge-probing kinds
-        // (CornerFence) this also locates the true stock corner and stores it as Fixture.CornerOffsetX/Y - see
+        // (CornerFence) this also locates the true stock corner and writes it into Fixture.Coords - see
         // the block below the spoilboard search.
         private void btnTestPosition_Click(object sender, RoutedEventArgs e)
         {
@@ -555,8 +554,6 @@ namespace CNC.Controls
                 fx.Coords = current;
                 // Same reasoning as btnSetPosition_Click: a corner offset measured from the OLD reference is
                 // meaningless once that reference moves, and this is a genuine re-jog.
-                fx.CornerOffsetX = 0d;
-                fx.CornerOffsetY = 0d;
                 fx.CornerLocated = false;
                 UpdatePositionDisplay();
                 UpdateTestPositionEnabled();
@@ -665,7 +662,7 @@ namespace CNC.Controls
             // pcorner.macro DISCOVER pass (same wide-clearance search Start Job's own corner-1 probe used to run
             // EVERY job) - then park at a point 5mm INSIDE that corner (the same tight anchor Start Job's old
             // "exact size" re-probe used) so OnTestPositionDone can read the machine's resting XY back and store
-            // it as Fixture.CornerOffsetX/Y (relative to Coords). The fence is bolted down, so this only needs
+            // it into Fixture.Coords, replacing the eyeballed reference. The fence is bolted down, so this only needs
             // doing once - Start Job then points its own single corner-1 probe straight at this stored anchor
             // instead of locating it fresh every run. See the "double probe of corner 1" backlog item.
             if (edgeProbing)
@@ -720,9 +717,9 @@ namespace CNC.Controls
                 b.AppendLine("#<_ls_maxz> = " + GrblInfo.ClampToZTop(string.Format("[{0}+2]", z)));
                 b.AppendLine("#<_ls_appz> = 9999");
                 b.AppendLine(string.Format("O<pcorner> CALL [#<_ls_rad>]"));
-                // Park AT the true corner itself (not an inset/outset point) - CornerOffsetX/Y must be the raw
+                // Park AT the true corner itself (not an inset/outset point) - Coords must end up holding the raw
                 // true-corner-minus-Coords delta, because StartJobView.BuildProgram is the one place that adds
-                // the +5mm interior inset (#<_ls_topx> = CornerOffsetX + 5) on top of it. Parking at an already-
+                // the +5mm interior inset (#<_ls_topx> = 5) on top of it. Parking at an already-
                 // adjusted point here would double up/cancel that adjustment - confirmed on real hardware:
                 // parking 10mm OUTWARD here (matching the old exact-size re-probe's own reference point) made
                 // BuildProgram's "+5 inward" net to 5mm OUTSIDE the corner instead of 5mm inside it.
@@ -760,6 +757,7 @@ namespace CNC.Controls
         // Runs once Test position's async streamed probe has genuinely finished.
         private void OnTestPositionDone(Fixture fx)
         {
+            string cornerDelta = null;
             bool alarmed = model.GrblState.State == GrblStates.Alarm;
             fx.PositionValidated = !alarmed;
             // Edge-probing kinds: the macro above parked the machine at the tight corner anchor as its very
@@ -768,13 +766,49 @@ namespace CNC.Controls
             // saved reference), not as an absolute XY - Coords is what Start Job re-reads it against later.
             if (fx.PositionValidated && FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented)
             {
+                // THE PROBED CORNER BECOMES THE FIXTURE POSITION.
+                //
+                // The macro parked the machine at the tight corner anchor as its very last move, so the
+                // current machine position IS that corner - the same "read back after the macro parks
+                // there" idiom Set position uses.
+                //
+                // This used to be kept as CornerOffsetX/Y, a correction held alongside the reference the
+                // operator had jogged to by eye, and every consumer then had to remember to add the two
+                // together. Two numbers for one place, and the offset was of no use to anyone on its own:
+                // nobody reads "the corner is 0.4 mm from where I guessed" and does anything with it.
+                //
+                // So the eyeballed reference is REPLACED by the measurement, and the offset fields are gone
+                // altogether rather than kept at zero - a field nothing can ever set to anything is a
+                // question left lying around for someone to answer wrongly later. Start Job's corner-1
+                // probe now aims at Coords plus its own 5 mm inset, with no correction to remember.
+                //
+                // Z is deliberately NOT rewritten. Coords.Z is the height the operator jogged to and is the
+                // START of the capped downward search (see RunTestPositionMacro) - a travel reference, not
+                // a datum. Overwriting it with the stock top would mean the next Test position began its
+                // search already at the surface.
                 var refPos = new Position(fx.Coords);
-                fx.CornerOffsetX = model.MachinePosition.X - refPos.X;
-                fx.CornerOffsetY = model.MachinePosition.Y - refPos.Y;
-                // The measurement happened - say so explicitly. Either offset can legitimately be 0.000
-                // (the operator can set the reference right on the corner, and Test position parks there),
-                // so the values themselves cannot carry "was this measured?".
+                double dx = model.MachinePosition.X - refPos.X;
+                double dy = model.MachinePosition.Y - refPos.Y;
+
+                var coords = new Position(fx.Coords);
+                coords.X = model.MachinePosition.X;
+                coords.Y = model.MachinePosition.Y;
+                fx.Coords = coords.ToString();
+
+                // The measurement happened - say so explicitly. The offsets are now always 0.000, so they
+                // could never have carried "was this measured?" even by accident.
                 fx.CornerLocated = true;
+
+                // How far out the eyeball was. Of no use to the machine, which is why it is a log line and
+                // not a stored field, but it is the one thing an operator actually wants to know after a
+                // Test - and on a fixture that has been tested before, a delta that has grown is the fence
+                // having moved.
+                CNC.Core.DebugLog.Write("fixture", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "Test position [{0}]: corner probed at X{1:0.0###} Y{2:0.0###}; reference was off by X{3:0.0###} Y{4:0.0###}",
+                    fx.Name, model.MachinePosition.X, model.MachinePosition.Y, dx, dy));
+
+                cornerDelta = string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                    "  Reference was out by X {0:0.0##}  Y {1:0.0##}.", dx, dy);
             }
             UpdatePositionDisplay();
 
@@ -796,7 +830,9 @@ namespace CNC.Controls
             // the same stay-put-program machinery as a wizard tool, and that banner fires synchronously as part
             // of the Idle transition, before this deferred callback runs. Re-assert a clear final message here,
             // same as OnViseCornerProbeDone already does for Set position.
-            model.Message = fx.PositionValidated ? "Test position OK - validated." : "Test position failed or alarmed - not validated.";
+            model.Message = fx.PositionValidated
+                ? "Test position OK - fixture position set from the probed corner." + (cornerDelta ?? string.Empty)
+                : "Test position failed or alarmed - not validated.";
         }
 
         // Unlock the probe-fail alarm ($X - no full reset needed, nothing actually faulted) and retract to the
