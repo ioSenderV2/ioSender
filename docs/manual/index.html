@@ -2513,33 +2513,47 @@
       the app would have told you.</div>
 
     <h4 class="subh">3 · Where do the reference positions go?</h4>
-    <p>A tool change runs <code>G30</code> → <code>G59.3</code> → <code>G30</code>: park where you can reach
-    the spindle, go and measure the new tool, come back. Work down these in order — each one is easier once the
-    one above it is known, and each has a <strong>Set from here</strong> button that stores the machine's
-    current position.</p>
+    <p>A tool change runs <code>G30</code> &rarr; <code>G59.3</code> &rarr; <code>G30</code>: park where you can
+    reach the spindle, go and measure the new tool, come back. There are two things to set, and the first one
+    is a probe rather than a jog.</p>
     <ol>
-      <li><strong>Target surface</strong> — <em>only when a plate does the measuring.</em> The spoilboard or
-      table the plate stands on. This is the <strong>floor</strong> for the tool-length probe: the move may
-      travel to 2&nbsp;mm above it and no further, so a plate that never triggers stops in air instead of at
-      the table. Jog a tool down beside the plate until it just touches, then click. A dedicated toolsetter
-      triggers on its own switch at a height that has nothing to do with where the table is, so this row is
-      <em>hidden</em> rather than asked and ignored — which is also why the numbering on screen may start at
-      <em>G59.3</em>.</li>
-      <li><strong><code>G59.3</code> — tool length.</strong> The approach position over whatever measures tool
-      length, centred on it in X and Y, with Z high enough that your <em>longest</em> tool still clears it on
-      the way in.</li>
-      <li><strong><code>G30</code> — tool swap.</strong> Where the machine parks for you to change the tool and
-      where it returns afterwards: near the top of Z, clear of the work, somewhere you can get a spanner to the
-      collet. Set it from the current position, or take the offer to place it <strong>100&nbsp;mm −X</strong> or
-      <strong>+X</strong> from <code>G59.3</code> — that one <em>moves the machine</em>.</li>
+      <li><strong>Tool-length target and <code>G59.3</code>.</strong> Put a tool or probe in the spindle, jog
+      <em>roughly</em> over the toolsetter or plate, and press <strong>Probe it</strong>. One probe settles
+      three numbers at once:
+        <ul>
+          <li>the <strong>target surface</strong> &mdash; the height it touched, which is the top of the
+          toolsetter or plate: the surface every later tool-length probe will actually hit;</li>
+          <li>the <strong>tool-length baseline</strong> (see below);</li>
+          <li><strong><code>G59.3</code></strong> &mdash; X and Y from where you were standing, and Z at the
+          <em>top of Z travel</em>. That Z is deliberate: <code>G59.3</code> is an approach height, and the
+          contract is that your <em>longest</em> tool still clears the target on the way in. The top of travel
+          is the only height that is true for every tool.</li>
+        </ul>
+        The row then shows both the height it found and where <code>G59.3</code> ended up, so you can see the
+        part that affects every tool change actually landed. Nothing is recorded if the probe does not touch.
+      </li>
+      <li><strong><code>G30</code> &mdash; tool swap.</strong> Where the machine parks for you to change the
+      tool and where it returns afterwards: near the top of Z, clear of the work, somewhere you can get a
+      spanner to the collet. Set it from the current position, or take the offer to place it
+      <strong>100&nbsp;mm &minus;X</strong> or <strong>+X</strong> from <code>G59.3</code> &mdash; that one
+      <em>moves the machine</em>.</li>
     </ol>
-    <div class="callout note"><span class="k">The search distance is worked out, not typed</span><br>
-      The page computes how far the tool-length probe will search, from the chosen probe's height and the
-      <code>G59.3</code> Z, and tells you: <em>"searches up to n&nbsp;mm down — far enough to reach the target,
-      stopping 2&nbsp;mm above the surface if nothing triggers."</em> It is a <strong>limit</strong>, not a
-      prediction of where the target is. With no target surface set it falls back to a fixed 90&nbsp;mm and
-      says that too, so a search that will fall short is visible here rather than discovered as an alarm
-      partway down.</div>
+    <div class="callout warn"><span class="k">What bounds the probe</span><br>
+      <strong>Probe it descends from wherever you have jogged to</strong>, and the only thing that stops it is
+      the selected probe's own <strong>Max search distance</strong>, on its <em>Edit motion params</em>. The
+      row says which probe and what the number currently is. Too small and the probe stops in mid air; too
+      large and one that never triggers keeps going. Jog to within that distance of the target before pressing
+      it.</div>
+    <div class="callout note"><span class="k">There is no separate &ldquo;Set G59.3&rdquo; here</span><br>
+      Deliberately. Two buttons writing the same stored position is how one of them came to fold the live tool
+      length into it &mdash; a <code>G59.3</code> stored 94&nbsp;mm above the top of the machine, which then
+      refused every tool change. The probe is the one route. If you ever need to correct
+      <code>G59.3</code> by hand, the <a href="#offsets">Offsets</a> table edits it directly.</div>
+    <div class="callout note"><span class="k">The search distance for later probes is worked out</span><br>
+      Once the target height is known, ioSender computes how far each tool-length probe needs to search, from
+      that height and the <code>G59.3</code> Z, and tells you: <em>&ldquo;searches up to n&nbsp;mm down
+      &mdash; far enough to reach the target, stopping 2&nbsp;mm above the surface if nothing
+      triggers.&rdquo;</em> It is a <strong>limit</strong>, not a prediction of where the target is.</div>
 
     <h4 class="subh">The tool-length reference baseline</h4>
     <p>At the bottom of step 5, <strong>Reference TLO</strong> probes a baseline <em>once</em> against a fixed

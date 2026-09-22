@@ -412,6 +412,11 @@
                         <TextBlock x:Uid="txt_refPosHdr" Text="3 · Where do the reference positions go?" FontWeight="SemiBold" Margin="0,10,0,3"/>
                         <TextBlock x:Uid="txt_refPosDesc" TextWrapping="Wrap" Margin="0,0,0,5"
                                    Text="A tool change runs G30 → G59.3 → G30: park so you can reach the spindle, go and measure the new tool, come back. Work down these in order - each one is easier once the one above it is known."/>
+                        <!-- Two items now, not three. The tool-length target and G59.3 are set by ONE
+                             probe (ProbeTloTarget_Click), so they are one row - there is no separate way to
+                             set G59.3 from this page any more. Two buttons writing the same stored position
+                             is exactly how one of them came to use G10 L20 and fold the tool length in. The
+                             Offsets tab can still edit G59.3 by hand. -->
                         <Grid Margin="10,0,0,4">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -420,7 +425,6 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
@@ -438,24 +442,17 @@
                             <Button x:Uid="btn_setTloSurface" x:Name="btnSetTloSurface" Grid.Row="0" Grid.Column="3" Content="Probe it" Padding="8,1" MinHeight="24" Click="ProbeTloTarget_Click"
                                     ToolTip="Probe straight down from where the machine is standing to find the top of the toolsetter or plate. Records the target surface, the tool-length baseline and G59.3 in one go. The machine WILL move."/>
 
-                            <TextBlock x:Uid="lbl_g593" x:Name="lblG593" Grid.Row="1" Grid.Column="0" Text="2. G59.3 - tool length:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,6,8,0"/>
-                            <TextBlock x:Uid="txt_g593Desc" Grid.Row="1" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="11" Foreground="#FF5A5A5A" Margin="0,6,0,0"
-                                       Text="The approach position over whatever measures tool length, centred on it in X and Y, with Z high enough that your LONGEST tool still clears it on the way in."/>
-                            <TextBlock x:Name="txtG593Value" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="10,6,8,0" FontFamily="Consolas" FontSize="11"/>
-                            <Button x:Uid="btn_setG593" x:Name="btnSetG593" Grid.Row="1" Grid.Column="3" Content="Set from here" Padding="8,1" MinHeight="24" Margin="0,6,0,0" Click="SetG593_Click"
-                                    ToolTip="Store the machine's CURRENT position as the G59.3 origin. Jog over the toolsetter or plate first, at a safe height."/>
-
-                            <TextBlock x:Uid="lbl_g30" x:Name="lblG30" Grid.Row="2" Grid.Column="0" Text="3. G30 - tool swap:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,6,8,0"/>
-                            <TextBlock x:Uid="txt_g30Desc" Grid.Row="2" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="11" Foreground="#FF5A5A5A" Margin="0,6,0,0"
+                            <TextBlock x:Uid="lbl_g30" x:Name="lblG30" Grid.Row="1" Grid.Column="0" Text="3. G30 - tool swap:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,6,8,0"/>
+                            <TextBlock x:Uid="txt_g30Desc" Grid.Row="1" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="11" Foreground="#FF5A5A5A" Margin="0,6,0,0"
                                        Text="Where the machine parks for you to change the tool, and where it returns afterwards. Near the top of Z, clear of the work, somewhere you can reach the collet."/>
-                            <TextBlock x:Name="txtG30Value" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" Margin="10,6,8,0" FontFamily="Consolas" FontSize="11"/>
-                            <Button x:Uid="btn_setG30" x:Name="btnSetG30" Grid.Row="2" Grid.Column="3" Content="Set from here" Padding="8,1" MinHeight="24" Margin="0,6,0,0" Click="SetG30_Click"
+                            <TextBlock x:Name="txtG30Value" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="10,6,8,0" FontFamily="Consolas" FontSize="11"/>
+                            <Button x:Uid="btn_setG30" x:Name="btnSetG30" Grid.Row="1" Grid.Column="3" Content="Set from here" Padding="8,1" MinHeight="24" Margin="0,6,0,0" Click="SetG30_Click"
                                     ToolTip="Store the machine's CURRENT position as G30. Jog to the park position first."/>
 
                             <!-- Placing G30 relative to G59.3, which is why G59.3 is set first. 100 mm to one
                                  side keeps the tool change close to the measuring point without the spindle
                                  sitting over it while you have both hands on a collet. -->
-                            <StackPanel Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,4,0,0">
+                            <StackPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,4,0,0">
                                 <TextBlock x:Uid="txt_g30Offer" Text="or place it 100 mm from G59.3:" VerticalAlignment="Center" FontSize="11" Foreground="#FF5A5A5A" Margin="0,0,8,0"/>
                                 <Button x:Uid="btn_g30Left" x:Name="btnG30Left" Content="100 mm −X" Padding="8,1" MinHeight="22" Margin="0,0,6,0" Click="PlaceG30_Click" Tag="-1"
                                         ToolTip="Move to 100 mm in −X from G59.3 at safe Z, and store that as G30. The machine WILL move."/>
