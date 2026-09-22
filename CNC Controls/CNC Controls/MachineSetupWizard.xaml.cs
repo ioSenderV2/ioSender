@@ -1454,6 +1454,36 @@ namespace CNC.Controls
             RefreshStepColors();
         }
 
+        /// <summary>
+        /// The next step whose dot is not green, EXCLUDING the one being shown - or 0 when there is nowhere
+        /// to go.
+        ///
+        /// Apply carries the operator down the tree ("Apply, answer, Apply"), but its enable was purely
+        /// "is there something to write". So finishing step 5 - probes chosen, target probed, G30 and G59.3
+        /// taught - left nothing to write, Apply went dead, and the operator had to find step 6 by hand.
+        /// Reported 2026-09-21 doing exactly that.
+        ///
+        /// Excluding the CURRENT tab is what makes this terminate. Step 6 is deliberately non-gating, so a
+        /// machine with no fixtures keeps a red 6 for ever; without the exclusion Apply would sit there
+        /// offering to take you to the page you are already on. With it, Apply simply goes quiet once the
+        /// only thing left is the step in front of you.
+        ///
+        /// Graded on the DOTS, not on FirstIncompleteStep, because the dots are what the operator is
+        /// reading - including step 6, which the gate ignores on purpose.
+        /// </summary>
+        private int NextIncompleteStepByColour()
+        {
+            int current = tabSteps == null ? -1 : tabSteps.SelectedIndex;   // tab index == step number
+            for (int step = 1; step <= 7; step++)
+            {
+                if (step == current)
+                    continue;
+                if (StepStatusOf(step) != StepState.Complete)
+                    return step;
+            }
+            return 0;
+        }
+
         private void UpdateApplyState()
         {
             if (model == null || !GrblSettings.IsLoaded)
@@ -1466,7 +1496,8 @@ namespace CNC.Controls
             // machine identity, so it must stay live when that is all there is to commit - see
             // MachineIdentityUnsaved for the deadlock that came of conflating the two.
             btnPreview.IsEnabled = Changes.Count > 0;
-            btnApply.IsEnabled = Changes.Count > 0 || MachineIdentityUnsaved();
+            // ...or when it still has somewhere to take you. See NextIncompleteStepByColour.
+            btnApply.IsEnabled = Changes.Count > 0 || MachineIdentityUnsaved() || NextIncompleteStepByColour() != 0;
         }
 
         // Preview the pending changes in a dialog (replaces the old inline expander).
@@ -2762,11 +2793,14 @@ namespace CNC.Controls
             BuildReview();
             // "No changes" alone was a statement about SETTINGS on a button that also commits the machine
             // identity, so an enabled Apply with nothing to write read as a fault. Say which it is.
+            int nextStep = NextIncompleteStepByColour();
             btnApply.ToolTip = Changes.Count == 0
                 ? (MachineIdentityUnsaved()
                     ? "No setting changes - the controller already matches. Apply records the machine as "
                       + SelectedMachineId() + " and completes step 1."
-                    : "No changes - the target settings already match the controller.")
+                    : nextStep != 0
+                        ? "Nothing to write. Apply goes on to step " + nextStep + " - " + StepName(nextStep) + "."
+                        : "No changes - the target settings already match the controller.")
                 : string.Format("Writes {0} setting{1} to the controller:\n{2}",
                     Changes.Count, Changes.Count == 1 ? "" : "s",
                     string.Join("\n", Changes.Select(c => string.Format("  {0} {1}: {2} → {3}", c.Setting, c.Name, c.OldValue, c.NewValue))));
@@ -2795,6 +2829,19 @@ namespace CNC.Controls
                     // is what the navigation tree's dots listen to.
                     RefreshStepColors();
                     SetupApplied?.Invoke();
+                    return;
+                }
+
+                // Nothing to write and nothing to record - but the tree may still have work in it, and
+                // Apply is the button the operator is pressing to work down it. Take them there rather
+                // than reporting that nothing happened, which is true of the settings and useless as an
+                // answer to "what next".
+                int next = NextIncompleteStepByColour();
+                if (next != 0)
+                {
+                    GoToStep(next);                       // sets the status line itself
+                    if (model != null)
+                        model.Message = "Machine setup: step " + next + " - " + StepName(next) + " still needs attention.";
                     return;
                 }
 
