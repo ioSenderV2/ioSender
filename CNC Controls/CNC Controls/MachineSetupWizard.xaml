@@ -378,7 +378,10 @@
                         <TextBlock x:Uid="txt_tloProbeDesc" TextWrapping="Wrap" Margin="0,0,0,4"
                                    Text="Tool length is measured at the G59.3 position below. A dedicated toolsetter is the usual answer; with no toolsetter, a touch plate does the same job - including your corner plate turned upside down, probed in the middle clear of its lips."/>
                         <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
-                            <Label x:Uid="lbl_tloProbe" Content="Tool-length probe:" VerticalAlignment="Center" Width="130" HorizontalContentAlignment="Right"/>
+                            <!-- No fixed Width. It was 130 and clipped its own English text to "Tool-length p", and this
+                                 label is localized through its x:Uid - every translation is a different
+                                 length, so a hard-coded box can only ever be wrong somewhere. -->
+                            <Label x:Uid="lbl_tloProbe" Content="Tool-length probe:" VerticalAlignment="Center" Margin="0,0,4,0"/>
                             <ComboBox x:Uid="cbx_tloProbe" x:Name="cbxTloProbe" MinWidth="240" MinHeight="22" VerticalAlignment="Center"
                                       DisplayMemberPath="Label" SelectedValuePath="Name" SelectionChanged="TloProbe_SelectionChanged"
                                       ToolTip="Which of your defined probes sits at the G59.3 position. Its feeds are the ones the tool-length probe move uses."/>
