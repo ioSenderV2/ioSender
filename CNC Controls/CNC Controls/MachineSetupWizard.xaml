@@ -337,9 +337,13 @@
             <TabItem x:Uid="tabstep_probes" x:Name="tabStepProbes" ToolTip="Define the probes fitted to this machine - tip diameter, feeds, clearances and offsets.">
                 <TabItem.Header><TextBlock x:Uid="step_probes" x:Name="hdrProbes" Text="5 · Probe definitions"/></TabItem.Header>
                 <Grid Margin="10">
+                    <!-- Row order follows the questions: 1 and the probe table it is about, THEN 2 and 3.
+                         The table used to sit at the bottom, under all three questions, so the list you were
+                         being asked to fill in was the furthest thing from the asking. -->
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
@@ -358,6 +362,12 @@
                                    Text="Start with the list below. A new install begins with one generic touch plate - edit it to match the plate you actually own, and add a row for anything else: a toolsetter, a 3D probe, an edge finder. Nothing here is guessed from the controller; these are facts about your bench."/>
                         <TextBlock x:Uid="txt_probeIntro2" TextWrapping="Wrap" Margin="0,0,0,8" FontSize="11" Foreground="#FF5A5A5A"
                                    Text="A touch plate is the one thing nearly every machine has. If yours has two lips meeting at a right angle it can find a corner as well as set Z; a plain slab sets Z only. Say which in the plate's own editor - Setup relies on the answer."/>
+                        <TextBlock x:Uid="txt_probesDesc" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Text="The probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Setup and the probing tabs."/>
+                    </StackPanel>
+
+                    <!-- Questions 2 and 3, BELOW the table (grid row 2) - see the row comment above. -->
+                    <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,10,0,0">
 
                         <!-- ===== Which probe measures tool length =====
                              Asked second, because it is a choice AMONG the definitions above. All eligible
@@ -454,10 +464,6 @@
                         <TextBlock x:Uid="txt_refPosAdjacent" TextWrapping="Wrap" Margin="10,4,0,8" FontSize="11" Foreground="#FF5A5A5A"
                                    Text="Put them next to each other. Every tool change travels G30 → G59.3 and back, so the gap between them is paid twice per tool, every job."/>
 
-                        <Separator Margin="0,10,0,6"/>
-
-                        <TextBlock x:Uid="txt_probesDesc" TextWrapping="Wrap"
-                                   Text="The probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Setup and the probing tabs."/>
                     </StackPanel>
                     <DataGrid x:Uid="grdProbes" x:Name="grdProbes" Grid.Row="1" Grid.Column="0" AutoGenerateColumns="False"
                               CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True" SelectionMode="Single"
@@ -485,7 +491,7 @@
                          real height regardless of which tool is currently mounted, with no cached spoilboard
                          value needed anywhere. Re-run this any time (new puck, machine re-leveled, etc.) -
                          it's just a fresh probe, not a one-time-ever setup step. -->
-                    <Border Grid.Row="2" Grid.ColumnSpan="2" BorderBrush="#D0D7DE" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="0,10,0,0">
+                    <Border Grid.Row="3" Grid.ColumnSpan="2" BorderBrush="#D0D7DE" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="0,10,0,0">
                         <StackPanel>
                             <TextBlock x:Uid="txt_tloRefDesc" TextWrapping="Wrap" Margin="0,0,0,6"
                                        Text="Tool-length reference baseline - probed once against a fixed object at the G59.3 position, and reused by every job so 'work Z0' means the same real height no matter which tool is mounted. That object is the toolsetter puck if you have one; with no toolsetter it is a touch plate, which must then live in that same spot. Whatever's in the spindle now touches it; check the box first if that's the 3D probe itself."/>

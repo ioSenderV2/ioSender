@@ -143,14 +143,16 @@ namespace CNC.Controls.Probing
             }
 
             // Probing parameters come from the shared probe library (Settings: App > Edit Probe
-            // Definitions). Seed sensible defaults if it's empty so probing always has parameters.
-            if (ProbeDefinitions.Items.Count == 0)
-            {
-                ProbeDefinitions.Items.Add(new ProbeDefinition { ProbeType = ProbeType.ThreeDProbe });
-                ProbeDefinitions.Items.Add(new ProbeDefinition { ProbeType = ProbeType.ToolSetter });
-                ProbeDefinitions.Renumber();
-                ProbeDefinitions.Save();
-            }
+            // Definitions). This view does NOT seed it.
+            //
+            // It used to, adding a 3D probe and a tool setter whenever the library was empty - a second
+            // seeder, disagreeing with the real one. ProbeDefinitions.SetItems seeds a touch plate and ONLY
+            // a touch plate, and its comment says why: most hobby machines have no 3D probe, they cost real
+            // money and break on an unexpected touch, so listing one is a claim about hardware the operator
+            // may not own. That correction was made there and missed here.
+            //
+            // An empty library now means the operator emptied it, and inventing two probes is not the answer
+            // to that. Step 5 asks what is actually fitted.
 
             DataContext = model = new ProbingViewModel(grbl);
 
