@@ -134,6 +134,9 @@ namespace GCode_Sender
             loadingConfig = true;
             try
             {
+                // Read, then overridden by ApplyHoldForProbe on the very next line of Activate. Kept because
+                // it is what holds the value across a probe run within one visit; it is no longer a
+                // preference that outlives the visit - the probe class decides that. See ApplyHoldForProbe.
                 HeightMap.AddPause = cfg.HoldAtEachPoint;
                 HeightMap.GridSizeX = cfg.GridSizeX > 0d ? cfg.GridSizeX : 25d;
                 HeightMap.GridSizeY = cfg.GridSizeY > 0d ? cfg.GridSizeY : 25d;
@@ -260,6 +263,7 @@ namespace GCode_Sender
                 model?.Poller.SetState(AppConfig.Settings.Base.PollInterval);
                 RefreshProbes();
                 LoadConfig();
+                ApplyHoldForProbe();
                 DefaultArea();
                 RefreshPreview();
                 if (primaryStyle == null)
@@ -304,6 +308,7 @@ namespace GCode_Sender
         {
             model = m;
             RefreshProbes();
+            ApplyHoldForProbe();
 
             rbAreaProgram.IsChecked = true;          // an explicit area, not the whole table
             HeightMap.MinX = 0d; HeightMap.MaxX = width;
@@ -1716,6 +1721,26 @@ namespace GCode_Sender
         /// Area setter above: a height map probed with no holds and no plate under the bit.
         /// </summary>
         private bool settingProbeSelection;
+
+        /// <summary>
+        /// Put the hold where the selected probe says it belongs, and record that class as the baseline.
+        ///
+        /// Called on every activation, NOT only when the probe changes. The change-only version shipped on
+        /// 2026-09-21 and did nothing at all on the machine it was written for: that operator owns two touch
+        /// plates and no 3D probe, so the selection STARTS in the plate class and never transitions into it -
+        /// RefreshProbes records the baseline without acting, and plate-to-plate is ignored on purpose. A rule
+        /// that only fires on a transition cannot fire on a machine that has nowhere to transition from.
+        ///
+        /// So the probe decides, every time this view is opened. The cost is that an untick lasts for the
+        /// visit rather than for ever, and that is the right way round: a hold you did not want costs one walk
+        /// to the machine, while a missing hold wastes the whole map - or drives a bit at a board that was
+        /// never going to close a circuit.
+        /// </summary>
+        private void ApplyHoldForProbe()
+        {
+            lastProbeNeedsPlate = NeedsPlateByHand(cbxProbe.SelectedItem as ProbeDefinition);
+            HeightMap.AddPause = lastProbeNeedsPlate.Value;
+        }
 
         private void cbxProbe_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
