@@ -321,11 +321,19 @@ namespace CNC.Controls
             if (fx == null || (fx.CornerOffsetX == 0d && fx.CornerOffsetY == 0d))
                 return;
 
+            // Assigning Coords sets PositionValidated FALSE - the setter says so, and it is right to: a
+            // re-jogged reference invalidates the probe that was measured against it. This fold is the one
+            // case where that is wrong. It is not a new reference, it is the SAME physical corner written
+            // against Coords directly instead of as a correction beside it, so the validation it already
+            // had still holds. Carried across explicitly.
+            bool wasValidated = fx.PositionValidated;
+
             var coords = new CNC.Core.Position(fx.Coords);
             double x = coords.X + fx.CornerOffsetX, y = coords.Y + fx.CornerOffsetY;
             coords.X = x;
             coords.Y = y;
             fx.Coords = CoordsCsv(coords);
+            fx.PositionValidated = wasValidated;
 
             CNC.Core.DebugLog.Write("fixture", string.Format(System.Globalization.CultureInfo.InvariantCulture,
                 "Fixture [{0}]: folded the saved corner correction X{1:0.0###} Y{2:0.0###} into Coords -> X{3:0.0###} Y{4:0.0###}",

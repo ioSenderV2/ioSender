@@ -795,6 +795,12 @@ namespace CNC.Controls
                 coords.Y = model.MachinePosition.Y;
                 fx.Coords = Fixtures.CoordsCsv(coords);   // NOT coords.ToString() - see CoordsCsv
 
+                // ...and Coords' setter clears PositionValidated on the way through. That is correct for a
+                // re-jogged reference and wrong here: this write IS the validation, a probed corner
+                // replacing the guess. Re-assert it, after the write rather than before it, or Test position
+                // finishes by un-validating the fixture it just proved.
+                fx.PositionValidated = true;
+
                 // The measurement happened - say so explicitly. The offsets are now always 0.000, so they
                 // could never have carried "was this measured?" even by accident.
                 fx.CornerLocated = true;
