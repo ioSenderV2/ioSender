@@ -111,6 +111,25 @@ namespace CNC.Controls
         public double MaxOpening { get { return _maxOpening; } set { _maxOpening = value; OnChanged(); } }
 
 
+        // ---- deserialization only: the pre-2026-09-22 corner correction -----------------------
+        //
+        // Test position used to leave the eyeballed reference in Coords and put the probe's correction
+        // here, and every consumer added the two. The corner lives in Coords itself now.
+        //
+        // These two survive for exactly one purpose: an App.config written by the old scheme still has the
+        // values, and deleting the properties outright would make the serializer discard them silently -
+        // Coords would keep pointing at the guess while the fixture still showed a validated tick, which is
+        // a quiet positional error of however far the operator's eye was out. So they are read back,
+        // FOLDED INTO COORDS as the library loads (Fixtures.SetItems), and zeroed.
+        //
+        // ShouldSerialize* keeps them out of everything written from here on, so the elements disappear
+        // from App.config the first time it is saved and never come back. Nothing but the serializer and
+        // the fold should ever touch them.
+        public double CornerOffsetX { get; set; }
+        public double CornerOffsetY { get; set; }
+        public bool ShouldSerializeCornerOffsetX() { return false; }
+        public bool ShouldSerializeCornerOffsetY() { return false; }
+
         // Which probe Set/Test position use for THIS fixture. Persisted rather than defaulting to 3D Probe on
         // every open: the dialog reopened in 3D-probe mode even for a fixture set up with a touch plate, so the
         // first Set/Test after reopening quietly ran with the wrong probe geometry until the operator noticed
@@ -283,7 +302,36 @@ namespace CNC.Controls
                 _items.Clear();
             if (list?.Items != null)
                 foreach (var d in list.Items)
+                {
+                    FoldLegacyCorner(d);
                     _items.Add(d);
+                }
+        }
+
+        /// <summary>
+        /// Move a pre-2026-09-22 corner correction into Coords, where the corner now lives.
+        ///
+        /// Idempotent by construction: once folded the offsets are zero, and adding zero does nothing - so
+        /// this needs no "already migrated" marker and cannot run twice to any effect. That matters, because the
+        /// last thing to guard a fixture migration with a standing check silently un-validated freshly
+        /// probed fences on the next restart.
+        /// </summary>
+        private static void FoldLegacyCorner(Fixture fx)
+        {
+            if (fx == null || (fx.CornerOffsetX == 0d && fx.CornerOffsetY == 0d))
+                return;
+
+            var coords = new CNC.Core.Position(fx.Coords);
+            double x = coords.X + fx.CornerOffsetX, y = coords.Y + fx.CornerOffsetY;
+            coords.X = x;
+            coords.Y = y;
+            fx.Coords = coords.ToString();
+
+            CNC.Core.DebugLog.Write("fixture", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                "Fixture [{0}]: folded the saved corner correction X{1:0.0###} Y{2:0.0###} into Coords -> X{3:0.0###} Y{4:0.0###}",
+                fx.Name, fx.CornerOffsetX, fx.CornerOffsetY, x, y));
+
+            fx.CornerOffsetX = fx.CornerOffsetY = 0d;
         }
 
         // The enabled axes' current machine position as an invariant CSV (the stored-coords format), or null
