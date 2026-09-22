@@ -226,11 +226,17 @@ namespace CNC.Controls
             if (hardGateOnly)
                 return 0;
 
-            // 5 - Probe definitions: at least one defined (Load Stock / probing need it).
-            if (ProbeDefinitions.Items.Count == 0)
+            // 5 - Probe definitions: the SAME grading the step's own dot uses (ProbeStepStatus) - a probe
+            // defined, the tool-length probe chosen, and G30/G59.3 taught. It used to be "at least one
+            // defined", which a fresh install passes on its seeded generic touch plate, so Apply announced
+            // setup complete and left for the Job tab with step 5 still showing red. Anything short of
+            // Complete keeps you here, matching the other steps: the gate clears on green, not on amber.
+            if (ProbeStepStatus() != StepState.Complete)
                 return 5;
 
-            // Step 6 (Fixture definitions) is NOT gating - fixtures aren't required for basic machine operation.
+            // Step 6 (Fixture definitions) is NOT gating - fixtures aren't required for basic machine
+            // operation, and plenty of machines have none. Its dot is guidance; leaving it out here is what
+            // stops a red 6 becoming a wizard nobody can finish.
 
             // 7 - Controller macros: on an ATC-capable controller every required macro must be present and
             // current. Query the filesystem (GetStatus) rather than trusting the ATC flag - the flag won't
@@ -485,6 +491,42 @@ namespace CNC.Controls
             RefreshStepColors();
         }
 
+        /// <summary>
+        /// Step 5 graded on the three questions the page actually asks.
+        ///
+        /// STATIC and used by BOTH the tab colour and FirstIncompleteStep, because they are two callers
+        /// asking the same question and they were answering it differently: the gate's test was "at least
+        /// one probe defined", which a fresh install passes on its seeded generic touch plate. So Apply
+        /// declared setup finished and jumped to the Job tab while step 5's own dot was still red. One
+        /// definition, one answer.
+        /// </summary>
+        private static StepState ProbeStepStatus()
+        {
+            // "At least one probe exists" was the old test, and a fresh install ships a seeded generic
+            // touch plate, so this step passed before the operator had answered anything on it.
+            bool haveProbe = (ProbeDefinitions.Items?.Count ?? 0) > 0;
+
+            // Question 2, asked of the STORED NAME rather than of ProbeDefinitions.TloTarget. TloTarget
+            // falls back to the first toolsetter, else the first touch plate, so it answers non-null on a
+            // configuration where nothing was ever chosen - the same "a default that looks like an answer"
+            // that let step 1 record a machine nobody picked.
+            bool tloChosen = !string.IsNullOrEmpty(AppConfig.Settings?.Base?.TloProbeName);
+
+            // Question 3. The target surface is only asked when a PLATE does the measuring - a toolsetter
+            // triggers on its own switch - so it is only required then, exactly as the page hides the row
+            // (see UpdateReferencePositions).
+            bool needSurface = ProbeDefinitions.TloTargetIsTouchPlate;
+            bool haveSurface = !needSurface || AppConfig.Settings?.Base?.TloSurfaceZ != 0d;
+            bool havePositions = PositionTaught("G59.3") && PositionTaught("G30") && haveSurface;
+
+            if (!haveProbe)
+                return StepState.NotStarted;
+            if (tloChosen && havePositions)
+                return StepState.Complete;
+            // Nothing but the seeded probe is a step not started; anything further is in progress.
+            return (tloChosen || havePositions) ? StepState.NeedsAttention : StepState.NotStarted;
+        }
+
         private StepState StepStatusOf(int step)
         {
             // Runs at init too (before settings/AppConfig are loaded), so anything not ready yet falls through
@@ -515,32 +557,7 @@ namespace CNC.Controls
                         return (Setup.SoftLimitsEnable || Setup.HasLimitSwitches || Setup.HomingEnable) ? StepState.Complete : StepState.NotStarted;
 
                     case 5: // Probes, the tool-length probe, and the reference positions - the page's three questions
-                    {
-                        // "At least one probe exists" was the old test, and a fresh install ships a seeded
-                        // generic touch plate, so this step was green before the operator had answered
-                        // anything on it.
-                        bool haveProbe = (ProbeDefinitions.Items?.Count ?? 0) > 0;
-
-                        // Question 2, asked of the STORED NAME rather than of ProbeDefinitions.TloTarget.
-                        // TloTarget falls back to the first toolsetter, else the first touch plate, so it
-                        // answers non-null on a config where nothing was ever chosen - the same "a default
-                        // that looks like an answer" that let step 1 record a machine nobody picked.
-                        bool tloChosen = !string.IsNullOrEmpty(AppConfig.Settings?.Base?.TloProbeName);
-
-                        // Question 3. The target surface is only asked when a PLATE does the measuring -
-                        // a toolsetter triggers on its own switch - so it is only required then, exactly as
-                        // the page hides the row (see UpdateReferencePositions).
-                        bool needSurface = ProbeDefinitions.TloTargetIsTouchPlate;
-                        bool haveSurface = !needSurface || AppConfig.Settings?.Base?.TloSurfaceZ != 0d;
-                        bool havePositions = PositionTaught("G59.3") && PositionTaught("G30") && haveSurface;
-
-                        if (!haveProbe)
-                            return StepState.NotStarted;
-                        if (tloChosen && havePositions)
-                            return StepState.Complete;
-                        // Nothing but the seeded probe is a step not started; anything further is in progress.
-                        return (tloChosen || havePositions) ? StepState.NeedsAttention : StepState.NotStarted;
-                    }
+                        return ProbeStepStatus();
 
                     case 6: // Fixtures: at least one with a captured position. NOT gating - see RefreshStepColors.
                     {
