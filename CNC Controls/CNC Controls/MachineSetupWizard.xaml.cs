@@ -1884,18 +1884,51 @@ namespace CNC.Controls
             }
 
             var here = model.MachinePosition;
-            double search = p.ProbeDistance > 0d ? p.ProbeDistance : 90d;
+
+            // How far down the machine can actually GO from here, as opposed to how far the probe is
+            // willing to look. Missing this raised ALARM:2 on the first real run: standing at Z -61.254
+            // with a 100 mm Max search distance asked for -161.254 against an envelope of -146..0, over the
+            // bottom by 15.254 mm, and the dialog had just promised "up to 100 mm down".
+            double zBottom = GrblInfo.ReachableLimit(2, false);
+            if (double.IsNaN(zBottom))
+            {
+                AppDialogs.Show(Window.GetWindow(this),
+                    "The machine's Z travel could not be read, so how far the probe may safely descend is unknown. Finish steps 3 and 4 first.",
+                    "Probe the target", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            double room = here.Z - zBottom;      // both negative; the descent left before the soft limit
+            if (room <= 1d)
+            {
+                AppDialogs.Show(Window.GetWindow(this), string.Format(CultureInfo.CurrentCulture,
+                    "There is no room to probe: Z is at {0:0.0##} and its travel stops at {1:0.0##}." + Environment.NewLine + Environment.NewLine +
+                    "Jog up, then position over the target and try again.", here.Z, zBottom),
+                    "Probe the target", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // The smaller of the two bounds, and the dialog says WHICH - a silent clamp is how a stored
+            // position 94 mm out of range got past the reachability guard earlier today.
+            double want = p.ProbeDistance > 0d ? p.ProbeDistance : 90d;
+            bool limitedByTravel = room < want;
+            double search = limitedByTravel ? room : want;
 
             if (AppDialogs.Show(Window.GetWindow(this), string.Format(CultureInfo.CurrentCulture,
                     "Probe straight down from here to find the top of the {0}?" + Environment.NewLine + Environment.NewLine +
-                    "It will search up to {1:0.#} mm down at the probe's own feeds. Position it roughly over the target first - X and Y are not changed." +
+                    "It will search up to {1:0.#} mm down at the probe's own feeds{5}. Position it roughly over the target first - X and Y are not changed." +
                     Environment.NewLine + Environment.NewLine +
                     "On a successful touch it records:" + Environment.NewLine +
                     "  target surface = the probed height" + Environment.NewLine +
                     "  tool-length baseline" + Environment.NewLine +
                     "  G59.3 = X {2:0.0##}  Y {3:0.0##}  Z {4:0.0##} (top of travel, so any tool clears)" + Environment.NewLine + Environment.NewLine +
                     "Nothing is recorded if the probe does not touch.",
-                    usingPlate ? "touch plate" : "toolsetter", search, here.X, here.Y, zTop),
+                    usingPlate ? "touch plate" : "toolsetter", search, here.X, here.Y, zTop,
+                    limitedByTravel
+                        ? string.Format(CultureInfo.CurrentCulture,
+                            " - all the travel left below Z {0:0.0##}, which is less than {1}'s {2:0.#} mm search distance",
+                            here.Z, p.Name, want)
+                        : string.Format(CultureInfo.CurrentCulture, " ({0}'s Max search distance)", p.Name)),
                     "Probe the target", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK)
                 return;
 
