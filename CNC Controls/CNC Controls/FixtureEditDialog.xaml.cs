@@ -602,6 +602,18 @@ namespace CNC.Controls
 
             bool edgeProbing = FixtureKinds.ProbesEdges(fx.Kind) && fx.Implemented;
 
+            // The height to travel at. Refused rather than guessed: a retract to an invented "safe" Z is
+            // the one move in this program that is supposed to make the rest safe, and GoToMachineXY
+            // already refuses for the same reason when the envelope cannot be read.
+            double zSafe = GrblInfo.ReachableLimit(2, true);
+            if (double.IsNaN(zSafe))
+            {
+                AppDialogs.Show(Window.GetWindow(this),
+                    "The machine's Z travel or pull-off could not be read, so a safe height to travel at is unknown. Finish Machine Setup steps 3 and 4, then try Test position again.",
+                    "Test position", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             var b = new StringBuilder();
             b.AppendLine(edgeProbing
                 ? "(Test position - locate the true corner)"
@@ -621,7 +633,21 @@ namespace CNC.Controls
             // active. A prior interrupted tool-change leaves Q1 selected (tc.macro's own comment on this
             // exact hazard), which would silently send this Z probe to the toolsetter input instead.
             b.AppendLine(string.Format(GrblCommand.ProbeSelect, 0));
-            b.AppendLine(string.Format("G53G0X{0}Y{1}Z{2}", x, y, z));
+            // UP, ACROSS, THEN DOWN - never the diagonal this used to be.
+            //
+            // It was one G53 G0 carrying X, Y and Z together, so the machine cut the corner from wherever
+            // the spindle happened to be straight to the fixture position. Reported 2026-09-22: Test
+            // position did not raise Z before travelling. From anywhere low - beside a clamp, inside a
+            // vise, below the stock top after a previous probe - that diagonal goes through whatever is in
+            // the way, and the operator has no reason to expect it because every other travel move in the
+            // app lifts first.
+            //
+            // It is the same rule the jog pad's go-to menu already states in as many words: retract, travel
+            // in X and Y, and only then descend, because the only clearance anyone has actually checked is
+            // "at the top".
+            b.AppendLine(string.Format("G53G0Z{0}", zSafe.ToInvariantString("0.0##")));
+            b.AppendLine(string.Format("G53G0X{0}Y{1}", x, y));
+            b.AppendLine(string.Format("G53G0Z{0}", z));
 
             if (!edgeProbing)
             {
