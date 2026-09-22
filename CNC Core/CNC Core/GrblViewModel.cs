@@ -1894,7 +1894,20 @@ namespace CNC.Core
 
             if (!inAlarm && GrblState.State == GrblStates.Alarm) {
                 System.Threading.Interlocked.Increment(ref AlarmEventCounter);
-                SetErrorMessage(GrblAlarms.GetMessage(State.GrblState.Substate.ToString()));
+
+                // ALARM:2 names neither the axis nor the number - "G-code motion target exceeds machine
+                // travel" is the whole of it. Everything needed to say which and by how much is already
+                // here, so say it. SoftLimitExplainer returns null rather than guess when the frame or the
+                // envelope cannot be settled honestly.
+                string alarmText = GrblAlarms.GetMessage(State.GrblState.Substate.ToString());
+                if (State.GrblState.Substate == 2)
+                {
+                    string why = SoftLimitExplainer.Explain(MachinePosition, WorkPositionOffset);
+                    if (!string.IsNullOrEmpty(why))
+                        alarmText = alarmText + "  " + why;
+                }
+
+                SetErrorMessage(alarmText);
                 ResponseLog.Add(string.Format("Alarm:{0} - {1}", State.GrblState.Substate, Message));
             }
             else if ((!Silent || isBootBanner) && (ResponseLogVerbose || mdiQueryReply || !(data.First() == '<' || data.First() == '$' || data.First() == 'o' || (data.First() == '[' && (data.StartsWith("[GC") || DataIsEnumeration(data)))) || data.StartsWith("error")))

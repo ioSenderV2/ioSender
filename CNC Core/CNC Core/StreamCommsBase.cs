@@ -1,4 +1,4 @@
-/*
+﻿/*
  * StreamCommsBase.cs - part of CNC Core library
  *
  * The shared write path for every transport (serial, telnet, websocket, Eltima).
@@ -45,7 +45,21 @@ namespace CNC.Core
         public void WriteBytes(byte[] bytes, int len)
         {
             WireLog.TxBytes(bytes, len);
+            TraceMotion(bytes, len);
             WriteBytesRaw(bytes, len);
+        }
+
+        /// <summary>
+        /// Remember the last motion line for SoftLimitExplainer. Here rather than inside WireLog because
+        /// WireLog returns early when wire logging is off, and an explanation that only appears under a
+        /// debug flag is no use to the operator who just hit the alarm.
+        /// </summary>
+        private static void TraceMotion(byte[] bytes, int len)
+        {
+            if (bytes == null || len <= 0)
+                return;
+            try { MotionTrace.Record(System.Text.Encoding.Default.GetString(bytes, 0, System.Math.Min(len, bytes.Length))); }
+            catch { }   // never let bookkeeping break a write to the machine
         }
 
         /// <summary>
@@ -58,6 +72,7 @@ namespace CNC.Core
         protected static void TraceRawWrite(byte[] bytes, int len)
         {
             WireLog.TxBytes(bytes, len);
+            TraceMotion(bytes, len);
         }
     }
 }
