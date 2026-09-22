@@ -609,12 +609,32 @@ namespace CNC.Controls
         }
 
         // Restore the machine persisted from a previous run, else fall back to the generic default.
+        /// <summary>
+        /// Re-select the machine the operator picked last time, or - only when there is nothing to keep -
+        /// fall back to the generic default.
+        ///
+        /// The fallback used to be unconditional, and it caused a real bug that reached the operator's own
+        /// config. SelectDefaultMachine puts SelectedIndex 0 into all three dropdowns, so the page came up
+        /// showing a machine nobody had chosen. SelectedMachineId() then answered with that auto-selection
+        /// while LastMachine was still empty, MachineIdentityUnsaved() reported an uncommitted identity, and
+        /// Apply was live on arrival over an empty review - tooltip reading "No changes", which is what made
+        /// it look broken. One click then RECORDED that generic identity and completed step 1, closing the
+        /// wizard. Found 2026-09-21 with "Generic / custom|3-axis CNC|With limit switches (homing)" - index 0
+        /// of each list - sitting in a real App.config as though it had been chosen.
+        ///
+        /// So the fallback now happens only where it earns its place: with no settings from the controller,
+        /// the catalogue is the only source for the fields below and ApplyPreset seeds from it. When the
+        /// controller HAS answered, its values are already in the fields, the pick is documentation, and
+        /// leaving the dropdowns empty is the honest way to ask for it - it is also what makes step 1's red
+        /// dot agree with what is on screen.
+        /// </summary>
         private void RestoreOrDefaultMachine()
         {
             string saved = AppConfig.Settings.Base != null ? AppConfig.Settings.Base.LastMachine : null;
             if (!string.IsNullOrEmpty(saved) && TrySelectMachine(saved))
                 return;
-            SelectDefaultMachine();
+            if (!HaveControllerSettings)
+                SelectDefaultMachine();
         }
 
         // Select Manufacturer/Product/Model by name ("mfr|product|model"); returns false if not found.
@@ -2489,8 +2509,13 @@ namespace CNC.Controls
         private void btnApply_ToolTipOpening(object sender, ToolTipEventArgs e)
         {
             BuildReview();
+            // "No changes" alone was a statement about SETTINGS on a button that also commits the machine
+            // identity, so an enabled Apply with nothing to write read as a fault. Say which it is.
             btnApply.ToolTip = Changes.Count == 0
-                ? "No changes - the target settings already match the controller."
+                ? (MachineIdentityUnsaved()
+                    ? "No setting changes - the controller already matches. Apply records the machine as "
+                      + SelectedMachineId() + " and completes step 1."
+                    : "No changes - the target settings already match the controller.")
                 : string.Format("Writes {0} setting{1} to the controller:\n{2}",
                     Changes.Count, Changes.Count == 1 ? "" : "s",
                     string.Join("\n", Changes.Select(c => string.Format("  {0} {1}: {2} → {3}", c.Setting, c.Name, c.OldValue, c.NewValue))));
