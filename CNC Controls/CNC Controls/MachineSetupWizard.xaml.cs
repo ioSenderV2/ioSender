@@ -1549,10 +1549,14 @@ namespace CNC.Controls
             txtG30Value.Text = DescribeStoredPosition("G30");
             txtG593Value.Text = DescribeStoredPosition("G59.3");
 
-            // The surface only matters when a PLATE is doing the measuring: a dedicated toolsetter triggers
-            // on its own switch, so where the table is underneath it changes nothing. Hidden rather than
-            // shown-and-ignored, so a toolsetter owner is not asked to go and measure something irrelevant.
-            bool needSurface = ProbeDefinitions.TloTargetIsTouchPlate;
+            // Always shown now, for a toolsetter as much as a plate.
+            //
+            // It used to be plate-only, and that followed from what the field used to MEAN: the spoilboard
+            // the plate stands on, which is irrelevant to a puck that triggers on its own switch. The field
+            // now means the top of whatever measures tool length - the surface the probe actually touches -
+            // and a puck has one of those just as much as a plate does. Hiding it would leave a toolsetter
+            // owner with no way to reach the Probe it button that sets all three numbers.
+            bool needSurface = true;
             var surfaceVis = needSurface ? Visibility.Visible : Visibility.Collapsed;
             lblTloSurface.Visibility = txtTloSurfaceDesc.Visibility = txtTloSurfaceValue.Visibility =
                 btnSetTloSurface.Visibility = surfaceVis;
@@ -1752,29 +1756,164 @@ namespace CNC.Controls
         /// records where the machine is standing, so the instruction is to jog a tool down until it just
         /// touches the spoilboard beside the target, then click.
         /// </summary>
-        private void SetTloSurface_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Find the target surface by PROBING it, and take everything that follows from that one touch.
+        ///
+        /// The old flow asked the operator to jog a tool down until it just kissed the spoilboard and then
+        /// click. Three things were wrong with that. It asked for the spoilboard, when the number that
+        /// matters is the top of the plate or puck - the surface every tool-length probe will actually hit.
+        /// It asked for a hand-jogged eyeball where a probe would give a measurement. And it made the
+        /// operator do the most delicate jog on the page for a number they could not check afterwards.
+        ///
+        /// So: jog roughly over the toolsetter, press this, and one probe settles all three of
+        ///   - the target surface   (the probed machine Z - the real top)
+        ///   - the tool-length baseline
+        ///   - G59.3                (X and Y where you are standing, Z at the top of travel)
+        /// which is the whole of question 3 bar G30.
+        ///
+        /// G59.3 is written LAST and inside the same program, so a probe that alarms never reaches it -
+        /// fail closed. It is written with G10 L2 in machine coordinates for the reason the Set G59.3
+        /// button now does: L20 would fold the live tool length into the stored position.
+        ///
+        /// Its Z is the top of Z travel rather than "just above the surface". G59.3 is an APPROACH height
+        /// and tc.macro's contract is that the longest tool must clear the target on the way in; the top of
+        /// travel is the only height that is true for every tool, and the search distance is computed from
+        /// it afterwards anyway.
+        /// </summary>
+        private void ProbeTloTarget_Click(object sender, RoutedEventArgs e)
         {
             if (model == null)
                 return;
 
-            // MachinePosition, not Position minus the work offset. The model reports machine position
-            // directly, so deriving it was doing arithmetic on two numbers to arrive at one that was
-            // already there - and it would have been wrong the moment the DRO was showing something other
-            // than what that subtraction assumed.
-            double z = model.MachinePosition.Z;
+            var p = SelectedTloProbe()
+                    ?? ProbeDefinitions.Items.FirstOrDefault(x => x.ProbeType == ProbeType.ToolSetter)
+                    ?? ProbeDefinitions.Items.FirstOrDefault(x => x.ProbeType == ProbeType.TouchPlate);
+            if (p == null)
+            {
+                AppDialogs.Show(Window.GetWindow(this),
+                    "Choose what measures tool length first (question 2 above).",
+                    "Probe the target", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
 
-            if (AppDialogs.Show(Window.GetWindow(this),
-                    string.Format("Record machine Z {0:0.0##} as the surface the tool-length target stands on?\r\n\r\n" +
-                                  "Jog a tool down until it just touches the spoilboard beside the toolsetter or plate first. " +
-                                  "Nothing moves - this only reads the current position.\r\n\r\n" +
-                                  "It is used with the target's height to work out how far the tool-length probe has to search.", z),
-                    "Set target surface", MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+            bool usingPlate = p.ProbeType == ProbeType.TouchPlate;
+
+            // Same refusal Reference TLO makes, and for the same reason: with $65 bit 3 set the controller
+            // re-routes any probe near G59.3 to the toolsetter input, and a plate is not on it.
+            if (ToolsetterAutoSelectConflicts())
+            {
+                AppDialogs.Show(Window.GetWindow(this),
+                    "$65 has \"Auto select toolsetter\" switched on and a touch plate is on the main probe input, " +
+                    "so the probe could not trigger. Turn it off on the row above, then try again.",
+                    "Probe the target", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // The envelope has to be known before anything moves: G59.3's Z comes from it, and inventing a
+            // bound is exactly what ReachableLimit refuses to do.
+            double zTop = GrblInfo.ReachableLimit(2, true);
+            if (double.IsNaN(zTop))
+            {
+                AppDialogs.Show(Window.GetWindow(this),
+                    "The machine's Z travel or pull-off could not be read, so a safe approach height for G59.3 cannot be worked out. Finish steps 3 and 4 first.",
+                    "Probe the target", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var here = model.MachinePosition;
+            double search = p.ProbeDistance > 0d ? p.ProbeDistance : 90d;
+
+            if (AppDialogs.Show(Window.GetWindow(this), string.Format(CultureInfo.CurrentCulture,
+                    "Probe straight down from here to find the top of the {0}?" + Environment.NewLine + Environment.NewLine +
+                    "It will search up to {1:0.#} mm down at the probe's own feeds. Position it roughly over the target first - X and Y are not changed." +
+                    Environment.NewLine + Environment.NewLine +
+                    "On a successful touch it records:" + Environment.NewLine +
+                    "  target surface = the probed height" + Environment.NewLine +
+                    "  tool-length baseline" + Environment.NewLine +
+                    "  G59.3 = X {2:0.0##}  Y {3:0.0##}  Z {4:0.0##} (top of travel, so any tool clears)" + Environment.NewLine + Environment.NewLine +
+                    "Nothing is recorded if the probe does not touch.",
+                    usingPlate ? "touch plate" : "toolsetter", search, here.X, here.Y, zTop),
+                    "Probe the target", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK)
                 return;
 
-            AppConfig.Settings.Base.TloSurfaceZ = z;
-            AppConfig.Settings.Save();
-            UpdateReferencePositions();
+            bool probeInSpindle = !usingPlate && chkTloRef3dProbe.IsChecked == true;
+            string searchF = p.ProbeFeedRate.ToInvariantString("0.0##"), latchF = p.LatchFeedRate.ToInvariantString("0.0##");
+
+            var b = new StringBuilder();
+            b.AppendLine("(Machine Setup - probe the tool-length target from the current position)");
+            // No G59.3 in the prereqs, deliberately: this is the probe that DEFINES it. G30 is not needed
+            // either - nothing here goes to a park.
+            b.AppendLine("(PREREQ, connected, homed, noalarm)");
+            b.AppendLine("G21 G90 G94 G17");
+            b.AppendLine("G49");
+            b.AppendLine(string.Format(GrblCommand.ProbeSelect, (usingPlate || probeInSpindle) ? 0 : 1));
+            b.AppendLine("G91");
+            b.AppendLine(string.Format("G38.2 Z-{0} F{1}", search.ToInvariantString("0.0##"), searchF));
+            b.AppendLine("G0 Z2");
+            b.AppendLine(string.Format("G38.2 Z-5 F{0}", latchF));
+            b.AppendLine("#<_probe_z> = #5063");
+            b.AppendLine("G0 Z10");
+            b.AppendLine("G90");
+            b.AppendLine(string.Format(GrblCommand.ProbeSelect, 0));
+            b.AppendLine("(PRINT, TLOREF_Z=#<_probe_z>)");
+            // Only reached when the probe touched - an alarm ends the program above this line.
+            MacroProcessor.EmitWcsWrite(l => b.AppendLine(l), string.Format(CultureInfo.InvariantCulture,
+                "G10 L2 P9 X{0:0.0###} Y{1:0.0###} Z{2:0.0###}", here.X, here.Y, zTop));
+
+            double? captured = null;
+            PropertyChangedEventHandler zHandler = (s2, pe) =>
+            {
+                if (pe.PropertyName != nameof(GrblViewModel.Message) || string.IsNullOrEmpty(model.Message))
+                    return;
+                var m = rxTloRefZ.Match(model.Message);
+                if (m.Success && double.TryParse(m.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double v))
+                    captured = v;
+            };
+            model.PropertyChanged += zHandler;
+
+            bool started = false;
+            PropertyChangedEventHandler doneHandler = null;
+            doneHandler = (s2, pe) =>
+            {
+                if (pe.PropertyName != nameof(GrblViewModel.StreamingState))
+                    return;
+                if (!started) { started = true; return; }
+
+                var st = model.StreamingState;
+                if (st != StreamingState.Idle && st != StreamingState.NoFile && st != StreamingState.Stop)
+                    return;
+
+                model.PropertyChanged -= doneHandler;
+                model.PropertyChanged -= zHandler;
+
+                bool alarmed = model.GrblState.State == GrblStates.Alarm;
+                if (alarmed || !captured.HasValue || !model.IsProbeSuccess)
+                {
+                    model.Message = "Probe did not touch - nothing recorded.";
+                    return;
+                }
+
+                // The MACHINE Z of the touch, from the controller's own PRB report, not arithmetic on the
+                // work position - the same reasoning the surface button already used for reading Z.
+                AppConfig.Settings.Base.TloSurfaceZ = model.ProbePosition.Z;
+                AppConfig.Settings.Base.TloRefBaseline = captured.Value;
+                AppConfig.Settings.Save();
+
+                UpdateTloRefValueDisplay();
+                UpdateReferencePositions();
+                RefreshStoredPositionsAfterWrite();
+                RefreshStepColors();
+                model.Message = "Target surface, tool-length baseline and G59.3 all set from one probe.";
+            };
+            model.PropertyChanged += doneHandler;
+
+            if (!MacroProcessor.Run(model, "Probe the target", b.ToString(), true))
+            {
+                model.PropertyChanged -= doneHandler;
+                model.PropertyChanged -= zHandler;
+            }
         }
+
 
         /// <summary>
         /// How far the tool-length probe should search downward from the G59.3 origin, or 0 to say "cannot
