@@ -620,15 +620,17 @@ one-action-per-press / only-the-bound-device / beep-means-heard details. `#setti
 page in the User Interface row, `#heightmap` cross-links it from the hold-at-each-point bullet, and
 `#jogging`'s "a jog key jogs wherever you are" rule carries the Keyboard-panel exception.
 
-⚠️ **The volume item below was overstated, and the manual says something more careful.** Read
-`ShutterRemote.cs`: the hook DOES swallow a press that meant something — that is the whole reason it is
-there. What makes the volume move anyway is that this class of remote is not reliably delivered to the hook
-at all (measured on the PICO 2026-09-21: the machine's own keyboard reached the hook, the remote's buttons
-did not), and the raw-input path that does hear it **can read but not intercept**. So the honest statement is
-"expect the volume to step on each press; there is no setting that fixes it", not "ioSender cannot swallow
-it". 🔴 **The in-app string is the one that is now wrong**: `lbl_remoteFallthrough` on the Remote page says a
-discarded press "never reach[es] the volume control", which is only true on the hook path. Not fixed here —
-it is app text, not manual text.
+⚠️ **On the volume item below — it was right, and I briefly "corrected" it wrongly.** Both halves of it
+hold: `RIDEV_NOLEGACY` really is rejected with error 87 because it cannot be combined with `RIDEV_INPUTSINK`,
+and INPUTSINK is what makes an unfocused remote work at all (`RemoteDevices.cs`, the "on NOT being able to
+stop the volume moving" block — read to THERE, not just the file header, which only says the flag is
+deliberately not used). The extra fact worth having beside it: the hook CAN swallow a press that meant
+something, but on this remote the hook never sees the buttons, so there is nothing to swallow. Either way the
+volume moves and no setting fixes it.
+
+🔴 **What WAS wrong was an in-app string**, now fixed (`10afe296`): `lbl_remoteFallthrough` claimed a
+discarded press "never reach[es] the volume control", which holds only on the hook path. So did the Height map
+tab's own tooltip, which was additionally still describing the pre-#391 fixed button mapping.
 
 ### (what it needed to say — the original list)
 
