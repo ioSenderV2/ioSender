@@ -616,6 +616,13 @@
 
         <!-- Footer -->
         <DockPanel Grid.Row="1" Margin="0,8,0,0">
+            <!-- The page has two kinds of change and they commit at different times. That was never said
+                 anywhere, and inferring it wrongly is what made a disabled Apply and a silently recorded
+                 machine both read as faults. DockPanel's LAST child fills, so this sits left of the
+                 buttons and wraps into whatever room they leave. -->
+            <TextBlock x:Uid="txt_applyScope" DockPanel.Dock="Left" TextWrapping="Wrap" MaxWidth="520"
+                       VerticalAlignment="Center" Margin="0,0,16,0" FontSize="11" Foreground="#FF5A5A5A"
+                       Text="Apply writes the controller settings and the values typed on these pages. Probes, fixtures, and anything measured or taught - a probe result, G30, G59.3 - are saved the moment you do them."/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <TextBlock x:Name="txtStatus" VerticalAlignment="Center" Margin="0,0,16,0" Foreground="Gray"/>
                 <Button x:Name="btnForget" x:Uid="btn_forget" Content="Forget machine" Padding="14,0" Margin="0,0,6,0" Click="Forget_Click"

@@ -2369,6 +2369,22 @@
       <tr><td><strong>8 · Build simulator</strong></td><td>Build a grblHAL simulator matching this machine's axes, probe and options — detected automatically, no picks needed — so you can test jobs offline (see <a href="#connect">Connect</a>).</td><td>—</td></tr>
     </table>
 
+    <div class="callout note"><span class="k">What Apply commits, and what is already saved</span><br>
+      Machine Setup holds two kinds of change and they land at different moments. The footer says so, and it
+      is worth knowing which is which:
+      <ul>
+        <li><strong>Typed numbers wait for Apply</strong> &mdash; the controller's <code>$</code> settings,
+        the work surface extents, and the machine you picked in step 1. Hover <strong>Apply</strong> and it
+        lists exactly what it is about to write. Leave the page without pressing it and those edits are
+        discarded, as <strong>Reload</strong> also discards them.</li>
+        <li><strong>Things you did have already happened</strong> &mdash; a probe definition you added, a
+        fixture you positioned, and anything <em>measured or taught</em>: a probe result, <code>G30</code>,
+        <code>G59.3</code>. These are saved the moment you do them, and they have to be: a probe result
+        arrives with controller writes that have already gone in, so a copy waiting for Apply would be a
+        number contradicting the machine in front of you.</li>
+      </ul>
+      The short version: <strong>typed numbers land on Apply; things you did have already happened.</strong></div>
+
     <div class="callout note"><span class="k">What the step colours mean</span><br>
       Each step in the tree carries a dot: <strong>red</strong> not started, <strong>orange</strong> part
       answered, <strong>green</strong> done. On a fresh install <strong>5 &middot; Probe definitions</strong>

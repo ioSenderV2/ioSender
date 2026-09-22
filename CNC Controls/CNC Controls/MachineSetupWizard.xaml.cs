@@ -705,6 +705,10 @@ namespace CNC.Controls
                     GrblWorkParameters.CoordinateSystems.CollectionChanged -= OnCoordinateSystemsChanged;
                     _positionsHookAttached = false;
                 }
+
+                // Staged and never applied: put the object back, or numbers nobody committed go on being
+                // live for the rest of the session while App.config says something else.
+                RevertWorkSurface();
                 if (_fwInfoWindow != null)
                     _fwInfoWindow.Close();
             }
@@ -1177,6 +1181,57 @@ namespace CNC.Controls
 
         private bool loadingWorkSurface = false;
 
+        // ---- the work surface is a STAGED edit -------------------------------------------------
+        //
+        // It is typed numbers, exactly like the $ settings beside it, and it used to write itself to
+        // App.config on every keystroke while they waited for Apply. Two kinds of change on one page
+        // committing at different moments, with nothing saying so, is the confusion underneath most of what
+        // this page got wrong: an Apply whose scope you had to infer.
+        //
+        // Measured values are NOT staged and must not be - a probe result arrives with controller writes
+        // that have already happened (G59.3 by G10 L2, G30 by G30.1), so a pending copy would contradict
+        // the machine. Typed numbers land on Apply; things you did have already happened.
+        //
+        // WorkSurface.Current is still updated live, because the summary and the travel checks read it and
+        // an operator has to see what they are typing. What is deferred is the SAVE - and leaving without
+        // Apply puts the object back, or unapplied numbers would go on being live for the rest of the
+        // session while disk said something else.
+        private bool workSurfaceDirty = false;
+        private bool wsSnapDefined;
+        private double wsSnapMinX, wsSnapMaxX, wsSnapMinY, wsSnapMaxY;
+
+        private void SnapshotWorkSurface()
+        {
+            var ws = WorkSurface.Current;
+            wsSnapDefined = ws.Defined;
+            wsSnapMinX = ws.MinX; wsSnapMaxX = ws.MaxX;
+            wsSnapMinY = ws.MinY; wsSnapMaxY = ws.MaxY;
+            workSurfaceDirty = false;
+        }
+
+        /// <summary>Put back what was on disk, discarding staged edits. Called when the page is left.</summary>
+        private void RevertWorkSurface()
+        {
+            if (!workSurfaceDirty)
+                return;
+
+            var ws = WorkSurface.Current;
+            ws.Defined = wsSnapDefined;
+            ws.MinX = wsSnapMinX; ws.MaxX = wsSnapMaxX;
+            ws.MinY = wsSnapMinY; ws.MaxY = wsSnapMaxY;
+            workSurfaceDirty = false;
+        }
+
+        /// <summary>Commit the staged work surface. Called from Apply.</summary>
+        private bool CommitWorkSurface()
+        {
+            if (!workSurfaceDirty)
+                return false;
+            AppConfig.Settings.Save();
+            SnapshotWorkSurface();
+            return true;
+        }
+
         private void LoadWorkSurface()
         {
             var ws = WorkSurface.Current;
@@ -1187,6 +1242,7 @@ namespace CNC.Controls
             txtWsMinY.Text = ws.MinY.ToString("0.###", CultureInfo.InvariantCulture);
             txtWsMaxY.Text = ws.MaxY.ToString("0.###", CultureInfo.InvariantCulture);
             loadingWorkSurface = false;
+            SnapshotWorkSurface();
             ShowWorkSurfaceSummary();
         }
 
@@ -1208,8 +1264,9 @@ namespace CNC.Controls
             ws.MaxX = ParseOr(txtWsMaxX.Text, ws.MaxX);
             ws.MinY = ParseOr(txtWsMinY.Text, ws.MinY);
             ws.MaxY = ParseOr(txtWsMaxY.Text, ws.MaxY);
-            AppConfig.Settings.Save();
+            workSurfaceDirty = true;    // staged - Apply writes it. See SnapshotWorkSurface.
             ShowWorkSurfaceSummary();
+            UpdateApplyState();         // so Apply lights up for a typed change, as it does for a $ setting
         }
 
         /// <summary>
@@ -1497,7 +1554,8 @@ namespace CNC.Controls
             // MachineIdentityUnsaved for the deadlock that came of conflating the two.
             btnPreview.IsEnabled = Changes.Count > 0;
             // ...or when it still has somewhere to take you. See NextIncompleteStepByColour.
-            btnApply.IsEnabled = Changes.Count > 0 || MachineIdentityUnsaved() || NextIncompleteStepByColour() != 0;
+            btnApply.IsEnabled = Changes.Count > 0 || MachineIdentityUnsaved() || workSurfaceDirty
+                                 || NextIncompleteStepByColour() != 0;
         }
 
         // Preview the pending changes in a dialog (replaces the old inline expander).
@@ -1521,6 +1579,10 @@ namespace CNC.Controls
             cbxManufacturer.SelectedIndex = -1;   // force the change events so the machine is re-applied
             RestoreOrDefaultMachine();
             Changes.Clear();
+            // Reload says "discard edits", and the work surface is an edit now - it was writing itself to
+            // disk before, so there was nothing for Reload to discard and nothing here to do.
+            RevertWorkSurface();
+            LoadWorkSurface();
             txtStatus.Text = "Reloaded from controller.";
             // LAST, after the machine re-apply: re-selecting the dropdowns drives the fields and so trips the
             // edit flag. Leaving it set would quietly disable the settings-reloaded refresh for the rest of
@@ -2788,27 +2850,53 @@ namespace CNC.Controls
 
         // Populate the Apply tooltip on hover with the exact pending changes (old -> new), recomputed live
         // against the current selection and the controller's current values.
+        /// <summary>
+        /// Say what Apply will actually do, in the order it will do it.
+        ///
+        /// It commits more than one kind of thing - controller settings, the staged work surface, the
+        /// machine identity - and it also leads on to the next unfinished step. "No changes" was a
+        /// statement about the SETTINGS alone, on a button doing all of that, so an enabled Apply with
+        /// nothing to send read as a fault. Enumerate instead of summarising.
+        /// </summary>
         private void btnApply_ToolTipOpening(object sender, ToolTipEventArgs e)
         {
             BuildReview();
-            // "No changes" alone was a statement about SETTINGS on a button that also commits the machine
-            // identity, so an enabled Apply with nothing to write read as a fault. Say which it is.
-            int nextStep = NextIncompleteStepByColour();
-            btnApply.ToolTip = Changes.Count == 0
-                ? (MachineIdentityUnsaved()
-                    ? "No setting changes - the controller already matches. Apply records the machine as "
-                      + SelectedMachineId() + " and completes step 1."
-                    : nextStep != 0
-                        ? "Nothing to write. Apply goes on to step " + nextStep + " - " + StepName(nextStep) + "."
-                        : "No changes - the target settings already match the controller.")
-                : string.Format("Writes {0} setting{1} to the controller:\n{2}",
+
+            var parts = new List<string>();
+
+            if (Changes.Count > 0)
+                parts.Add(string.Format("{0} controller setting{1}:\n{2}",
                     Changes.Count, Changes.Count == 1 ? "" : "s",
-                    string.Join("\n", Changes.Select(c => string.Format("  {0} {1}: {2} → {3}", c.Setting, c.Name, c.OldValue, c.NewValue))));
+                    string.Join("\n", Changes.Select(ch => string.Format("  {0} {1}: {2} → {3}",
+                        ch.Setting, ch.Name, ch.OldValue, ch.NewValue)))));
+
+            if (workSurfaceDirty)
+                parts.Add("the work surface extents");
+
+            if (MachineIdentityUnsaved())
+                parts.Add("the machine, as " + SelectedMachineId());
+
+            if (parts.Count > 0)
+            {
+                btnApply.ToolTip = "Apply writes " + string.Join(", and ", parts);
+                return;
+            }
+
+            int nextStep = NextIncompleteStepByColour();
+            btnApply.ToolTip = nextStep != 0
+                ? "Nothing to write. Apply goes on to step " + nextStep + " - " + StepName(nextStep) + "."
+                : "No changes - the target settings already match the controller.";
         }
 
         private void Apply_Click(object sender, RoutedEventArgs e)
         {
             BuildReview();
+
+            // Staged typed values go out with the settings - and on their own when there are none, which is
+            // the case that used to report "Nothing changed" over an edit the operator had just made.
+            bool wroteWorkSurface = CommitWorkSurface();
+            if (wroteWorkSurface)
+                UpdateApplyState();
 
             if (Changes.Count == 0)
             {
@@ -2845,9 +2933,11 @@ namespace CNC.Controls
                     return;
                 }
 
-                txtStatus.Text = "Nothing changed.";
+                txtStatus.Text = wroteWorkSurface ? "Work surface saved." : "Nothing changed.";
                 if (model != null)
-                    model.Message = "Machine setup: nothing changed.";
+                    model.Message = wroteWorkSurface
+                        ? "Machine setup: work surface saved."
+                        : "Machine setup: nothing changed.";
                 return;
             }
 
