@@ -684,3 +684,68 @@ the manual anywhere implies shortcuts work normally while the settings page is o
   fix, the console-window Owner fix and the `locadd --sync` CSV fix are all behaviour or tooling with **no
   UI surface**. Nothing to document.
 - The probe false-triggering was **a wiring fault** (bare foil shield), not an app change.
+
+---
+
+## Debt from the fixture rework (shipped 2026-09-22) — RECORDED AS IT SHIPPED
+
+Seven commits. **Test position stopped being a check and became the measurement**: it writes the
+probed corner straight into the fixture's position, replacing the reference the operator jogged to by
+eye, and the `CornerOffsetX/Y` pair it used to keep alongside is gone. It also lifts before it
+travels, which it did not. Separately, `ALARM:2` now explains itself with the arithmetic.
+
+The manual's step-6 section described the old behaviour in two ways that are now wrong, which is why
+this is text debt and not just a record.
+
+### `#machine-setup` step 6 — Test position — ✅ TEXT DONE 2026-09-26
+- [x] **"Test rapids to the saved position and probes it"** — it does not rapid there. It
+      **retracts to the top of travel, travels in X and Y, and descends last** (`fa63ede9`). The
+      diagonal it used to emit went from wherever the spindle was — beside a clamp, inside a vise,
+      below the stock top after a previous probe — straight to the fixture position. Same rule the
+      jog pad's Go to menu already states: the only clearance anyone has checked is at the top. The
+      retract height is **refused rather than guessed** when Z travel or pull-off cannot be read.
+- [x] **The probed corner IS the fixture position now** (`1a4037d2`). On an edge-probing fixture the
+      macro parks at the tight corner as its last move and that machine position is written into
+      Coords, replacing the eyeballed reference. Consumers lost the addition they each used to do —
+      corner 1's inset is aimed from the measurement, with no correction to remember.
+- [x] **Z is deliberately NOT rewritten.** Coords.Z is the height the operator jogged to and is the
+      **start of the capped downward search**, a travel reference rather than a datum. Overwriting it
+      with the stock top would have the next Test position begin its search already at the surface.
+- [x] **The delta is reported, not stored** — "Reference was out by X 0.369 Y 0.000" on the
+      completion message and in the fixture debug log. Worth documenting for the reason it exists:
+      **on a fixture tested before, a delta that has grown is the fence having moved.**
+- [x] **Test position is what validates a fixture** (`c6168e66`). Writing Coords normally clears the
+      validated tick — correct for a re-jogged reference, wrong for a probed corner — so Test
+      re-asserts it after the write. Set position still clears it, and that distinction is the thing
+      to state: Set records where you think it is, Test proves it.
+
+### `#errors-alarms` — `ALARM:2` carries the arithmetic — ✅ TEXT DONE 2026-09-26
+- [x] "Soft limit alarm. G-code motion target exceeds machine travel." names neither the axis nor
+      the number. The alarm message now appends the sum (`02fa93f5`,
+      `CNC Core/CNC Core/SoftLimitExplainer.cs`) — *"Z: -61.254 - 100.000 = -161.254, which is
+      15.254 mm below the limit of -146.000"* — and the offending line. Worth saying it
+      **says nothing rather than guessing**: a `G90` move is in work coordinates and on a rotated
+      system an X/Y target does not resolve by adding an offset at all, so an axis it cannot settle
+      honestly is skipped.
+
+### `#machine-setup` step 5 — what bounds Probe it — ✅ TEXT DONE 2026-09-26
+- [x] The **What bounds the probe** callout said the *only* thing that stops the descent is the
+      probe's Max search distance. Since `81a90d1e` it is the **smaller of that and the travel
+      actually left below where you are standing**, and the confirm dialog names which bound applies
+      rather than silently clamping. It refuses outright, with both numbers, when there is no room.
+      This was a real `ALARM:2` on the first run: standing at Z −61.254 it asked for the full 100 mm
+      against a −146 floor.
+      ⚠️ **A small app inconsistency left standing, deliberately not "fixed" here:** the live line on
+      the step-5 row still names only the probe's Max search distance, because it is a plan line and
+      does not follow the machine position. The dialog is the authority and says which bound applies.
+
+### Not manual debt, recorded so it is not mistaken for debt
+- **The load-time conversion of old fixtures** (`83836f93`, `b266d978`) is **transparent to the
+  reader**: a fixture saved before the rework has its saved correction folded into Coords as the
+  library loads, keeps its validated tick, and the retired elements leave `App.config` on the first
+  save. The manual never documented `CornerOffsetX/Y`, so there is nothing to correct — one sentence
+  saying an existing fixture needs nothing done to it is the whole of it. 🔴 One caveat that is
+  history rather than debt: two fixtures on the author's own machine lost their offsets to the
+  intermediate commit before the fold existed and want Test position re-run.
+- `Position` having no `ToString()` override (`b266d978`) and the `ShouldSerialize*` suppression are
+  implementation. No UI surface.
