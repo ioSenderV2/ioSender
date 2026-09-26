@@ -687,6 +687,28 @@
     <p>The per-axis <strong>zero</strong> buttons set the <em>work</em> origin at the current spot — handy for
     quick manual setups (though probing is more repeatable, see <a href="#setup">Setup</a>).</p>
 
+    <h4 class="subh">The DRO's own title is the offset picker</h4>
+    <p>The heading reads <strong>DRO (G54)</strong> — the work offset the readout is <em>in</em> — with a
+    chevron after it, because it is a dropdown. Click it and you get the selectable work offsets
+    (<code>G54</code>–<code>G59.3</code>) with the current one ticked; pick one and the machine switches to it.
+    Right-click does the same thing.</p>
+    <ul>
+      <li><strong>Hovering an entry shows what is in it</strong> — its X, Y and Z, and its rotation. So you can
+      choose between two offsets by reading them, rather than selecting one and then looking at the DRO, which
+      would mean changing the machine's state to answer a question.</li>
+      <li>The rotation is shown <em>always</em>, not only when it is non-zero: on a rotated offset it is the one
+      number that explains why a move went somewhere you did not expect, and leaving it out would read as "no
+      rotation" rather than "not shown".</li>
+      <li>Stored <em>positions</em> — <code>G28</code>, <code>G30</code>, <code>G92</code> — are deliberately
+      <strong>not</strong> in this list. They are not offsets you can work in, and sending their codes moves the
+      machine. See the jog pad's <strong>Go to</strong> button below for reaching those.</li>
+      <li>It works <strong>in both places the DRO appears</strong> — the Job tab's panel and the
+      <a href="#job">run strip</a>'s compact copy. That is the point of it living on the readout itself: the run
+      strip is reachable when the Job tab is not.</li>
+    </ul>
+    <div class="shot-todo">screenshot: dro-offset-menu.png — the DRO title dropdown open, one entry
+    hovered so its X/Y/Z and rotation tooltip shows</div>
+
     <h3>Two ways to jog</h3>
     <p><strong>On-screen jog pad</strong> — arrow buttons for each axis, with:</p>
     <ul>
@@ -697,13 +719,35 @@
       machine envelope at safe Z.</li>
       <li><strong>Corner buttons</strong> (the four diagonals) — rapid to that corner of the machine envelope
       at safe Z, held back 20&nbsp;mm from each limit so you never drive into a switch.</li>
+      <li><strong>Go to</strong> — the target-and-pin button in the <strong>Z column, between Z+ and
+      Z−</strong>: the one square in the pad that used to be empty. A menu of everywhere
+      the machine has a <em>stored</em> position, grouped by what sort of thing it is: your
+      <a href="#machine-setup">fixtures</a> that have a captured position, the stored positions
+      (<code>G28</code>, <code>G30</code>, <code>G59.3</code>), and any work offset that is not still at zero.
+      Hovering an entry shows the machine coordinates it will go to, before it goes — a fixture's name says
+      nothing about where it is. Anything still sitting at all zeros is left out: grbl has no "has been taught"
+      flag, so all-zero is what never-set looks like, and offering to go to an untaught <code>G28</code> would
+      send the machine to the top corner at rapid.</li>
     </ul>
+    <div class="callout warn"><span class="k">Go to drives Z for two targets only</span><br>
+      Every target retracts Z first and then travels in X and Y. Only <code>G30</code> and <code>G59.3</code>
+      then <strong>lower Z</strong> to their stored height, and that is by definition rather than by luck:
+      <code>G30</code> is the tool-swap park, over clear air so you can reach the collet, and
+      <code>G59.3</code> is the approach over the toolsetter, whose Z has to clear your longest tool. For
+      everything else — a fixture, a work offset — the stored Z is <em>at the work</em>, so driving to it would
+      be a plunge to a height decided before whatever is clamped there now was clamped. Those go to X and Y at
+      the current Z and stop. <code>G28</code> is not in the drive-Z list either: nothing in ioSender writes
+      it, so its Z is whatever a previous owner of the machine left there. When Z is driven it happens
+      <em>last</em>, as its own move — up, across, then down, never a diagonal into a park.</div>
+    <div class="shot-todo">screenshot: jog-goto-menu.png — the jog pad's Go to menu open, showing the
+    grouping and one entry's machine-coordinate tooltip</div>
     <div class="callout note"><span class="k">The pad targets the machine, not the job</span><br>
       Centre and the four corners are the <em>machine envelope</em> — they don't follow the loaded program's
       bounding box. That way they mean the same thing whether or not a file is loaded.</div>
     <p>If you'd rather have a plain arrow pad, untick <em>Show go-to buttons on the jog pad</em> in
     <strong>Settings → User Interface → General</strong> — the centre and four corner buttons disappear and the
-    arrows stay exactly where they are.</p>
+    arrows stay exactly where they are. That tick covers the <em>envelope</em> buttons only: the arrows, the Z
+    buttons and <strong>Go to</strong> are unaffected.</p>
     <p><strong>Keyboard jogging</strong> — arrow keys for X/Y and Page&nbsp;Up/Down for Z. Hold a key for
     continuous motion; tap for a step. Holding <kbd>Ctrl</kbd> switches to a precise <strong>step jog</strong>
     of the distance shown as <em>Jog step</em> on the run strip.</p>
@@ -714,7 +758,10 @@
       carrying <kbd>Ctrl</kbd> or <kbd>Alt</kbd> still fires even with the caret in a field, because it can't
       be mistaken for typing. Jogging while a setup dialog is open — lining a fixture up by eye — is the case
       this was built for. And a key <em>release</em> always stops a continuous jog, whatever has focus by
-      then: that's a moving machine, not a UI detail.</div>
+      then: that's a moving machine, not a UI detail.<br><br>
+      <strong>One exception:</strong> while <a href="#settings">Settings → User Interface →
+      Keyboard</a> is open, a bound shortcut is <em>found</em> in the list rather than run — see that
+      page. Jog keys are unaffected.</div>
 
     <h3>Step vs continuous</h3>
     <p><strong>Step</strong> moves an exact distance per press — use small steps for fine positioning near the
@@ -1033,13 +1080,21 @@
     </figure>
     <p><strong>What you're looking at:</strong></p>
     <ul>
-      <li><strong>DRO</strong> (top left) — the live X/Y/Z position, with a per-axis zero button; see <a href="#jogging">Jogging &amp; the DRO</a>.</li>
+      <li><strong>DRO</strong> (top left) — the live X/Y/Z position, with a per-axis zero button. Its title
+      reads <strong>DRO (G54)</strong> and is itself a <strong>dropdown of the work offsets</strong>, here and
+      on the run strip both; see <a href="#jogging">Jogging &amp; the DRO</a>.</li>
       <li><strong>Machine Position</strong> — the same position in fixed machine coordinates rather than your work origin.</li>
       <li><strong>Program limits</strong> — the loaded program's own footprint (min/max per axis), so you can sanity-check it fits your stock before running.</li>
       <li><strong>Coolant</strong> — manual Flood/Mist toggles, independent of whatever the running program itself commands.</li>
       <li><strong>The g-code list</strong> (centre) — the loaded program, line by line, with the current line highlighted as it runs. Hover any line for a plain-English tooltip explaining exactly what it does (shown here for <code>T1M6</code> — "Select tool 1", then "Tool change (M6)", in the same left-to-right order the words appear in the line) — click the tooltip to copy the line.</li>
       <li><strong>Jogging / UI Jogging / Keyboard jogging</strong> (right) — the on-screen jog pad plus the distance/feed presets each jog step uses. The pad is the widest thing on that side; if the run strip's own compact jog controls are enough for you, untick <em>Show the jog pad on the Job tab</em> in <strong>Settings → User Interface → Job tab layout</strong> and the panels get that height back. Keyboard and game-controller jogging are unaffected either way.</li>
-      <li><strong>Work Parameters &amp; Spindle</strong> — the active work offset and tool, and manual spindle RPM/direction/override controls.</li>
+      <li><strong>Work Parameters &amp; Spindle</strong> — the active work offset and tool, and manual spindle
+      RPM/direction/override controls. Its offset dropdown lists <code>G54</code>–<code>G59.3</code> only.
+      <code>G28</code>, <code>G30</code> and <code>G92</code> arrive from the controller in the same report and
+      used to appear here, which was a real hazard: this combo sends the selected code to the controller
+      verbatim, so picking <code>G28</code> did not select anything — it <em>rapided the machine</em> to the
+      stored <code>G28</code>, from a dropdown next to the tool selector. To reach a stored position on
+      purpose, use the jog pad's <a href="#jogging"><strong>Go to</strong></a> button.</li>
       <li><strong>The fixture panel</strong> (far right, vertical) — quick-jump buttons to named machine positions like G28/G30/G54.</li>
       <li><strong>The run strip</strong> (bottom, spanning the window) — everything a running job needs, in one
       place. On the left: the <strong>Run</strong> button and its mode dropdown, Feed Hold, Stop,
@@ -1344,7 +1399,9 @@
       stock against (defined in <a href="#machine-setup">Machine&nbsp;Setup</a>'s Fixture definitions, or the
       built-in <strong>Dynamic</strong> fixture below) and which <strong>Probe</strong> to use — a 3D probe,
       or a Touch Plate (electrical continuity). Safe Z delta sets how high the probe retracts between
-      touches.</li>
+      touches. Only probes that can do the job on offer appear here: a touch plate declared as
+      <em>Flat (Z only)</em> in <a href="#machine-setup">Machine&nbsp;Setup</a> is not offered for finding a
+      corner, because it has no lips to register against the stock's edges.</li>
       <li><strong>Geometry</strong> — only shown when the <strong>Dynamic</strong> fixture is picked: choose
       External/Internal and Is Circle with clickable corner/edge/centre picker grids, so a one-off feature
       that doesn't have a saved fixture position can still be set up here without leaving the tab.</li>
@@ -2185,7 +2242,14 @@
       so on anything non-conductive the plate has to travel with the probe. Ticked, the machine positions over
       each point and <em>waits</em>: put the plate under the bit and press <strong>Continue</strong> (Cycle
       Start does the same). It holds before every point except the first, where you are already standing at the
-      machine. Untick it only where the probe reaches the surface on its own.</li>
+      machine. <strong>It follows the probe you pick:</strong> with a touch plate selected it is ticked, and with a
+      3D probe or an edge finder it is not, since those reach the surface on their own. The probe decides this
+      each time you open the tab, so unticking it by hand holds for that visit rather than for ever &mdash;
+      deliberately, because a hold you did not want costs you one walk to the machine, while a missing hold
+      wastes the whole map. A
+      <a href="#remote">Bluetooth shutter remote</a> will release each point from your hand, which is the
+      job it was bought for &mdash; set one up under <strong>Settings &rarr; User Interface &rarr;
+      Remote</strong>.</li>
       <li><strong>Drop allowance.</strong> Between points the tool lifts clear of the surface and then
       searches that lift <em>plus</em> this allowance, so a point up to the allowance lower than the one
       before it is still found. The note under the field spells out all three distances in millimetres as you
@@ -2295,15 +2359,56 @@
     <p>An <strong>Overview</strong> page lists them; each is a numbered entry in the tree that you complete in order.</p>
     <table class="reftab">
       <tr><th>Step</th><th>What you set</th><th>grbl settings</th></tr>
-      <tr><td><strong>1 · Machine</strong></td><td>Start from your machine — pick your machine so the later steps begin from sensible defaults instead of blanks.</td><td>—</td></tr>
+      <tr><td><strong>1 · Machine</strong></td><td>Say which machine this is. It is mostly a label — it does <em>not</em> overwrite settings read from your controller. See below.</td><td>—</td></tr>
       <tr><td><strong>2 · Home position</strong></td><td>The corner your machine homes to (front-left / front-right / back-left / back-right). Must match where your limit switches actually are — this is also machine origin.</td><td><code>$23</code></td></tr>
       <tr><td><strong>3 · Axis information</strong></td><td>Per axis: travel, max rate, steps/mm, invert direction, limit-switch type and home direction. A <em>Live</em> column shows the controller's current value as you edit. Also <strong>Work surface (spoilboard)</strong> — see below.</td><td><code>$3</code> <code>$5</code> <code>$23</code> <code>$1nn</code></td></tr>
       <tr><td><strong>4 · Homing &amp; limits</strong></td><td>Enable limit switches, homing, force-origin and soft limits; set pull-off, locate/seek feed rates and debounce.</td><td><code>$27</code> <code>$24</code> <code>$25</code> <code>$26</code></td></tr>
-      <tr><td><strong>5 · Probe definitions</strong></td><td>Declare the probes fitted to this machine (touch plate / 3D probe / toolsetter) so probing and <a href="#setup">Setup</a> know what's available.</td><td>—</td></tr>
+      <tr><td><strong>5 · Probe definitions</strong></td><td>Three questions: what probes this machine has, which of them measures tool length, and where <code>G59.3</code> and <code>G30</code> go. Also where the tool-length baseline is probed — see below.</td><td><code>$65</code></td></tr>
       <tr><td><strong>6 · Fixture definitions</strong></td><td>Define your own named workholding fixtures (a specific vise, fence, dog-hole grid…) that <a href="#setup">Setup</a> can pick from, with a captured machine-coordinate reference position.</td><td>—</td></tr>
       <tr><td><strong>7 · Controller macros</strong></td><td>Install the controller-side macro set onto the controller's storage (e.g. <em>Install ATC macros…</em>). This step queries the controller to show what's installed or outdated.</td><td>—</td></tr>
       <tr><td><strong>8 · Build simulator</strong></td><td>Build a grblHAL simulator matching this machine's axes, probe and options — detected automatically, no picks needed — so you can test jobs offline (see <a href="#connect">Connect</a>).</td><td>—</td></tr>
     </table>
+
+    <div class="callout note"><span class="k">What Apply commits, and what is already saved</span><br>
+      Machine Setup holds two kinds of change and they land at different moments. The footer says so, and it
+      is worth knowing which is which:
+      <ul>
+        <li><strong>Typed numbers wait for Apply</strong> &mdash; the controller's <code>$</code> settings,
+        the work surface extents, and the machine you picked in step 1. Hover <strong>Apply</strong> and it
+        lists exactly what it is about to write. Leave the page without pressing it and those edits are
+        discarded, as <strong>Reload</strong> also discards them.</li>
+        <li><strong>Things you did have already happened</strong> &mdash; a probe definition you added, a
+        fixture you positioned, and anything <em>measured or taught</em>: a probe result, <code>G30</code>,
+        <code>G59.3</code>. These are saved the moment you do them, and they have to be: a probe result
+        arrives with controller writes that have already gone in, so a copy waiting for Apply would be a
+        number contradicting the machine in front of you.</li>
+      </ul>
+      The short version: <strong>typed numbers land on Apply; things you did have already happened.</strong></div>
+
+    <div class="callout note"><span class="k">What the step colours mean</span><br>
+      Each step in the tree carries a dot: <strong>red</strong> not started, <strong>orange</strong> part
+      answered, <strong>green</strong> done. On a fresh install <strong>5 &middot; Probe definitions</strong>
+      and <strong>6 &middot; Fixture definitions</strong> both start <strong>red</strong>, because neither has
+      been answered yet &mdash; the single generic touch plate a new install ships is a starting point, not
+      your probe.
+      <ul>
+        <li><strong>5</strong> turns orange once you have chosen what measures tool length <em>or</em> taught
+        the reference positions, and green when both are done &mdash; <code>G59.3</code> and <code>G30</code>
+        taught, plus the target surface if a plate does the measuring.</li>
+        <li><strong>6</strong> turns orange for a fixture that has been defined but never positioned (Setup
+        cannot probe against one whose machine coordinates were never captured) and green once at least one
+        has a position.</li>
+      </ul>
+      <strong>Step 6 never blocks you.</strong> Fixtures are not needed to run a machine, so its dot is
+      guidance and nothing more &mdash; it is deliberately left out of the check that decides whether setup
+      is finished.<br><br>
+      <strong>Apply follows the dots.</strong> Press it with steps still outstanding and it does not leave
+      for the Job screen &mdash; it takes you to the next one that needs answering and says so in the status
+      line. It only hands you back to the Job screen once nothing is left, so working down the tree is just
+      Apply, answer, Apply.<br><br>
+      It stays live for that even when there is nothing to <em>write</em> &mdash; hover it and the tooltip
+      names the step it will go to. It goes quiet only when the one remaining step is the one you are already
+      looking at, which is what stops a machine with no fixtures being offered step 6 for ever.</div>
 
     <div class="callout note"><span class="k">Calibration has moved out</span><br>
     It used to be step 8 here. It is now its own
@@ -2330,6 +2435,164 @@
       <a href="#work-order">Work Order</a>'s <strong>Entire spoilboard</strong> Surface toolpath and the
       <a href="#heightmap">Height Map</a>'s <strong>Full work surface</strong> mode. Left undeclared on a
       machine where it isn't true, both run the cutter through open air at one end.</li>
+    </ul>
+
+    <h3>Picking your machine (step 1), and what it does not do</h3>
+    <p>Choose your manufacturer, product and model. On a machine ioSender is connected to, that is
+    <strong>all</strong> it does: the pick is recorded, any note about the model is shown, and
+    <strong>nothing on the later steps changes</strong>.</p>
+    <p>The three dropdowns <strong>start empty</strong> on a machine whose settings were read from the
+    controller, and step 1's dot stays red until you answer them. That is the one thing step 1 actually
+    wants from you, and <strong>Apply</strong> stays greyed out until you have given it &mdash; then it
+    lights up, and pressing it records the machine and turns the dot green. If <em>Apply</em> is live with
+    nothing else pending, hover it: the tooltip names the machine it is about to record.</p>
+    <p>That is deliberate. The catalogue holds what a model <em>typically</em> ships with; your controller
+    holds what this machine is <em>actually</em> set to. The second is the better fact by a wide margin — it
+    may have been tuned, re-geared, or had its travel trimmed to clear a fixture — and a label should not
+    overwrite a measurement. Everything you see on steps 2 to 4 was read off the controller when ioSender
+    connected.</p>
+    <p><strong>When there is nothing to overwrite, it fills the fields in.</strong> If ioSender could not
+    reach a controller, or the settings did not come back, the catalogue is the only thing there is, so it
+    seeds as much as it knows: steps/mm, max rate and travel for X, Y and Z, plus homing and the home
+    corner.</p>
+    <div class="callout tip"><span class="k">Apply catalogue values — the deliberate version</span><br>
+      Next to the model dropdown. It puts the catalogue's typical values into the fields
+      <em>over</em> what the controller reported, and asks first. This is for the case where the real
+      settings are gone — a reflashed controller, cleared settings, a board swap — and you need a sane
+      starting point to work from. It sends <strong>nothing</strong> to the controller: the values land as
+      pending changes, and <strong>Apply</strong> is still what writes them, with its own count and a
+      tooltip listing exactly what will go.</div>
+
+    <h3>Probes and the reference positions (step 5)</h3>
+    <p>Step 5 is not a list of checkboxes; it is three questions, asked in the order they can actually be
+    answered. The second cannot be asked before the first — there would be nothing to choose from — and the
+    third reads better after both, because it can then name the thing you have just said is sitting there.</p>
+    <div class="shot-todo">screenshot: machine-setup-probes.png — Machine Setup step 5 whole, showing all
+    three questions: the probe list, the tool-length dropdown with its <code>$65</code> line, and the
+    reference positions with their captured values</div>
+
+    <h4 class="subh">1 · What probes does this machine have?</h4>
+    <ul>
+      <li>A fresh install starts with <strong>one generic touch plate</strong>. Edit it to match the plate you
+      actually own, and add a row for anything else — a toolsetter, a 3D probe, an edge finder. <strong>No 3D
+      probe is seeded</strong>: most machines do not have one, and a definition for a probe you do not own is
+      worse than no definition at all.</li>
+      <li>Nothing here is guessed from the controller. These are facts about your bench, and only you know
+      them.</li>
+      <li>A touch plate gets one extra question, up front beside the type rather than buried among the
+      measurements — <strong>Plate type: Corner (two lips)</strong> or <strong>Flat (Z only)</strong>:
+        <ul>
+          <li><strong>Corner</strong> — two lips meeting at 90°. It sits over the stock's corner, the lips
+          register against the two edges, and it can set X, Y <em>and</em> Z. Only this kind has a
+          <em>Lip width</em> field.</li>
+          <li><strong>Flat</strong> — a plain slab lying on top of the work. It sets Z and nothing else: there
+          is no edge to register against, so <a href="#setup">Setup</a> will not offer it for a corner.</li>
+        </ul>
+      </li>
+    </ul>
+    <div class="callout tip"><span class="k">One plate can be both</span><br>
+      <strong>Turn a corner plate upside down and it is a flat plate.</strong> The lips point up, so touch off
+      near the middle, clear of them. If you own one plate, that is how it does both jobs — and it is the
+      answer to "I have no toolsetter": the app says as much when you pick a corner plate to measure tool
+      length.</div>
+    <div class="shot-todo">screenshot: probe-definition.png — the probe edit dialog on a touch plate:
+    the Plate type radios, the note under them, and Lip width present for a corner plate</div>
+    <p><strong>Edit motion params…</strong> holds how a probe <em>moves</em>: approach speed, re-touch speed,
+    max search distance, back-off distance, edge standoff, drop to side, and the probe tip's offset from the
+    spindle centre in X and Y. Two of those only mean anything when probing <em>sideways</em>, so
+    <strong>Edge standoff</strong> and <strong>Drop to side</strong> are hidden for a flat plate.</p>
+    <div class="callout note"><span class="k">Two settings that have gone</span><br>
+      <strong>Travel speed</strong> and <strong>Target height</strong> are no longer part of a probe
+      definition. Nothing in the app ever read either of them, so they were two more numbers to get wrong for
+      no effect. If you remember setting them, you were not imagining it — they are gone, not hidden.</div>
+    <div class="shot-todo">screenshot: probe-motion-params.png — the motion parameters dialog for a
+    <em>flat</em> plate, so Edge standoff and Drop to side are absent</div>
+
+    <h4 class="subh">2 · Which one measures tool length?</h4>
+    <p>A dropdown over the probes you just defined, asked <em>after</em> they exist. Tool length is measured at
+    the <code>G59.3</code> position, and all the eligible answers probe the same way — straight down — so what
+    this really settles is <em>whose feeds get used</em>, and what advice the page can give you. A dedicated
+    toolsetter is the usual answer; with no toolsetter a touch plate does the same job.</p>
+    <div class="callout tip"><span class="k">Give a plate a seat</span><br>
+      A puck is bolted down and lands in the same place by construction. A plate is a loose object, and it has
+      to be <em>made</em> to land the same way every time — a shallow cutout it drops into, or anything that
+      registers it. Without that, every tool measurement carries however far the plate wandered. For the same
+      reason, put <code>G30</code> and <code>G59.3</code> next to each other.</div>
+    <p><strong>This answer drives <code>$65</code> bit 3</strong>, the controller's "auto-select the toolsetter
+    input near <code>G59.3</code>" flag. The page reads the bit out, says what it currently is and what the
+    probe you chose needs it to be, and offers a button that reads <strong>Turn it on</strong> or <strong>Turn
+    it off</strong> accordingly — greyed out when the controller already agrees. It does <em>not</em> write it
+    silently: this is a controller setting you may have chosen deliberately, and only bit 3 is touched. If
+    <code>$65</code> cannot be read, the page says so rather than guessing.</p>
+    <div class="callout warn"><span class="k">The trap this closes</span><br>
+      Plenty of touch plates are wired onto the ordinary <em>probe</em> input. If <code>$65</code> is set to
+      auto-select the <em>toolsetter</em> input whenever the machine is near <code>G59.3</code>, then a plate
+      on the main input <strong>never triggers</strong> — and the tool-length move drives the bit into the
+      plate looking for a switch that is not listening. That is a real crash, from one bit, and nothing else in
+      the app would have told you.</div>
+
+    <h4 class="subh">3 · Where do the reference positions go?</h4>
+    <p>A tool change runs <code>G30</code> &rarr; <code>G59.3</code> &rarr; <code>G30</code>: park where you can
+    reach the spindle, go and measure the new tool, come back. There are two things to set, and the first one
+    is a probe rather than a jog.</p>
+    <ol>
+      <li><strong>Tool-length target and <code>G59.3</code>.</strong> Put a tool or probe in the spindle, jog
+      <em>roughly</em> over the toolsetter or plate, and press <strong>Probe it</strong>. One probe settles
+      three numbers at once:
+        <ul>
+          <li>the <strong>target surface</strong> &mdash; the height it touched, which is the top of the
+          toolsetter or plate: the surface every later tool-length probe will actually hit;</li>
+          <li>the <strong>tool-length baseline</strong> (see below);</li>
+          <li><strong><code>G59.3</code></strong> &mdash; X and Y from where you were standing, and Z at the
+          <em>top of Z travel</em>. That Z is deliberate: <code>G59.3</code> is an approach height, and the
+          contract is that your <em>longest</em> tool still clears the target on the way in. The top of travel
+          is the only height that is true for every tool.</li>
+        </ul>
+        The row then shows both the height it found and where <code>G59.3</code> ended up, so you can see the
+        part that affects every tool change actually landed. Nothing is recorded if the probe does not touch.
+      </li>
+      <li><strong><code>G30</code> &mdash; tool swap.</strong> Where the machine parks for you to change the
+      tool and where it returns afterwards: near the top of Z, clear of the work, somewhere you can get a
+      spanner to the collet. Set it from the current position, or take the offer to place it
+      <strong>100&nbsp;mm &minus;X</strong> or <strong>+X</strong> from <code>G59.3</code> &mdash; that one
+      <em>moves the machine</em>.</li>
+    </ol>
+    <div class="callout warn"><span class="k">What bounds the probe</span><br>
+      <strong>Probe it descends from wherever you have jogged to</strong>, and it stops at whichever comes
+      first: the selected probe's own <strong>Max search distance</strong>, on its <em>Edit motion params</em>,
+      or <strong>the travel you have actually got left below where you are standing</strong>. The step-5 row
+      names the probe and its search distance; the confirm dialog names <em>which of the two bounds applies</em>
+      — "all the travel left below Z &minus;61.254, which is less than Touch plate's 100&nbsp;mm search
+      distance" — rather than quietly clamping a number it had just promised you. With no room to descend at
+      all it refuses and shows both figures. Too small a search distance and the probe stops in mid air; too
+      large and one that never triggers keeps going. Jog to within that distance of the target before pressing
+      it.</div>
+    <div class="callout note"><span class="k">There is no separate &ldquo;Set G59.3&rdquo; here</span><br>
+      Deliberately. Two buttons writing the same stored position is how one of them came to fold the live tool
+      length into it &mdash; a <code>G59.3</code> stored 94&nbsp;mm above the top of the machine, which then
+      refused every tool change. The probe is the one route. If you ever need to correct
+      <code>G59.3</code> by hand, the <a href="#offsets">Offsets</a> table edits it directly.</div>
+    <div class="callout note"><span class="k">The search distance for later probes is worked out</span><br>
+      Once the target height is known, ioSender computes how far each tool-length probe needs to search, from
+      that height and the <code>G59.3</code> Z, and tells you: <em>&ldquo;searches up to n&nbsp;mm down
+      &mdash; far enough to reach the target, stopping 2&nbsp;mm above the surface if nothing
+      triggers.&rdquo;</em> It is a <strong>limit</strong>, not a prediction of where the target is.</div>
+
+    <h4 class="subh">The tool-length reference baseline</h4>
+    <p>At the bottom of step 5, <strong>Reference TLO</strong> probes a baseline <em>once</em> against a fixed
+    object at the <code>G59.3</code> position, and every job reuses it — which is what makes "work Z0" the same
+    real height no matter which tool is in the spindle.</p>
+    <ul>
+      <li>That object is the <strong>toolsetter puck</strong> if you have one. With no toolsetter it is a touch
+      plate, which then has to <em>live</em> in that spot rather than being carried to it.</li>
+      <li>Whatever is in the spindle right now is what touches it. Tick <strong>3D probe is in the spindle
+      now</strong> first if that is what is fitted — the tick only appears where the question arises, because a
+      puck can be met either by a rigid tool on the toolsetter input or by a self-triggering 3D probe on the
+      main one, whereas a plate is always on the main input.</li>
+      <li>It runs in <strong>machine coordinates</strong> and leaves your active work offset alone — it does
+      not select <code>G59.3</code> and walk away with it active.</li>
+      <li><strong>Re-run it whenever the physical facts change</strong> — a new puck, a re-levelled machine, a
+      plate that got moved. It is just a fresh probe, not a once-ever commissioning step.</li>
     </ul>
 
     <h3>Controller macros (step 7)</h3>
@@ -2368,16 +2631,38 @@
     captured machine-coordinate reference position that <a href="#setup">Setup</a> can probe against. The edit
     dialog is deliberately <strong>non-modal</strong> so the jog pad stays live while you're defining one:</p>
     <ul>
-      <li><strong>Set position</strong> captures wherever the machine currently is as the fixture's reference.</li>
-      <li><strong>Test</strong> rapids to the saved position and probes it. If you've since jogged somewhere
-      noticeably different, it asks first and defaults to adopting <em>where the machine actually is</em> —
-      otherwise pressing Test would silently undo your jog and re-run the identical failing probe. Nothing
-      moves until you answer.</li>
+      <li><strong>Set position</strong> captures wherever the machine currently is as the fixture's reference.
+      That is a <em>guess</em> — wherever you jogged to by eye — and it clears the validated tick, because a
+      moved reference invalidates whatever was measured against the old one.</li>
+      <li><strong>Test position</strong> goes to the saved position and probes it, and on a fixture that
+      probes its edges <strong>the corner it finds becomes the fixture's position</strong> — the measurement
+      replaces the guess. That is what puts the green tick on: Set records where you <em>think</em> it is,
+      Test proves it. If you've since jogged somewhere noticeably different, it asks first and defaults to
+      adopting <em>where the machine actually is</em> — otherwise pressing Test would silently undo your jog
+      and re-run the identical failing probe. Nothing moves until you answer.</li>
       <li>The <strong>3D Probe / Touch Plate</strong> choice is remembered per fixture. A touch-plate fixture
       reopens as a touch-plate fixture, so the next Set/Test can't quietly run with 3D-probe geometry and drop
       the plate thickness and lip offset. A brand-new fixture defaults by which probes you actually declared
       in step 5.</li>
     </ul>
+    <div class="callout warn"><span class="k">Test position lifts before it travels</span><br>
+      It <strong>retracts to the top of Z travel, travels in X and Y, and descends last</strong> — never a
+      diagonal from wherever the spindle happens to be. That matters because you press it from anywhere: beside
+      a clamp, inside a vise, or low down after a previous probe, and a diagonal from there goes through
+      whatever is in the way. It is the same rule the jog pad's <a href="#jogging">Go&nbsp;to</a> menu follows,
+      for the same reason — the only clearance anyone has actually checked is <em>at the top</em>. If Z travel
+      or pull-off can't be read it <strong>refuses rather than guessing</strong> a safe height, and points you
+      at steps 3 and 4.</div>
+    <div class="callout note"><span class="k">What Test position writes, and what it leaves alone</span><br>
+      <strong>X and Y</strong> become the probed corner. <strong>Z is deliberately left as you jogged it</strong>
+      — it is the <em>start</em> of the capped downward search, a travel reference rather than a datum, and
+      overwriting it with the stock top would have the next Test begin its search already touching the surface.
+      The message afterwards reports how far out the reference was — <em>&ldquo;Reference was out by X 0.369
+      Y 0.000&rdquo;</em>. Nothing stores that number, and it is worth reading anyway: on a fixture you have
+      tested before, <strong>a delta that has grown is the fence having moved.</strong>
+      <br><br><em>Fixtures saved by an earlier version need nothing done to them</em> — an older fixture kept
+      its measured corner separately from its reference, and the two are merged as the library loads, keeping
+      the validated tick it already had.</div>
     <div class="callout tip"><span class="k">If a probe search fails</span><br>
       The recovery prompt tells you what went wrong and points you at <strong>Test</strong>. Jog closer to the
       feature, then press Test — it will offer to adopt the new position and probe from there.</div>
@@ -2581,8 +2866,8 @@
       <tr><td><strong>Controller</strong></td><td><strong>Grbl</strong> — every <code>$</code> setting the controller has, with its own group tree and <code>$</code>-search (see below). <strong>Simulator</strong> — build and manage the bundled option-matched grblHAL simulator (see <a href="#connect">Connect</a> and <a href="#machine-setup">Machine Setup</a>), also reachable at startup via the <code>-simulator</code> command-line flag.</td></tr>
       <tr><td><strong>Application</strong></td><td>One page per panel — <strong>Main</strong> is how ioSender <em>talks to the controller</em> (reset delay, poll interval, buffer size and aggressive buffering, comment/line-number handling, prefer-network-if-available, and the grbl auto-save pair), plus <strong>Work Order</strong>, <strong>Camera</strong> and <strong>Demo recording (OBS)</strong>. How the app itself <em>looks and behaves</em> is not here — that's User Interface → General, below.</td></tr>
       <tr><td><strong>Jogging</strong></td><td><strong>UI jogging</strong> and <strong>Keyboard jogging</strong> — jog steps and feeds for each, and mirroring them to the controller's firmware jog (<code>$5x</code>). See <a href="#jogging">Jogging</a>.</td></tr>
-      <tr><td><strong>G Code</strong></td><td><strong>GCode command stripping</strong> (what gets filtered on the way out) and <strong>GCode Viewer</strong> (how the <a href="#gcode-viewer">3D view</a> draws it).</td></tr>
-      <tr><td><strong>User Interface</strong></td><td><strong>General</strong> — how the app itself looks and behaves: keep MDI focus, restore the last window size, friendly Start/Pause run-strip labels, UI scale, the go-to buttons on the <a href="#jogging">jog pad</a>, <strong>ESC closes current tab if closable</strong>, <strong>Show 3D view in split screen on Job tab</strong>, the <strong>status pop-up dwell</strong> slider, and the app's own auto-save / prompt-before-saving pair. Then <strong>Keyboard</strong> and <strong>Controller</strong> (game-controller bindings), <strong>Macros</strong>, <strong>Job tab layout</strong>, and <strong>Top-level tabs</strong>.</td></tr>
+      <tr><td><strong>G Code</strong></td><td><strong>GCode command stripping</strong> — what gets filtered on the way out to the controller. That is the whole category now: what the <a href="#gcode-viewer">3D view</a> draws is set <em>in the view</em>, from its own <strong>View options</strong> button. The <em>GCode Viewer</em> page that used to sit here drove an earlier renderer the app no longer uses, so nothing on it affected anything; it has been removed rather than left to mislead.</td></tr>
+      <tr><td><strong>User Interface</strong></td><td><strong>General</strong> — how the app itself looks and behaves: keep MDI focus, restore the last window size, friendly Start/Pause run-strip labels, UI scale, the go-to buttons on the <a href="#jogging">jog pad</a>, <strong>ESC closes current tab if closable</strong>, <strong>Show 3D view in split screen on Job tab</strong>, the <strong>status pop-up dwell</strong> slider, and the app's own auto-save / prompt-before-saving pair. Then <strong>Keyboard</strong>, <strong>Remote</strong> (a Bluetooth shutter remote as a one-button pendant — see <a href="#remote">A shutter remote as a pendant</a>), <strong>Controller</strong> (game-controller bindings), <strong>Macros</strong>, <strong>Job tab layout</strong>, and <strong>Top-level tabs</strong>.</td></tr>
     </table>
 
     <h3>Four in User Interface → General worth knowing about</h3>
@@ -2753,6 +3038,16 @@
     presses the actual button, so it can't drift from what clicking does, and it's refused while the button
     is disabled.</p>
 
+    <div class="callout tip"><span class="k">In this panel, a shortcut finds itself instead of firing</span><br>
+      Press a bound combination while the <strong>Keyboard</strong> page is open and it does not run the
+      action — it <em>locates</em> it, expanding its group and scrolling the row into view. That is what
+      you want when you are trying to remember what <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>H</kbd> was for, and
+      it means you can sweep a keyboard for collisions without homing the machine by accident. A combination
+      with modifiers that is <em>not</em> bound beeps and does nothing. Unbound bare keys still walk the list
+      as they always did. The page says as much on screen, above the tree.</div>
+    <div class="shot-todo">screenshot: settings-keyboard.png — Settings → User Interface → Keyboard: the
+    help block at the top including the find-by-key line, and the grouped binding tree below it</div>
+
     <h3>Keeping ioSender up to date</h3>
     <p><strong>Help → Support → Check for updates...</strong> checks GitHub for a newer released version and
     walks you through installing it (on a dev build, it instead offers a dropdown of every published release
@@ -2762,6 +3057,128 @@
     work if you haven't updated at least once yet.</p>
 
     <div class="xref">Related: <a href="#machine-setup">Machine&nbsp;Setup</a> · <a href="#accuracy-calibration">Accuracy &amp; calibration</a> · <a href="#jogging">Jogging</a> · <a href="#lathe">Lathe</a></div>
+  </section>
+
+  <!-- ===================== REMOTE ===================== -->
+  <section class="topic" id="remote" data-title="A shutter remote as a pendant" data-level="int"
+           data-track="novice:0,intermediate:9,machinist:0">
+    <h2>A shutter remote as a pendant <a class="anchor" href="#remote">#</a></h2>
+    <div class="tags"><span class="tag int">Intermediate</span></div>
+
+    <div class="shot-todo">screenshot: Settings → App → User Interface → Remote — the enable tick, the
+    binding status line showing a bound device, Rebind, the swap tick, and the six-row function table with
+    its dropdowns</div>
+
+    <p>Probing a <a href="#heightmap">height map</a> with a touch plate means: place the plate, press
+    <em>Continue</em>, walk back, place the plate, press <em>Continue</em> — sixteen times for a 4×4 grid,
+    with the laptop across the shop each time. A cheap Bluetooth camera shutter remote solves that, and once
+    ioSender can hear one it is useful well beyond the height map: it can answer any prompt, hold a running
+    job, resume a hold, and get you out of an alarm — all with your hands on the work instead of on the
+    keyboard.</p>
+
+    <h3>What you need, and pairing it</h3>
+    <p>Any of the cheap two-button Bluetooth shutter remotes. They present themselves to Windows as ordinary
+    HID keyboards and send a <strong>media key</strong> — volume up or volume down — rather than Enter.</p>
+    <p><strong>Pair it in Windows,</strong> as you would any Bluetooth keyboard. ioSender never pairs to the
+    remote itself; it only listens for one that Windows has already brought in. It hears the remote whether
+    or not ioSender is the focused window, which is the whole point of a pendant.</p>
+
+    <h3>Turning it on and binding it</h3>
+    <p>Everything is on one page: <strong>Settings → App → User Interface → Remote</strong>.</p>
+    <ol>
+      <li>Tick <strong>A shutter remote drives the machine (volume keys)</strong>. It is <strong>off by
+      default</strong> — listening for a remote means installing a system-wide keyboard hook, and nobody who
+      has not asked for that should get it.</li>
+      <li>The status line under the tick reads <em>"Waiting — press a button on your remote to bind it."</em>
+      Ticking the box <strong>arms a one-shot bind</strong>; nothing is listening to any particular device
+      yet.</li>
+      <li><strong>Press a button on the remote.</strong> You get a chime, and the line changes to
+      <em>"Bound to &lt;your remote&gt; — the button you pressed is the primary one."</em> That press
+      only binds; it does not answer whatever happened to be on screen at the time.</li>
+    </ol>
+    <p>Two buttons, and <strong>the one you press when binding becomes the primary one</strong>. This is
+    deliberate rather than lazy: the buttons are not marked up and down, and which of them sends which media
+    key is the remote's own business — on the common PICO, the <em>larger top button</em> is the one that
+    sends volume <em>down</em>. So rather than the manual telling you which is which and being wrong for your
+    remote, you nominate it by pressing it. Changed your mind? <strong>Swap the two buttons</strong> does
+    exactly that.</p>
+    <p><strong>Rebind</strong> forgets the bound remote and listens for the next press — that is what to use
+    after replacing a remote, or if the wrong device claimed the binding. Unticking and reticking the enable
+    does the same thing, plus stopping and restarting the listener for no reason.</p>
+    <div class="callout note"><span class="k">This page is the only place it is set up</span><br>
+      The enable was born on the <a href="#heightmap">Height map</a> tab, because that is where the need
+      showed up first, and for a while the same tick appeared in both places. It does not any more: a
+      duplicate of a global switch, sitting inside one feature, is just another place to look for something
+      that is not there. Everything about the remote — the enable, the binding and the function table — is
+      here.</div>
+
+    <h3>What a press does</h3>
+    <p>The table on the page has one row per situation, each with its own <strong>On</strong> tick, so a
+    behaviour you dislike can be switched off without giving up the remote. The rows are consulted
+    <strong>in this order</strong> — a prompt on screen beats everything, then a height-map hold, and only
+    then does the machine's state decide.</p>
+    <table class="reftab">
+      <tr><th>When</th><th>Primary button</th><th>Secondary button</th><th>Assignable?</th></tr>
+      <tr><td>A prompt is on screen</td><td>OK / Yes</td><td>Cancel / No</td><td>No — on or off only</td></tr>
+      <tr><td>Height map is waiting</td><td>Continue</td><td>Continue</td><td>No — on or off only</td></tr>
+      <tr><td>A job is running</td><td><strong>Feed Hold</strong></td><td><strong>Feed Hold</strong></td><td>Yes</td></tr>
+      <tr><td>The machine is holding</td><td><strong>Cycle Start</strong></td><td><strong>Stop</strong></td><td>Yes</td></tr>
+      <tr><td>The machine is idle</td><td><strong>Nothing</strong></td><td><strong>Nothing</strong></td><td>Yes</td></tr>
+      <tr><td>The machine is in alarm</td><td><strong>Reset and unlock</strong></td><td><strong>Nothing</strong></td><td>Yes</td></tr>
+    </table>
+    <p>The values in bold are the defaults, which reproduce what the remote used to do before any of it was
+    configurable. Idle starts at <em>Nothing</em> on purpose: a pendant that acts when it is nudged on a
+    bench is a trap.</p>
+    <p>The four assignable rows each choose from the same ten functions:</p>
+    <table class="reftab">
+      <tr><th>Function</th><th>What it does</th></tr>
+      <tr><td><strong>Nothing</strong></td><td>The button does nothing in this state. It still beeps, so you know it was heard.</td></tr>
+      <tr><td><strong>Cycle Start</strong></td><td>Start a program, or resume from a hold.</td></tr>
+      <tr><td><strong>Feed Hold</strong></td><td>Decelerate and stop, keeping position.</td></tr>
+      <tr><td><strong>Stop</strong></td><td>End the run.</td></tr>
+      <tr><td><strong>Peek / Resume</strong></td><td>Pause at the end of the current block and park at <code>G30</code> with the spindle off; press again to go back and carry on.</td></tr>
+      <tr><td><strong>MDI (open console)</strong></td><td>Open the console with the caret in its input box.</td></tr>
+      <tr><td><strong>Status</strong></td><td>Show the status message history.</td></tr>
+      <tr><td><strong>Reset</strong></td><td>Soft-reset the controller (<code>Ctrl-X</code>). Stops motion immediately and clears the planner.</td></tr>
+      <tr><td><strong>Unlock</strong></td><td>Clear an alarm (<code>$X</code>) so the machine takes commands again.</td></tr>
+      <tr><td><strong>Reset and unlock</strong></td><td>Soft-reset, then clear the alarm once the controller has restarted — the usual way out of an alarm, in one press.</td></tr>
+    </table>
+    <p>Each of these presses the corresponding button on the <a href="#job">run strip</a>, so the remote can
+    never do something the app itself would refuse. Ask for <em>Cycle Start</em> when the Start button is
+    greyed out and you get the beep, not a surprise.</p>
+
+    <h3>Three things to know before you trust it</h3>
+    <div class="callout warn"><span class="k">Both buttons mean Feed Hold while a job runs</span><br>
+      Deliberately, and it is the shipped default for both. A hand reaching for the remote mid-cut wants the
+      machine to <em>stop</em> — not to pick the right button of two by feel. You can change either one in
+      the table, but think about that before you do.</div>
+    <div class="callout warn"><span class="k">A prompt with no Cancel takes either button as OK</span><br>
+      The commonest prompt of the lot — <em>"move the plate to the next corner, then click OK"</em> — has no
+      Cancel button. There is nothing else the secondary button could mean there, so both answer it. A button
+      that did nothing would just be one you have to remember not to press.</div>
+    <div class="callout warn"><span class="k">The system volume will probably still move</span><br>
+      These are volume keys, and Windows routes media keys to the shell and the audio endpoint on a path that
+      does not pass through ioSender's window at all. ioSender can suppress a press only in the one case where
+      Windows also delivers it as a keystroke — and on the remotes measured so far it does not: the buttons
+      arrive as raw HID input, which can be <em>read</em> but not intercepted. So expect the volume to step on
+      each press. <strong>It is not a fault, and there is no setting that fixes it</strong> — turn the machine
+      PC's volume down, or mute it, and ignore the on-screen volume bar.</div>
+
+    <h3>Odds and ends worth knowing</h3>
+    <ul>
+      <li><strong>One action per physical press.</strong> Holding a button down does not release one
+      height-map point after another while your hand is still on the plate — that is enforced by the
+      button's release, not by a timer.</li>
+      <li><strong>Only the bound remote is yours.</strong> Every other device is ignored entirely, so the
+      machine keyboard's own volume keys go on working exactly as they did.</li>
+      <li><strong>A press that means nothing beeps.</strong> That is the remote telling you it was heard and
+      had nothing to do, which is worth being able to tell apart from a flat battery.</li>
+      <li><strong>Bluetooth remotes sleep.</strong> Waking one can bring it back as a different device
+      instance; ioSender watches for that, but if a remote ever goes quiet for good, <strong>Rebind</strong>
+      is the fix.</li>
+    </ul>
+
+    <div class="xref">Related: <a href="#heightmap">Height map</a> · <a href="#job">The Job screen</a> · <a href="#settings">Settings</a> · <a href="#errors-alarms">Errors &amp; alarms</a></div>
   </section>
 
   <!-- ===================== FEEDS & SPEEDS ===================== -->
@@ -2879,38 +3296,89 @@
     <h2>The 3D g-code viewer <a class="anchor" href="#gcode-viewer">#</a></h2>
     <div class="tags"><span class="tag int">Intermediate</span></div>
     <figure>
-      <img src="img/gcode-viewer.png" alt="The 3D toolpath viewer and its toolbar">
-      <figcaption>The Job screen with the 3D View sub-tab open, mid-program.</figcaption>
+      <img src="img/gcode-viewer.png" alt="The 3D toolpath view, its playback controls and the View options button">
+      <figcaption>The Job screen's 3D view, mid-playback. <em>This shot predates the September&nbsp;2026
+      rework</em>: it has no signs on the bed, no green dot at machine zero and no <strong>View
+      options</strong> button, and it still shows the wireframe box that has since gone.</figcaption>
     </figure>
+
+    <p>The 3D view sits beside the g-code list on the <a href="#job">Job screen</a> — as a sub-tab, or side
+    by side with the program list if you tick <strong>Show 3D view in split screen on Job tab</strong> in
+    <a href="#settings">Settings → User Interface → General</a>. It draws the whole program before you cut,
+    carved into a model of your actual stock, so you can see where the job sits on the board and how deep it
+    goes.</p>
+
     <p><strong>What you're looking at:</strong></p>
     <ul>
-      <li>The 3D pane itself sits between the DRO panel and the jogging controls on the Job screen (see <a href="#job">The Job screen</a>) — this shot shows it mid-program, with the toolpath already carved into the stock model.</li>
-      <li><strong>Play / Pause / Stop</strong> and the speed dropdown (<strong>1x</strong>) play back the toolpath animation at the chosen speed without actually running the machine.</li>
-      <li><strong>Reset view</strong> snaps the camera back to fit the whole scene; the small cube gizmo in the bottom-right corner (the ViewCube) can be clicked to snap to a specific face.</li>
-      <li>The orange cylinder is the cutting tool's current position; the brown block is the stock, shown at its real probed size.</li>
+      <li><strong>The stock block</strong> — the material, at the size the program declares or
+      <a href="#setup">Setup</a> probed, with the toolpath genuinely <em>removed</em> from it rather than
+      drawn on top of it. What that size is taken from is worth knowing — see below.</li>
+      <li><strong>Cut and rapid lines</strong> — every move in the program. Rapids are the thinner set, and
+      can be hidden.</li>
+      <li><strong>The cutter</strong> — a cone at the machine's live position. It follows the machine as you
+      jog.</li>
+      <li><strong>The bed grid</strong> — 50&nbsp;mm squares with a heavier line every 100&nbsp;mm, so a
+      distance in the view is a distance you can pace out on the real table.</li>
+      <li><strong>Signs painted on the bed</strong> — a blue <strong>P</strong> where <code>G30</code> parks
+      and an orange <strong>TS</strong> at the toolsetter (<code>G59.3</code>), each a real 100&nbsp;mm square
+      lying flat on the table. They tell you <em>where on the table</em> those positions are; their height
+      carries nothing, as both are over clear air by definition. A position still sitting at all zeros is
+      treated as never taught and is not drawn — better nothing than a park marked at the corner of the
+      machine.</li>
+      <li><strong>A green dot at machine zero</strong> — where the machine homes to, drawn only when homing is
+      enabled. Worth knowing why it earns its place: machine zero is at the <em>top</em> of Z travel, so the
+      gap between that dot and the top of your stock is your headroom, read against something real. On a
+      machine with homing turned off there is no such place, so there is no dot.</li>
+      <li><strong>The ViewCube</strong> in the corner, and a small axis triad showing which way X, Y and Z
+      run.</li>
     </ul>
-    <p>The 3D viewer sits beside the g-code list on the <a href="#job">Job</a> screen and draws the entire
-    toolpath before you cut — so you can sanity-check a program, see where it sits on your stock, and watch
-    progress as it runs.</p>
 
     <h3>Getting around</h3>
     <ul>
-      <li><strong>Drag</strong> to rotate, <strong>scroll</strong> to zoom, and use the <strong>ViewCube</strong>
-      to snap to a face.</li>
-      <li><strong>Reset view</strong> (<kbd>Ctrl</kbd>+<kbd>V</kbd>) re-fits the machine/program;
-      <strong>Save view</strong> stores the current angle as your default.</li>
+      <li><strong>Drag</strong> to rotate and <strong>scroll</strong> to zoom — both about the point under the
+      pointer, so you can zoom into a corner without losing it off the edge.</li>
+      <li><strong>Click a ViewCube face</strong> to snap square to it.</li>
+      <li><strong>Reset view</strong>, inside <strong>View options</strong>, zooms and centres so the whole
+      scene fits.</li>
     </ul>
+    <div class="callout note"><span class="k">This view has no keyboard shortcuts</span><br>
+      There is nothing here to bind. Earlier versions of this manual described
+      <kbd>Ctrl</kbd>+<kbd>V</kbd> for Reset view, <kbd>Ctrl</kbd>+<kbd>G</kbd> for the grid, a
+      <strong>Save view</strong> button that stored your angle, and <kbd>Ctrl</kbd>-click in the view to jog
+      to that point. All four belonged to an earlier renderer the app no longer uses — the buttons and the
+      keys are both gone, and there is no setting anywhere that brings them back.</div>
 
-    <h3>What you can show</h3>
-    <p>Toggle the <strong>grid</strong> (<kbd>Ctrl</kbd>+<kbd>G</kbd>), <strong>X/Y/Z axis markers</strong>,
-    the <strong>work envelope</strong> (your machine's travel), the program's <strong>bounding box</strong>,
-    the coordinate system and a text overlay. Colours for cuts, rapids, retracts and the highlight are all
-    configurable, and <strong>Highlight completed cuts</strong> shows how far a running job has got.</p>
+    <h3>View options — what the view draws</h3>
+    <p>The <strong>View options</strong> button opens a small dialog. Everything in it applies straight away
+    and is remembered between sessions.</p>
+    <table class="reftab">
+      <tr><th>Control</th><th>What it does</th></tr>
+      <tr><td><strong>Rapid moves</strong></td><td>The lines between cuts. Hiding them leaves only the cutting path.</td></tr>
+      <tr><td><strong>Stock block</strong></td><td>The material. Hide it to see the whole toolpath, including the parts buried inside the board.</td></tr>
+      <tr><td><strong>Bed grid</strong></td><td>The table grid.</td></tr>
+      <tr><td><strong>Stored positions</strong></td><td>The <code>G30</code> and toolsetter signs, and the dot at machine zero.</td></tr>
+      <tr><td><strong>Cut moves / Rapid moves / Stock</strong></td><td>Three colour pickers. <strong>Default colours</strong> puts all three back to the shipped palette.</td></tr>
+      <tr><td><strong>Reset view</strong></td><td>Zoom and centre so the whole scene fits.</td></tr>
+    </table>
+    <div class="callout note"><span class="k">Why the stock never matches its swatch</span><br>
+      Cut and rapid moves are drawn as <em>lines</em>, and lines are not lit — those two appear in the view
+      exactly as you picked them. The stock is a lit <em>surface</em>, so it renders darker than the swatch,
+      and its sides darker again where the light rakes across them. Pick the stock colour by what the block
+      looks like, not by matching the square in the dialog.</div>
 
-    <div class="callout tip"><span class="k">Click to jog</span><br>
-      Hold <kbd>Ctrl</kbd> and click a point in the view to <strong>jog there</strong> — the machine raises Z
-      to a safe height first, then rapids to the spot. A fast way to reach a feature without nudging with the
-      <a href="#jogging">jog</a> keys.</div>
+    <h3>Playback, and what the view does during a real job</h3>
+    <ul>
+      <li><strong>Play / Pause / Stop</strong>, at <strong>1x</strong>, <strong>2x</strong>, <strong>5x</strong>
+      or <strong>10x</strong>, runs the program <em>in the view only</em> — the machine does not move. The
+      block is carved as it goes with the cone where the cutter would be, which makes it the cheapest dry run
+      there is. It needs no controller and no connection.</li>
+      <li><strong>While a job is streaming, the view holds still.</strong> This is deliberate, not a fault:
+      redrawing a carve competes with feeding lines to the controller, and a controller starved of lines
+      stutters the cut. The view picks up again by itself once the job ends. Watch the shape with
+      <strong>Play</strong> beforehand, and watch the run on the program list and the DRO.</li>
+      <li><strong>Jogging does move the cone</strong> — and carves with it. Anything other than a streaming
+      program is tracked live.</li>
+    </ul>
 
     <h3>The stock block, and what it is drawn from</h3>
     <p>The block the toolpath carves into is not a decoration — it is a real dexel model, and it is drawn
@@ -3008,7 +3476,7 @@
     <table class="reftab">
       <tr><th>Alarm</th><th>Meaning &amp; usual cause</th></tr>
       <tr><td><strong>1</strong></td><td>Hard limit tripped — a limit switch was hit. Re-home.</td></tr>
-      <tr><td><strong>2</strong></td><td>Soft limit — a commanded move would exceed machine travel. Usually a bad work origin or a program too big for the stock position. Two specific causes ioSender now catches <em>before</em> the run: a stored <a href="#offsets">WCS origin sitting outside the travel envelope</a>, and a <a href="#job">program whose footprint is bigger than the machine</a>. If one of those is your cause, you get a dialog at the start instead of an alarm halfway through.</td></tr>
+      <tr><td><strong>2</strong></td><td>Soft limit — a commanded move would exceed machine travel. Usually a bad work origin or a program too big for the stock position. Two specific causes ioSender now catches <em>before</em> the run: a stored <a href="#offsets">WCS origin sitting outside the travel envelope</a>, and a <a href="#job">program whose footprint is bigger than the machine</a>. If one of those is your cause, you get a dialog at the start instead of an alarm halfway through. When it does alarm, <strong>ioSender adds the arithmetic</strong> the controller leaves out — which axis, and by how much: <em>&ldquo;Z: &minus;61.254 &minus; 100.000 = &minus;161.254, which is 15.254&nbsp;mm below the limit of &minus;146.000&rdquo;</em>, naming the line that asked for it. It says nothing rather than guessing: a <code>G90</code> move is in <em>work</em> coordinates, and on a rotated system an X/Y target doesn't resolve by adding an offset at all, so an axis it can't settle honestly is left out.</td></tr>
       <tr><td><strong>3</strong></td><td>Reset while in motion — position lost. Re-home.</td></tr>
       <tr><td><strong>4 / 5</strong></td><td>Probe failed — didn't start where expected (4) or didn't make contact within travel (5). Check wiring and the probe.</td></tr>
       <tr><td><strong>6–9</strong></td><td>Homing failed — reset during homing, or a switch wasn't found. Check switch wiring and pull-off.</td></tr>
