@@ -117,10 +117,12 @@ namespace CNC.Controls
             if (Topmost)
                 WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-            // Network is the default transport: open on the Network tab unless an existing serial/simulator
-            // target below selects another. Most grblHAL controllers are networked, and the Scan button lives
-            // here - so a first-time / no-target connect lands where discovery is.
-            tab.SelectedItem = tabNetwork;
+            // Serial is the default transport (2026-08-12, was Network): open on the Serial tab unless an
+            // existing network/simulator target below selects another. A first-time connect is far more
+            // likely to be a USB cable already plugged in than a controller to go discovering for, and the
+            // Network tab's Scan button is one click away for the machines that are on the network.
+            // Matches Config.PreferNetwork's default, which is now also off.
+            tab.SelectedItem = tabSerial;
 
             // Default the network tab's host to the last successfully-connected IP (falls back to the mDNS
             // name set in PortProperties). If the saved target itself is a network one, parsenet below
@@ -244,8 +246,15 @@ namespace CNC.Controls
                 string exe = SimulatorManager.AppDataSimulatorExePath();
                 prop.SimulatorExe = exe;
                 prop.SimulatorArgs = "-p " + prop.NetPort.ToString();
+                // Mirror the real machine's toolsetter/tool-change positions into the simulated world
+                // before it boots - the sim reads sim_setup.cfg once, at startup, so a simulator that is
+                // already running has to be restarted for a changed geometry to mean anything at all
+                // (see MachineOffsets).
+                if (MachineOffsets.WriteSimSetup(exe) && SimulatorManager.IsProcessRunningByExe(exe))
+                    SimulatorManager.StopSimulator(exe);
+
                 if (!SimulatorManager.IsProcessRunningByExe(exe))
-                    SimulatorManager.StartSimulator(exe, prop.SimulatorArgs, prop.AutoKillSimulator);
+                    SimulatorManager.StartSimulator(exe, MachineOffsets.SimulatorArgs(exe, prop.SimulatorArgs), prop.AutoKillSimulator);
             }
             else if(prop.Com.Ports.Count > 0)
             {

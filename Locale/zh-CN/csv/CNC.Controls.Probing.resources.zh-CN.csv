@@ -79,8 +79,6 @@ CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,hdr_preview:System.W
 CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,lbl_addOffset:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,添加偏移量
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,lbl_addOffset:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,"确定直角工件的X0,Y0"
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,lbl_addOffset:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,在左边缘添加一个探测点。
-CNC.Controls.Probing.g.en-US.resources:configcontrol.baml,lbl_chkProbeConnected:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,将显示一个对话框，直到探测成功或取消该对话框。
-CNC.Controls.Probing.g.en-US.resources:configcontrol.baml,lbl_chkProbeConnected:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,手动验证探头是否已连接
 CNC.Controls.Probing.g.en-US.resources:configcontrol.baml,lbl_chkProbeStatus:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,如果未启用且探头已置位，控制器将生成警报。
 CNC.Controls.Probing.g.en-US.resources:configcontrol.baml,lbl_chkProbeStatus:System.Windows.Controls.ContentControl.Content,CheckBox,True,True,,启动前检查探头状态（G59.3）
 CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,lbl_clearToolOffset:System.Windows.Controls.ContentControl.Content,Button,True,True,,清除刀具长度偏置
@@ -161,7 +159,6 @@ CNC.Controls.Probing.g.en-US.resources:probingview.baml,str_jogActive:System.Str
 CNC.Controls.Probing.g.en-US.resources:probingview.baml,str_jogDisabled:System.String.$Content,None,True,True,,键盘点动已禁用
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_macroChangedSave:System.String.$Content,None,True,True,,"Macro was changed, save?"
 CNC.Controls.Probing.g.en-US.resources:centerfindercontrol.baml,str_positionsRequired:System.String.$Content,None,True,True,,需要 {0} 个探针位置。
-CNC.Controls.Probing.g.en-US.resources:probeverify.baml,str_probeVerify:System.Windows.Controls.ContentControl.Content,Label,True,True,,置位探针以验证连接。
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probing:System.String.$Content,None,True,True,,探测…
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingDistanceError:System.String.$Content,None,True,True,,探测距离必须大于 XY 间隙 + ? 探头/工具直径。
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingFailedAlarm:System.String.$Content,None,True,True,,探测失败并发出警报，在 Grbl 选项卡中清除。
@@ -173,11 +170,9 @@ CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingLatchDistanceE
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingNoPos:System.String.$Content,None,True,True,,探测失败，无法确定当前机器位置。
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingNoProbe:System.String.$Content,None,True,True,,"探测失败,探头未连接。"
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingNotIdle:System.String.$Content,None,True,True,,"探测失败,Grbl 未处于空闲或换刀状态。"
-CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingNoVerifyContinue:System.String.$Content,None,True,True,,探针连接未验证，是否仍继续？
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingProbeAsserted:System.String.$Content,None,True,True,,"探测失败,探测信号有效。"
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingProbingAtX0Y0:System.String.$Content,None,True,True,,探测@X0Y0…
 CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingRadiusArcs:System.String.$Content,None,True,True,,"GCode contains arcs in XZ or YZ plane (G18/19), can&apos;t apply transform. Use &apos;Arcs to Lines&apos; if you really need this."
-CNC.Controls.Probing.g.en-US.resources:libstrings.baml,str_probingVerifyStart:System.String.$Content,None,True,True,,再次按[开始]开始探测。
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,str_rotationCompleted:System.String.$Content,None,True,True,,探测完成。
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,str_rotationFailed:System.String.$Content,None,True,True,,探测失败
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,str_rotationInitFailed:System.String.$Content,None,True,True,,角度：{0} 度
@@ -241,3 +236,4 @@ CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,str_rotationDescript
 CNC.Controls.Probing.g.en-US.resources:rotationcontrol.baml,txt_warning:System.Windows.Documents.Run.Text,Text,True,True,,Warning! Use with care - incorrect parameters may damage your probe!
 CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,str_toolLengthDescription:System.Windows.Documents.Run.Text,Text,True,True,,"Use after a tool change, or to set a tool-length reference, so the controller knows the current tool's length. Probes Z down onto a toolsetter or touch plate. Probe fixture @ G59.3 measures against a fixed toolsetter at a known machine position, so a new tool re-measures to the same reference (applied as G43.1). Establish reference offset stores the master-tool baseline other tools measure against; Clear removes the active offset (G49). Tick 'Also set work origin' to instead set work Z0 from a touch-off on the job. Probe: toolsetter / Z touch plate."
 CNC.Controls.Probing.g.en-US.resources:toollengthcontrol.baml,txt_warning:System.Windows.Documents.Run.Text,Text,True,True,,Warning! Use with care - incorrect parameters may damage your probe!
+CNC.Controls.Probing.g.en-US.resources:edgefinderintcontrol.baml,str_edgeIntFinderOffsetWarning:System.String.$Content,None,True,True,,Offset is less than XY Clearance + ½ Probe/tool diameter.\nUse Offset as clearance and run anyway?.

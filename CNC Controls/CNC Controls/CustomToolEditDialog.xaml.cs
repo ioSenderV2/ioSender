@@ -21,11 +21,12 @@ namespace CNC.Controls
         {
             InitializeComponent();
             target = tool;
-            edit = new CustomTool { Id = tool.Id, Name = tool.Name, Kind = tool.Kind, DiameterMm = tool.DiameterMm, Flutes = tool.Flutes };
+            edit = new CustomTool { Id = tool.Id, Name = tool.Name, Kind = tool.Kind, DiameterMm = tool.DiameterMm, Flutes = tool.Flutes, IncludedAngleDeg = tool.IncludedAngleDeg };
 
             txtName.Text = edit.Name;
             fldDiameter.Value = edit.DiameterMm;
             fldFlutes.Value = edit.Flutes;
+            fldAngle.Value = edit.IncludedAngleDeg;
 
             // Select by Tag (the enum member's name as text), not SelectedIndex - robust against the XAML
             // item order ever drifting out of lockstep with the enum's own declaration order.
@@ -45,6 +46,10 @@ namespace CNC.Controls
             // comment) - hide it there so an inert field doesn't invite setting a number that's ignored.
             var kind = SelectedKind();
             fldFlutes.Visibility = (kind == CustomToolKind.Drill || kind == CustomToolKind.Countersink) ? Visibility.Collapsed : Visibility.Visible;
+
+            // The included angle only means anything on a V-shaped tool - same reasoning as Flutes above:
+            // an inert field invites setting a number that is then ignored.
+            fldAngle.Visibility = (kind == CustomToolKind.VBitOrChamfer || kind == CustomToolKind.Countersink) ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void btnOk_Click(object sender, RoutedEventArgs e)
@@ -61,10 +66,19 @@ namespace CNC.Controls
                 return;
             }
 
+            var kindNow = SelectedKind();
+            if ((kindNow == CustomToolKind.VBitOrChamfer || kindNow == CustomToolKind.Countersink) &&
+                 (fldAngle.Value < 1d || fldAngle.Value > 179d))
+            {
+                AppDialogs.Show(Window.GetWindow(this), "Included angle must be between 1 and 179 degrees.", "Custom tool", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
             target.Name = name;
             target.Kind = SelectedKind();
             target.DiameterMm = fldDiameter.Value;
             target.Flutes = (int)Math.Round(fldFlutes.Value);
+            target.IncludedAngleDeg = fldAngle.Value;
 
             DialogResult = true;
         }

@@ -40,19 +40,42 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using System;
 using System.IO;
 using System.Text;
-using System.Windows.Threading;
-using WebSocketSharp;
+using System.Threading;
+#if USEWEBSOCKET
+using System.Net.WebSockets;    // in the framework on BOTH net462 and net8.0 - replaces websocket-sharp,
+using System.Threading.Tasks;   // an unmaintained net462-only binary, with no external reference at all
+#endif
 
 namespace CNC.Core
 {
 #if USEWEBSOCKET
-    public class WebsocketStream : StreamComms
+    /* Transport for grblHAL's websocket daemon (ws://host:port).
+     *
+     * Ported from websocket-sharp to System.Net.WebSockets.ClientWebSocket: that library was the last
+     * dependency keeping CNC.Core off modern .NET, and unlike ObsBridge (client functionality, which
+     * simply moved to CNC.Controls) this is a genuine server concern - it talks to the machine.
+     *
+     * The API difference that shapes this file: websocket-sharp was event-driven with a blocking
+     * Connect() and an OnMessage callback, ClientWebSocket is task-based. So reads become an explicit
+     * receive loop on a background task, and writes block on the send task - StreamComms is a
+     * synchronous contract and websocket-sharp's Send was synchronous too, so blocking preserves the
+     * existing behaviour rather than introducing new async semantics on the write path.
+     */
+    public class WebsocketStream : StreamCommsBase, StreamComms
     {
-        private WebSocket websocket = null;
+        private const int ConnectTimeout = 3000;
+
+        private ClientWebSocket websocket = null;
+        private CancellationTokenSource cancel = null;
         private volatile bool _isOpen = false;
         private volatile Comms.State state = Comms.State.ACK;
         private StringBuilder input = new StringBuilder(1024);
-        private Dispatcher Dispatcher { get; set; }
+        private SynchronizationContext SyncContext { get; set; }
+
+        // ClientWebSocket allows only ONE send in flight - a concurrent SendAsync throws "There is
+        // already one outstanding 'SendAsync' call". websocket-sharp serialised internally; here the
+        // streamer thread and the UI thread both write, so serialise them explicitly.
+        private readonly object sendLock = new object();
 
         private readonly string hostUrl;
         private readonly Reconnector reconnector;
@@ -60,14 +83,14 @@ namespace CNC.Core
 
         public event DataReceivedHandler DataReceived;
 
-        public Action<string> AckSink { get; set; }
+        public event Action<Comms.ReplyClass, string> ReplyClassified;
         public bool BlockingWrites { get; set; }   // websocket Send is already synchronous; no-op here
 
-        public WebsocketStream(string host, Dispatcher dispatcher)
+        public WebsocketStream(string host, SynchronizationContext syncContext)
         {
             Comms.com = this;
             Reply = string.Empty;
-            Dispatcher = dispatcher;
+            SyncContext = syncContext;
 
             hostUrl = host;
 
@@ -83,14 +106,30 @@ namespace CNC.Core
         {
             try
             {
-                websocket = new WebSocketSharp.WebSocket(hostUrl);
-                websocket.OnMessage += OnMessage;
-                websocket.OnOpen += OnOpen;
-                websocket.OnClose += OnClose;
-                websocket.Connect();
+                var ws = new ClientWebSocket();
+                var cts = new CancellationTokenSource();
+
+                // Cap the connect attempt, same rationale as TelnetStream: an unreachable host - the
+                // controller rebooting, typically - would otherwise sit on the OS connect timeout and
+                // stall the reconnect retry loop long enough to look like it had given up.
+                if (!ws.ConnectAsync(new Uri(hostUrl), cts.Token).Wait(ConnectTimeout))
+                {
+                    cts.Cancel();
+                    try { ws.Dispose(); } catch { }
+                    return false;
+                }
+
+                websocket = ws;
+                cancel = cts;
+                _isOpen = ws.State == WebSocketState.Open;
+
+                // Fire and forget: the loop owns its own lifetime, ends on Close()'s cancellation, and
+                // swallows its exceptions, so nothing observes this task.
+                Task.Run(() => ReceiveLoop(ws, cts.Token));
             }
             catch
             {
+                _isOpen = false;
             }
 
             return IsOpen;
@@ -98,12 +137,77 @@ namespace CNC.Core
 
         private void HandleWriteError(Exception ex)
         {
-            if (ex is IOException || ex is ObjectDisposedException || ex is InvalidOperationException)
+            // Task.Wait wraps failures in AggregateException - unwrap before testing, or a dropped
+            // connection is never recognised here and the reconnector never starts.
+            if (ex is AggregateException)
+                ex = ex.GetBaseException();
+
+            if (ex is WebSocketException || ex is IOException || ex is ObjectDisposedException ||
+                 ex is InvalidOperationException || ex is OperationCanceledException)
             {
                 _isOpen = false;
                 if (!closing)
                     reconnector?.NotifyLost();
             }
+        }
+
+        // The one write path: all of WriteByte/WriteBytes/WriteString funnel through here so the
+        // single-send-in-flight rule is enforced in exactly one place.
+        private void Send(byte[] bytes, int len)
+        {
+            var ws = websocket;
+            var cts = cancel;
+
+            try
+            {
+                if (ws != null && IsOpen)
+                    // Binary frames: websocket-sharp's Send(byte[]) sent binary, so this keeps the wire
+                    // format byte-identical to before the port.
+                    lock (sendLock)
+                        ws.SendAsync(new ArraySegment<byte>(bytes, 0, len), WebSocketMessageType.Binary,
+                                      true, cts?.Token ?? CancellationToken.None).Wait();
+            }
+            catch (Exception ex)
+            {
+                HandleWriteError(ex);
+            }
+        }
+
+        // Replaces websocket-sharp's OnMessage callback. Runs on a pool thread for the life of the
+        // connection; ends on cancellation (Close) or on the connection faulting.
+        private async Task ReceiveLoop(ClientWebSocket ws, CancellationToken token)
+        {
+            var buffer = new byte[512];
+
+            try
+            {
+                while (ws.State == WebSocketState.Open && !token.IsCancellationRequested)
+                {
+                    var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), token);
+
+                    if (result.MessageType == WebSocketMessageType.Close)
+                        break;
+
+                    if (result.Count > 0)
+                        // EndOfMessage is deliberately ignored: unlike websocket-sharp, ClientWebSocket
+                        // can hand back a partial message, but no reassembly is needed because the parser
+                        // is stream-oriented (append, then split on '\n') exactly like the serial and
+                        // telnet readers - a reply split across two frames rejoins in 'input'.
+                        ProcessReceived(Encoding.Default.GetString(buffer, 0, result.Count));
+                }
+            }
+            catch
+            {
+                // Cancellation from Close(), or the connection faulting. Which one it was is decided by
+                // 'closing' below, the same test the old OnClose handler made.
+            }
+
+            _isOpen = false;
+
+            // Unexpected end -> start the reconnect loop (OpenConnection builds a fresh socket).
+            // An intentional Close() sets 'closing' first to suppress this.
+            if (!closing)
+                reconnector?.NotifyLost();
         }
 
         ~WebsocketStream()
@@ -120,6 +224,8 @@ namespace CNC.Core
         public Action<int> ByteReceived { get; set; }
 
         public bool IsReconnecting { get { return reconnector != null && reconnector.IsReconnecting; } }
+
+        public void NotifyLinkLost() { reconnector?.NotifyLost(); }
 
         public event System.Action ConnectionLost
         {
@@ -145,12 +251,29 @@ namespace CNC.Core
             closing = true;
             reconnector?.Cancel(); // an explicit close must not trigger an auto-reconnect
 
-            if (IsOpen)
+            var ws = websocket;
+            var cts = cancel;
+
+            if (ws != null)
             {
-                websocket.OnMessage -= OnMessage;
-                websocket.OnOpen -= OnOpen;
-                websocket.Close();
+                try
+                {
+                    if (ws.State == WebSocketState.Open)
+                        ws.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None).Wait(300);
+                }
+                catch { }
+
+                // Cancel AFTER the close handshake attempt (cancelling first would abort it), which is
+                // also what unblocks the receive loop's pending ReceiveAsync. The CTS is deliberately
+                // NOT disposed: the loop may still be inside that call, and disposing it underneath
+                // would race for no benefit - GC handles it.
+                try { cts?.Cancel(); } catch { }
+                try { ws.Dispose(); } catch { }
             }
+
+            _isOpen = false;
+            websocket = null;
+            cancel = null;
         }
 
         public int ReadByte()
@@ -163,35 +286,24 @@ namespace CNC.Core
             return c;
         }
 
-        public void WriteByte(byte data)
+        protected override void WriteByteRaw(byte data)
         {
-            try
-            {
-                if (websocket != null && IsOpen)
-                    websocket.Send(new byte[1] { data });
-            }
-            catch (Exception ex)
-            {
-                HandleWriteError(ex);
-            }
+            Send(new byte[1] { data }, 1);
         }
 
-        public void WriteBytes(byte[] bytes, int len)
+        protected override void WriteBytesRaw(byte[] bytes, int len)
         {
-            try
-            {
-                if (websocket != null && IsOpen)
-                    websocket.Send(bytes);
-            }
-            catch (Exception ex)
-            {
-                HandleWriteError(ex);
-            }
+            Send(bytes, len);
         }
 
         public void WriteString(string data)
         {
-            WriteBytes(Encoding.Default.GetBytes(data), 0);
+            byte[] bytes = Encoding.Default.GetBytes(data);
+            // Was WriteBytes(bytes, 0): the old body ignored 'len' and always sent the whole array, so 0
+            // worked by accident. 'len' is honoured now (as SerialStream and TelnetStream always have),
+            // so it has to be right - and YModem, which passes a real length into a larger buffer, stops
+            // sending that buffer's trailing garbage over this transport.
+            WriteBytes(bytes, bytes.Length);
         }
 
         public void WriteCommand(string command)
@@ -207,30 +319,27 @@ namespace CNC.Core
             }
         }
 
-        public void AwaitAck()
+        // Pending predicates read this instance's own volatile state, not Comms.com's - the loops these
+        // replace all went through the global, which is only the same object by convention.
+        private bool AwaitingAck { get { return state == Comms.State.DataReceived || state == Comms.State.AwaitAck; } }
+
+        public bool AwaitAck()
         {
-            while (Comms.com.CommandState == Comms.State.DataReceived || Comms.com.CommandState == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
+            if (EventUtils.WaitWhile(() => AwaitingAck, Comms.AckTimeoutMs))
+                return true;
+
+            ConsoleLog.Write("[WebsocketStream] AwaitAck: no ok/error within " + Comms.AckTimeoutMs + "ms");
+            return false;
         }
 
-        public void AwaitAck(string command)
+        public bool AwaitAck(string command)
         {
+            // This overload used to spin bare - `while (...) ;` - with no pump and no sleep: a frozen UI
+            // and a saturated core for as long as the controller stayed quiet. Serial/Eltima pumped, so
+            // the same operation behaved differently depending on how you were connected.
             WriteCommand(command);
 
-            while (Comms.com.CommandState == Comms.State.DataReceived || Comms.com.CommandState == Comms.State.AwaitAck) ;
-        }
-
-        public void AwaitResponse()
-        {
-            while (Comms.com.CommandState == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
-        }
-
-        public void AwaitResponse(string command)
-        {
-            WriteCommand(command);
-
-            while (Comms.com.CommandState == Comms.State.AwaitAck) ;
+            return AwaitAck();
         }
 
         public string GetReply(string command)
@@ -238,33 +347,14 @@ namespace CNC.Core
             Reply = string.Empty;
             WriteCommand(command);
 
-            while (state == Comms.State.AwaitAck)
-                EventUtils.DoEvents();
-
-            return Reply;
-        }
-
-        private void OnOpen(object sender, EventArgs e)
-        {
-            _isOpen = true;
-        }
-
-        private void OnClose(object sender, CloseEventArgs e)
-        {
-            _isOpen = false;
-
-            var ws = sender as WebSocket;
-            if (ws != null)
+            // Any reply ends this wait, not just ok/error - GetReply's caller wants the response line.
+            if (!EventUtils.WaitWhile(() => state == Comms.State.AwaitAck, Comms.AckTimeoutMs))
             {
-                ws.OnMessage -= OnMessage;
-                ws.OnOpen -= OnOpen;
-                ws.OnClose -= OnClose;
+                ConsoleLog.Write("[WebsocketStream] GetReply('" + command + "'): no reply within " + Comms.AckTimeoutMs + "ms");
+                return string.Empty;
             }
 
-            // Unexpected close -> start the reconnect loop (OpenConnection will create a fresh
-            // socket). An intentional Close() sets 'closing' first to suppress this.
-            if (!closing)
-                reconnector?.NotifyLost();
+            return Reply;
         }
 
         private int gp()
@@ -277,17 +367,14 @@ namespace CNC.Core
             return found ? pos - 1 : 0;
         }
 
-        private void OnMessage(object sender, MessageEventArgs e)
+        private void ProcessReceived(string data)
         {
             int pos = 0;
             System.Collections.Generic.List<string> replies = null;
 
             lock (input)
             {
-                if (e.IsText)
-                    input.Append(e.Data);
-                else
-                    input.Append(Encoding.Default.GetString(e.RawData, 0, e.RawData.Length));
+                input.Append(data);
 
                 if (EventMode)
                 {
@@ -307,14 +394,19 @@ namespace CNC.Core
             {
                 Reply = reply;
                 state = reply == "ok" ? Comms.State.ACK : (reply.StartsWith("error") ? Comms.State.NAK : Comms.State.DataReceived);
-                // Tap ok/error acks straight to the streamer (when installed), bypassing the UI dispatcher.
-                if (AckSink != null && (state == Comms.State.ACK || state == Comms.State.NAK))
-                    AckSink(reply);
+                // Classified-reply tap straight to any subscriber, bypassing the UI dispatcher. Raised
+                // for every reply, not just ack/nak - see the interface doc-comment.
+                ReplyClassified?.Invoke(
+                    state == Comms.State.ACK ? Comms.ReplyClass.Ack :
+                    state == Comms.State.NAK ? Comms.ReplyClass.Nak :
+                    reply.Length > 0 && reply[0] == '<' ? Comms.ReplyClass.Status :
+                    Comms.ReplyClass.Other,
+                    reply);
                 // Async marshal (BeginInvoke, not Invoke): a synchronous Invoke blocks this read thread on a
                 // busy UI, stalling reads and acks. BeginInvoke keeps reads flowing; the per-call reply value
                 // is captured (strings are immutable) so order/content are preserved (see TelnetStream).
                 if (reply.Length != 0 && DataReceived != null)
-                    Dispatcher.BeginInvoke(DataReceived, reply);
+                    Comms.PostTo(SyncContext, DataReceived, reply);
             }
         }
     }

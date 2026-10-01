@@ -1,0 +1,72 @@
+<Window x:Class="GCode_Sender.MirrorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Uid="wnd_mirror" Title="Machine mirror (wire protocol)" Height="430" Width="420"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResize">
+    <!-- The MachineMirror's first real WPF consumer (client/server split, 6a read-side proof).
+         EVERYTHING shown here arrived exclusively over the wire protocol: parser -> MachineState ->
+         MachineDeltaProducer -> MachineStateStream -> MachineDelta messages -> MachineMirror. Nothing
+         reads GrblViewModel. If a value here ever disagrees with the main UI, that IS a protocol bug,
+         made visible side by side - which is this window's whole purpose.
+         Values are painted from code-behind (one coalesced repaint per delta burst): the mirror's
+         surface is deliberately wire-shaped - struct FIELDS and double?[] arrays - which WPF bindings
+         cannot address, and reformatting them per-row is the readout's real work anyway. -->
+    <DockPanel Margin="10">
+        <TextBlock x:Uid="lbl_mirfootnote" DockPanel.Dock="Bottom" Margin="0,8,0,0" FontSize="11" Foreground="Gray" TextWrapping="Wrap"
+                   Text="Read-only view fed solely by the MachineDelta stream - the same data a remote client would see. Any disagreement with the main window is a wire-protocol bug."/>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" SharedSizeGroup="lbl"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <RowDefinition Height="Auto"/> <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/> <RowDefinition Height="Auto"/> <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/> <RowDefinition Height="Auto"/> <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/> <RowDefinition Height="Auto"/> <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid.Resources>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Margin" Value="0,2,10,2"/>
+                </Style>
+            </Grid.Resources>
+
+            <TextBlock x:Uid="lbl_mirstate" Grid.Row="0" Grid.Column="0" Text="State" FontWeight="SemiBold"/>
+            <TextBlock x:Name="txtState" Grid.Row="0" Grid.Column="1" FontFamily="Consolas"/>
+
+            <TextBlock x:Uid="lbl_mirhomed" Grid.Row="1" Grid.Column="0" Text="Homed" FontWeight="SemiBold"/>
+            <TextBlock x:Name="txtHomed" Grid.Row="1" Grid.Column="1" FontFamily="Consolas"/>
+
+            <TextBlock x:Uid="lbl_mirmpos" Grid.Row="2" Grid.Column="0" Text="Machine position" FontWeight="SemiBold"/>
+            <TextBlock x:Name="txtMPos" Grid.Row="2" Grid.Column="1" FontFamily="Consolas"/>
+
+            <TextBlock x:Uid="lbl_mirwpos" Grid.Row="3" Grid.Column="0" Text="Work position" FontWeight="SemiBold"/>
+            <TextBlock x:Name="txtWPos" Grid.Row="3" Grid.Column="1" FontFamily="Consolas"/>
+
+            <TextBlock x:Uid="lbl_mirwco" Grid.Row="4" Grid.Column="0" Text="Work offset" FontWeight="SemiBold"/>
+            <TextBlock x:Name="txtWco" Grid.Row="4" Grid.Column="1" FontFamily="Consolas"/>
+
+            <TextBlock x:Uid="lbl_mirwcs" Grid.Row="5" Grid.Column="0" Text="WCS / Tool" FontWeight="SemiBold"/>
+            <TextBlock x:Name="txtWcsTool" Grid.Row="5" Grid.Column="1" FontFamily="Consolas"/>
+
+            <TextBlock x:Uid="lbl_mirtlo" Grid.Row="6" Grid.Column="0" Text="TLO reference" FontWeight="SemiBold"/>
+            <TextBlock x:Name="txtTlo" Grid.Row="6" Grid.Column="1" FontFamily="Consolas"/>
+
+            <TextBlock x:Uid="lbl_mirfeed" Grid.Row="7" Grid.Column="0" Text="Feed" FontWeight="SemiBold"/>
+            <TextBlock x:Name="txtFeed" Grid.Row="7" Grid.Column="1" FontFamily="Consolas"/>
+
+            <TextBlock x:Uid="lbl_mirspindle" Grid.Row="8" Grid.Column="0" Text="Spindle" FontWeight="SemiBold"/>
+            <TextBlock x:Name="txtSpindle" Grid.Row="8" Grid.Column="1" FontFamily="Consolas"/>
+
+            <TextBlock x:Uid="lbl_mirsignals" Grid.Row="9" Grid.Column="0" Text="Signals" FontWeight="SemiBold"/>
+            <TextBlock x:Name="txtSignals" Grid.Row="9" Grid.Column="1" FontFamily="Consolas"/>
+
+            <TextBlock x:Uid="lbl_mirprobe" Grid.Row="10" Grid.Column="0" Text="Probe" FontWeight="SemiBold"/>
+            <TextBlock x:Name="txtProbe" Grid.Row="10" Grid.Column="1" FontFamily="Consolas"/>
+
+            <TextBlock x:Uid="lbl_mirreporting" Grid.Row="11" Grid.Column="0" Text="Reporting" FontWeight="SemiBold"/>
+            <TextBlock x:Name="txtReporting" Grid.Row="11" Grid.Column="1" FontFamily="Consolas"/>
+        </Grid>
+    </DockPanel>
+</Window>

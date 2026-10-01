@@ -1,4 +1,8 @@
-﻿# End-of-session wrap-up
+# End-of-session wrap-up
+
+> **Shadows: `claude-hub/playbooks/end_of_session_wrapup.md`** — that file holds the shared
+> shape (the ordering, and why the conversation-log step is last). This one replaces it for
+> ioSender because every step below names this project's branches, remotes and release tooling.
 
 **When:** work for the session is done and the user is about to `/clear`.
 **Memory context:** `iosender-end-of-session-convolog.md`.
@@ -44,17 +48,79 @@ always `/clear`.
    the last capture is this session — so don't skip it, and don't run it twice (use `-Amend` if you
    captured early and kept working). No separate `build-session-index.ps1` step any more.
 
-## Ordering that matters (steps 5 → 6): put the summary BEFORE the capture, in the SAME message
+## Ordering that matters (steps 5 → 6): the wrap-up is TWO turns
 
-The capture reads the session transcript from disk. Claude Code flushes the assistant message's **text**
-to the transcript **before** it runs a tool call in that same message — so any text written *earlier in the
-message than the capture call* is already on disk and gets captured. Therefore:
+> ⚠️ **CORRECTED 2026-08-08 — this supersedes the same-message flow described below, which lost the
+> summary TWICE.** Mid-turn prose (text emitted *between* tool calls in one turn) is **not reliably
+> persisted** to the transcript `.jsonl`. Two separate summary attempts written mid-turn — prose, then
+> the capture call in the same turn — both vanished; the transcript kept the surrounding `tool_use`
+> entries but no text block, verified by parsing the raw `.jsonl` both times. Short mid-turn status
+> lines sometimes survive; long prose did not. **Only the TURN-FINAL message is guaranteed captured.**
 
-- **Write the full end-of-session summary as prose first, then make the capture the LAST action of the
-  same message.** The summary lands in *this* session's log, not the next run's. (Verified 2026-07-08 with a
-  marker-phrase test.)
-- The old flow ran the capture and *then* wrote the summary as trailing text — which pushed the summary to
-  the following run. Don't do that.
+So:
+
+1. **Turn A** ends with the session summary as its **final message — no tool calls after it.** Before
+   writing that message, arm the trigger — this is the last tool call of the turn:
+
+   ```powershell
+   pwsh -File c:\github\claude-hub\tools\turn.ps1 wrapup
+   ```
+
+   It prints the working title recorded at session start and arms the next prompt to set the title.
+   Then say plainly that the capture still has to run, that anything the user sends will trigger it,
+   and **name the session** so the next message can replace it. One line is enough:
+
+   > Filing this as **"Feed hold starves the planner buffer"** — send `Title: <name>` to file it
+   > under something else; anything else you send just runs the capture.
+
+   **Then end the message with this line, alone, in capitals, as the very last thing in it:**
+
+   ```
+   READY TO CAPTURE
+   ```
+
+   Nothing after it — no sign-off, no further sentence. It is the one line whose job is to be *seen*,
+   and it only works if it is last: a summary is a wall of text after a long session, the sentence
+   naming the trigger reads like more of the same, and the user's own account of the failure is that
+   he read the wrap-up, did not register that something was still owed, and moved on. That is how the
+   2026-09-29 CNCBuild capture was lost — 227 turns and 15 hours, wrapped up correctly and then
+   `/clear`ed, because the request for the trigger never stood out from the report around it. The
+   recovery in `on-session-start.ps1` now catches this after the fact; this line is the half that
+   stops it happening, and the two are not alternatives. Capitals on their own line, because that is
+   what survives being skim-read.
+
+   **`Title: <name>` at the trigger needs nothing from you** — `on-prompt.ps1` has already rewritten
+   the working title record, and the injected context says so. Do not pass `-Title` as well, and do
+   not re-record it. `-Title "..."` is for the other case: the user renames it in prose ("call it the
+   feed hold one") rather than with the prefix. Give their words as given.
+2. **Turn B** (the user says anything) runs the capture as the **LAST ACTION OF THE TURN, and writes
+   nothing after it.**
+
+> 🔴 **Why nothing after it (user, 2026-08-12) — this is the orphan bug's actual cause.** The stray
+> 1-2 turn fragments the capture keeps having to fold backwards are **just the messages written after
+> the capture ran**: a verification report, a sign-off, a "captured N turns" note. They land between
+> the end of one session and the start of the next and belong to neither.
+> *"When you do the capture don't do anything else, don't send any more output to the messages. I will
+> see when it's done and do the `/clear` at that point."*
+> Say everything beforehand — the summary in turn A, any commentary before the tool call. The user
+> reads the tool result themselves.
+>
+> **Consequence for the verify step:** "grep the HTML before reporting success" cannot be done as prose
+> afterwards without recreating the bug. Never report "captured" from an exit code alone either — that
+> chained two false claims once, including wrongly "correcting" the user, who had it right. The way out
+> is to **build the check into `convo-sessions.ps1`** (does the final turn's text appear in the HTML?)
+> so the script itself answers it. Until then: verify in the *next* session, not after the run.
+>
+> Use **`-Amend`** only when a capture already ran for THIS sitting and turns need folding into it;
+> `-Amend` extends the most recent session, so on a first capture it would wrongly extend the previous
+> one.
+
+The original reasoning still holds and is why `-Amend` works at all: the capture reads the transcript from
+disk, and Claude Code flushes an assistant message's **text** before running a tool call in that same
+message — so text written earlier *in the message* than the capture call is already on disk. What the
+2026-08-08 incident showed is that this holds for the message's **final** text block, not for prose
+sandwiched between tool calls. Never run the capture first and write the summary as trailing text — that
+pushed the summary into the following run, which is the original bug this ordering fixed (2026-07-08).
 
 ## Ready command (step 3.5)
 

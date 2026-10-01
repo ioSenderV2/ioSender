@@ -13,7 +13,10 @@
     <system:String x:Uid="str_validateMin" x:Key="ValAllowedMin">Invalid input: minimum allowed value is {0}.</system:String>
     <system:String x:Uid="str_validateMax" x:Key="ValAllowedMax">Invalid input: maximum allowed value is {0}.</system:String>
     <system:String x:Uid="str_validateNotIP4" x:Key="ValNotIPV4">Invalid input: not an IP4 address..</system:String>
-    <system:String x:Uid="str_msgWait" x:Key="MsgWaiting">Waiting for controller ({0})...</system:String>
+    <system:String x:Uid="str_setTipOrigin" x:Key="SetTipOrigin">Make the current position the {0} origin: the DRO reads zero here afterwards (G10 L20). Any G92 or tool length offset in effect is accounted for.</system:String>
+    <system:String x:Uid="str_setTipMachinePos" x:Key="SetTipMachinePos">Store the current MACHINE position in {0} (G10 L2) - a fixed machine reference such as a toolsetter. G92 and tool length offsets are NOT subtracted, so the DRO will not read zero here.</system:String>
+    <system:String x:Uid="str_setTipPredefined" x:Key="SetTipPredefined">Store the current MACHINE position as {0} ({0}.1).</system:String>
+    <system:String x:Uid="str_msgWait" x:Key="MsgWaiting">Connecting to controller ({0})...</system:String>
     <system:String x:Uid="str_msgNoCommAlarm" x:Key="MsgNoCommAlarm">Controller is not able to communicate due to alarm {0}, attempting a soft reset.</system:String>
     <system:String x:Uid="str_msgResetFailed" x:Key="MsgResetFailed">Controller soft reset failed, exiting.</system:String>
     <system:String x:Uid="str_msgEStop" x:Key="MsgEStop">E-Stop active! - clear before continuing...</system:String>
@@ -40,7 +43,12 @@
     <system:String x:Uid="str_grblStateSleep" x:Key="StateSleep">SLEEP</system:String>
     <system:String x:Uid="str_settingsSaved" x:Key="SettingsSaved">Settings saved.</system:String>
     <system:String x:Uid="str_keymappingsSaved" x:Key="KeymappingsSaved">Keymappings saved to {0}</system:String>
-    <system:String x:Uid="str_verifyStartFrom" x:Key="VerifyStartFrom">Are you sure the controller is in the correct state to start from block {0}?</system:String>
+    <!-- Deliberately states the LIMITATION rather than asking "are you sure": the old wording asked the
+         operator to confirm something the app had not told them. Starting mid-program restores only what
+         GCodeJob.DefaultProlog carries, and the difference between this and Start from toolpath is not that
+         the app does more there - it is that a toolpath begins at a section boundary, where the PROGRAM
+         re-declares its own tool, speed and offsets. See GCodeListControl.StartHere_Click. -->
+    <system:String x:Uid="str_verifyStartFrom" x:Key="VerifyStartFrom">Start from block {0}? Only units, plane and distance/feed mode are restored. The work offset, tool length offset, feed rate and spindle are NOT - the run uses whatever the machine currently holds, and anything the program set before this line is skipped. Start from toolpath is the supported way to run part of a program: a toolpath begins at a section boundary, where the program declares its own tool, speed and offsets. Continue anyway?</system:String>
     <system:String x:Uid="str_verifySendController" x:Key="VerifySendController">Are you sure you want to send the selected blocks to the controller?</system:String>
     <system:String x:Uid="str_themeBlack" x:Key="ThemeBlack">Black</system:String>
     <system:String x:Uid="str_themeDark" x:Key="ThemeDark">Dark</system:String>
@@ -63,6 +71,7 @@
     <system:String x:Uid="str_tabLatheWizards" x:Key="TabLatheWizards">Lathe Tools</system:String>
     <system:String x:Uid="str_tabTools" x:Key="TabTools">Tools</system:String>
     <system:String x:Uid="str_tabMachineSetup" x:Key="TabMachineSetup">Machine Setup</system:String>
+    <system:String x:Uid="str_tabCalibration" x:Key="TabCalibration">Calibration</system:String>
     <system:String x:Uid="str_tabFeedsSpeeds" x:Key="TabFeedsSpeeds">Feeds &amp; Speeds</system:String>
     <!-- Tools container sub-tab labels (built in code by ToolsView.RegisterTools). -->
     <system:String x:Uid="str_tabToolTable" x:Key="TabToolTable">Tool table</system:String>

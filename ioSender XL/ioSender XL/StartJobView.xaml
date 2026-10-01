@@ -1,4 +1,4 @@
-<UserControl x:Class="GCode_Sender.StartJobView"
+﻿<UserControl x:Class="GCode_Sender.StartJobView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -401,7 +401,7 @@
                                       ToolTip="Probe all four corners to measure the true stock size and skew. When off, the width/height above are used as-is and only the front-left origin (and optional TLO reference) is set."/>
                             <CheckBox x:Uid="ls_heightmap" x:Name="chkHeightMap" Content="Probe height map" IsChecked="False" Margin="18,2,0,2" VerticalAlignment="Center"
                                       IsEnabled="{Binding ElementName=chkMeasure, Path=IsChecked}"
-                                      ToolTip="After the origin/size are set, probe a grid over the measured stock area and apply the resulting height map to the loaded job - folds the Height Map tab's own probing into this run. Requires Measure (needs the stock area)."/>
+                                      ToolTip="After the origin/size are set, open the Height Map view filled in for the measured stock, ready to probe. You press Start there, and the map is kept for a work order to apply - tick 'Apply height map' on the work order. Requires Measure (needs the stock area). You can also skip this and run Tools > Height Map yourself at any time."/>
                             <StackPanel Orientation="Horizontal" Margin="36,2,0,2" Visibility="{Binding ElementName=chkHeightMap, Path=IsChecked, Converter={StaticResource ToVisibleConverter}}">
                                 <cnccontrols:NumericField x:Name="fldHeightMapGridX" x:Uid="ls_hmGridX" Label="Grid X:" ColonAt="55" Unit="mm" Format="###0.0#" Value="25" Margin="0,0,10,0"
                                                           ToolTip="Grid spacing along X for the height-map probe (mm between probed points)."/>
@@ -440,16 +440,51 @@
             <!-- Warning + result + Generate/Run pinned at the bottom-left of the input column -->
             <StackPanel Grid.Row="1" Margin="0,8,8,0">
                 <TextBlock x:Name="txtNoProbe" Foreground="#C0392B" TextWrapping="Wrap" Visibility="Collapsed"
-                           Text="No 3D probe defined. Add one in Machine Setup Wizard &gt; Probe definitions - Start Job reads its tip radius and probing feeds."/>
+                           Text="No 3D probe defined. Add one in Machine Setup Wizard &gt; Probe definitions - Setup reads its tip radius and probing feeds."/>
                 <TextBlock x:Name="txtExprWarn" Foreground="#C0392B" TextWrapping="Wrap" Visibility="Collapsed"
                            Text="This controller does not report NGC expression support ($I). The generated program needs grblHAL with expressions enabled."/>
                 <TextBlock x:Name="txtResult" FontWeight="SemiBold" TextWrapping="Wrap" Text="Measured stock:  X = -   Y = -"/>
-                <StackPanel x:Name="pnlCopyVerifyButtons" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,8,0,0">
+                <!-- WrapPanel, not a horizontal StackPanel: this row has grown to two buttons, a checkbox, a
+                     label, a 150px combo and a third button, which is wider than the left column at its
+                     minimum. A StackPanel does not wrap - it just runs past the edge and silently takes the
+                     last control with it, which is how the Scribe square button shipped invisible. -->
+                <WrapPanel x:Name="pnlCopyVerifyButtons" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,8,0,0">
                     <Button x:Uid="ls_copysize" x:Name="btnCopySize" Content="Copy size" MinWidth="90" MinHeight="26" Margin="8,0,0,0" Click="CopySize_Click" IsEnabled="False"
                             ToolTip="Copy the measured stock size (X Y [Z] in mm) to the clipboard for Fusion's ioSenderBatchPost 'measured stock' field."/>
                     <Button x:Uid="ls_verifyskew" x:Name="btnVerify" Content="Verify skew" MinWidth="90" MinHeight="26" Margin="8,0,0,0" Click="VerifySkew_Click" IsEnabled="False"
-                            ToolTip="After a measure run: re-apply the measured origin + skew rotation, then touch each corner in the rotated work frame. If the skew is right (and the stock square) the probe lands right at every corner."/>
-                </StackPanel>
+                            ToolTip="After a measure run: re-apply the measured origin + skew rotation, then visit each corner in the rotated work frame. If the skew is right (and the stock square) every corner lines up."/>
+                    <!-- Unticked turns Verify skew into a FLY-OVER: the six frame points are visited at machine
+                         top with no Z descent at all, so it needs no probe, cannot reach the stock, and does not
+                         care what tool-length offset is active. Ticked adds the G38.3 touch at each point (needs
+                         a 3D probe defined and fitted). Default ticked - the touch is the more informative check. -->
+                    <!-- ToolTipService.ShowOnDisabled because this control's DISABLED state is the one that needs
+                         explaining: WPF shows no tooltip on a disabled control by default, which would hide the
+                         reason exactly when the operator is looking for it. Cleared and disabled when no 3D probe
+                         is defined - see RefreshVerifyTouchAvailability. -->
+                    <CheckBox x:Uid="ls_verifytouch" x:Name="chkVerifyTouch" Content="Touch corners" IsChecked="True"
+                              VerticalAlignment="Center" Margin="10,0,0,0" ToolTipService.ShowOnDisabled="True"
+                              ToolTip="Ticked: probe down at each corner - needs a 3D probe defined and fitted. Unticked: fly over the six points at machine top so you can sight the tool tip against each corner - no probe needed. Disabled when no 3D probe is defined."/>
+                    <!-- Fly-over only, and V-BITS ONLY (CustomToolKind.VBitOrChamfer). Two reasons, and neither
+                         is convenience. A V-bit's tip IS a point, so it sights a corner exactly - which is why
+                         the program centres it on the corner rather than insetting by a radius as it must for a
+                         round tool that would otherwise hide what you are looking at. And the M6 runs tc.macro,
+                         which applies a G43.1 against the machine-wide baseline, so the tool-length offset then
+                         matches the frame the corners were measured in and the 2mm sight gap is correct by
+                         construction instead of assumed. "(none)" leaves the spindle alone. -->
+                    <TextBlock x:Uid="lbl_verifytool" Text="V-bit:" VerticalAlignment="Center" Margin="12,0,4,0"/>
+                    <ComboBox x:Uid="cbx_verifytool" x:Name="cbxVerifyTool" MinWidth="150" VerticalAlignment="Center"
+                              DisplayMemberPath="Label" SelectedValuePath="Id" ToolTipService.ShowOnDisabled="True"
+                              SelectionChanged="VerifyTool_SelectionChanged"
+                              ToolTip="Fly-over only: change to this V-bit before visiting the corners. Its point sights each corner exactly, and the tool change re-references the tool length so the 2mm sight gap is real rather than assumed. Leave at (none) to use whatever is already in the spindle. Only V-bit / chamfer tools are listed."/>
+                    <!-- Its OWN button, deliberately not a third mode on Verify skew: this one CUTS. It runs the
+                         spindle and leaves a permanent mark, and that must not sit one checkbox away from a
+                         check that touches nothing. What it buys is the only measurable test in the set - a
+                         scribed line turns an angular error into a taper you read with calipers, where every
+                         other check here is an eyeball judgement at a point. -->
+                    <Button x:Uid="ls_scribesquare" x:Name="btnScribe" Content="Scribe square" MinWidth="90" MinHeight="26" Margin="10,0,0,0" Click="ScribeSquare_Click" IsEnabled="False"
+                            ToolTipService.ShowOnDisabled="True"
+                            ToolTip="CUTS a shallow square into the stock with the selected V-bit, inset 10mm from every edge of the measured frame, following the probed surface. Measure the scribed line against each stock edge afterwards: if the rotation is right the gap to the front edge is a constant 10mm end to end. Needs four probed corners and a V-bit selected."/>
+                </WrapPanel>
             </StackPanel>
         </Grid>
 

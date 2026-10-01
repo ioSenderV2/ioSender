@@ -218,14 +218,35 @@ namespace CNC.Controls
         private static readonly Regex rxToolpathComment =
             new Regex(@"\(\s*TOOLPATH\s+(.+?)\)\s*$", RegexOptions.IgnoreCase);
 
+        // Timing wrappers (UiDiag). These two are the prime suspects behind "the UI goes unresponsive while
+        // a program runs": both are driven off BlockExecuting, i.e. potentially every streamed line, and both
+        // walk the program with regexes rather than caching. The item counts they report are lines scanned -
+        // if that tracks the program's length, the cost is O(N) per line and O(N^2) per run, and the fix is
+        // to stop rescanning. If it does not, these are innocent and the search moves elsewhere.
+        // Note "runstatus" ENCLOSES "tooltip": the core calls it. Subtract to read them separately.
         private void UpdateRunStatus()
+        {
+            long diagStamp = UiDiag.Start();
+            int scanned = UpdateRunStatusCore();
+            UiDiag.Stop("runstatus", diagStamp, scanned);
+        }
+
+        private void UpdateTitleTooltip(int executingIndex)
+        {
+            long diagStamp = UiDiag.Start();
+            int scanned = UpdateTitleTooltipCore(executingIndex);
+            UiDiag.Stop("tooltip", diagStamp, scanned);
+        }
+
+        // Returns the number of program lines scanned - see the wrapper above.
+        private int UpdateRunStatusCore()
         {
             int exec = _model?.BlockExecuting ?? -1;
             if (exec < 0 || Blocks == null || Blocks.Count == 0)
             {
                 txtRunStatus.Visibility = Visibility.Collapsed;
                 UpdateTitleTooltip(-1);   // nothing running yet - the tooltip lists the whole program
-                return;
+                return 0;
             }
 
             string tool = null, toolpath = null;
@@ -247,12 +268,13 @@ namespace CNC.Controls
             {
                 txtRunStatus.Visibility = Visibility.Collapsed;
                 UpdateTitleTooltip(upTo);
-                return;
+                return upTo + 1;
             }
 
             txtRunStatus.Text = tool != null && toolpath != null ? tool + "  |  " + toolpath : (tool ?? toolpath);
             txtRunStatus.Visibility = Visibility.Visible;
             UpdateTitleTooltip(upTo);
+            return upTo + 1;
         }
 
         // Title-bar tooltip: what's left to run. The (TOOLPATH ..) section currently executing heads the list
@@ -260,12 +282,13 @@ namespace CNC.Controls
         // come. The sticky status line above only ever shows the CURRENT section, so without this there was no
         // way to see what a long work order still has in store - the headers themselves scroll out of the
         // 3-line compact view immediately.
-        private void UpdateTitleTooltip(int executingIndex)
+        // Returns the number of program lines scanned - see the wrapper above.
+        private int UpdateTitleTooltipCore(int executingIndex)
         {
             if (Blocks == null || Blocks.Count == 0)
             {
                 titleBar.ToolTip = DefaultTitleTooltip;
-                return;
+                return 0;
             }
 
             var upcoming = new List<string>();
@@ -291,7 +314,7 @@ namespace CNC.Controls
             if (current == null && upcoming.Count == 0)
             {
                 titleBar.ToolTip = DefaultTitleTooltip;
-                return;
+                return Blocks.Count;
             }
 
             var sb = new System.Text.StringBuilder();
@@ -304,6 +327,8 @@ namespace CNC.Controls
 
             sb.Append("\n\n").Append(DefaultTitleTooltip);
             titleBar.ToolTip = sb.ToString();
+
+            return Blocks.Count;
         }
 
         private const string DefaultTitleTooltip = "Click to collapse to a 3-line run view / expand.";

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CNC.Client - the self-updating client-side mirror of MachineState (step 6a of the client/server
+  split). Design agreed with the user 2026-08-07: the contracts assembly stays pure data, and this
+  library is where the "observable state a client binds to" lives - layered ON TOP of CNC.Contracts,
+  never the other way round.
+
+  THE DISCIPLINE THIS PROJECT EXISTS TO PROTECT: it must reference CNC.Contracts ONLY, never
+  CNC.Core. A desktop client CAN see CNC.Core and pass its C# objects around - the exact shortcut a
+  browser client cannot take - so if this library ever gains a CNC.Core reference, the split has
+  quietly become fake again. Check the reference list below before adding anything.
+
+  MachineMirror is internally MAINTAINED but externally READ-ONLY: it applies the delta stream to
+  itself and raises INotifyPropertyChanged; nothing outside this library ever calls a setter on it.
+  Every mutation of the real machine goes through a COMMAND to the server (not built yet - the next
+  slice after this one) - a mirror with public setters would grow a second source of truth and the
+  first divergence would be unfindable. See MachineMirror.cs for the field-level detail.
+
+  Legacy net462 project (this file, in the .sln) + CNC.Client.net8.csproj (same folder, NOT in the
+  .sln, dotnet-built portability probe) - the same two-project pattern CNC Core and CNC Contracts
+  already use, and for the same reason: the VS MSBuild that builds this solution cannot resolve an
+  SDK-style project targeting net8.0.
+-->
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{6C2E7A2D-6C0B-4B0A-9F0E-6B6B7D6A1234}</ProjectGuid>
+    <OutputType>library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>CNC.Client</RootNamespace>
+    <AssemblyName>CNC.Client</AssemblyName>
+    <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <WarningLevel>4</WarningLevel>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Contracts (the wire) + Common (shared non-wire infra: ViewModelBase, UiContext). NEVER
+         CNC Core - that is the contracts-only client discipline this assembly exists to enforce. -->
+    <ProjectReference Include="..\..\CNC Contracts\CNC.Contracts.csproj">
+      <Project>{9448A265-0B77-4235-A5F5-BDE212EC75E7}</Project>
+      <Name>CNC.Contracts</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\CNC Common\CNC.Common.csproj">
+      <Project>{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}</Project>
+      <Name>CNC.Common</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="MachineMirror.cs" />
+    <Compile Include="MachineViewModel.cs" />
+    <Compile Include="MachineClient.cs" />
+    <Compile Include="Position.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

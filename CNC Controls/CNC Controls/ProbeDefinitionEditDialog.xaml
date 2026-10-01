@@ -32,6 +32,22 @@
                     <ComboBoxItem x:Uid="pd_typeEdge" Content="Edge finder" Tag="EdgeFinder"/>
                 </ComboBox>
             </StackPanel>
+
+            <!-- Which of the two touch plates this is. Shown only for TouchPlate (UpdateFieldVisibility).
+                 It decides whether Setup can use this plate to find a corner, so it is a question asked
+                 up front beside the type rather than a checkbox buried among the measurements. -->
+            <StackPanel x:Name="pnlPlateKind" Orientation="Horizontal" Margin="0,6,0,0">
+                <Label x:Uid="pd_plateKind" Content="Plate type:" Width="120" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                <RadioButton x:Uid="pd_plateCorner" x:Name="rbPlateCorner" GroupName="PlateKind" VerticalAlignment="Center"
+                             Content="Corner (two lips)" Margin="0,0,14,0" Checked="PlateKind_Checked"
+                             ToolTip="A plate with two lips meeting at 90 degrees. It sits over the stock's corner, the lips register against the two edges, and it can probe X, Y and Z."/>
+                <RadioButton x:Uid="pd_plateFlat" x:Name="rbPlateFlat" GroupName="PlateKind" VerticalAlignment="Center"
+                             Content="Flat (Z only)" Checked="PlateKind_Checked"
+                             ToolTip="A plain slab that lies on top of the work. It can set Z and nothing else - it has no edges to register against, so it cannot find a corner."/>
+            </StackPanel>
+            <TextBlock x:Name="txtPlateKindNote" x:Uid="pd_plateKindNote" TextWrapping="Wrap" Margin="124,3,0,0"
+                       FontSize="11" Foreground="#FF5A5A5A" MaxWidth="420" HorizontalAlignment="Left"/>
+
             <Separator Margin="0,7"/>
         </StackPanel>
 

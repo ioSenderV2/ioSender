@@ -1,4 +1,4 @@
-/*
+﻿/*
  * AutoSquareWizard.xaml.cs - part of CNC Controls library
  *
  * Facilitates Phil Barrett's auto-square OFFSET method for a ganged, auto-squared gantry (typically Y).
@@ -52,14 +52,10 @@ namespace CNC.Controls
 
         public GrblConfigType GrblConfigType { get { return GrblConfigType.AutoSquare; } }
 
-        // This tool's own program view (ProgramView refactor): created lazily, titled, connected to the streamer
-        // stack so the overlay hosts it and the run marks it - independent of the Job-tab view.
-        private ProgramView programView;
-        private void EnsureProgramView()
-        {
-            if (programView == null)
-                programView = new ProgramView { Title = "Auto Square" };
-        }
+        // This tool no longer owns a ProgramView of its own. Generate hands the program to the Job tab as
+        // the loaded job (MacroProcessor.HandOffToJobTab), so the display is the Job tab's docked list and
+        // its jobProgramView - the same one every loaded file uses - rather than a floating overlay shown
+        // over whatever tab happened to be underneath.
 
         public void Activate(bool activate)
         {
@@ -68,12 +64,6 @@ namespace CNC.Controls
             {
                 DetectOffsetSetting();
                 UpdateComputed();
-                if (!string.IsNullOrEmpty(program))
-                {
-                    EnsureProgramView();
-                    programView.SetProgramText(program);
-                    programView.Connect();     // this tool's own view shows in the overlay
-                }
                 MacroProcessor.ActiveRun = Run;                                     // Cycle Start runs it
 
                 // Generate-mode registration (see MacroProcessor's own comments / StartJobView for the
@@ -85,7 +75,12 @@ namespace CNC.Controls
                 MacroProcessor.IsProgramGenerated = !string.IsNullOrEmpty(program);
                 RefreshReadout();   // (re)establishes MacroProcessor.IsGenerateReady for the bar
             }
-            else
+            // Our OWN handoff switching away to the Job tab, not the operator leaving: keep the run bar
+            // and keep the program. Tearing down here would land them on the Job tab holding an Auto Square
+            // program with no way to start it AS an Auto Square run - no confirmation, and no ReuseZ0
+            // arming when it finishes. The teardown is deferred to the run's terminal, where the shared
+            // watcher switches back here and Activate(true) above re-registers everything.
+            else if (!MacroProcessor.IsHandingOffFrom(ViewType.Calibration))
             {
                 MacroProcessor.ActiveRun = null;
                 MacroProcessor.SupportsGenerateMode = false;
@@ -97,7 +92,7 @@ namespace CNC.Controls
                 // MacroProcessor.IsProgramGenerated write here, since isActiveTab was already set false at
                 // the top of this same Activate() call - but this IS the moment that write belongs.
                 program = string.Empty;
-                programView?.Disconnect();                     // active program follows the focused tab
+                MacroProcessor.ReleaseHandoff(model);   // a program generated and never run gives the previous job back
             }
 
             if (model != null)
@@ -109,12 +104,51 @@ namespace CNC.Controls
         // can't stomp whichever OTHER tab is now focused. See StartJobView.isActiveTab's own comment.
         private bool isActiveTab = false;
 
+        // The run bar is ours while this tab is focused OR while our Generate has handed the program to the
+        // Job tab - across that handoff the bar keeps pointing here, so every write to the shared
+        // MacroProcessor statics has to be gated on this rather than isActiveTab alone. StartJobView's own
+        // OwnsRunBar, same reasoning; it just reads the shared handoff record instead of a private flag.
+        private bool OwnsRunBar { get { return isActiveTab || MacroProcessor.HoldsHandoffFrom(ViewType.Calibration); } }
+
+
+        // The handoff is over - the run reached its terminal. On a CLEAN finish the shared watcher has
+        // already switched back here and Activate(true) re-registered everything, so this no-ops. On an
+        // ABORT it deliberately leaves the operator on the Job tab, and the run bar would go on pointing at
+        // this off-screen tab: the next Cycle Start over a file of their own would run THIS program instead
+        // of it. Give the bar back; the program itself is kept, so coming back here still offers Run.
+        private void EndHandoff()
+        {
+            if (isActiveTab)
+                return;
+            MacroProcessor.ActiveRun = null;
+            MacroProcessor.SupportsGenerateMode = false;
+            MacroProcessor.ActiveGenerate = null;
+            MacroProcessor.DiscardGenerated = null;
+            MacroProcessor.IsProgramGenerated = false;
+        }
+
         // The coarse live-readiness gate for the shared Run bar's "Generate" button - mirrors Generate()'s
         // own first precondition check (travel legs known).
         private void RefreshGenerateReady(bool travelSet)
         {
             if (isActiveTab)
+            {
                 MacroProcessor.IsGenerateReady = travelSet;
+                // After the gate, never before: setting it ready clears the reason (see MacroProcessor).
+                if (!travelSet)
+                    MacroProcessor.GenerateBlockedReason =
+                        "The axis travel legs are not known yet - enter them above before generating.";
+            }
+        }
+
+        // The name this tool's program is loaded under. It is an IDENTITY, not a label: the handoff record
+        // and its watcher both test the loaded job against it to decide whether a terminal is ours to pop,
+        // so Generate and Run must name the program identically. They did not - Generate published
+        // "Auto square X" while Run streamed "Auto square holes X" - which under the shared handoff would
+        // have read as a foreign program and pushed a second slot over the first.
+        private string ProgramName
+        {
+            get { return (DryRun ? "Auto square dry run " : "Auto square holes ") + "XYZ"[_gangedAxis]; }
         }
 
         // Drop the generated program; also registered as MacroProcessor.DiscardGenerated (see Activate) -
@@ -122,7 +156,8 @@ namespace CNC.Controls
         private void DiscardProgram()
         {
             program = string.Empty;
-            if (isActiveTab)
+            MacroProcessor.ReleaseHandoff(model);   // no-op after a run: its watcher popped before calling us
+            if (OwnsRunBar)
                 MacroProcessor.IsProgramGenerated = false;
         }
 
@@ -402,7 +437,13 @@ namespace CNC.Controls
                 txtWarnings.Text = warn;
 
             if (btnApply != null)
-                btnApply.IsEnabled = !measureOnly && travelSet && Math.Abs(NewOffset - CurrentOffset) > 1e-6;
+                // Not gated on the value differing: that deadlocks against the commit-on-click fix in
+                // Button_Click. A typed value does not reach the DependencyProperty until focus leaves the
+                // field, and these buttons are Focusable="False", so the comparison uses the OLD value, sees
+                // no difference and disables the button - which then never receives the click that would
+                // have committed the edit. ApplyOffset decides after the commit instead. travelSet stays:
+                // without max travel there is no rail span, so nothing here can compute an offset at all.
+                btnApply.IsEnabled = !measureOnly && travelSet;
 
             RefreshGenerateReady(travelSet);
 
@@ -568,8 +609,8 @@ namespace CNC.Controls
             lines.Add(string.Format("(ioSender auto-square reference holes - centred L: +{0} mm X, +{1} mm Y, {2} mm bit, {3} mm deep{4})",
                 F(xleg), F(yleg), F(BitDiameter), F(DrillDepth), preview ? ", DRY RUN" : ""));
 
-            lines.Add("(PREREQ, connected, homed, noalarm)");
-            lines.Add("G90 G94 G17 G21");
+            MacroProcessor.EmitProgramHeader(lines.Add, "connected, homed, noalarm");
+            MacroProcessor.EmitModalDefaults(lines.Add);
             if (!ReuseZ0)
             {
                 // Park at the first hole and touch off Z there (sets work Z0).
@@ -618,7 +659,13 @@ namespace CNC.Controls
             }
 
             lines.Add("G0 Z" + F(SafeZ));
-            lines.Add("M30");
+            // parkAtG30: FALSE, and that is this tool's outstanding gap, not an oversight of the shared
+            // footer. Every other generated program hands the machine back at G30; this one finishes at
+            // safe Z over the last hole it drilled, which is exactly the post-condition class that wrecked
+            // a toolsetter on 2026-09-14. Adding the park is a SAFETY CHANGE, not a tidy-up - it puts a
+            // rapid into a program that has never had one, and this tool's (PREREQ) does not demand G30 be
+            // set - so it is left for a deliberate decision rather than slipped in with a refactor.
+            MacroProcessor.EmitProgramFooter(lines.Add, stopSpindle: false, parkAtG30: false, endWord: "M30");
 
             return lines;
         }
@@ -635,6 +682,14 @@ namespace CNC.Controls
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
+            // FIRST, before reading any field. These buttons are Focusable="False" so they cannot steal
+            // the jog keys, and a non-focusable button takes no focus - so a value being typed when the
+            // operator clicks has never raised LostFocus, and a length-unit field commits only then.
+            // Without this the handler reads the PREVIOUS value and acts on it silently: on 2026-09-16
+            // a typed 0.37 was on screen while 0.450 went to the controller. See
+            // NumericField.CommitPendingEdits.
+            NumericField.CommitPendingEdits(this);
+
             switch ((string)((Button)sender).Tag)
             {
                 case "apply": ApplyOffset(); break;
@@ -663,9 +718,14 @@ namespace CNC.Controls
                 return;
             }
             program = string.Join("\r\n", BuildProgram());
-            MacroProcessor.PublishGenerated("Auto square " + "XYZ"[_gangedAxis], program, EnsureProgramView, () => programView);   // refresh + show this tool's own view
-            if (isActiveTab)
-                MacroProcessor.IsProgramGenerated = true;   // flips the shared Run bar from "Generate" to "Run"
+            // Hand it to the Job tab as the loaded job and take the operator there to look at it, run bar
+            // still pointing back here - the same tail Work Order and Setup use.
+            MacroProcessor.HandOffToJobTab(model, ProgramName, program, ViewType.Calibration, onHandoffEnd: EndHandoff);
+            // OwnsRunBar, not isActiveTab: the handoff's tab switch has already run this tab's own
+            // Activate(false) synchronously by now, so isActiveTab is false and this write - the one that
+            // flips the bar from "Generate" to "Run" - would simply be skipped.
+            if (OwnsRunBar)
+                MacroProcessor.IsProgramGenerated = true;
         }
 
         private void Run()
@@ -676,12 +736,17 @@ namespace CNC.Controls
             if (string.IsNullOrWhiteSpace(program))
                 return;
 
-            bool ok = MacroProcessor.Run(model, (DryRun ? "Auto square dry run " : "Auto square holes ") + "XYZ"[_gangedAxis], program, true);
-
             // Touch-off completed (or was already reused) -> a follow-up run can reuse this Z0. So after a dry
             // run you can untick Dry run and Run again to cut at the same Z0 without touching off again.
-            if (ok)
-                ReuseZ0 = true;
+            // onDone, not the return value (Step 7): Run() now reports "started", asynchronously - the old
+            // blocking Run's true return meant the touch-off had actually happened, so arming ReuseZ0 from
+            // "started" would wrongly arm it when the operator cancels at a hold mid-run. jobFinished=true
+            // is the genuine program end, which is when the touch-off is a fact.
+            // ProgramName, not a second spelling of it: MacroProcessor.Run matches this against the handoff
+            // record to know the program is already loaded, and a name that differs by one word reads as a
+            // foreign program - a second pushed slot over the first.
+            MacroProcessor.Run(model, ProgramName, program, true,
+                onDone: jobFinished => { if (jobFinished) ReuseZ0 = true; });
         }
 
         private void ApplyOffset()
@@ -691,8 +756,18 @@ namespace CNC.Controls
                 AppDialogs.Show(Loc("AsNoOffset"), "Auto square", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 return;
             }
-            if (XLeg() <= 0d || Math.Abs(NewOffset - CurrentOffset) <= 1e-6)
+            if (XLeg() <= 0d)
                 return;
+            // Reached only after Button_Click has committed any half-typed field, so this is the real value.
+            // Said out loud rather than returning silently - the button is always live now, so a press that
+            // did nothing would look like a fault.
+            if (Math.Abs(NewOffset - CurrentOffset) <= 1e-6)
+            {
+                AppDialogs.Show(string.Format(CultureInfo.InvariantCulture,
+                    "New offset is already {0:0.000###} - the same as the current one, so there is nothing to write.", NewOffset),
+                    "Auto square", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
 
             double newVal = NewOffset;   // clamped to the setting range in UpdateComputed
             string caution = Math.Abs(newVal) > LargeOffsetWarn
@@ -758,6 +833,15 @@ namespace CNC.Controls
         #region ConfigPanel<AutoSquareParams> overrides
 
         protected override AutoSquareParams Config { get { return SectionConfig; } set { SectionConfig = value; } }
+
+        // Same omission the scratch wizard had (fixed 2026-09-14): without this, editing any of the inputs
+        // below left the previously generated program held and the Run bar still reading "Run", so pressing
+        // it drilled the OLD pattern - blade/tongue lengths, depths and feeds all silently ignored.
+        protected override void OnPersistedPropertyChanged()
+        {
+            Persist();
+            DiscardProgram();
+        }
 
         protected override DependencyProperty[] PersistedProperties => new[] {
             BladeLengthProperty, TongueLengthProperty, CornerOffsetProperty, BitDiameterProperty,

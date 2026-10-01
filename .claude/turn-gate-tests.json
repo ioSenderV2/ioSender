@@ -1,0 +1,68 @@
+{
+  "_comment": [
+    "ioSender's OWN gate cases. The hub's test-gates.ps1 proves the mechanism against a synthetic",
+    "fixture and knows nothing about this project; these prove THIS project's rules. Run them with",
+    "  powershell -File c:\\github\\claude-hub\\hooks\\test-gates.ps1 -ProjectRoot c:\\github\\ioSender",
+    "",
+    "The testserver cases exist because on 2026-07-21 an unrequested -testserver run sent MDI",
+    "commands to the real controller mid-homing. The push cases exist because ioSender once froze a",
+    "restated copy of the hub's push rule and silently lost its later widening - 'lets get them",
+    "pushed' was denied for weeks. They guard the inherited rule, so a future restatement fails here."
+  ],
+  "cases": [
+    {
+      "name": "testserver on my own initiative is blocked",
+      "prompt": "add a Feed Rate column to the job grid",
+      "command": ".\\build.ps1 -Launch -testserver -simulator",
+      "expect": "DENY"
+    },
+    {
+      "name": "testserver requested but aimed at real hardware",
+      "prompt": "use the test server to check the new tab",
+      "command": ".\\build.ps1 -Launch -testserver",
+      "expect": "DENY"
+    },
+    {
+      "name": "testserver requested and pointed at the simulator",
+      "prompt": "use the test server to check the new tab",
+      "command": ".\\build.ps1 -Launch -testserver -simulator",
+      "expect": "allow"
+    },
+    {
+      "name": "testserver via the env-var form is still the same rule",
+      "prompt": "add a Feed Rate column to the job grid",
+      "command": "$env:IOSENDER_TESTSERVER=1; .\\build.ps1 -Launch -simulator",
+      "expect": "DENY"
+    },
+    {
+      "name": "ordinary final build is never touched",
+      "prompt": "add a Feed Rate column to the job grid",
+      "command": ".\\build.ps1 -Launch -message=\"new column\"",
+      "expect": "allow"
+    },
+    {
+      "name": "push mid-turn is blocked",
+      "prompt": "add a Feed Rate column to the job grid",
+      "command": "git push v2 pr/portable-core",
+      "expect": "DENY"
+    },
+    {
+      "name": "inherited push rule: past tense (froze once, must not again)",
+      "prompt": "I think the tools are ready. Lets get them pushed",
+      "command": "git push v2 pr/portable-core",
+      "expect": "allow"
+    },
+    {
+      "name": "inherited push rule: gerund",
+      "prompt": "start pushing this to the remote now",
+      "command": "tools\\push-all.ps1",
+      "expect": "allow"
+    },
+    {
+      "name": "inherited push rule: releasing / shipping",
+      "prompt": "we are releasing the beta now",
+      "command": "gh release create vbeta-pr20",
+      "expect": "allow"
+    }
+  ]
+}

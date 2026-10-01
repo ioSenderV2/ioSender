@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Exercises the REAL file loader (GCodeJob.ParseFileLines) against a program that declares constant
+    #<name> parameters, because the resolver's own unit tests cannot prove the wiring: that Data ends
+    up resolved, that Raw keeps the source form, and that Save would therefore write the variables
+    back out. Same shape and the same net8 core project as tools/waitidle-probe.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <AssemblyName>ngc-roundtrip</AssemblyName>
+    <RootNamespace>NgcRoundTrip</RootNamespace>
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\CNC Core\CNC Core\CNC.Core.net8.csproj" />
+  </ItemGroup>
+</Project>

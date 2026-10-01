@@ -87,9 +87,6 @@ namespace CNC.Controls.Probing
             if (!probing.WaitForIdle(string.Format("G90G0X{0}Y{1}", startpos.X.ToInvariantString(probing.Grbl.Format), startpos.Y.ToInvariantString(probing.Grbl.Format))))
                 return;
 
-            if (!probing.VerifyProbe())
-                return;
-
             if (!probing.Program.Init())
                 return;
 

@@ -10,6 +10,7 @@
  * Persisted as an App.config section via AppConfig.RegisterFolded, same idiom as OddJobsToolMemory.
  */
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -43,6 +44,121 @@ namespace CNC.Controls
         // Not operator-editable via CustomToolEditDialog (retune the RPM field itself instead) - this is
         // just the one-time starting value shown when the tool is first selected.
         public double DefaultRpm = 0d;
+
+        // Full included angle of a V-shaped tool, in degrees - the angle BETWEEN the two flanks, which is
+        // how bits are sold ("60 degree V-bit"), not the half-angle the trigonometry actually wants.
+        // Meaningful only for VBitOrChamfer and Countersink; ignored (and hidden in the edit dialog) for
+        // every other kind, the same way Flutes is for Drill/Countersink.
+        //
+        // It matters because the tool's angle is what converts between depth and width. A V-bit plunged
+        // 1 mm cuts 2 mm wide at 90 degrees but only 1.15 mm at 60 - so engraving and countersinking both
+        // give the wrong size if the angle is assumed. BuildCountersink assumed 90 outright.
+        //
+        // Defaults to 90 rather than 0 deliberately: an existing tool list has no such element, so every
+        // saved tool deserializes to exactly the value that was previously hardcoded, and no installed
+        // work order changes behaviour. 0 would have been a silent divide-into-nonsense.
+        public double IncludedAngleDeg = 90d;
+
+        /// <summary>
+        /// Half the included angle in RADIANS - what the depth/width trigonometry actually takes. Clamped
+        /// well away from 0 and 180 so a nonsense value cannot produce an infinite or negative depth;
+        /// tan() at those limits is where a bad tool definition would otherwise turn into a plunge.
+        /// </summary>
+        public double HalfAngleRad
+        {
+            get
+            {
+                double deg = IncludedAngleDeg;
+                if (double.IsNaN(deg) || deg < 1d || deg > 179d)
+                    deg = 90d;
+                return deg * Math.PI / 360d;   // /2 for half-angle, then degrees->radians
+            }
+        }
+
+        /// <summary>
+        /// What this tool will actually cut when asked for a stroke <paramref name="requestedWidth"/> mm
+        /// wide: how deep to plunge, the width really achieved, and whether the request had to be limited.
+        /// </summary>
+        /// <remarks>
+        /// The limit is real geometry, not a policy choice. A V-bit's quoted diameter is its MAXIMUM
+        /// cutting diameter - the width of the cone where the flutes end and the shank begins - so it is
+        /// also the widest stroke the bit can engrave. Ask for more and the arithmetic happily returns a
+        /// depth as though the cone continued forever, and the machine drives the SHANK into the work.
+        ///
+        ///     max usable depth = (D/2) / tan(halfAngle)
+        ///     1/4" 90 deg -> 3.18 mm deep, 1/4" 60 deg -> 5.50 mm deep; both cap at a 6.35 mm stroke
+        ///
+        /// Note the maximum width is the diameter whatever the angle - the angle only decides how far down
+        /// you travel to reach it.
+        ///
+        /// Lives here, on the tool, so the compiler and the UI readout share one answer. They were already
+        /// computing depth separately from the same formula, which is exactly the arrangement that drifts.
+        /// </remarks>
+        public EngraveCut EngraveCutFor(double requestedWidth)
+        {
+            var cut = new EngraveCut();
+
+            // A tool with no diameter recorded cannot be checked against one - don't invent a limit that
+            // would silently narrow a stroke the operator asked for.
+            cut.MaxWidth = DiameterMm > 0d ? DiameterMm : double.MaxValue;
+
+            double want = Math.Max(0.01d, requestedWidth);
+            cut.Clamped = want > cut.MaxWidth;
+            cut.Width = cut.Clamped ? cut.MaxWidth : want;
+            cut.Depth = (cut.Width / 2d) / Math.Tan(HalfAngleRad);
+
+            return cut;
+        }
+
+        /// <summary>
+        /// The deepest a V-carve with this tool will go, given an operation's optional cap
+        /// (WorkOrderOperation.CarveMaxDepth; 0 = no cap asked for).
+        /// </summary>
+        /// <remarks>
+        /// One shared answer, for the same reason EngraveCutFor is: the compiler and the editor's note
+        /// both need it, and computing it twice is how they drift.
+        ///
+        /// A V-carve has no depth SETTING - depth is a consequence of the shape's own local width - so
+        /// this is a ceiling, not a target. Narrow detail never reaches it and is unaffected; only the
+        /// parts wide enough to want more get flattened off and cleared. That is what lets a very narrow
+        /// bit be used for fine lettering without the wide areas plunging: a 15 degree bit takes the
+        /// widest feature of a logo measured at 1.355 mm inscribed radius to 10.29 mm deep, while the
+        /// same artwork's 0.5 mm tagline strokes only ever ask for 1.88 mm.
+        /// </remarks>
+        public CarveDepth CarveDepthFor(double requestedCapMm)
+        {
+            var d = new CarveDepth();
+
+            // Past its own cutting diameter the cone has run out and the shank would be doing the work,
+            // so this is a hard ceiling no operation may raise - the same reasoning as the width clamp
+            // in EngraveCutFor. A tool with no diameter recorded cannot be checked against one; 3 mm
+            // matches the fallback the carve compiler has always used.
+            d.BitLimit = DiameterMm > 0d ? (DiameterMm / 2d) / Math.Tan(HalfAngleRad) : 3d;
+
+            d.Requested = requestedCapMm > 0d;
+            d.Clamped = d.Requested && requestedCapMm > d.BitLimit;
+            d.Depth = d.Requested ? Math.Min(requestedCapMm, d.BitLimit) : d.BitLimit;
+
+            return d;
+        }
+    }
+
+    /// <summary>The result of asking a tool how deep it will carve - see CustomTool.CarveDepthFor.</summary>
+    public struct CarveDepth
+    {
+        public double Depth;      // the ceiling actually applied, mm
+        public double BitLimit;   // the deepest this bit can carve at all, whatever was asked for
+        public bool Requested;    // the operation asked for a cap (rather than leaving it automatic)
+        public bool Clamped;      // the requested cap was deeper than the bit can go and was limited
+    }
+
+    /// <summary>The result of asking a tool for a given engraved stroke width - see CustomTool.EngraveCutFor.</summary>
+    public struct EngraveCut
+    {
+        public double Depth;      // mm to plunge
+        public double Width;      // the width actually cut - equals what was asked for unless Clamped
+        public double MaxWidth;   // the widest stroke this tool can cut at all
+        public bool Clamped;      // the request exceeded MaxWidth and was limited to it
     }
 
     public class CustomToolList

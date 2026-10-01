@@ -61,9 +61,7 @@
     <Compile Include="CarveView.xaml.cs">
       <DependentUpon>CarveView.xaml</DependentUpon>
     </Compile>
-    <Compile Include="ConfigControl.xaml.cs">
-      <DependentUpon>ConfigControl.xaml</DependentUpon>
-    </Compile>
+    <Compile Include="IToolpathView.cs" />
     <Compile Include="RenderControl.xaml.cs">
       <DependentUpon>RenderControl.xaml</DependentUpon>
     </Compile>
@@ -76,15 +74,18 @@
     <Compile Include="Viewer.xaml.cs">
       <DependentUpon>Viewer.xaml</DependentUpon>
     </Compile>
+    <Compile Include="ViewOptionsDialog.xaml.cs">
+      <DependentUpon>ViewOptionsDialog.xaml</DependentUpon>
+    </Compile>
+    <Page Include="ViewOptionsDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="CarveView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="ColorPicker.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="ConfigControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -133,6 +134,14 @@
     <ProjectReference Include="..\..\CNC Controls\CNC Controls\CNC Controls.csproj">
       <Project>{fa7fef55-aa80-4b20-b345-e3ca7204dd18}</Project>
       <Name>CNC Controls</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\CNC Contracts\CNC.Contracts.csproj">
+      <Project>{9448A265-0B77-4235-A5F5-BDE212EC75E7}</Project>
+      <Name>CNC.Contracts</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\CNC Common\CNC.Common.csproj">
+      <Project>{5F8CE05A-C5E1-4E17-91F5-FD25E59EDA94}</Project>
+      <Name>CNC.Common</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\CNC Core\CNC Core\CNC Core.csproj">
       <Project>{f245ff89-a838-4d6e-aa40-92cfd3d072d3}</Project>

@@ -41,8 +41,16 @@ scene_debug.log
 # Git-Bash crash artifacts
 *.stackdump
 
-# Claude Code: per-turn state written by the turn-loop hooks (tools/claude-hooks/)
+# Claude Code: per-turn state written by the shared turn-loop hooks (claude-hub/hooks/)
 .claude/turn-state.json
+**/.claude/turn-state.json
+.claude/session-banner.json
+**/.claude/session-banner.json
+.claude/session-wrapup.json
+**/.claude/session-wrapup.json
 .claude/settings.local.json
 .claude/worktrees/
 .claude/scheduled_tasks.lock
+
+# render-harness output images (generated; see tools/render-harness/README.md)
+tools/render-harness/*.png

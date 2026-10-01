@@ -200,6 +200,7 @@ namespace CNC.Controls
             // views - usually after this Setup - so place present controls now and react to later additions.
             model.ConfigControls.Add(new BasicConfigControl());
             model.ConfigControls.Add(new UiGeneralConfigControl());
+            model.ConfigControls.Add(new UiRemoteConfigControl());
             model.ConfigControls.Add(new OddJobsSettingsControl());
             model.ConfigControls.Add(new JogUiConfigControl());
             model.ConfigControls.Add(new JogConfigControl());
@@ -644,7 +645,10 @@ namespace CNC.Controls
         // prompts (see Activate) - they would otherwise pop up modal behind the new instance's topmost splash.
         private static bool _restarting;
 
-        private void DoRestart()
+        // public static: the settings footer's Restart button is no longer the only caller - applying or
+        // undoing a config overlay (Help > Support) relaunches through this same path, so the relaunch
+        // mechanics and the _restarting guard stay in one place.
+        public static void DoRestart()
         {
             if (_restarting)
                 return;

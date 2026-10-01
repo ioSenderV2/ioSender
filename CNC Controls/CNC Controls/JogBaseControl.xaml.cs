@@ -38,7 +38,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -158,7 +160,7 @@ namespace CNC.Controls
                     if (softLimits)
                         (DataContext as GrblViewModel).PropertyChanged += Model_PropertyChanged;
 
-                    keyboard = (DataContext as GrblViewModel).Keyboard;
+                    keyboard = (DataContext as GrblViewModel).Keyboard as KeypressHandler;
 
                     keyboardMappingsOk = true;
 
@@ -504,6 +506,12 @@ namespace CNC.Controls
 
         private void JogCommand(string cmd, JogKind kind)
         {
+            // Diagnostic only, 2026-08-08: entry-point trace, before ANYTHING else in this method - the
+            // 80s-silent repro left zero [jog]/[jobrunner] lines, meaning the click never reached even
+            // JogGate.TryBegin(). This answers whether JogCommand itself is being entered at all.
+            if (DebugLog.Enabled)
+                DebugLog.Write("jog", string.Format("JogCommand ENTERED cmd=\"{0}\" kind={1}", cmd, kind));
+
             GrblViewModel model = DataContext as GrblViewModel;
 
             if (cmd == "stop") {
@@ -685,23 +693,23 @@ namespace CNC.Controls
                 return;
 
             if (model.HomedState != HomedState.Homed) {
-                model.Message = "Go to centre: home the machine first.";
+                model.SetErrorMessage("Go to centre: home the machine first.");
                 return;
             }
 
             if (model.IsJobRunning ||
                  !(model.GrblState.State == GrblStates.Idle || model.GrblState.State == GrblStates.Jog || model.GrblState.State == GrblStates.Tool)) {
-                model.Message = "Go to centre: the machine must be idle.";
+                model.SetErrorMessage("Go to centre: the machine must be idle.");
                 return;
             }
 
             if (GrblInfo.MaxTravel.X <= 0d || GrblInfo.MaxTravel.Y <= 0d || GrblInfo.MaxTravel.Z <= 0d) {
-                model.Message = "Go to centre: set max travel ($130-$132) first.";
+                model.SetErrorMessage("Go to centre: set max travel ($130-$132) first.");
                 return;
             }
 
             if (GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1) {
-                model.Message = "Go to centre: enable soft limits ($20=1) first.";
+                model.SetErrorMessage("Go to centre: enable soft limits ($20=1) first.");
                 return;
             }
 
@@ -733,6 +741,208 @@ namespace CNC.Controls
                 GoToCorner(tag[1] == 'R', tag[0] == 'T');
         }
 
+        // ---- Go to a stored position -------------------------------------------------------------------
+
+        /// <summary>One thing the machine can be sent to, as the operator would recognise it.</summary>
+        private class GotoTarget
+        {
+            public string Name;         // "Vise", "G28", "G54"
+            public string Kind;         // what sort of thing it is, for the menu's grouping
+            public double X, Y, Z;      // MACHINE coordinates
+            public bool DriveZ;         // see DrivesZ below
+        }
+
+        /// <summary>
+        /// Whether this target's stored Z is somewhere to GO, or merely somewhere that happens to be
+        /// recorded.
+        ///
+        /// For almost everything it is the latter. A fixture's Z and a work offset's Z are at the WORK -
+        /// the top of the stock, the face of a vise jaw - so driving to them is a plunge into whatever is
+        /// clamped there now, at a height decided before it was clamped.
+        ///
+        /// G30 and G59.3 are the exceptions, and they are exceptions by definition rather than by luck.
+        /// G30 is the tool-swap park, set near the top of travel over clear air so you can reach the
+        /// collet. G59.3 is the approach position over whatever measures tool length, and tc.macro's own
+        /// contract requires its Z to be high enough that the LONGEST tool still clears the target on the
+        /// way in. Both stored Zs ARE the height meant to be gone to; stopping at the top instead leaves
+        /// the machine somewhere the operator did not ask for.
+        ///
+        /// G28 is deliberately NOT in this list. It is conventionally a park too, but nothing in this app
+        /// writes or relies on it, so its Z is whatever a previous owner of the machine left there.
+        /// </summary>
+        private static bool DrivesZ(string code)
+        {
+            return code == "G30" || code == "G59.3";
+        }
+
+        /// <summary>
+        /// Everything worth offering: the fixtures that have a captured position, the stored machine
+        /// positions that have been set, and the work offsets that are not still at zero.
+        ///
+        /// Zero is the filter throughout, and it is the same convention the rest of the app uses - grbl has
+        /// no "is defined" flag for any of these, so all-zero is what never-been-set looks like. It also
+        /// happens to be the right SAFETY filter: an unset G28 reads as machine zero, and offering "go to
+        /// G28" on a machine whose G28 was never taught would send it to the top corner at rapid.
+        /// </summary>
+        private List<GotoTarget> BuildGotoTargets()
+        {
+            var list = new List<GotoTarget>();
+
+            foreach (var fx in Fixtures.Items)
+                if (fx.HasPosition)
+                    list.Add(new GotoTarget { Name = fx.Name, Kind = "Fixture", X = fx.X, Y = fx.Y, Z = fx.Z, DriveZ = false });
+
+            foreach (var cs in GrblWorkParameters.CoordinateSystems)
+            {
+                bool any = false;
+                for (int i = 0; i < GrblInfo.NumAxes && i < cs.Values.Length; i++)
+                    if (!double.IsNaN(cs.Values[i]) && cs.Values[i] != 0d)
+                        any = true;
+                if (!any)
+                    continue;
+
+                // G92 is an offset applied ON TOP of the active WCS, not a place - there is nothing to go
+                // to. Everything else here resolves to a machine position.
+                if (cs.Code == "G92")
+                    continue;
+
+                list.Add(new GotoTarget
+                {
+                    Name = cs.Code,
+                    Kind = cs.IsSelectableWcs ? "Work offset" : "Stored position",
+                    X = cs.Values.Length > 0 ? cs.Values[0] : 0d,
+                    Y = cs.Values.Length > 1 ? cs.Values[1] : 0d,
+                    Z = cs.Values.Length > 2 ? cs.Values[2] : 0d,
+                    DriveZ = DrivesZ(cs.Code)
+                });
+            }
+
+            return list;
+        }
+
+        private void GotoTargets_Click(object sender, RoutedEventArgs e)
+        {
+            var btn = sender as FrameworkElement;
+            var menu = btn?.ContextMenu;
+            var model = DataContext as GrblViewModel;
+            if (menu == null)
+                return;
+
+            menu.Items.Clear();
+
+            var targets = BuildGotoTargets();
+            if (model == null || targets.Count == 0)
+            {
+                menu.Items.Add(new MenuItem { Header = "Nothing stored to go to yet", IsEnabled = false });
+            }
+            else
+            {
+                string kind = null;
+                foreach (var t in targets)
+                {
+                    if (t.Kind != kind)     // a separator where the sort of thing changes
+                    {
+                        if (kind != null)
+                            menu.Items.Add(new Separator());
+                        kind = t.Kind;
+                    }
+
+                    menu.Items.Add(new MenuItem
+                    {
+                        Header = t.Name,
+                        Tag = t,
+                        // Where it will actually go, before it goes - these are machine coordinates, and a
+                        // fixture's name says nothing about where it is.
+                        ToolTip = string.Format(CultureInfo.CurrentCulture,
+                                    t.DriveZ
+                                      ? "{0}\r\nMachine X {1:0.0##}  Y {2:0.0##}  Z {3:0.0##}\r\nRetracts Z, travels in X and Y, then LOWERS Z to {3:0.0##}."
+                                      : "{0}\r\nMachine X {1:0.0##}  Y {2:0.0##}\r\nRetracts Z and travels in X and Y. Z {3:0.0##} is NOT driven to - it is at the work.",
+                                    t.Kind, t.X, t.Y, t.Z)
+                    });
+                }
+
+                foreach (var item in menu.Items)
+                    if (item is MenuItem mi)
+                        mi.Click += GotoTarget_Click;
+            }
+
+            menu.PlacementTarget = btn;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Right;
+            menu.IsOpen = true;
+        }
+
+        private void GotoTarget_Click(object sender, RoutedEventArgs e)
+        {
+            var t = (sender as MenuItem)?.Tag as GotoTarget;
+            if (t != null)
+                GoToMachineXY(t.X, t.Y, t.Name, t.DriveZ ? (double?)t.Z : null);
+        }
+
+        /// <summary>
+        /// Retract Z, then travel to a machine X/Y - the same move the corner buttons make, through the same
+        /// guards, for the same reasons.
+        ///
+        /// Z is driven down ONLY when <paramref name="z"/> is given, which is only for the two targets whose
+        /// stored Z is a height meant to be gone to - see DrivesZ. For everything else the target's Z is at
+        /// the WORK, and lowering to it would be a plunge to a height chosen before whatever is currently
+        /// clamped to the table was clamped there.
+        ///
+        /// Even when it is driven, it happens LAST and as its own jog: up, across, then down. Never down
+        /// before across, and never combined with the XY move - a diagonal into a park position is a
+        /// different path from the one the operator pictured, and the only clearance anyone has actually
+        /// checked is "at the top".
+        /// </summary>
+        private void GoToMachineXY(double x, double y, string what, double? z = null)
+        {
+            GrblViewModel model = DataContext as GrblViewModel;
+
+            if (model == null)
+                return;
+
+            if (model.HomedState != HomedState.Homed) {
+                model.SetErrorMessage("Go to " + what + ": home the machine first.");
+                return;
+            }
+
+            if (model.IsJobRunning ||
+                 !(model.GrblState.State == GrblStates.Idle || model.GrblState.State == GrblStates.Jog || model.GrblState.State == GrblStates.Tool)) {
+                model.SetErrorMessage("Go to " + what + ": the machine must be idle.");
+                return;
+            }
+
+            if (GrblInfo.MaxTravel.X <= 0d || GrblInfo.MaxTravel.Y <= 0d || GrblInfo.MaxTravel.Z <= 0d) {
+                model.SetErrorMessage("Go to " + what + ": set max travel ($130-$132) first.");
+                return;
+            }
+
+            if (GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1) {
+                model.SetErrorMessage("Go to " + what + ": enable soft limits ($20=1) first.");
+                return;
+            }
+
+            // Clamped rather than refused: a stored position a little outside the envelope (a pull-off
+            // changed, say) should still take the machine as close as it can safely get, which is what the
+            // corner buttons already do. The clamp is what keeps this inside travel whatever is stored.
+            double mx = ClampMachine(0, x), my = ClampMachine(1, y);
+            double mtop = ClampMachine(2, double.MaxValue);
+            double zFeed = RapidFeed(2), xyFeed = Math.Max(RapidFeed(0), RapidFeed(1));
+
+            model.Message = z.HasValue
+                ? string.Format(CultureInfo.CurrentCulture, "Go to {0} - X {1:0.0##} Y {2:0.0##}, then Z {3:0.0##}.", what, mx, my, ClampMachine(2, z.Value))
+                : string.Format(CultureInfo.CurrentCulture, "Go to {0} at safe Z - X {1:0.0##} Y {2:0.0##}.", what, mx, my);
+
+            // Z first, then XY, as queued jogs. $J= rather than G0 throughout: a jog is cancellable, and it
+            // does not touch the modal state or the parser's idea of position - which matters more here than
+            // it looks, given what an offset write can do to that.
+            model.ExecuteCommand(string.Format("$J=G53G21Z{0}F{1}", mtop.ToInvariantString(), Math.Ceiling(zFeed).ToInvariantString()));
+            model.ExecuteCommand(string.Format("$J=G53G21X{0}Y{1}F{2}", mx.ToInvariantString(), my.ToInvariantString(), Math.Ceiling(xyFeed).ToInvariantString()));
+
+            // ...and only then down, for the two targets that are over clear air by definition. Clamped like
+            // the rest: a stored Z below the machine's travel is not a reason to try to reach it.
+            if (z.HasValue)
+                model.ExecuteCommand(string.Format("$J=G53G21Z{0}F{1}", ClampMachine(2, z.Value).ToInvariantString(), Math.Ceiling(zFeed).ToInvariantString()));
+        }
+
         private void GoToCorner(bool xMax, bool yMax)
         {
             GrblViewModel model = DataContext as GrblViewModel;
@@ -741,23 +951,23 @@ namespace CNC.Controls
                 return;
 
             if (model.HomedState != HomedState.Homed) {
-                model.Message = "Go to corner: home the machine first.";
+                model.SetErrorMessage("Go to corner: home the machine first.");
                 return;
             }
 
             if (model.IsJobRunning ||
                  !(model.GrblState.State == GrblStates.Idle || model.GrblState.State == GrblStates.Jog || model.GrblState.State == GrblStates.Tool)) {
-                model.Message = "Go to corner: the machine must be idle.";
+                model.SetErrorMessage("Go to corner: the machine must be idle.");
                 return;
             }
 
             if (GrblInfo.MaxTravel.X <= 0d || GrblInfo.MaxTravel.Y <= 0d || GrblInfo.MaxTravel.Z <= 0d) {
-                model.Message = "Go to corner: set max travel ($130-$132) first.";
+                model.SetErrorMessage("Go to corner: set max travel ($130-$132) first.");
                 return;
             }
 
             if (GrblSettings.GetInteger(GrblSetting.SoftLimitsEnable) != 1) {
-                model.Message = "Go to corner: enable soft limits ($20=1) first.";
+                model.SetErrorMessage("Go to corner: enable soft limits ($20=1) first.");
                 return;
             }
 
@@ -792,11 +1002,20 @@ namespace CNC.Controls
             double maxTravel = GrblInfo.MaxTravel.Values[axis];
 
             if (GrblInfo.ForceSetOrigin) {
+                // Clearance at BOTH ends. It used to clamp the home end to exactly 0 - the limit switch
+                // itself, with no set-back at all - and only held the far end off. Confirmed on the machine
+                // 2026-08-12 ($22=9, so this branch): a go-to-corner emitted "$J=G53G21Z0F4570", i.e. drive
+                // Z hard to the top limit. It happened to be a no-op that time because Z was already home,
+                // but from any other height that is a jog into the switch. The far end was right (X869 of
+                // $130=889), which is why only this end had gone unnoticed.
+                //
+                // It also silently skewed the centre: (max+min)/2 with min pinned at 0 put "centre" half a
+                // clearance off the true middle. With the set-back symmetric, the midpoint is correct again.
                 if (!GrblInfo.HomingDirection.HasFlag(GrblInfo.AxisIndexToFlag(axis))) {
-                    if (pos > 0d) pos = 0d;
+                    if (pos > -clearance) pos = -clearance;                                  // 0 .. -maxTravel
                     else if (pos < -maxTravel + clearance) pos = -maxTravel + clearance;
                 } else {
-                    if (pos < 0d) pos = 0d;
+                    if (pos < clearance) pos = clearance;                                    // 0 .. +maxTravel
                     else if (pos > maxTravel - clearance) pos = maxTravel - clearance;
                 }
             } else {
@@ -861,9 +1080,10 @@ namespace CNC.Controls
         {
             if (AppConfig.Settings.Base != null && AppConfig.Settings.Base.Jog.KeepUiJogSelection)
             {
-                _lastStep = (JogStep)System.Math.Max(0, System.Math.Min(3, Properties.Settings.Default.UiJogStep));
-                Feed = (JogFeed)System.Math.Max(0, System.Math.Min(3, Properties.Settings.Default.UiJogFeed));
-                StepSize = Properties.Settings.Default.UiJogContinuous ? JogStep.Continuous : _lastStep;
+                var ui = UiState.Current;
+                _lastStep = (JogStep)System.Math.Max(0, System.Math.Min(3, ui.UiJogStep));
+                Feed = (JogFeed)System.Math.Max(0, System.Math.Min(3, ui.UiJogFeed));
+                StepSize = ui.UiJogContinuous ? JogStep.Continuous : _lastStep;
             }
             _persistSelection = true;
 
@@ -877,15 +1097,19 @@ namespace CNC.Controls
                 };
         }
 
-        // Persist the current selection immediately (user settings store - isolated from the Base config file).
+        // Persist the current selection immediately. Now stored in App.config's UiState section rather than
+        // user.config - see UiState.cs for why that isolation was given up. Gated on KeepUiJogSelection, so
+        // this only writes when the user asked for the selection to be remembered.
         private void PersistSelection()
         {
             if (!_persistSelection || AppConfig.Settings.Base == null || !AppConfig.Settings.Base.Jog.KeepUiJogSelection)
                 return;
-            Properties.Settings.Default.UiJogStep = DistanceIndex;
-            Properties.Settings.Default.UiJogContinuous = Continuous;
-            Properties.Settings.Default.UiJogFeed = (int)_jogFeed;
-            Properties.Settings.Default.Save();
+
+            var ui = UiState.Current;
+            ui.UiJogStep = DistanceIndex;
+            ui.UiJogContinuous = Continuous;
+            ui.UiJogFeed = (int)_jogFeed;
+            AppConfig.Settings.Save();
         }
 
         public void SetMetric(bool on)
@@ -994,9 +1218,11 @@ namespace CNC.Controls
     // Bare value (the feed rate) is shown; the unit lives in the header and follows the UI jog panel.
     public class KeyboardJogViewModel : ViewModelBase
     {
-        private readonly KeypressHandler keyboard;
+        // Only DefaultSpeedFast is touched here, which is portable jog config - so this takes the base
+        // JogController and does not care whether a keyboard handler is installed.
+        private readonly JogController keyboard;
 
-        public KeyboardJogViewModel(KeypressHandler keyboard)
+        public KeyboardJogViewModel(JogController keyboard)
         {
             this.keyboard = keyboard;
 

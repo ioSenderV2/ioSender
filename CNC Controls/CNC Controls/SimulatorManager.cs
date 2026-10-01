@@ -419,6 +419,25 @@ namespace CNC.Controls
             get { return started != null && !started.HasExited; }
         }
 
+        /// <summary>
+        /// Stop the simulator so the next launch re-reads its boot-time configuration. The sim loads
+        /// sim_setup.cfg (and its EEPROM) exactly once, at startup - so a geometry change written while
+        /// one is running has no effect at all until it is restarted. Kills the instance we started AND
+        /// any other copy of the same exe, since the one holding the listen port may be a leftover from
+        /// a previous session (see StartSimulator's own reaping comment).
+        /// </summary>
+        public static void StopSimulator(string exePath)
+        {
+            KillStarted();
+
+            try
+            {
+                foreach (var p in Process.GetProcessesByName(System.IO.Path.GetFileNameWithoutExtension(exePath)))
+                    try { p.Kill(); p.WaitForExit(2000); } catch { }
+            }
+            catch { }
+        }
+
         private static void KillStarted()
         {
             try

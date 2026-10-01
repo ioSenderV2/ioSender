@@ -42,7 +42,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Windows;
-using System.Windows.Media.Media3D;
+// Point3D here is CNC.Core.Point3D - a plain coordinate holder, no renderer geometry involved.
 using CNC.Core;
 using CNC.Controls;
 

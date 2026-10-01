@@ -56,7 +56,7 @@ namespace CNC.Controls
         private void About_Load(object sender, System.EventArgs e)
         {
             Title = version;
-            if (CNC.Core.Resources.IsLegacyController)
+            if (CNC.Core.GrblInfo.IsLegacyController)
                 Title += " (legacy mode)";
             if((DataContext as GrblViewModel).IsMPGActive != true)
                 GrblInfo.Get();
@@ -77,7 +77,16 @@ namespace CNC.Controls
 
         private void clbButton_Click(object sender, System.EventArgs e)
         {
-            GrblSettings.CopyToClipboard();
+            // The clipboard write lives here, not in CNC.Core: Clipboard is a WPF/OS facility.
+            var text = GrblSettings.ExportText();
+
+            if (text != null) try
+            {
+                System.Windows.Clipboard.SetText(text);
+            }
+            catch
+            {
+            }
         }
     }
 }

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Harness for CNC.Core.MachineDeltaProducer - the server-side state diff (step 6 of the client/server
+    split). Runs on net8.0 with no controller, no UI and no running app: it mutates a MachineState the
+    way the parser does and checks the emitted MachineDelta stream against the protocol's promises,
+    including the one the design leans on: applying a delta's flagged fields to a mirror must reproduce
+    the full state - a changed-but-unflagged field diverges here instead of in production.
+
+    Run with:  dotnet run (from tools/delta-probe)
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <AssemblyName>delta-probe</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CNC Core\CNC Core\CNC.Core.net8.csproj" />
+    <!-- MachineMirror (CNC.Client) - the harness drives it two ways: a fake IMachineStateStream for
+         precise gap/selective-apply checks, and the real MachineStateStream for one end-to-end pass. -->
+    <ProjectReference Include="..\..\CNC Client\CNC Client\CNC.Client.net8.csproj" />
+  </ItemGroup>
+
+</Project>

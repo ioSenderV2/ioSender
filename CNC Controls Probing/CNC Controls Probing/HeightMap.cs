@@ -275,7 +275,15 @@ namespace CNC.Controls.Probing
         {
             MeshBuilder mb = new MeshBuilder(false, true);
 
+            // Normaliser for the colour ramp: 0 at the lowest probed point, 1 at the highest.
+            //
+            // The texture coordinate below used to MULTIPLY by the range instead of dividing by it, which
+            // made the colour scale depend on the square of how flat the board is. A 0.837mm board reached
+            // only 0.70 of the ramp (blue to orange, never red or purple); a 2mm board saturated at purple
+            // over most of its area; a 0.1mm board came out uniformly blue. The same colour meant a
+            // different height on every board, which is the one thing a colour scale must not do.
             double Hdelta = MaxHeight - MinHeight;
+            double Hscale = Hdelta > 0d ? 1d / Hdelta : 0d;   // a perfectly flat map is all one colour, not a divide by zero
 
             for (int x = 0; x < SizeX - 1; x++)
             {
@@ -289,10 +297,10 @@ namespace CNC.Controls.Probing
                         new Point3D(Min.X + (x + 1) * Delta.X / (SizeX - 1), Min.Y + (y + 1) * Delta.Y / (SizeY - 1), Points[x + 1, y + 1].Value),
                         new Point3D(Min.X + (x) * Delta.X / (SizeX - 1), Min.Y + (y + 1) * Delta.Y / (SizeY - 1), Points[x, y + 1].Value),
                         new Point3D(Min.X + (x) * Delta.X / (SizeX - 1), Min.Y + (y) * Delta.Y / (SizeY - 1), Points[x, y].Value),
-                        new Point(0, (Points[x + 1, y].Value - MinHeight) * Hdelta),
-                        new Point(0, (Points[x + 1, y + 1].Value - MinHeight) * Hdelta),
-                        new Point(0, (Points[x, y + 1].Value - MinHeight) * Hdelta),
-                        new Point(0, (Points[x, y].Value - MinHeight) * Hdelta)
+                        new Point(0, (Points[x + 1, y].Value - MinHeight) * Hscale),
+                        new Point(0, (Points[x + 1, y + 1].Value - MinHeight) * Hscale),
+                        new Point(0, (Points[x, y + 1].Value - MinHeight) * Hscale),
+                        new Point(0, (Points[x, y].Value - MinHeight) * Hscale)
                         );
                 }
             }

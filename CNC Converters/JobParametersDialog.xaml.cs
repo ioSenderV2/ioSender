@@ -43,6 +43,7 @@ using System.Xml.Serialization;
 using System.Windows.Threading;
 using System.Windows.Input;
 using CNC.Core;
+using CNC.Controls;   // AppDialogs moved here from CNC.Core
 
 namespace CNC.Converters
 {

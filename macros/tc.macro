@@ -63,7 +63,29 @@
 ; Confirmed on real hardware 2026-07-27: this used to hardcode G54 on return, which silently left Pocket's
 ; finishing pass running under the wrong WCS after its own mid-program tool change - its first move
 ; (computed in G59 coordinates, executed under G54) landed outside travel and hit a soft limit.
-#<_wcs> = #5220
+; (The capture itself moved to tlo.macro with the restore that consumed it - keeping a dead
+;  #<_wcs> here would be one more thing to drift out of agreement with the macro that uses it.)
+
+; Suspend any active G92 offset for the duration of this macro, and restore it before returning
+; (G92.3, next to the WCS restore below). WCO = G5x offset + G92 offset + TLO, so a leftover G92
+; shifts every non-G53 move this macro makes - including "G0 Z0" over the puck after G59.3 is
+; selected, which is NOT a machine-coordinate move however much it reads like one.
+;
+; Confirmed on real hardware 2026-08-16: a persistent G92 of Z+37 (set by the Probing tab's G92
+; coordinate-system option, and restored from NVS across resets because $384=0) made that G0 Z0
+; target machine Z +37 against a Z envelope topping out at 0 -> ALARM:2 at TC02, before the probe.
+; G49 below is NOT enough: it cancels the old tool's TLO and never touches G92.
+; pcorner.macro and pvisecorner.macro already guard this - see their own notes about a stray G92
+; landing a search ~70 mm from the real surface. This macro had the same exposure and no guard.
+;
+; G92.2/G92.3, NOT G92.1: this runs MID-JOB, and a job may legitimately be working under a G92.
+; Destroying it here would move every remaining cut. G92.2 zeroes the applied offset while leaving
+; the stored one intact; G92.3 puts it back. Both verified present in this controller's firmware
+; (gcode.c: NonModal_ClearCoordinateOffset / NonModal_RestoreCoordinateOffset).
+; ⚠️ G92.3 restores from NVS, so it depends on G92 persistence being ENABLED ($384=0, the default
+; and this machine's setting). With $384=1 a G92 is never written, and G92.3 would restore a stale
+; value instead of the caller's - if that setting is ever changed, revisit this pair.
+G92.2
 
 M5
 M9
@@ -88,99 +110,17 @@ o100 IF [#<_selected_tool> NE 8]
   G49                ; cancel old tool's TLO before probing the new one
 o100 ENDIF
 
-; --- Rapid to G59.3 (over puck) ---
-; Safe-Z goto: lift (below), select G59.3, traverse XY at the safe Z, then
-; descend - rather than the coordinated "G0 X0 Y0 Z0", which would move Z while
-; traversing. Traversing at machine -5 (this macro's safe height) no longer
-; relies on G59.3's Z being set high enough to clear the puck during the rapid.
-G53 G0 Z-5
-G59.3
-G0 X0 Y0
-G0 Z0
-(PRINT, TC02 at G59.3)
-
-; --- Select probe input based on the tool in the spindle ---
-; Touch-plate mode: no toolsetter hardware exists, so every tool (T8's
-; stylus included) always probes via the MAIN probe input - see
-; _tc_touchplate's comment at the top of this file.
-; Toolsetter mode (default): T8 = 3D mechanical probe. Its stylus is
-; sensitive (sub-mm deflection) and is NOT designed to bear downward force
-; on the puck. We probe via the MAIN probe input (pin 15) — the stylus
-; triggers it on first touch, well before any meaningful pressure on the
-; puck. Any other tool = rigid cutting tool with no electrical sensing. The
-; puck's NC switch on the TOOLSETTER input fires when the tool pushes down
-; on it.
-; G65 P5 Q<id>: Q0 = Probe_Default (main), Q1 = Probe_Toolsetter (probe.h:40).
-o150 IF [#<_tc_touchplate> EQ 1]
-  G65 P5 Q0
-  (PRINT, TC02b main probe selected (touch-plate mode))
-o150 ELSEIF [#<_selected_tool> EQ 8]
-  G65 P5 Q0
-  (PRINT, TC02b main probe selected for T8)
-o150 ELSE
-  G65 P5 Q1
-  (PRINT, TC02b toolsetter selected for T#<_selected_tool>)
-o150 ENDIF
-
-G91
-; -90mm (was -80mm): a short V-bit (chamfer) sits well above the puck at G59.3's park height, calibrated for
-; the LONGEST tool in use - confirmed on real hardware 2026-07-27, Alarm 5 (probe fail, no contact within
-; programmed travel) landing 5mm short of the puck for the V-bit specifically.
-G38.2 Z-90 F500
-G0 Z2
-G38.2 Z-5 F25
-#<_probe_z> = #5063
-G0 Z10
-G90
-G65 P5 Q0
-
-; Restore the caller's own WCS (saved as #<_wcs> at the top) - see that comment for why this must NOT be a
-; hardcoded G54.
-o120 IF [#<_wcs> EQ 1]
-  G54
-o120 ELSEIF [#<_wcs> EQ 2]
-  G55
-o120 ELSEIF [#<_wcs> EQ 3]
-  G56
-o120 ELSEIF [#<_wcs> EQ 4]
-  G57
-o120 ELSEIF [#<_wcs> EQ 5]
-  G58
-o120 ELSEIF [#<_wcs> EQ 6]
-  G59
-o120 ELSEIF [#<_wcs> EQ 7]
-  G59.1
-o120 ELSEIF [#<_wcs> EQ 8]
-  G59.2
-o120 ELSE
-  G59.3
-o120 ENDIF
-(PRINT, TC03 probe_z=#<_probe_z>)
-
-o199 IF [EXISTS[#<_tlo_ref>]]
-o199 ELSE
-  #<_tlo_ref> = 0
-o199 ENDIF
-o200 IF [#<_tlo_ref> EQ 0]
-  #<_tlo_ref> = #<_probe_z>
-  (PRINT, TC04 TLO REF SET ref=#<_tlo_ref>)
-o200 ELSE
-  G43.1 Z[#<_probe_z> - #<_tlo_ref>]
-  (PRINT, TC05 TLO APPLIED tlo=[#<_probe_z> - #<_tlo_ref>])
-o200 ENDIF
-; $TLR - the REAL grblHAL system command that commits the tool length reference to the controller's own
-; native TLR flag (GrblViewModel.IsTloReferenceSet / the status report's TLR: field) - same one the Probing
-; tab's own Tool Length flow uses (ToolLengthControl.xaml.cs). #<_tlo_ref> above is a SEPARATE, older,
-; script-only convention (this macro's own bookkeeping for the G43.1 apply-on-next-M6 logic) that never
-; touched the native flag at all - confirmed on real hardware 2026-07-27: every PREREQ gate checking "tlo"
-; (Contour, etc.) could never pass even after a successful M6 T8 reference.
-; Sent EVERY time (both branches above, first reference and every later apply), NOT just the first-ever
-; reference - G49 earlier in this macro (cancels the OLD tool's TLO before probing the new one) clears the
-; controller's native TLR flag as a side effect on every real tool swap, so a job with multiple M6 tool
-; changes (e.g. Odd Jobs' Pocket roughing -> finishing) would otherwise see TLR go false after the FIRST
-; swap and never come back true for the rest of the job/session - confirmed on real hardware 2026-07-27
-; ("every time a tool finishes its program, the setup gate reset").
-$TLR
+; --- Reference this tool against the puck ---
+; The whole sequence - park over the puck, pick the probe input, probe, restore the caller's WCS/G92,
+; set or apply the TLO, $TLR - moved to tlo.macro on 2026-09-14 and is CALLED from here. It was
+; extracted because the sender had grown a second copy of it, emitted inline into generated g-code,
+; which had already drifted (Z-80 instead of Z-90, a hardcoded G54, an unconditional toolsetter
+; select) and could not have been correct anyway: two of those three need o-word branching, and
+; o-word flow control cannot be streamed. One implementation, on the controller, called by both.
+;
+; #<_tc_touchplate> and #<_tlo_ref> are already globals and are read directly by tlo.macro.
+#<_tlo_toolid> = #<_selected_tool>
+O<tlo> CALL
 
 ; Safe-Z goto to G30 (Z lifted just above): traverse XY at the safe height, then
 ; move Z. See the matching note on the G30 swap move earlier in this macro.

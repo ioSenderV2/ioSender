@@ -39,8 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using System;
 using System.Collections.Generic;
-using System.Windows.Media.Media3D;
-using CNC.Core;
+using CNC.Core;   // Point3D here is CNC.Core.Point3D - these points come from the parser/emulator, not the renderer
 using CNC.GCode;
 using System.Windows;
 

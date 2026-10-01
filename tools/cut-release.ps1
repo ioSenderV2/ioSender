@@ -140,13 +140,23 @@ $newEntries = @($entries.Values | Where-Object { $_.N -gt $previousThrough } | S
 # uses internally for Check for Updates/Roll back).
 $lines = @("## ioSender $newVersion", "")
 $lines += "### Install / update"
-$lines += "Run from CMD or PowerShell:"
+# The one-liner is PowerShell syntax and CANNOT be pasted into cmd.exe - "&" is CMD's own command
+# separator, so it dies with "& was unexpected at this time" before anything else is parsed. This
+# said "Run from CMD or PowerShell" for every release until a user hit exactly that (2026-08-10).
+# The CMD form wraps it in powershell -Command and uses SINGLE quotes for the tag: nesting double
+# quotes inside the double-quoted -Command argument is what breaks it. Both forms tested in a real
+# cmd.exe before being written here.
+$lines += "**PowerShell:**"
 $lines += '```'
 $lines += "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/$Repo/master/install.ps1))) -Tag `"$newVersion`""
 $lines += '```'
+$lines += "**Command Prompt (cmd.exe):**"
+$lines += '```'
+$lines += "powershell -NoProfile -ExecutionPolicy Bypass -Command `"& ([scriptblock]::Create((irm https://raw.githubusercontent.com/$Repo/master/install.ps1))) -Tag '$newVersion'`""
+$lines += '```'
 $lines += ""
 if ($newEntries.Count -eq 0) {
-    $lines += "No changelog entries in this build (see [Overview.html](https://github.com/$Repo/blob/master/Overview.html#features-and-fixes) for the full history)."
+    $lines += "No changelog entries in this build."
 } else {
     foreach ($e in $newEntries) {
         # Strip inner HTML tags for a plain-text release note line.
@@ -154,6 +164,28 @@ if ($newEntries.Count -eq 0) {
         $lines += "- **[$($e.Tag)] #$($e.N)** $plain"
     }
 }
+$lines += ""
+
+# Link to the GitHub Pages copy, NOT the repo blob view. github.com/<repo>/blob/master/Overview.html
+# serves 880KB of HTML *source* in a code viewer - readable only as markup, and the
+# #features-and-fixes anchor is meaningless there. Pages serves it as text/html, so it renders as
+# the actual document and the anchor lands on the changelog. raw.githubusercontent.com is no good
+# either (text/plain), and attaching the file as a release asset downloads it instead of opening it.
+#
+# The Pages host is the owner lowercased - github.io hostnames are case-folded - while the path
+# segment keeps the repo's own casing, and the FILE is lowercase overview.html (see the publish
+# step in .github/workflows/release.yml, which is what keeps this URL from going stale).
+#
+# This used to live inside the "$newEntries.Count -eq 0" branch, which meant the link appeared only
+# on the rare release that shipped NO changelog entries - i.e. it was missing from essentially every
+# real release. It is unconditional now.
+#
+# Note for anyone tempted: the link cannot be made to open in a new tab. GitHub sanitizes release
+# body markdown and strips target attributes, so raw <a target="_blank"> gets scrubbed. Ctrl+click
+# or middle-click is the reader's only route, and that's fine.
+$owner, $repoName = $Repo -split '/', 2
+$overviewUrl = "https://$($owner.ToLowerInvariant()).github.io/$repoName/overview.html#features-and-fixes"
+$lines += "Full changelog and feature documentation: [**Overview**]($overviewUrl) (opens in your browser; Ctrl+click for a new tab)"
 $lines += ""
 $lines += "<!-- changelog-through:$currentMax -->"
 $notes = ($lines -join "`n")
@@ -167,6 +199,18 @@ if (-not $DryRun -and $newEntries.Count -gt 0) {
     $firstN = ($newEntries | Sort-Object N | Select-Object -First 1).N
     $marker = "<tr><td class=""n"">$firstN</td>"
     if ($content.Contains($marker)) {
+        # Drop the "pending" placeholder header before inserting the real one. Entries that are
+        # merged but unreleased sit under a `ver-hdr pending` row (added by add-changelog-entry.ps1)
+        # so the TOC never implies they shipped in the version above them - which is exactly what
+        # went wrong before this existed: #218-#268 sat under "Version 2.41", a release that
+        # actually stopped at #217, so 51 unreleased entries read as shipped.
+        #
+        # Removing it here is not optional: the pending row sits immediately above $firstN, the same
+        # place the real header goes, so skipping this leaves BOTH stacked on the released version.
+        # add-changelog-entry.ps1 recreates a fresh pending row for the next entry added after this
+        # release, which is what stops the mislabelling from creeping back in a version or two.
+        $pendingRe = '<tr class="ver-hdr pending" id="pending"><td colspan="3">[^<]*</td></tr>\r?\n?'
+        $content = [regex]::Replace($content, $pendingRe, '')
         $hdr = "<tr class=""ver-hdr""><td colspan=""3"">Version $newVersion</td></tr>`n"
         $content = $content.Replace($marker, $hdr + $marker)
         [System.IO.File]::WriteAllText($Html, $content)

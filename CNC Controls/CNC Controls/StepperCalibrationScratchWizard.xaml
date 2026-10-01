@@ -1,0 +1,162 @@
+﻿<local:ConfigPanel x:TypeArguments="local:ScratchParams" x:Class="CNC.Controls.StepperCalibrationScratchWizard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:system="clr-namespace:System;assembly=mscorlib"
+             xmlns:cnccore="clr-namespace:CNC.Core;assembly=CNC.Core"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="480" d:DesignWidth="980">
+    <Grid VerticalAlignment="Stretch" Grid.IsSharedSizeScope="True">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1*" MinWidth="400"/>
+            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="2*"/>
+        </Grid.ColumnDefinitions>
+        <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                      Background="#FFCCCCCC" ResizeBehavior="PreviousAndNext" Cursor="SizeWE"/>
+        <!-- Left: scrolling inputs on top, Generate/Run/Save pinned at the column bottom (shared tool layout) -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Orientation="Vertical" Margin="5,5,0,0">
+            <StackPanel Orientation="Horizontal">
+                <Label x:Uid="lbl_scaxis" Content="Axis:" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="120"/>
+                <ComboBox x:Uid="cbxAxis" x:Name="cbxAxis" IsEditable="False" DisplayMemberPath="Letter" SelectedValuePath="Index"
+                          ItemsSource="{Binding Path=CalAxes, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                          SelectedValue="{Binding Path=Axis, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                          HorizontalAlignment="Left" VerticalAlignment="Center" MinWidth="60" MinHeight="22" Margin="2"
+                          ToolTip="Axis to calibrate. Current steps/mm below is read from its existing setting."/>
+            </StackPanel>
+            <local:NumericField x:Uid="fld_sccurrent" Label="Current steps/mm:" ColonAt="120" IsReadOnly="True" Format="###0.000###"
+                Value="{Binding CurrentResolution, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=OneWay}" Unit="steps/mm"/>
+            <local:NumericField x:Uid="fld_scspan" Label="Span:" ColonAt="120"
+                Value="{Binding Span, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <local:NumericField x:Uid="fld_scdelta" Label="Delta steps/mm:" ColonAt="120" Format="###0.000###"
+                Value="{Binding Delta, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="steps/mm"/>
+            <local:NumericField x:Uid="fld_scpoints" Label="Test points:" ColonAt="120" Format="##0"
+                Value="{Binding Points, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit=""/>
+            <!-- Two depths, one per mark of a pair. Hand-rolled rather than two NumericFields: NumericField
+                 reserves a shared-size label column, so a second one on the same row would sit a label's
+                 width to the right of the first instead of beside it. Unit="mm" here is the PARSE/display
+                 unit (mm vs in), not a visible suffix - only NumericField renders one - so the row carries
+                 its own "mm" at the end, once, for both boxes. -->
+            <Grid Margin="0,2,0,0"
+                  ToolTip="How deep each of the two marks in a pair is cut - the first at the edge margin, the second a full span away. They are separate because the reference surface is not flat: a spoilboard that dips more than the cut depth across the span marks one end and misses the other, and a pair with one mark missing cannot be measured at all. Depth does not affect the RESULT - the measurement is the spacing between the two line centres, and a V-bit's centre sits under the spindle axis whatever the depth - so set each one as deep as it needs to be to come out crisp.">
+                <Grid.ColumnDefinitions>
+                    <!-- The SAME shared column every NumericField on this panel uses, so the label sits in
+                         the common label column and the boxes start where every other field's box starts.
+                         A hand-set Width="120" did neither: ColonAt is only a MINIMUM (the column is Auto
+                         and grows to the longest label in the scope), so 120 both clipped "Scratch depths:"
+                         and started the boxes left of everything else. MinWidth matches the ColonAt="120"
+                         the fields above and below pass. -->
+                    <ColumnDefinition Width="Auto" MinWidth="120" SharedSizeGroup="NumericFieldLabel"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Label x:Uid="lbl_scdepths" Grid.Column="0" Content="Scratch depths:" Padding="0,0,4,0" HorizontalContentAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <local:NumericTextBox x:Uid="num_scdepth1" x:Name="numDepth1" MinWidth="64" VerticalAlignment="Center" Margin="0,0,8,0" Format="##0.0##" Unit="mm"
+                        Value="{Binding ScratchDepth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                    <local:NumericTextBox x:Uid="num_scdepth2" x:Name="numDepth2" MinWidth="64" VerticalAlignment="Center" Format="##0.0##" Unit="mm"
+                        Value="{Binding ScratchDepth2, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"/>
+                    <TextBlock x:Uid="txt_scdepthsunit" Text="mm" VerticalAlignment="Center" Margin="6,0,0,0" Opacity="0.75"/>
+                </StackPanel>
+            </Grid>
+            <local:NumericField x:Uid="fld_scplunge" Label="Plunge feed:" ColonAt="120" Format="#####0"
+                Value="{Binding PlungeFeed, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm/min"
+                ToolTip="How fast the V-bit descends into the surface at the start of each line. Straight down into material, so keep it well below the scratch feed."/>
+            <local:NumericField x:Uid="fld_scfeed" Label="Scratch feed:" ColonAt="120" Format="#####0"
+                Value="{Binding ScratchFeed, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm/min"
+                ToolTip="How fast the V-bit draws each line, once it is down at depth. Nothing is probed or searched for in this program - it is all plain moves - so this is simply a cutting feed; slower gives a cleaner edge to measure against."/>
+            <local:NumericField x:Uid="fld_scsafez" Label="Safe Z:" ColonAt="120"
+                Value="{Binding SafeZ, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <local:NumericField x:Uid="fld_sclinelen" Label="Line length:" ColonAt="120"
+                Value="{Binding LineLength, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <local:NumericField x:Uid="fld_scrowspacing" Label="Row spacing:" ColonAt="120"
+                Value="{Binding RowSpacing, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <local:NumericField x:Uid="fld_scmargin" Label="Edge margin:" ColonAt="120"
+                Value="{Binding EdgeMargin, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="mm"/>
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                <Label x:Uid="lbl_scorigin" Content="Work origin:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding OriginText, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" VerticalAlignment="Center" FontWeight="SemiBold"
+                           ToolTip="The work offset this run will use - whichever coordinate system is active right now. The program does not change it and does not set it; touch off on the stock corner first (Z0 = stock top)."/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                <Label x:Uid="lbl_scfit" Content="Pattern:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding FitText, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" VerticalAlignment="Center" TextWrapping="Wrap"
+                           ToolTip="Where the scratch pattern reaches from that origin, checked against the machine envelope (travel less the homing pull-off)."/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                <Label Content="Min stock:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding MinStockText, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" VerticalAlignment="Center" FontWeight="SemiBold"
+                           ToolTip="Smallest stock the scratch pattern fits on: span + 2x edge margin along the axis, (points-1)x row spacing + line length + 2x edge margin across it."/>
+            </StackPanel>
+            <local:NumericField x:Uid="fld_scrpm" Label="Spindle RPM:" ColonAt="120" Format="#####0"
+                Value="{Binding SpindleRPM, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit=""/>
+            <CheckBox x:Uid="chk_screftlo" x:Name="chkRefTlo" Content="Reference the loaded bit at the puck" Margin="124,6,0,0"
+                      IsChecked="{Binding ReferenceTlo, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}"
+                      ToolTip="Touch the bit that is already in the spindle on the tool setter puck and apply its tool length offset, before cutting. No tool change and no prompt. Leave this on unless the bit was loaded by a tool change in this same session - the work Z0 only means the stock top for a tool that HAS an offset, so a bit fitted by hand without one cuts at the previous tool's depth."/>
+            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                <Label x:Uid="lbl_sctool" Content="Tool:" Width="120" Padding="0,0,4,0" HorizontalContentAlignment="Right" VerticalAlignment="Center"/>
+                <ComboBox x:Uid="cbxTool" x:Name="cbxTool" MinWidth="90" MinHeight="22" VerticalAlignment="Center" SelectionChanged="cbxTool_SelectionChanged"
+                          ToolTip="Loaded: the V-bit is already in the spindle (no tool change). Prompt: the program issues a tool change (M6) so it is loaded before scratching.">
+                    <ComboBoxItem x:Uid="cbi_toolLoaded" Content="Loaded"/>
+                    <ComboBoxItem x:Uid="cbi_toolPrompt" Content="Prompt"/>
+                </ComboBox>
+            </StackPanel>
+            <local:NumericField x:Uid="fld_scnewres" Label="New steps/mm:" ColonAt="120" Format="###0.000###"
+                Value="{Binding NewResolution, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, Mode=TwoWay}" Unit="steps/mm"/>
+        </StackPanel>
+        </ScrollViewer>
+        <!-- Save pinned at the bottom of the input column (the shared Run bar's Generate/Run builds/runs the program) -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="5,8,5,6" HorizontalAlignment="Right">
+            <Button x:Uid="btn_scsave" Content="Save steps/mm" Tag="save" Focusable="False" MinWidth="100" MinHeight="24" Margin="3,0"
+                    IsEnabled="{Binding CanUpdate, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}" Click="Button_Click"
+                    ToolTip="Write the steps/mm value implied by the row highlighted green to the axis' setting."/>
+        </StackPanel>
+        </Grid>
+        <!-- Right: measurements grid (the generated program previews in the bottom Program View, not here) -->
+        <Grid Grid.Column="2" Margin="8,5,5,5">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel Grid.Row="0">
+                <TextBlock x:Uid="hlp_scHdr" Text="About scratch calibration" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                <TextBlock x:Uid="hlp_scBody" TextWrapping="Wrap" Margin="0,0,0,10"
+                           Text="Fine-tunes an axis' steps/mm by scratching a row of test lines, each cut at a slightly different step value, so you can pick the one whose measured spacing is most accurate - no dial indicator needed.&#10;&#10;Choose the axis and a V-bit, set the Span, Delta and number of Test points, then Generate and Run to scratch the pattern. Measure the spacing between each numbered pair, enter it in the Measured column, and the row whose implied steps/mm is closest is highlighted green. Save steps/mm writes that value to the setting."/>
+                <TextBlock x:Uid="txt_scresults" Text="Measured results - enter the measured spacing for each pair after running:" Margin="0,0,0,4" TextWrapping="Wrap"/>
+            </StackPanel>
+            <DataGrid x:Uid="dgResults" x:Name="dgResults" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                      HeadersVisibility="Column" GridLinesVisibility="All" SelectionMode="Single"
+                      ItemsSource="{Binding Results, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}">
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsClosest}" Value="True">
+                                <Setter Property="Background" Value="#FFCCFFCC"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.RowStyle>
+                <DataGrid.Columns>
+                    <DataGridTextColumn x:Uid="col_scPair" Header="Pair" Binding="{Binding Label}" IsReadOnly="True" MinWidth="70"/>
+                    <DataGridTextColumn x:Uid="col_scCandidate" Header="Candidate steps/mm" Binding="{Binding Steps, StringFormat=0.000###}" IsReadOnly="True" Width="*"/>
+                    <DataGridTextColumn x:Uid="col_scCommanded" Header="Commanded (mm)" Binding="{Binding Commanded, StringFormat=0.000}" IsReadOnly="True" Width="*"/>
+                    <!-- No UpdateSourceTrigger=PropertyChanged here, deliberately. With it, every keystroke
+                         pushed the half-typed number to the source, which raised PropertyChanged, which wrote
+                         the StringFormat'd text ("500.000") back into the box you were still typing in - so
+                         typing 500 then .2 left you looking at "500.2.000" and deleting the wreckage. The
+                         default (commit on Enter/Tab/leaving the cell) lets the text alone while it is being
+                         typed and formats it once, when it is a number. -->
+                    <DataGridTextColumn x:Uid="col_scMeasured" Header="Measured (mm)" Binding="{Binding Measured, StringFormat=0.000}" Width="*"/>
+                    <DataGridTextColumn x:Uid="col_scImplied" Header="Implied steps/mm" Binding="{Binding Estimate, StringFormat=0.000###}" IsReadOnly="True" Width="*"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+    </Grid>
+</local:ConfigPanel>

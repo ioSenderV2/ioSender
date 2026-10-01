@@ -73,6 +73,12 @@
                     </ContextMenu>
                 </TextBox.ContextMenu>
             </TextBox>
+            <!-- Job elapsed time, next to the state it belongs to. Text and visibility are driven from the
+                 code-behind (see ShowRunTime) rather than bound: a zero time is never displayed, so the field
+                 has to disappear instead of reading 00:00:00. -->
+            <TextBlock x:Uid="txt_runTime" x:Name="txtRunTime" VerticalAlignment="Center" Margin="8,0,0,0"
+                       FontFamily="Consolas" Visibility="Collapsed"
+                       ToolTip="Elapsed time of the current or last job."/>
         </StackPanel>
         <StackPanel x:Name="buttonRow" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,4,0,0" VerticalAlignment="Bottom">
             <Button x:Uid="btn_home" x:Name="btnHome" Content="Home" ToolTip="Ctrl+H" Background="{Binding Path=HomedState, Converter={StaticResource HomedStateConverter}}" Style="{StaticResource StatusButtonStyle}" Click="btn_Click">

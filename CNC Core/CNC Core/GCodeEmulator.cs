@@ -41,9 +41,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
-using System.Windows.Media.Media3D;
 using CNC.GCode;
-using RP.Math;
 
 namespace CNC.Core
 {
@@ -52,9 +50,17 @@ namespace CNC.Core
         public Point3D Start;
         public Point3D End;
         public GCodeToken Token;
-        public double Rotation;
+        // No Rotation here. There was one, never written and never read, left over from when the emulator
+        // rotated its output into the machine frame - an empty slot on a struct is an invitation to fill it
+        // and re-create exactly the bug the class comment describes.
         public bool IsRetract;
         public bool IsSpindleSynced;
+        // This action started life as a G38.x PROBE. It is reported as a Commands.G1 linear move (see the
+        // G38 arm below, under 'translate') because for drawing a path a probe IS a feed move - but a probe
+        // removes no material, and a consumer reasoning about CUTS cannot tell the two apart from the token
+        // alone. The 3D view's stock block did exactly that and drew a 6.35 mm board ~80 mm thick, taking a
+        // toolsetter probe for a cut that deep.
+        public bool IsProbe;
         public bool IsScaled;
         public Point3D ScaleFactors;
         public bool IsInMachineCoord;
@@ -92,6 +98,35 @@ namespace CNC.Core
         public bool Brk;
     }
 
+    /// <summary>
+    /// Walks a program's tokens and yields the move each one makes, with its start and end point.
+    /// </summary>
+    /// <remarks>
+    /// ---- One frame: WORK coordinates, always ----
+    ///
+    /// Every point this yields is in the program's own work frame. There is exactly one conversion in
+    /// here - a G53 move, whose machine coordinates are converted INTO the work frame by subtracting the
+    /// active WCS offset - and it exists to preserve that rule, not to break it. Consumers depend on it
+    /// absolutely: the bounding box is measured across these points (a box spanning two frames measures the
+    /// distance between two origins - a 32 mm program once reported an 858 mm Y span), the 3D view draws
+    /// them against a stock at 0..W and an envelope shifted by the work offset, and JobRunner's
+    /// does-it-fit check reads that box.
+    ///
+    /// A WCS ROTATION therefore changes nothing here, and this is the part that looks wrong until it
+    /// doesn't: in work coordinates a rotated WCS is still square - the rotation describes how the work
+    /// frame sits on the TABLE, which only matters converting work -> machine, which is the controller's
+    /// job and not done here at all. The stock is drawn square for the same reason.
+    ///
+    /// This used to rotate: for a rotated WCS, G0/G1/G2/G3 added the WCS origin, rotated about (0,0) -
+    /// MACHINE zero - and left the point there. So a rotated program's every point came out in the machine
+    /// frame while everything around it stayed work-frame. Measured 2026-09-18 with a 0.09 deg rotation on
+    /// G54: the toolpath was drawn 600 mm in front of the stock, outside the machine envelope, and tilted
+    /// by 5.16 deg - because the same code also read that 0.09 as RADIANS (see CoordinateSystem.Rotation,
+    /// which is degrees). The Y span of a 224 mm job came out as 417 mm, which the fit check believed.
+    ///
+    /// If a machine-space view is ever wanted, convert at the point of drawing, where the WCS origin and
+    /// the rotation can be applied to the stock and the envelope too. Do not reintroduce it here.
+    /// </remarks>
     public class GCodeEmulator : Machine
     {
         private bool translate;
@@ -119,6 +154,17 @@ namespace CNC.Core
             return run(Tokens);
         }
 
+        /// <summary>
+        /// Continue from the current state instead of resetting - for walking a program one section at a
+        /// time while modal state (feed rate, position, plane, distance mode) carries across the boundary
+        /// exactly as it does on the machine. Resetting between sections would restore a default feed and
+        /// origin that the program never re-states, so every section after the first would be wrong.
+        /// </summary>
+        public IEnumerable<RunAction> ExecuteContinue(List<GCodeToken> Tokens)
+        {
+            return run(Tokens);
+        }
+
         private IEnumerable<RunAction> run(List<GCodeToken> Tokens)
         {
             if (Tokens == null)   // program-free render (e.g. work-envelope-only scene) - nothing to emulate
@@ -137,7 +183,7 @@ namespace CNC.Core
 
                 action.IsInMachineCoord = false;
                 action.Token = token;
-                action.IsRetract = action.IsSpindleSynced = false;
+                action.IsRetract = action.IsSpindleSynced = action.IsProbe = false;
 
                 if (token.Command == Commands.FlowControl)
                 {
@@ -224,18 +270,9 @@ namespace CNC.Core
                     case Commands.G0:
                     case Commands.G1:
                         {
+                            // No rotation transform here, and that is the point - see "One frame" above.
                             var motion = token as GCLinearMotion;
-                            if (coordinateSystem.Rotation != 0d)
-                            {
-                                var move = new GCLinearMotion(motion.Command, motion.LineNumber, motion.Values.ToArray(), motion.AxisFlags, motion.BlockDelete);
-                                var target = new Vector3(move.X + coordinateSystem.X, move.Y + coordinateSystem.Y, 0d).RotateZ(0d, 0d, coordinateSystem.Rotation);
-                                move.X = target.X;
-                                move.Y = target.Y;
-                                move.AxisFlags |= AxisFlags.XY;
-                                setEndP(move.Values, move.AxisFlags);
-                            }
-                            else
-                                setEndP(motion.Values, motion.AxisFlags);
+                            setEndP(motion.Values, motion.AxisFlags);
                         }
                         break;
 
@@ -243,25 +280,10 @@ namespace CNC.Core
                     case Commands.G2:
                     case Commands.G3:
                         {
+                            // As G0/G1: the arc and its centre offsets stay in the frame the program wrote
+                            // them in - see "One frame" above.
                             var arc = token as GCArc;
-                            if (coordinateSystem.Rotation != 0d)
-                            {
-                                var move = arc.Values.ToArray();
-                                var ijk = arc.IJKvalues.ToArray();
-                                var target = new Vector3(move[0] + coordinateSystem.X, move[1] + coordinateSystem.Y, 0d).RotateZ(0d, 0d, coordinateSystem.Rotation);
-                                move[0] = target.X;
-                                move[1] = target.Y;
-                                if (arc.IjkFlags != IJKFlags.None)
-                                {
-                                    target = new Vector3(ijk[0], ijk[1], 0d).RotateZ(0d, 0d, coordinateSystem.Rotation);
-                                    ijk[0] = target.X;
-                                    ijk[1] = target.Y;
-                                }
-                                action.Token = new GCArc(token.Command, token.LineNumber, move, AxisFlags.XY, ijk, arc.IjkFlags, arc.R, arc.P, arc.IJKMode, arc.BlockDelete);
-                                setEndP((action.Token as GCArc).Values, (action.Token as GCArc).AxisFlags);
-                            }
-                            else
-                                setEndP(arc.Values, arc.AxisFlags);
+                            setEndP(arc.Values, arc.AxisFlags);
                         }
                         break;
 
@@ -307,7 +329,12 @@ namespace CNC.Core
                                 if (gcsys.P == 0)
                                     offsets[i] = csys.Values[i];
                             }
-                            csys.Rotation = gcsys.L == 2 && Plane.Plane == GCode.Plane.XY ? gcsys.R * Math.PI / 180d : 0d;
+                            // DEGREES, as the R word is written and as every other writer and reader of
+                            // this field uses it (Machine.AddOrUpdateCS from $#, the Work Order's rotation
+                            // advisory). This line alone used to store RADIANS into the same field, which
+                            // is half of how a 0.09 deg rotation drew a 5.16 deg tilt - a field with two
+                            // units is a trap whoever reads it next walks into.
+                            csys.Rotation = gcsys.L == 2 && Plane.Plane == GCode.Plane.XY ? gcsys.R : 0d;
                         }
                         break;
 
@@ -428,6 +455,7 @@ namespace CNC.Core
                             var motion = token as GCLinearMotion;
                             setEndP(motion.Values, motion.AxisFlags);
                             action.Token = new GCLinearMotion(Commands.G1, token.LineNumber, machinePos.Array, motion.AxisFlags, token.BlockDelete);
+                            action.IsProbe = true;   // it draws like a feed move, but it cuts nothing - see RunAction.IsProbe
                         }
                         break;
 
@@ -486,7 +514,19 @@ namespace CNC.Core
                             if (action.IsInMachineCoord)
                             {
                                 foreach (int i in motion.AxisFlags.ToIndices())
+                                {
+                                    // offsets[] is the active WCS origin, set by the G54..G59.3 case from
+                                    // coordinateSystems ($#). If it is still 0 here the subtraction is a
+                                    // no-op and this machine coordinate enters the bounding box RAW, in a
+                                    // different frame from every work-frame point - see ProgramFitsMachine.
+                                    if (DebugLog.Enabled)
+                                        DebugLog.Write("gcode", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                                            "G53 axis {0}: raw={1:0.###} offsets={2:0.###} origin={3:0.###} -> {4:0.###}{5}",
+                                            i, motion.Values[i], offsets[i], origin[i],
+                                            motion.Values[i] - offsets[i] - origin[i],
+                                            offsets[i] == 0d ? "   <-- WCS offset is ZERO" : ""));
                                     machinePos[i] = motion.Values[i] - offsets[i] - origin[i];
+                                }
                                 action.End = machinePos.Point3D;
                             }
                             action.Token = new GCLinearMotion(motion.Motion, token.LineNumber, machinePos.Array, motion.AxisFlags, token.BlockDelete);
@@ -507,9 +547,22 @@ namespace CNC.Core
                     case Commands.G59_3:
                         {
                             string cs = token.Command.ToString().Replace('_', '.');
-                            coordinateSystem = coordinateSystems.Where(x => x.Code == cs).FirstOrDefault();
+                            // Same reason as Machine.Reset: an unknown system must not put a null back.
+                            var found = coordinateSystems.Where(x => x.Code == cs).FirstOrDefault();
+                            coordinateSystem = found ?? Neutral(cs);
                             foreach (int i in AxisFlags.All.ToIndices()) // GrblInfo.AxisFlags?
                                 offsets[i] = coordinateSystem.Values[i];
+
+                            // A Neutral() fallback silently zeroes offsets[], which makes every later G53
+                            // land in the bounding box unconverted. Say which one happened, and how many
+                            // systems $# actually gave us.
+                            if (DebugLog.Enabled)
+                                DebugLog.Write("gcode", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                                    "select {0}: {1} (coordinateSystems={2} [{3}]) -> offsets X{4:0.###} Y{5:0.###} Z{6:0.###}",
+                                    cs, found == null ? "NOT FOUND - using Neutral(zeros)" : "found",
+                                    coordinateSystems.Count,
+                                    string.Join(",", coordinateSystems.Select(x => x.Code).ToArray()),
+                                    offsets[0], offsets[1], offsets[2]));
                             //    CoordinateSystem = GrblWorkParameters.CoordinateSystems();
                             //GCCoordinateSystem cs = (GCCoordinateSystem)token;
                             // TODO: handle offsets... Need to read current from grbl
@@ -752,8 +805,21 @@ namespace CNC.Core
                     case Commands.G92:
                         {
                             var cs = token as GCCoordinateSystem;
+
+                            // g92 is FirstOrDefault over the controller's coordinate systems, so it is null
+                            // until those have been read - and stays null when there is no controller at
+                            // all. Machine.cs guards every one of its own uses for exactly that reason;
+                            // these two did not, so loading any file containing a G92 while disconnected
+                            // took the app down in the 3D viewer's toolpath build (2026-08-21).
+                            //
+                            // origin is what the emulator actually needs; g92 is only kept in step for
+                            // whoever reads it later, so the offset is still applied when it is absent.
                             foreach (int i in cs.AxisFlags.ToIndices())
-                                origin[i] = g92.Values[i] = cs.Values[i];
+                            {
+                                origin[i] = cs.Values[i];
+                                if (g92 != null)
+                                    g92.Values[i] = cs.Values[i];
+                            }
                         }
                         break;
 
@@ -761,7 +827,11 @@ namespace CNC.Core
                     case Commands.G92_1:
                         {
                             for (int i = 0; i < origin.Length; i++)
-                                origin[i] = g92.Values[i] = 0d;
+                            {
+                                origin[i] = 0d;
+                                if (g92 != null)
+                                    g92.Values[i] = 0d;   // see the G92 case above
+                            }
                         }
                         break;
 
