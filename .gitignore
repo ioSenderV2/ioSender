@@ -46,6 +46,8 @@ scene_debug.log
 **/.claude/turn-state.json
 .claude/session-banner.json
 **/.claude/session-banner.json
+.claude/session-wrapup.json
+**/.claude/session-wrapup.json
 .claude/settings.local.json
 .claude/worktrees/
 .claude/scheduled_tasks.lock
