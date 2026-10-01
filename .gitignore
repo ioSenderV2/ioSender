@@ -51,3 +51,6 @@ scene_debug.log
 .claude/settings.local.json
 .claude/worktrees/
 .claude/scheduled_tasks.lock
+
+# render-harness output images (generated; see tools/render-harness/README.md)
+tools/render-harness/*.png
