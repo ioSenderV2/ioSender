@@ -59,8 +59,40 @@ always `/clear`.
 
 So:
 
-1. **Turn A** ends with the session summary as its **final message — no tool calls after it.** Tell the
-   user plainly that the capture still has to run, and that anything they send will trigger it.
+1. **Turn A** ends with the session summary as its **final message — no tool calls after it.** Before
+   writing that message, arm the trigger — this is the last tool call of the turn:
+
+   ```powershell
+   pwsh -File c:\github\claude-hub\tools\turn.ps1 wrapup
+   ```
+
+   It prints the working title recorded at session start and arms the next prompt to set the title.
+   Then say plainly that the capture still has to run, that anything the user sends will trigger it,
+   and **name the session** so the next message can replace it. One line is enough:
+
+   > Filing this as **"Feed hold starves the planner buffer"** — send `Title: <name>` to file it
+   > under something else; anything else you send just runs the capture.
+
+   **Then end the message with this line, alone, in capitals, as the very last thing in it:**
+
+   ```
+   READY TO CAPTURE
+   ```
+
+   Nothing after it — no sign-off, no further sentence. It is the one line whose job is to be *seen*,
+   and it only works if it is last: a summary is a wall of text after a long session, the sentence
+   naming the trigger reads like more of the same, and the user's own account of the failure is that
+   he read the wrap-up, did not register that something was still owed, and moved on. That is how the
+   2026-09-29 CNCBuild capture was lost — 227 turns and 15 hours, wrapped up correctly and then
+   `/clear`ed, because the request for the trigger never stood out from the report around it. The
+   recovery in `on-session-start.ps1` now catches this after the fact; this line is the half that
+   stops it happening, and the two are not alternatives. Capitals on their own line, because that is
+   what survives being skim-read.
+
+   **`Title: <name>` at the trigger needs nothing from you** — `on-prompt.ps1` has already rewritten
+   the working title record, and the injected context says so. Do not pass `-Title` as well, and do
+   not re-record it. `-Title "..."` is for the other case: the user renames it in prose ("call it the
+   feed hold one") rather than with the prefix. Give their words as given.
 2. **Turn B** (the user says anything) runs the capture as the **LAST ACTION OF THE TURN, and writes
    nothing after it.**
 
