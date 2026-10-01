@@ -2,9 +2,10 @@
   "_comment": [
     "This project's inputs to the shared turn-loop hooks in claude-hub/hooks/.",
     "The mechanism lives in the hub; every string specific to ioSender lives here.",
-    "Layered over hub defaults.json - `denies` merge by name, and a named entry REPLACES the hub's",
-    "whole rule, freezing its regex at today's version. So only 'testserver' lives here: it is this",
-    "project's own. 'push' is deliberately absent - it is the hub's rule and stays the hub's rule.",
+    "Layered over hub defaults.json. `denies` merge by name and FIELD BY FIELD since hub ca6fca8",
+    "(2026-08-28), so overriding one field no longer freezes the rest of the hub's rule at today's",
+    "version - that trap is fixed, and this comment used to still warn about it. Only 'testserver'",
+    "lives here: it is this project's own. 'push' is deliberately absent - it is the hub's rule.",
     "Canonical doc: docs/playbooks/turn_workflow_loop.md."
   ],
 
@@ -15,7 +16,7 @@
   },
 
   "verify": {
-    "pattern": "build\\.ps1(?=.*-Launch)",
+    "pattern": "(?:build\\.ps1|\\brun\\s+build\\b)(?=.*-Launch)",
     "command": ".\\build.ps1 -Launch -message=\"what we're testing\"",
     "label": "final build + launch"
   },
