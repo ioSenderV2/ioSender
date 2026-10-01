@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
   Wait for the "Rolling release" GitHub Actions run triggered by the just-pushed commit to finish.
   Playbook: docs/playbooks/end_of_session_wrapup.md (step 3.5).
@@ -29,6 +29,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
+
+# gh wrapper lives in claude-hub (portable-gh lookup + registry GH_TOKEN); this repo no longer
+# carries a copy of its own - see docs/playbooks/github_cli_token.md.
+$ghWrapper = 'c:\github\claude-hub\tools\gh.ps1'
+if (-not (Test-Path $ghWrapper)) { throw "gh wrapper not found at $ghWrapper - is claude-hub cloned?" }
 if (-not $Sha) { $Sha = (git -C $repoRoot rev-parse HEAD).Trim() }
 
 Write-Host "Waiting for '$Workflow' on $Repo for commit $($Sha.Substring(0,7)) ..." -ForegroundColor Cyan
@@ -36,7 +41,7 @@ Write-Host "Waiting for '$Workflow' on $Repo for commit $($Sha.Substring(0,7)) .
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 $run = $null
 while ((Get-Date) -lt $deadline) {
-    $json = & "$PSScriptRoot\gh.ps1" run list --repo $Repo --workflow $Workflow --limit 10 --json 'databaseId,headSha,status,conclusion,url' 2>$null
+    $json = & $ghWrapper run list --repo $Repo --workflow $Workflow --limit 10 --json 'databaseId,headSha,status,conclusion,url' 2>$null
     if ($LASTEXITCODE -eq 0 -and $json) {
         $runs = $json | ConvertFrom-Json
         $run = $runs | Where-Object { $_.headSha -eq $Sha } | Select-Object -First 1

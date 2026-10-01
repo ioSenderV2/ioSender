@@ -38,4 +38,4 @@ matching memory file keeps its context and just points here.
   authoritative implementation — the playbook is the invocation guide + gotchas.
 - The mechanical procedures are now one-command scripts (playbook = invocation note):
   `tools/push-all.ps1` (push to both remotes), `tools/regen-overview-pdf.ps1` (PDF regen),
-  `tools/gh.ps1` (gh + token), `tools/add-changelog-entry.ps1 -Spec x.json` (changelog entry).
+  `tools/add-changelog-entry.ps1 -Spec x.json` (changelog entry).
