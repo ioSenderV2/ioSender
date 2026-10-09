@@ -1196,6 +1196,63 @@ namespace CNC.Controls
         {
             L(tloAlreadyReferenced ? "#<_tlo_saved> = #<_tlo_ref>" : "#<_tlo_saved> = 0");
             L(string.Format("#<_tlo_ref> = {0}", N(baseline)));
+            EmitTloSeekDepth(L, baseline);
+        }
+
+        /// <summary>
+        /// How far tlo.macro's G38.2 may descend from its park over the TLO target, in mm.
+        /// </summary>
+        /// <remarks>
+        /// This replaces a literal in tlo.macro that was wrong three times. -80 first; raised to -90 on
+        /// 2026-07-27 after a short V-bit threw Alarm 5 five mm short of the puck. Then on 2026-10-09 it
+        /// threw Alarm 5 again and the number could not work at all: the 50mm toolsetter-with-puck had been
+        /// replaced by a 15mm touch plate, putting the contact surface 35mm lower. The logs had the new
+        /// surface at machine Z -122.498 and the stored baseline at -122.473, against a seek that bottomed
+        /// out at machine -90 - it was never going to touch anything, and three sessions of Alarm 5 were
+        /// read as "the tool is short" before anyone compared those two numbers.
+        ///
+        /// Derived, the seek follows the target: re-reference once after changing the plate and this moves
+        /// with it, instead of waiting for the next Alarm 5 to reveal the drift.
+        ///
+        /// THE CLAMP IS THE SAFETY PROPERTY, not the depth. Too shallow throws Alarm 5 - a refusal, and the
+        /// machine is standing in mid-air. Too deep drills whatever the target is bolted to. So the depth is
+        /// capped at the Z envelope ($132) less a margin, and when ANY input is unknown this emits NOTHING
+        /// and lets the macro fall back to its own conservative literal - an unknown must not be turned into
+        /// a confident deep plunge.
+        /// </remarks>
+        public static void EmitTloSeekDepth(System.Action<string> L, double baseline)
+        {
+            // How much SHORTER than the referenced tool a tool may be and still be found. Beyond this the
+            // seek gives up (Alarm 5) rather than descending further, because on the current setup there is
+            // only about 15mm between the plate's surface and the table it stands on.
+            const double shortToolAllowance = 10d;
+            const double envelopeMargin = 5d;      // never seek into the last 5mm of Z travel
+
+            if (baseline == 0d)
+                return;                            // never referenced - nothing to derive from
+
+            var g593 = GrblWorkParameters.GetCoordinateSystem("G59.3");
+            if (g593 == null || double.IsNaN(g593.Values[2]))
+                return;                            // no fresh $# - the park's machine Z is unknown
+
+            double zTravel = GrblSettings.GetDouble(GrblSetting.MaxTravelBase + 2);
+            if (double.IsNaN(zTravel) || zTravel <= 0d)
+                return;                            // no configured envelope to clamp against
+
+            // The macro parks with "G0 Z0" in G59.3, so the seek STARTS at G59.3's own Z offset in the
+            // machine frame - not at machine zero. That offset has been both 0.000 and -42.000 on this
+            // machine within one week, which is exactly why it is read rather than assumed.
+            double parkZ = g593.Values[2];
+            double depth = parkZ - (baseline - shortToolAllowance);
+            double maxDepth = parkZ + zTravel - envelopeMargin;      // floor is machine -zTravel
+
+            if (depth <= 0d)
+                return;                            // baseline above the park - nonsense, let the macro decide
+
+            if (depth > maxDepth)
+                depth = maxDepth;
+
+            L(string.Format("#<_tlo_seekdepth> = {0}", N(depth)));
         }
 
         /// <summary>

@@ -97,7 +97,7 @@ G0 Z0
 ; G65 P5 Q<id>: Q0 = Probe_Default (main), Q1 = Probe_Toolsetter (probe.h:40).
 o150 IF [#<_tc_touchplate> EQ 1]
   G65 P5 Q0
-  (PRINT, TLO03 main probe selected (touch-plate mode))
+  (PRINT, TLO03 main probe selected - touch-plate mode)
 o150 ELSEIF [#<_tlo_toolid> EQ 8]
   G65 P5 Q0
   (PRINT, TLO03 main probe selected for T8)
@@ -107,10 +107,30 @@ o150 ELSE
 o150 ENDIF
 
 G91
-; -90mm (was -80mm): a short V-bit (chamfer) sits well above the puck at G59.3's park height, which is
-; calibrated for the LONGEST tool in use - confirmed on real hardware 2026-07-27, Alarm 5 (probe fail,
-; no contact within programmed travel) landing 5mm short of the puck for the V-bit specifically.
-G38.2 Z-90 F500
+; SEEK DEPTH IS PASSED IN, NOT A LITERAL. #<_tlo_seekdepth> is computed by the sender from the stored
+; TLO reference baseline and the live G59.3 Z offset, and clamped there so it can never reach the Z
+; envelope floor - see MacroProcessor.EmitTloSeekDepth for the arithmetic and the clamp.
+;
+; It was a literal, and the literal was wrong three times. -80 first; raised to -90 on 2026-07-27 after
+; a short V-bit threw Alarm 5 five mm short of the puck. Then on 2026-10-09 it threw Alarm 5 again, and
+; this time the number was not merely tight, it could not work at all: the 50mm toolsetter-with-puck had
+; been replaced by a 15mm touch plate, putting the contact surface 35mm lower. The logs had the new
+; surface at machine Z -122.498 and the stored baseline at -122.473 - a 90mm seek from the park at
+; machine Z 0 stopped 32.5mm above it and was never going to touch anything.
+;
+; Deriving it from the baseline is what stops the fourth time: re-reference the plate once after any
+; change of target and the seek follows it, instead of waiting for an Alarm 5 to reveal the drift.
+;
+; The fallback is the old literal, for a caller that does not pass the parameter (named parameters also
+; do not survive a controller reset). It fails SAFE - too shallow gives Alarm 5, which is a refusal, not
+; a crash. Too deep would drill the table, so the fallback must never be the generous one.
+o130 IF [EXISTS[#<_tlo_seekdepth>]]
+  #<_tlo_seekd> = #<_tlo_seekdepth>
+o130 ELSE
+  #<_tlo_seekd> = 90
+o130 ENDIF
+(PRINT, TLO02b seek depth=#<_tlo_seekd> from park)
+G38.2 Z-[#<_tlo_seekd>] F500
 ; --- Seek/latch agreement check: is this probe result REAL? ---
 ; A probe cycle is two independent triggers - a fast seek, a 2 mm back-off, a slow latch. On a real
 ; surface they land a fixed distance apart, because the only difference between them is the overshoot
