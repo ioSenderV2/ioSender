@@ -1,4 +1,4 @@
-/*
+﻿/*
  * waitidle-probe - exercises StreamPump's (WAITIDLE) dispatch barrier against the real grblHAL
  * simulator over the real TelnetStream. See the csproj header. Exit code 0 = all checks passed.
  */
@@ -206,6 +206,28 @@ static class Probe
         Check(unmetConn.Count == 0, "PREREQ connected passes on a live link", string.Join("; ", unmetConn));
         var unmetBoth = MacroRunner.EvaluatePrereqLines(model, new[] { "(PREREQ homed, connected)" });
         Check(unmetBoth.Count == 1, "combined PREREQ reports only the genuinely unmet condition", string.Join("; ", unmetBoth));
+
+        // ---- nog92: Setup's "is the machine handed over clean" gate ------------------------------
+        // Exercised against a REAL G92 on the controller rather than a hand-built model, because the
+        // whole point of the condition is that it reads the fresh $# [G92:] line - a version that
+        // answered from cached $# or from $G parser state would pass this file's first check and still
+        // be useless on the machine. So: clear, assert it passes; set one, assert it refuses AND says
+        // so; clear again, assert it goes back to passing (the gate must not latch).
+        Comms.com.WriteCommand("G92.1");
+        Thread.Sleep(300);
+        var unmetNoG92Clean = MacroRunner.EvaluatePrereqLines(model, new[] { "(PREREQ nog92)" });
+        Check(unmetNoG92Clean.Count == 0, "PREREQ nog92 passes with no G92 set", string.Join("; ", unmetNoG92Clean));
+
+        Comms.com.WriteCommand("G92 X10");
+        Thread.Sleep(400);
+        var unmetNoG92Dirty = MacroRunner.EvaluatePrereqLines(model, new[] { "(PREREQ nog92)" });
+        Check(unmetNoG92Dirty.Count == 1 && unmetNoG92Dirty[0].Contains("G92 offset is active"),
+              "PREREQ nog92 refuses, with the reason, on a live G92", string.Join("; ", unmetNoG92Dirty));
+
+        Comms.com.WriteCommand("G92.1");
+        Thread.Sleep(400);
+        var unmetNoG92Again = MacroRunner.EvaluatePrereqLines(model, new[] { "(PREREQ nog92)" });
+        Check(unmetNoG92Again.Count == 0, "PREREQ nog92 passes again once the G92 is cleared", string.Join("; ", unmetNoG92Again));
 
         // ---- (MBOX) barrier, OK path (unified streaming Step 4a) ----------------------------------
         Console.WriteLine();

@@ -2613,7 +2613,7 @@ namespace GCode_Sender
                 "(Scribe square - a {0}mm-deep rectangle inset {1}mm from the measured frame, cut with the {2}.)", N(depth), N(inset), vbit.Name));
             L("(Measure the scribed line against each stock edge afterwards. The gap to the FRONT edge is the rotation check - it should be constant end to end.)");
             L("(The other three gaps taper by however far out of square the stock is; that is the stock, not the frame.)");
-            MacroProcessor.EmitProgramHeader(L, "connected, homed, noalarm, EXPR, G30");
+            MacroProcessor.EmitProgramHeader(L, "connected, homed, noalarm, nog92, EXPR, G30");
             MacroProcessor.EmitModalDefaults(L);
 
             L(WcsCode(wcsP) + "  (activate the WCS the measure set - origin)");
@@ -2812,7 +2812,7 @@ namespace GCode_Sender
             // under an active rotation is fine - confirmed by reading the firmware 2026-09-16, replacing an older
             // "never mix them" rule of thumb. What is NOT fine is a G53 move right after a G10 L2 R write on the
             // active WCS; that is what EmitRotationWrite exists to repair.
-            MacroProcessor.EmitProgramHeader(L, "connected, homed, noalarm, EXPR, G30");
+            MacroProcessor.EmitProgramHeader(L, "connected, homed, noalarm, nog92, EXPR, G30");
             MacroProcessor.EmitModalDefaults(L);
             if (touch && GrblInfo.HasToolSetter)
                 L(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
@@ -3052,8 +3052,19 @@ namespace GCode_Sender
             // own G28 stored position at run-time. NOT required here via a plain PREREQ condition - Generate_Click
             // handles an unset G28 explicitly (jog-and-confirm dialog, sets it itself), so by the time this
             // program ever streams, G28 is guaranteed set.
-            MacroProcessor.EmitProgramHeader(L, "connected, homed, EXPR, ATC=1, G30, G59.3");
+            MacroProcessor.EmitProgramHeader(L, "connected, homed, noalarm, nog92, EXPR, ATC=1, G30, G59.3");
             MacroProcessor.EmitModalDefaults(L, cancelToolOffset: true);
+            // Select this program's WCS HERE, at the top, before anything else it emits. It is selected
+            // again later, where the origin is written (that one stays - it is idempotent and reads as the
+            // "activate it now that it means something" step), but a program must not spend its opening
+            // lines in whatever frame the LAST operation happened to leave active. On 2026-10-09 an aborted
+            // tlo.macro left G59.3 selected: the run itself survived (everything ahead of the late select
+            // is a G53 move), but the sender emulated those opening lines in the puck's frame, which put
+            // the EmitWcsWrite parser-resync line - a no-op on the controller, machine 0,0,0 to an emulator
+            // that starts there - 833 mm away from every other point in the box. ProgramFitsMachine then
+            // refused a 120 mm program for spanning 1546 mm. Asserting the frame first makes the opening
+            // deterministic whatever Setup inherits.
+            L(wcs + "  (assert this program's WCS before anything else - see comment)");
             // Save whatever #<_tlo_ref> held before this program touched it (restored near the end, on a clean
             // finish - see that comment), then load the machine-wide TLO baseline (Machine Setup's own
             // "Reference TLO" - AppConfig.Settings.Base.TloRefBaseline) as an INPUT, not a reset to 0. Every
@@ -3498,8 +3509,10 @@ namespace GCode_Sender
             L("(Start Job (Dynamic) - one-shot probe via pcorner/pcenter.macro.)");
             L(string.Format("(Probe \"{0}\": tip {1}mm body {2}mm.)", p.Name, N(p.ProbeDiameter), N(p.BodyDiameter)));
             L("(Jog target: the green dot picked on the Stock drawing. VALIDATE before trusting.)");
-            MacroProcessor.EmitProgramHeader(L, "connected, homed, EXPR, G30");
+            MacroProcessor.EmitProgramHeader(L, "connected, homed, noalarm, nog92, EXPR, G30");
             MacroProcessor.EmitModalDefaults(L, cancelToolOffset: true);
+            // Assert the WCS at the top - same reasoning as BuildProgram's own comment on this line.
+            L(wcs + "  (assert this program's WCS before anything else - see comment)");
             if (GrblInfo.HasToolSetter)
                 L(string.Format(GrblCommand.ProbeSelect, p.ProbeType == ProbeType.ToolSetter ? 1 : 0));
             L(string.Format("#<_ls_rad> = {0}", N(r)));
@@ -3756,12 +3769,14 @@ namespace GCode_Sender
             L("(not oversized: thickness sets how far above the jaw this descends before it starts probing.)");
             L("(Requires grblHAL NGC expressions. First run for this fixture kind - VALIDATE before trusting.)");
 
-            string prereq = "connected, homed, EXPR, G30";
+            string prereq = "connected, homed, noalarm, nog92, EXPR, G30";
             if (setTloRef)
                 prereq += ", ATC=1, G59.3";
             MacroProcessor.EmitProgramHeader(L, prereq);
 
             MacroProcessor.EmitModalDefaults(L, cancelToolOffset: true);
+            // Assert the WCS at the top - same reasoning as BuildProgram's own comment on this line.
+            L(wcs + "  (assert this program's WCS before anything else - see comment)");
             // Save/load the TLO baseline - same mechanism and reasoning as BuildProgram's own top-of-program
             // comment.
             if (setTloRef)

@@ -386,7 +386,12 @@ namespace CNC.Core
                 }
             }
 
-            if (conditions.Any(c => c.Equals("homed", StringComparison.OrdinalIgnoreCase) || CoordinateSystemCodes.Contains(c.ToUpperInvariant())))
+            // "nog92" joins the $#-refresh trigger: it is answered from the [G92:...] line, and reading a
+            // cached $# would answer from whatever the report held before the previous program touched it -
+            // the exact staleness this gate exists to catch.
+            if (conditions.Any(c => c.Equals("homed", StringComparison.OrdinalIgnoreCase)
+                                 || c.Equals("nog92", StringComparison.OrdinalIgnoreCase)
+                                 || CoordinateSystemCodes.Contains(c.ToUpperInvariant())))
                 GrblWorkParameters.Get(model);
 
             var unmet = new List<string>();
@@ -424,6 +429,34 @@ namespace CNC.Core
                     return model.GrblState.State != GrblStates.Alarm ? null : "the machine is in an alarm state";
                 case "connected":
                     return model.GrblState.State != GrblStates.Unknown ? null : "the controller is not connected";
+                case "nog92":
+                    // The INVERSE of the "G92" coordinate-system condition below: that one requires a G92 to
+                    // be SET, this one requires there to be none. A program that establishes its own origin
+                    // cannot run on top of somebody else's G92 - WCO = G5x + G92 + TLO, so a leftover G92
+                    // shifts every non-G53 move it makes, including the ones that read like machine moves.
+                    // Confirmed on hardware 2026-08-16 (see tlo.macro): a persistent G92 of Z+37 turned a
+                    // "G0 Z0" over the toolsetter into machine Z+37 against an envelope topping out at 0,
+                    // and the probe cycle died on ALARM:2 before it ever started.
+                    //
+                    // REFUSED, not cleared. G92.1 would destroy an offset a running job may legitimately be
+                    // working under and move every remaining cut; tlo.macro deliberately suspends and
+                    // restores (G92.2/G92.3) rather than clearing for exactly that reason. Whose G92 it is
+                    // and whether it is still wanted is the operator's call, not this gate's.
+                    //
+                    // Answered from the fresh $# [G92:...] values (refreshed above), not from the $G parser
+                    // state: grblHAL reports G92 in $G only while it is active, and a controller that omits
+                    // it drops this check to "no G92" silently. The values are the measurement.
+                    {
+                        var g92 = GrblWorkParameters.GetCoordinateSystem("G92");
+                        if (g92 == null)
+                            return null;        // no [G92:] line - nothing read, nothing to refuse on
+                        for (int i = 0; i < GrblInfo.NumAxes; i++)
+                            if (!double.IsNaN(g92.Values[i]) && Math.Abs(g92.Values[i]) > 0.0001d)
+                                return string.Format(
+                                    "a G92 offset is active ({0}) - clear it (G92.1) or finish the job that set it before running this",
+                                    g92.ToString(GrblInfo.AxisFlags));
+                        return null;
+                    }
                 default:
                     // A coordinate-system code (case-insensitive)?
                     string code = cond.ToUpperInvariant();
