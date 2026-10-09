@@ -431,6 +431,95 @@ namespace CNC.Controls
         /// watcher only arms by OBSERVING a Send transition, so arriving after one has already gone past
         /// means no terminal will ever fire it.
         /// </remarks>
+        // ---- a run that aborted with the probe STILL TOUCHING ------------------------------------------
+        private static bool _probeClearArmed;
+
+        /// <summary>
+        /// Retract Z after a run aborted while the probe was still closed, then report.
+        /// </summary>
+        /// <remarks>
+        /// 2026-10-09 on real hardware. A Setup run was started from the wrong fixture, so the descent to
+        /// position for the side probe came down ONTO the touch plate instead of beside it. pcorner.macro
+        /// caught it correctly - "Probe is still triggered before the X face seek - it did not release",
+        /// error 253 - and stopped. What it could not do is get off the plate: the tool was left resting on
+        /// it at machine Z -108.529 with Pn:P still asserted, and because the guard checks the probe's
+        /// INITIAL state, every retry re-tripped it instantly. The state perpetuated itself until the
+        /// operator reset the controller, 18 seconds in which nothing at all was sent to it.
+        ///
+        /// So the retract is automatic (operator's call, 2026-10-09): the tool is loaded against a 15mm
+        /// plate and getting it off matters more than a confirmation click. Straight up in Z, to machine
+        /// zero, which is the safe traverse height every generated program here already uses - from a
+        /// contact that can only be BELOW it, up is the one direction known to be clear.
+        ///
+        /// Fails safe in both directions. It will not run unless the probe is reading asserted RIGHT NOW,
+        /// and it carries a (PREREQ ... noalarm) so it refuses rather than moving blind on a machine whose
+        /// state it cannot confirm - in which case it says to jog clear by hand instead of leaving the
+        /// operator watching nothing happen, which is the whole failure being fixed.
+        /// </remarks>
+        public static void ClearStuckProbe(GrblViewModel model, string afterRun, bool sawError)
+        {
+            if (model == null || !sawError || _probeClearArmed)
+                return;
+
+            // A LIVE reading, not a latch. GrblViewModel sets Pn to empty - clearing Signals - on any
+            // status report that arrives without a |Pn: field, which grblHAL omits entirely when no input
+            // is asserted. So Probe set here means the pin is closed now, not that it was closed once.
+            if (!model.Signals.Value.HasFlag(Signals.Probe))
+                return;
+
+            _probeClearArmed = true;
+            DebugLog.Write("run", string.Format(
+                "ClearStuckProbe: '{0}' aborted with the probe still asserted (state={1}) - retracting Z",
+                afterRun, model.GrblState.State));
+
+            model.Message = "Probe still touching after " + afterRun + " - retracting Z clear...";
+
+            // An ERROR (253) leaves the controller Idle and needs no unlock; a probe-fail ALARM does. Same
+            // unlock-then-settle shape as FixtureEditDialog's own test-position recovery - the dwell is
+            // because the retract's (PREREQ ... noalarm) is evaluated against the state as it stands.
+            if (model.GrblState.State == GrblStates.Alarm)
+                model.ExecuteCommand(GrblConstants.CMD_UNLOCK);
+
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+            timer.Tick += (s, e) =>
+            {
+                timer.Stop();
+
+                var b = new System.Text.StringBuilder();
+                b.AppendLine("(Probe clear - retract Z after a run aborted with the probe still touching)");
+                b.AppendLine("(PREREQ, connected, homed, noalarm)");
+                b.AppendLine("G21 G90");
+                b.AppendLine("G53 G0 Z0");
+
+                bool ran = Run(model, "Probe clear retract", b.ToString(), false, true, onDone: finished =>
+                {
+                    // Report what the PIN says afterwards, not that the move was sent. A retract that ran
+                    // and left the probe still asserted means something other than a resting tool is
+                    // holding it closed - wiring, or inversion - and that must not read as "recovered".
+                    var check = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+                    check.Tick += (s2, e2) =>
+                    {
+                        check.Stop();
+                        _probeClearArmed = false;
+                        bool stillOn = model.Signals.Value.HasFlag(Signals.Probe);
+                        DebugLog.Write("run", string.Format("ClearStuckProbe: retract finished={0}, probe still asserted={1}", finished, stillOn));
+                        model.Message = stillOn
+                            ? "Retracted, but the probe is STILL asserted - it is not the tool holding it closed. Check the probe, its wiring and $6/$I inversion before probing again."
+                            : "Probe released - retracted to machine Z0. Check the fixture and starting position before running again.";
+                    };
+                    check.Start();
+                });
+
+                if (!ran)
+                {
+                    _probeClearArmed = false;
+                    DebugLog.Write("run", "ClearStuckProbe: the retract was refused - telling the operator to jog clear");
+                    model.Message = "Probe still touching after " + afterRun + " and the automatic retract was refused - jog Z clear by hand.";
+                }
+            };
+            timer.Start();
+        }
+
         private static void WatchHandoffEnd(GrblViewModel model)
         {
             if (_borrowedWatcherArmed)
@@ -524,6 +613,10 @@ namespace CNC.Controls
                 // been settled one way or the other.
                 onEnd?.Invoke();
                 onDone?.Invoke(jobFinished);
+
+                // LAST, after the teardown above: the retract borrows a program slot of its own, so the
+                // failed one has to be popped before it can run.
+                ClearStuckProbe(model, name, sawError);
             };
             model.PropertyChanged += _borrowedHandler;
 
@@ -965,6 +1058,11 @@ namespace CNC.Controls
                 if (jobFinished && SupportsGenerateMode)
                     DiscardGenerated?.Invoke();
                 onDone?.Invoke(jobFinished);
+
+                // The non-handoff twin of the call in WatchHandoffEnd - a macro run straight from a dialog
+                // (the fixture Test position, the probe wizards) can strand the tool on the plate just as
+                // easily. Unreachable for a handed-off run: that path returns above.
+                ClearStuckProbe(model, name, sawError);
             };
             model.PropertyChanged += handler;
             // The handoff watcher reaches the terminal first (it subscribed back at Generate time) and is
