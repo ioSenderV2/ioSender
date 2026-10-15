@@ -1,4 +1,4 @@
-/*
+﻿/*
  * OddJobsFeedsSpeedsDialog.xaml.cs - part of CNC Controls library
  *
  * Shared "Feeds and Speeds" dialog for the Odd Jobs job wizards - consolidates the bit/RPM/feed/depth-of-
@@ -125,6 +125,14 @@ namespace CNC.Controls
                 pick = entries.FirstOrDefault(t => t.Kind == CustomToolKind.OFlute);
             else if (operation == "roughing")
                 pick = entries.FirstOrDefault(t => t.Kind == CustomToolKind.EndMill && t.Flutes >= 3);
+            // "flattening" is NOT "finishing". Both are light final cuts, but this one is defined by the
+            // SHAPE it has to leave: a flat bottom. "finishing" resolves to a BallEnd, whose whole point is
+            // a rounded tip - the one profile that cannot produce a flat floor. Clear floor asked for
+            // "finishing" on that reasoning and defaulted to a 1/4" ball nose (reported 2026-09-14).
+            // After the Aluminum branch deliberately, so an aluminum job still gets its single-flute bit,
+            // which flattens perfectly well.
+            else if (operation == "flattening")
+                pick = entries.FirstOrDefault(t => t.Kind == CustomToolKind.EndMill && t.Flutes == 2);
 
             if (pick == null)
                 pick = entries.FirstOrDefault(t => t.Kind == CustomToolKind.EndMill && t.Flutes == 2)
@@ -158,9 +166,14 @@ namespace CNC.Controls
         {
             bool isDrill = kind == WorkOrderOpKind.Drill;
             bool isCountersink = kind == WorkOrderOpKind.Countersink;
-            bool isChamfer = kind == WorkOrderOpKind.Chamfer;
+            // Engrave and Chamfer both cut with the point of a V-shaped bit, so they want the same class of
+            // tool. Grouping them here rather than adding another flag matters because isMill below is a
+            // NEGATION of the special cases - a new operation kind that nobody adds to this list silently
+            // becomes a milling operation, which is how Engrave first shipped offering end mills and hiding
+            // the V-bit, the exact opposite of what it needs.
+            bool isVeeTool = kind == WorkOrderOpKind.Chamfer || kind == WorkOrderOpKind.Engrave || kind == WorkOrderOpKind.Mark;
             bool isSurface = kind == WorkOrderOpKind.Surface;
-            bool isMill = !isDrill && !isCountersink && !isChamfer && !isSurface;
+            bool isMill = !isDrill && !isCountersink && !isVeeTool && !isSurface;
 
             foreach (var item in toolItems)
             {
@@ -169,7 +182,7 @@ namespace CNC.Controls
                 switch (ct.Kind)
                 {
                     case CustomToolKind.Drill: visible = isDrill; break;
-                    case CustomToolKind.VBitOrChamfer: visible = isChamfer; break;
+                    case CustomToolKind.VBitOrChamfer: visible = isVeeTool; break;
                     case CustomToolKind.Countersink: visible = isCountersink; break;
                     // The surfacing bit is otherwise a normal mill-class tool (isMill's own bucket), but a
                     // Surface operation only ever wants IT - a facing pass with an ordinary endmill/ball end
@@ -342,6 +355,37 @@ namespace CNC.Controls
             // to drive for this tool, so showing it invites setting a number that's silently ignored.
             fldFeed.Visibility = isDrill ? Visibility.Collapsed : Visibility.Visible;
             ComputeRecommendation();
+        }
+
+        // Open the selected tool's own DEFINITION - name, kind, diameter, flutes, and a V-bit's included
+        // angle. Those describe the cutter rather than how hard to push it, so they live with the tool and
+        // are edited in one place; this button only makes that place reachable. It was previously behind a
+        // right-click on the tool list, which nobody finds - you could set a V-bit's angle when creating it
+        // and then never see it again (reported 2026-08-07).
+        //
+        // The ComboBoxItem's Tag IS the live CustomTool, so the dialog edits the very object this one is
+        // reading. That makes the refresh below necessary rather than cosmetic: the label can go stale on a
+        // rename, and diameter/flutes feed the advisor, so a changed diameter must reach the recommendation
+        // instead of quietly comparing against the old one.
+        private void btnEditTool_Click(object sender, RoutedEventArgs e)
+        {
+            var ct = SelectedTool;
+            if (ct == null)
+                return;
+
+            var dlg = new CustomToolEditDialog(ct) { Owner = Window.GetWindow(this) };
+            if (dlg.ShowDialog() != true)
+                return;
+
+            CustomTools.Save();
+
+            var item = cbxTool.SelectedItem as ComboBoxItem;
+            if (item != null)
+                item.Content = ct.Name;
+
+            // Re-apply through the selection handler rather than repeating its field logic here - it reads
+            // SelectedTool and ignores its event args, so this is the same path a fresh selection takes.
+            cbxTool_SelectionChanged(this, null);
         }
 
         // Runs FeedsSpeedsAdvisor.Evaluate and refreshes each field's highlight/tooltip against it. Called

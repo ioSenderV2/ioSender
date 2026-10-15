@@ -3,7 +3,7 @@
     Run any command with GH_TOKEN injected from the registry.
 
 .DESCRIPTION
-    gh.ps1 wraps gh.exe specifically; but git (fetch/push to the private v2 remote),
+    claude-hub's tools\gh.ps1 wraps gh.exe specifically (this repo has no copy); but git (fetch/push to the private v2 remote),
     publish-pages.ps1, and other tools also need GH_TOKEN in the environment, which
     harness shells DON'T inherit (it lives at User scope in the registry). Rather than
     re-inlining "$env:GH_TOKEN = [Environment]::GetEnvironmentVariable('GH_TOKEN','User')"

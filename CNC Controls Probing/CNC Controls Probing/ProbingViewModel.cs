@@ -153,28 +153,21 @@ namespace CNC.Controls.Probing
         {
         }
 
-        public bool VerifyProbe ()
-        {
-            bool probeOk = ProbeVerified || Grbl.Signals.Value.HasFlag(Signals.Probe);
-
-            if (!probeOk)
-            {
-                new ProbeVerify(this) { Owner = System.Windows.Application.Current.MainWindow }.ShowDialog();
-                if (!ProbeVerified)
-                    ProbeVerified = AppDialogs.Show(LibStrings.FindResource("NoVerifyContinue"), "ioSender", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
-
-                if (ProbeVerified)
-                    Grbl.Message = LibStrings.FindResource("VerifyStart");
-            }
-
-            return probeOk;
-        }
+        // VerifyProbe and its ProbeVerify dialog are gone (2026-08-19). It stopped every probing operation
+        // to demand the operator trigger the probe by hand first, which tells you nothing you did not already
+        // intend - you are about to probe, so the probe is fitted - and it cost a second button press to get
+        // past even once satisfied ("Press [Start] again to start probing"). Probing now assumes the probe
+        // works and lets the probe itself report otherwise, which it does: a probe that never makes contact
+        // fails the probing action, which is a real signal rather than a ritual.
+        //
+        // If connection validation is ever wanted back, it belongs where the probe is DEFINED, not in front
+        // of every use of it.
 
         public bool WaitForResponse(string command)
         {
             bool? res = null;
 
-            var t = new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                 cancellationToken,
@@ -182,10 +175,7 @@ namespace CNC.Controls.Probing
                 a => Grbl.OnResponseReceived += a,
                 a => Grbl.OnResponseReceived -= a,
                 5000, () => Grbl.ExecuteCommand(command));
-            }); t.Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             return res == true;
         }
@@ -201,7 +191,7 @@ namespace CNC.Controls.Probing
 
                 Comms.com.PurgeQueue();
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -209,16 +199,13 @@ namespace CNC.Controls.Probing
                     a => Grbl.OnResponseReceived += a,
                     a => Grbl.OnResponseReceived -= a,
                     1000, () => Grbl.ExecuteCommand(command));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
             }
 
             res = null;
 
             // Wait for real-time report to arrive
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.SingleEvent<string>(
                 cancellationToken,
@@ -226,10 +213,7 @@ namespace CNC.Controls.Probing
                 a => Grbl.OnRealtimeStatusProcessed += a,
                 a => Grbl.OnRealtimeStatusProcessed -= a,
                 1100);
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             if (Grbl.GrblState.State == GrblStates.Alarm)
                 res = null;
@@ -244,7 +228,7 @@ namespace CNC.Controls.Probing
 
                 while (res == null)
                 {
-                    new Thread(() =>
+                    EventUtils.RunPumped(() =>
                     {
                         res = WaitFor.SingleEvent<string>(
                         cancellationToken,
@@ -252,10 +236,7 @@ namespace CNC.Controls.Probing
                         a => Grbl.OnResponseReceived += a,
                         a => Grbl.OnResponseReceived -= a,
                         5000);
-                    }).Start();
-
-                    while (res == null)
-                        EventUtils.DoEvents();
+                    });
 
                     if (timer.Elapsed.Seconds > 120)
                         break;
@@ -281,23 +262,24 @@ namespace CNC.Controls.Probing
         {
             bool? res = null;
 
-            // Wait for WCO update to get current work offsets
+            // Wait for WCO update to get current work offsets.
+            //
+            // The wait is INSIDE the poller check now - the same unconditional hang Grbl.WaitForWcoUpdate
+            // had (this is its copy). With the poller disabled no thread was started, nothing could assign
+            // res, and this pumped the UI for ever. A WCO update only arrives because something polls for
+            // one, so with the poller off report "no update" rather than never returning.
+            if (!Grbl.Poller.IsEnabled)
+                return false;
 
-            if (Grbl.Poller.IsEnabled)
+            EventUtils.RunPumped(() =>
             {
-                new Thread(() =>
-                {
-                    res = WaitFor.SingleEvent<string>(
-                    cancellationToken,
-                    null,
-                    a => Grbl.OnWCOUpdated += a,
-                    a => Grbl.OnWCOUpdated -= a,
-                    AppConfig.Settings.Base.PollInterval * 35);
-                }).Start();
-            }
-
-            while (res == null)
-                EventUtils.DoEvents();
+                res = WaitFor.SingleEvent<string>(
+                cancellationToken,
+                null,
+                a => Grbl.OnWCOUpdated += a,
+                a => Grbl.OnWCOUpdated -= a,
+                AppConfig.Settings.Base.PollInterval * 35);
+            });
 
             return res == true;
         }
@@ -308,7 +290,7 @@ namespace CNC.Controls.Probing
             bool wait = true, running = false;
             double delta, delta_max = 0d;
 
-            string command = "G53" + RapidCommand + pos.ToString(axisflags);
+            string command = "G53G0" + pos.ToString(axisflags);
 
             Comms.com.PurgeQueue();
 
@@ -316,7 +298,7 @@ namespace CNC.Controls.Probing
 
             isCancelled = false;
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                 cancellationToken,
@@ -324,10 +306,7 @@ namespace CNC.Controls.Probing
                 a => Grbl.OnResponseReceived += a,
                 a => Grbl.OnResponseReceived -= a,
                 1000, () => Grbl.ExecuteCommand(command));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             if (res == true) {
 
@@ -335,7 +314,7 @@ namespace CNC.Controls.Probing
                 {
                     res = null;
 
-                    new Thread(() =>
+                    EventUtils.RunPumped(() =>
                     {
                         res = WaitFor.SingleEvent<string>(
                         cancellationToken,
@@ -343,10 +322,7 @@ namespace CNC.Controls.Probing
                         a => Grbl.OnRealtimeStatusProcessed += a,
                         a => Grbl.OnRealtimeStatusProcessed -= a,
                         400, () => Comms.com.WriteByte(GrblLegacy.ConvertRTCommand(GrblConstants.CMD_STATUS_REPORT)));
-                    }).Start();
-
-                    while (res == null)
-                        EventUtils.DoEvents();
+                    });
 
                     wait = res != true;
                     running |= Grbl.GrblState.State == GrblStates.Run;
@@ -419,20 +395,19 @@ namespace CNC.Controls.Probing
             {
                 if ((_selectedProbe = value) != null)
                 {
-                    RapidsFeedRate = value.RapidsFeedRate;
                     ProbeFeedRate = value.ProbeFeedRate;
                     LatchFeedRate = value.LatchFeedRate;
                     ProbeDistance = value.ProbeDistance;
                     LatchDistance = value.LatchDistance;
                     // Touch plate: a fixed "bit diameter" doesn't belong to the PLATE, it belongs to whatever
                     // tool happens to be in the spindle - so prefer the loaded program's own (TOOL T=n D=d ...)
-                    // comment for the CURRENT tool (CNC.Controls.GCodeProgramComments, refreshed on Load
+                    // comment for the CURRENT tool (CNC.Core.GCodeProgramComments, refreshed on Load
                     // File/Load Folder) over the stored value, which is now just a fallback for when that's
                     // unavailable (no program loaded, or its comments don't mention this tool number).
                     double? liveDiameter = null;
                     if (value.ProbeType == ProbeType.TouchPlate && _grblmodel != null &&
                         int.TryParse(_grblmodel.Tool, out int currentTool))
-                        liveDiameter = CNC.Controls.GCodeProgramComments.DiameterFor(currentTool);
+                        liveDiameter = CNC.Core.GCodeProgramComments.DiameterFor(currentTool);
                     ProbeDiameter = liveDiameter ?? value.ProbeDiameter;
                     XYClearance = value.XYClearance;
                     ProbeOffsetX = value.ProbeOffsetX;
@@ -460,7 +435,6 @@ namespace CNC.Controls.Probing
             }
         }
 
-        public bool ProbeVerified { get; set; } = false;
         public string FastProbe { get { return string.Format(Probing.Command + "F{0}", ProbeFeedRate.ToInvariantString()); } }
         public string SlowProbe { get { return string.Format(Probing.Command + "F{0}", LatchFeedRate.ToInvariantString()); } }
         public string Instructions { get { return _instructions; } set { _instructions = value; OnPropertyChanged(); } }
@@ -475,7 +449,6 @@ namespace CNC.Controls.Probing
         public double ProbeRadius { get { return _ProbeDiameter / 2d; } }
         public double LatchDistance { get { return _latchDistance; } set { _latchDistance = value; OnPropertyChanged(); } }
         public double LatchFeedRate { get { return _latchFeedRate; } set { _latchFeedRate = value; OnPropertyChanged(); } }
-        public double RapidsFeedRate { get { return _rapidsFeedRate; } set { _rapidsFeedRate = value; OnPropertyChanged(); } }
         public double TouchPlateHeight { get { return _tpHeight; } set { _tpHeight = value; OnPropertyChanged(); } }
         public bool TouchPlateIsXY { get { return _isXYtp; } set { _isXYtp = value; OnPropertyChanged(); } }
         public bool TouchPlateXYEnabled { get { return _probingType != ProbingType.HeightMap; } }
@@ -538,7 +511,6 @@ namespace CNC.Controls.Probing
         public bool OffsetEnable { get { return ((_probingType == ProbingType.EdgeFinderInternal || _probingType == ProbingType.EdgeFinderExternal) && _isCorner) || _probingType == ProbingType.Rotation; } }
         public bool XYOffsetEnable { get { return ((_probingType == ProbingType.EdgeFinderInternal || _probingType == ProbingType.EdgeFinderExternal) && _edge != Edge.None && _edge != Edge.Z) || _probingType == ProbingType.CenterFinder || _probingType == ProbingType.Rotation || _probingType == ProbingType.HeightMap; } }
         public double Depth { get { return _depth; } set { _depth = value; OnPropertyChanged(); } }
-        public string RapidCommand { get { return RapidsFeedRate == 0d ? "G0" : "G1F" + RapidsFeedRate.ToInvariantString(); } }
         public string ProbeProgram { get { return Program.ToString().Replace("G53", string.Empty); } }
         public bool ProbeDiameterEnable { get { return _probingType == ProbingType.CenterFinder || ((_probingType == ProbingType.EdgeFinderInternal || _probingType == ProbingType.EdgeFinderExternal) && _edge != Edge.Z); } }
         public bool FixtureHeightEnable { get { return _probingType == ProbingType.ToolLength && _useFixture /*&& !ReferenceToolOffset && !Grbl.IsTloReferenceSet*/; } }

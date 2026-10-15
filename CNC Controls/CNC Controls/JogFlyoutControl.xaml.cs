@@ -79,6 +79,9 @@ namespace CNC.Controls
 
         protected override void OnPreviewKeyDown(KeyEventArgs e)
         {
+            if (e.Handled)
+                return;
+
             if (!(e.Handled = ProcessKeyPreview(e)))
             {
                 if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
@@ -88,15 +91,22 @@ namespace CNC.Controls
             }
         }
 
+        // Bail when GlobalKeys (class handler on Window) has already dispatched this key - assigning
+        // e.Handled unconditionally here would hand the same key to ProcessKeypress twice.
         protected override void OnPreviewKeyUp(KeyEventArgs e)
         {
+            if (e.Handled)
+                return;
+
             if (!(e.Handled = ProcessKeyPreview(e)))
                 base.OnPreviewKeyDown(e);
         }
 
         protected bool ProcessKeyPreview(KeyEventArgs e)
         {
-            return (DataContext as GrblViewModel).Keyboard.ProcessKeypress(e, true, this);
+            var keyboard = (DataContext as GrblViewModel)?.Keyboard as KeypressHandler;
+
+            return keyboard != null && keyboard.ProcessKeypress(e, true, this);
         }
     }
 }

@@ -55,6 +55,21 @@ namespace CNC.Controls
             InitializeComponent();
         }
 
+        // The Continuous checkbox is the one control here that reflects LIVE jog state rather than a stored
+        // setting, so it takes the shared JogViewModel as its DataContext - the same instance the on-screen
+        // jog panels use, so toggling it here and selecting a distance there stay in agreement.
+        //
+        // Assigned on Loaded, not in the constructor: JogBaseControl.JogData is created by the first
+        // JogBaseControl and there is no ordering guarantee against a settings panel, which is why
+        // UIJogGridControl reads it the same way. If it is genuinely absent the checkbox is disabled rather
+        // than left bound to nothing - a control that silently does nothing is worse than one that says so.
+        private void JogUiConfigControl_Loaded(object sender, System.Windows.RoutedEventArgs e)
+        {
+            var jog = JogBaseControl.JogData;
+            chkContinuous.DataContext = jog;
+            chkContinuous.IsEnabled = jog != null;
+        }
+
         // Reset the on-screen jog presets (Config.JogUiMetric) this panel owns to their factory defaults.
         public void ResetToDefaults()
         {

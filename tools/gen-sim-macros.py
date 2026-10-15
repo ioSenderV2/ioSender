@@ -18,17 +18,63 @@ import os
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-MACROS = ["tc.macro", "pcorner.macro", "pvisecorner.macro"]
+# Order matters: it is the order AtcMacros.Required uses, and the checksum below hashes them in it.
+MACROS = ["tc.macro", "pcorner.macro", "pvisecorner.macro", "pcenter.macro"]
+
+# Sidecar AtcMacros writes next to the macros. Without it the sim has no checksum to compare, so
+# ioSender falls back to comparing SIZES - which is what made a one-byte generator bug visible as
+# "ATC macros are out of date" on a simulator whose macros were otherwise fine.
+CHECKSUM_FILE = "atc.sum"
 
 
-def c_string_literal(text):
-    """One adjacent-string-literal C line per input line (avoids literal-length limits, diffs cleanly)."""
-    lines = text.replace('\r\n', '\n').split('\n')
+def c_string_literal(data):
+    """Emit `data` (BYTES) as adjacent C string literals, one per line, reproducing it EXACTLY.
+
+    This has to be byte-for-byte. ioSender compares the controller's file SIZE against the byte
+    length of its own embedded copy, so a single byte of drift reports a perfectly good macro as
+    Outdated. The previous version got this wrong twice, in opposite directions:
+
+      * it read the file in TEXT mode, so Python's universal newlines collapsed every CRLF to LF -
+        losing one byte per CRLF (tc.macro has four, hence -4); and
+      * it split on '\\n' and appended '\\n' to every element, including the empty one left at the
+        end of a file that ends with a newline - adding one byte back.
+
+    Files with no CRLF (pcorner, pvisecorner) showed only the +1. Reading bytes and escaping them
+    individually removes the whole class of error rather than patching either symptom.
+    """
     out = []
-    for ln in lines:
-        escaped = ln.replace('\\', '\\\\').replace('"', '\\"')
-        out.append('    "' + escaped + '\\n"')
-    return '\n'.join(out)
+    line = '    "'
+    for b in bytearray(data):
+        if b == 0x5C:            # backslash
+            line += '\\\\'
+        elif b == 0x22:          # double quote
+            line += '\\"'
+        elif b == 0x0D:          # CR - kept, never normalised away
+            line += '\\r'
+        elif b == 0x0A:          # LF - ends this C line, keeping one literal per source line
+            out.append(line + '\\n"')
+            line = '    "'
+        elif 0x20 <= b <= 0x7E:
+            line += chr(b)
+        else:
+            # 3-digit octal: unambiguous even when the next character is itself a digit, unlike \x
+            # which greedily consumes every following hex digit.
+            line += '\\%03o' % b
+    if line != '    "':          # trailing bytes with no final newline
+        out.append(line + '"')
+    return '\n'.join(out) if out else '    ""'
+
+
+def atc_checksum(bodies):
+    """Reproduce AtcMacros.EmbeddedChecksum: for each required macro, in order, hash
+    name + "\\n", then the body bytes, then a single 0 byte. Lowercase hex SHA-256."""
+    import hashlib
+    h = hashlib.sha256()
+    for name, body in bodies:
+        h.update((name + "\n").encode('utf-8'))
+        h.update(body)
+        h.update(b'\x00')
+    return h.hexdigest()
 
 
 def main():
@@ -48,14 +94,25 @@ def main():
              '#define EMBEDDED_MACROS_H',
              '']
 
+    bodies = []
     for name in MACROS:
         path = os.path.join(REPO, 'macros', name)
-        with open(path, 'r', encoding='utf-8') as f:
+        # BINARY - see c_string_literal. Text mode silently rewrites line endings.
+        with open(path, 'rb') as f:
             content = f.read()
+        bodies.append((name, content))
         ident = 'embedded_macro_' + name.replace('.macro', '').replace('-', '_')
         parts.append('static const char *' + ident + ' =')
         parts.append(c_string_literal(content) + ';')
         parts.append('')
+
+    # The sidecar, so the simulator comes up looking exactly like a machine ioSender provisioned.
+    parts.append('// Checksum of the macro SET, computed the way AtcMacros.EmbeddedChecksum does.')
+    parts.append('// Seeded as atc.sum so ioSender\'s checksum comparison short-circuits instead of')
+    parts.append('// falling back to comparing file sizes.')
+    parts.append('static const char *embedded_atc_sum =')
+    parts.append('    "' + atc_checksum(bodies) + '\\n";')
+    parts.append('')
 
     parts.append('#endif // EMBEDDED_MACROS_H')
     parts.append('')
@@ -64,6 +121,9 @@ def main():
         f.write('\n'.join(parts))
 
     print('wrote', dest)
+    for name, content in bodies:
+        print('  %-20s %6d bytes' % (name, len(content)))
+    print('  %-20s %s' % (CHECKSUM_FILE, atc_checksum(bodies)))
 
 
 if __name__ == '__main__':

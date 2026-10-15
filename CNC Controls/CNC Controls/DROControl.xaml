@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:CNC.Controls"
-             xmlns:gcode="clr-namespace:CNC.GCode;assembly=CNC.Core"
+             xmlns:gcode="clr-namespace:CNC.GCode;assembly=CNC.Contracts"
              mc:Ignorable="d" 
              d:DesignHeight="216" d:DesignWidth="216"
              Loaded="DRO_Loaded">
@@ -31,10 +31,30 @@
               ToolTip="Current machine/work position for each axis. Click Zero all to reset the displayed work position to 0.">
         <GroupBox.HeaderTemplate>
             <DataTemplate>
-                <StackPanel Orientation="Horizontal">
+                <!-- Right-click the title to switch work offset. It lives on the HEADER rather than the
+                     whole group so a right-click on a coordinate value is still free for whatever that
+                     wants later - and because the header is what names the current WCS, so it is where
+                     someone looks when they want to change it.
+
+                     Background="Transparent" is load-bearing: a StackPanel with no background is not
+                     hit-testable in its empty areas, so without it the menu would only open on the few
+                     pixels of the letters themselves.
+
+                     The menu is built on opening (see DroWcs_ContextMenuOpening) because its contents are
+                     live - which offsets the controller reported, and which one is active right now. -->
+                <StackPanel x:Uid="dro_wcsHeader" Orientation="Horizontal" Background="Transparent" Cursor="Hand"
+                            MouseLeftButtonUp="DroWcs_Click"
+                            ContextMenuOpening="DroWcs_ContextMenuOpening"
+                            ToolTip="Click to change the work offset. Hover an entry to see what it holds.">
+                    <StackPanel.ContextMenu>
+                        <ContextMenu/>
+                    </StackPanel.ContextMenu>
                     <Ellipse Width="9" Height="9" Fill="{StaticResource PositionBaseBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
                     <TextBlock Text="{Binding}"/>
                     <TextBlock Text="{Binding Path=DataContext.WorkCoordinateSystem, RelativeSource={RelativeSource AncestorType=GroupBox}, Converter={StaticResource WcsHeaderSuffixConverter}}"/>
+                    <!-- Says "this opens something". Without it the title is just a label that happens to
+                         react to a click, which is the kind of affordance nobody finds. -->
+                    <TextBlock Text="&#x25BE;" Margin="4,0,0,0" VerticalAlignment="Center" Opacity="0.65"/>
                 </StackPanel>
             </DataTemplate>
         </GroupBox.HeaderTemplate>
@@ -48,6 +68,7 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="X">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.X" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.X" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>
@@ -59,6 +80,7 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="Y">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.Y" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.Y" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>
@@ -70,6 +92,7 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="Z">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.Z" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.Z" Mode="OneWay"/>
                         <Binding Path="ToolOffset.Z" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
@@ -82,6 +105,7 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="A">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.A" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.A" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>
@@ -93,6 +117,7 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="B">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.B" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.B" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>
@@ -104,6 +129,7 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="C">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.C" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.C" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>
@@ -115,6 +141,7 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="U">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.U" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.U" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>
@@ -126,6 +153,7 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="V">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.V" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.V" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>
@@ -137,11 +165,12 @@
                     <MultiBinding Converter="{StaticResource WcsOffsetTooltipConverter}" ConverterParameter="W">
                         <Binding Path="WorkCoordinateSystem" Mode="OneWay"/>
                         <Binding Path="WorkPositionOffset.W" Mode="OneWay"/>
+                        <Binding Path="MachinePosition.W" Mode="OneWay"/>
                     </MultiBinding>
                 </local:DROBaseControl.ToolTip>
             </local:DROBaseControl>
             <Button x:Uid="btn_zeroAll" x:Name="btnZeroAll" Content="Zero all" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}" Focusable="False" MinWidth="180" HorizontalAlignment="Center" Margin="2,3" Click="btnZeroAll_Click"
-                    ToolTip="Set the work coordinate to 0 on all axes at the current position."/>
+                    ToolTip="Make the current position the work origin on all axes: the DRO reads zero here afterwards (G10 L20). Any G92 or tool length offset in effect is accounted for."/>
         </StackPanel>
     </GroupBox>
 </UserControl>

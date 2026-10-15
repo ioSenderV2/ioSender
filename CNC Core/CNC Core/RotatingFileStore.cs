@@ -97,19 +97,40 @@ namespace CNC.Core
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         private static extern bool CreateHardLink(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
 
+        // A P/Invoke declaration is harmless on any platform - it only fails when CALLED - so the call is
+        // gated on actually being on Windows rather than the declaration being conditionally compiled.
+        // PlatformID is used rather than RuntimeInformation.IsOSPlatform because this file has to compile
+        // for net462, where that API is not available.
+        private static bool IsWindows
+        {
+            get
+            {
+                var p = Environment.OSVersion.Platform;
+                return p == PlatformID.Win32NT || p == PlatformID.Win32Windows || p == PlatformID.Win32S || p == PlatformID.WinCE;
+            }
+        }
+
         // A hard link (not a symlink) is used deliberately: creating an NTFS symlink needs
         // SeCreateSymbolicLinkPrivilege (admin, or Developer Mode enabled) - a hard link needs neither,
         // works for any user on the same volume, and since it's the SAME underlying file (not a copy),
         // it updates live if the target is appended to, with zero extra I/O. Falls back to a plain copy
         // (won't live-update, but at least exists) if the hard link can't be created (e.g. the root is
-        // on a different/non-NTFS volume).
+        // on a different/non-NTFS volume, or we're not on Windows at all).
         public static void UpdateLatestLink(string root, string linkName, string path)
         {
             try
             {
                 string latest = Path.Combine(root, linkName);
                 try { File.Delete(latest); } catch { }
-                if (!CreateHardLink(latest, path, IntPtr.Zero))
+
+                bool linked = false;
+                if (IsWindows) try
+                {
+                    linked = CreateHardLink(latest, path, IntPtr.Zero);
+                }
+                catch { }   // DllNotFoundException/EntryPointNotFound - fall through to the copy
+
+                if (!linked)
                     File.Copy(path, latest, true);
             }
             catch { /* best-effort - a missing convenience link must never block the write itself */ }

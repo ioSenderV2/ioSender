@@ -38,7 +38,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 using System;
-using System.Windows.Threading;
 
 namespace CNC.Core
 {
@@ -46,12 +45,68 @@ namespace CNC.Core
 
     public class Comms
     {
+        /// <summary>
+        /// Marshal a received reply onto the host's context, asynchronously.
+        /// Replaces Dispatcher.BeginInvoke(DataReceived, reply) in the stream classes - see their call
+        /// sites for why this must stay async: a synchronous marshal blocks the read thread on a busy
+        /// host, stalling reads and therefore the stream acks. SynchronizationContext.Post is the
+        /// portable equivalent of BeginInvoke (on WPF the context IS the dispatcher's), and the reply
+        /// value is captured per call, so order and content are preserved exactly as before.
+        ///
+        /// A null context - a headless server with no marshalling requirement - invokes inline on the
+        /// read thread, which is correct there and keeps CNC.Core free of any UI-thread assumption.
+        /// </summary>
+        public static void PostTo(System.Threading.SynchronizationContext context, DataReceivedHandler handler, string reply)
+        {
+            if (handler == null)
+                return;
+
+            // Every reply crosses here, on the read thread, before any marshalling - so this is where the
+            // wire's own timing is visible, and where an unfiltered trace has to be taken. Upstream of
+            // SuspendProcessing, Silent and the console's own filter, so a reply the app then ignores is
+            // still recorded. See PollDiag's and WireLog's headers.
+            if (PollDiag.Enabled)
+                PollDiag.RxArrived();
+
+            // Always on, unlike the two above - this is the only evidence that the link is actually
+            // two-way, and a half-open socket produces no other symptom. See LinkMonitor's header.
+            LinkMonitor.Rx();
+
+            WireLog.Rx(reply);
+
+            if (context == null)
+                handler(reply);
+            else if (PollDiag.Enabled)
+            {
+                // Stamped here on the READ thread and read again inside the callback, so what is measured is
+                // exactly how long this reply waited for the target thread to get to it - the one number that
+                // separates "the poller is late" from "the UI thread is saturated".
+                double stamp = PollDiag.MarshalStamp();
+                context.Post(state => { PollDiag.MarshalArrived(stamp); handler((string)state); }, reply);
+            }
+            else
+                context.Post(state => handler((string)state), reply);
+        }
+
         public enum State
         {
             AwaitAck,
             DataReceived,
             ACK,
             NAK
+        }
+
+        // The classification a reply gets for ReplyClassified below - a superset of State (which stays
+        // as-is, used for the unrelated CommandState/AwaitAck bookkeeping many other call sites depend
+        // on). Other = a reply that arrived and was assembled but isn't an ack or a status report (an
+        // alarm line, a $$ /$# response, ...) - raised so a subscriber only interested in one class can
+        // still tell "definitely something else" from silence, rather than never being called at all.
+        public enum ReplyClass
+        {
+            Ack,
+            Nak,
+            Status,
+            Other
         }
 
         public enum ResetMode
@@ -70,6 +125,18 @@ namespace CNC.Core
 
         public const int TXBUFFERSIZE = 4096, RXBUFFERSIZE = 1024;
 
+        /// <summary>
+        /// Backstop for the transports' ack waits. Deliberately LONGER than the per-operation caps
+        /// already in the codebase (AtcMacros.UnlinkWithTimeout 3000, ControllerValidator.AckTimeout
+        /// 4000) so it stays a backstop and never preempts them - it exists to end a wait that would
+        /// otherwise never end, not to police a reply that is merely slow.
+        ///
+        /// Safe for its two callers because neither waits on anything long-running: a `$n=v` settings
+        /// write and the PID report both ack in milliseconds. Do NOT reuse this for a wait that spans
+        /// a homing cycle or a YModem upload - grblHAL goes silent for the whole of both.
+        /// </summary>
+        public const int AckTimeoutMs = 5000;
+
         public static StreamComms com = null;
     }
 
@@ -83,12 +150,18 @@ namespace CNC.Core
         bool EventMode { get; set; }
         Action<int> ByteReceived { get; set; }
 
-        // Optional tap for ok/error acks, invoked ON THE READ THREAD the instant a reply is assembled -
-        // before (and in addition to) the DataReceived marshal to the UI thread. The streamer thread
-        // installs this so job flow control never waits on a busy UI dispatcher. Null (the default) =
-        // exactly today's behaviour. Implementations must call it only for "ok"/"error" replies and must
-        // not block (the handler does a non-blocking enqueue).
-        Action<string> AckSink { get; set; }
+        // Classified-reply tap, raised ON THE READ THREAD the instant a reply is assembled - before (and
+        // in addition to) the DataReceived marshal to the UI thread. Replaces the old single-purpose
+        // AckSink (2026-08-08, docs/Architecture-Unified-Streaming-Engine.md): StreamPump had zero
+        // visibility into status reports because AckSink only ever fired for ok/error, which made a
+        // WAITIDLE-style "wait for genuine Idle" barrier impossible to build safely. A real event, not a
+        // property, so more than one subscriber can attach if a future consumer needs the same
+        // comms-thread-speed delivery. Implementations must raise this for EVERY reply (all four
+        // classes, including Other) so a subscriber can tell "checked and it's not what I want" from
+        // "never got called". Handlers MUST NOT block - non-blocking enqueue only, the same discipline
+        // AckSink always had; this still runs on the comms read thread and a stall here stalls every
+        // subsequent reply behind it.
+        event Action<Comms.ReplyClass, string> ReplyClassified;
 
         // When true, multi-byte writes (WriteBytes/WriteString) are SYNCHRONOUS so back-to-back job lines
         // from the streamer thread can't overlap (a fire-and-forget async write would throw "a write is
@@ -99,6 +172,14 @@ namespace CNC.Core
 
         bool IsReconnecting { get; }
 
+        /// <summary>
+        /// Report the link as lost from OUTSIDE the read/write paths, for a failure those paths cannot
+        /// see - a half-open socket that still accepts writes and never errors. Drives the same
+        /// Reconnector as an I/O failure, so ConnectionLost/Reconnected behave identically.
+        /// Idempotent: a second call while already reconnecting does nothing.
+        /// </summary>
+        void NotifyLinkLost();
+
         void Close();
         int ReadByte();
         void WriteByte(byte data);
@@ -106,10 +187,19 @@ namespace CNC.Core
         void WriteString(string data);
         void WriteCommand(string command);
         string GetReply(string command);
-        void AwaitAck();
-        void AwaitAck(string command);
-        void AwaitResponse(string command);
-        void AwaitResponse();
+
+        /// <summary>
+        /// Wait for the outstanding command to be acknowledged (ok) or rejected (error:N), pumping the
+        /// host UI meanwhile. Returns FALSE if <see cref="Comms.AckTimeoutMs"/> elapsed with neither -
+        /// the caller must treat that as "the controller did not answer", NOT as success: on timeout
+        /// <see cref="Reply"/> still holds whatever arrived last, which is stale and belongs to some
+        /// other exchange. See [[iosender-connect-handshake-last-reply-race]].
+        ///
+        /// These waits were unbounded until 2026-08-13 and could hang the UI for the rest of the
+        /// session; a settings write that was never acknowledged is reported as an error now.
+        /// </summary>
+        bool AwaitAck();
+        bool AwaitAck(string command);
         void PurgeQueue();
 
         event DataReceivedHandler DataReceived;
@@ -187,20 +277,98 @@ namespace CNC.Core
         }
     }
 
+    /// <summary>
+    /// Nested message pump, used by the blocking controller handshakes (connect, settings read, macro
+    /// execution) to keep the host responsive while they wait for replies. ~70 call sites.
+    ///
+    /// The WPF implementation (DispatcherFrame + Dispatcher.PushFrame) cannot live in CNC.Core, so the
+    /// host installs it - see CNC.Controls.UiPump.Register, called from the same startup line as
+    /// UiContext.Register so the two cannot get out of step. A host with no message loop (a headless
+    /// server) leaves it null, where doing nothing is correct: there is no UI to keep alive.
+    /// </summary>
     public static class EventUtils
     {
+        public static System.Action Pump;
+
         public static void DoEvents()
         {
-            DispatcherFrame frame = new DispatcherFrame();
-            Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background, new DispatcherOperationCallback(ExitFrame), frame);
-            Dispatcher.PushFrame(frame);
+            var pump = Pump;
+            if (pump != null)
+                pump();
         }
 
-        public static object ExitFrame(object f)
+        /// <summary>
+        /// Run <paramref name="work"/> on a background thread while pumping the host's UI, returning once
+        /// it has finished.
+        ///
+        /// This replaces the idiom this codebase repeats ~40 times:
+        ///
+        ///     new Thread(() => { res = WaitFor.AckResponse(...); }).Start();
+        ///     while (res == null)
+        ///         EventUtils.DoEvents();
+        ///
+        /// which has no way to end if the worker never assigns its result. An exception thrown inside the
+        /// thread body dies on that thread - unobserved, no crash log, nothing sets the flag - and the UI
+        /// pumps for ever. The app looks alive and completely ignores you, which is much harder to
+        /// diagnose than a crash. Here the worker's exception is captured and rethrown on the CALLER's
+        /// thread with its original stack intact, so the failure surfaces where the caller can handle it.
+        ///
+        /// Deliberately NO timeout. Every caller is waiting on a controller that legitimately goes silent
+        /// for minutes at a time - grblHAL says nothing for a whole homing cycle, a YModem upload runs
+        /// long - and the operations already carry their own per-message timeouts. A backstop short enough
+        /// to be useful would abort work that was merely slow, which is a worse failure than the one being
+        /// fixed. This closes the loop that could never end, not the reply that is only late.
+        /// </summary>
+        public static void RunPumped(System.Action work)
         {
-            ((DispatcherFrame)f).Continue = false;
+            if (work == null)
+                return;
 
-            return null;
+            System.Exception failure = null;
+            bool done = false;
+
+            new System.Threading.Thread(() =>
+            {
+                try { work(); }
+                catch (System.Exception e) { failure = e; }
+                finally { System.Threading.Volatile.Write(ref done, true); }
+            }) { IsBackground = true }.Start();
+
+            while (!System.Threading.Volatile.Read(ref done))
+                DoEvents();
+
+            if (failure != null)
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+        }
+
+        /// <summary>
+        /// Pump the host UI while <paramref name="pending"/> stays true, giving up after
+        /// <paramref name="msTimeout"/>. Returns true if the condition cleared, false on timeout.
+        ///
+        /// This is the counterpart to <see cref="RunPumped"/> for waits that have NO worker thread to
+        /// own them: the transports' ack waits spin on a volatile state field that the comms READ
+        /// thread assigns, so there is no result to wait for and nothing to rethrow - only a condition
+        /// that may never clear. Hence a wall clock, where RunPumped deliberately has none.
+        ///
+        /// Unlike the loops this replaces, every caller pumps. Two of the transports used to spin bare
+        /// (`while (...) ;`) and two slept without pumping, so the same operation froze the UI on
+        /// Telnet/Websocket but not on Serial/Eltima.
+        /// </summary>
+        public static bool WaitWhile(System.Func<bool> pending, int msTimeout)
+        {
+            if (pending == null)
+                return true;
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+
+            while (pending())
+            {
+                if (sw.ElapsedMilliseconds >= msTimeout)
+                    return false;
+                DoEvents();
+            }
+
+            return true;
         }
     }
 }

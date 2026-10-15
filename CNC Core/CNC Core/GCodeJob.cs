@@ -42,19 +42,14 @@ using System.Collections.Generic;
 using System.IO;
 using System.ComponentModel;
 using System.Windows;
-using System.Windows.Media.Media3D;
 using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
 using CNC.GCode;
 
 namespace CNC.Core
 {
-    public enum Action
-    {
-        New,
-        Add,
-        End
-    }
+    // The Action enum moved to CNC Common (GCodeAction.cs), same namespace - first piece of the
+    // g-code document model to go shared (converters/transformers are client-side document tooling).
 
     public class GCodeBlock : ViewModelBase
     {
@@ -78,6 +73,22 @@ namespace CNC.Core
         public uint LineNum { get { return _lineNum; } set { _lineNum = value; RefreshDisplay(); } }
         public int Length { get; set; }
         public string Data { get { return _data; } set { _data = value; RefreshDisplay(); OnPropertyChanged(); } }
+
+        /// <summary>
+        /// The block as it was BEFORE constant #&lt;name&gt; parameters were substituted into it, or null
+        /// when nothing was substituted (the overwhelmingly common case - one null reference per line,
+        /// no second copy of a 220k-line program).
+        ///
+        /// Data is what runs: literals, so it parses, renders in the 3D view and reaches a controller
+        /// that cannot evaluate parameters. Raw is what the file SAID, and is what gets written back out
+        /// by Save - otherwise saving a program with variables in it would quietly flatten them to
+        /// literals and the whole point of putting them there (retuning by editing four numbers) would
+        /// be lost on the first save.
+        /// </summary>
+        public string Raw { get; set; }
+
+        /// <summary>What Save should write: the source form when there was one, else what runs.</summary>
+        public string Source { get { return Raw ?? _data; } }
 
         // Program list display: the Block column shows the program line number and the Data column hides the N
         // word - while Data itself stays intact for streaming (the controller needs the N word for line-number
@@ -140,6 +151,17 @@ namespace CNC.Core
         // G92 is active, which corrupted a real tool-change macro's positioning (Alarm:2 + a hang-watchdog
         // reset) before this fix.
         public bool HasToolChange { get; set; }
+
+        // DRAFT/UNVERIFIED 2026-08-08 - not yet built or hardware-tested, see
+        // docs/Architecture-Unified-Streaming-Engine.md Step 2. Set at load time (GCodeJob.ParseFileLines/
+        // AddBlock, same call sites as HasSpindleOrCoolantOn/HasToolChange above) from a plain text check
+        // (MacroRunner.RecognizeDirective) - NOT the token parser, since a directive is sender-only
+        // metadata inside an ordinary "(...)" comment, never real G-code. Canonical uppercase keyword
+        // ("PREREQ"/"PROMPT"/"MBOX"/"WAITIDLE") or null. Purely additive for now: nothing reads this yet,
+        // so setting it changes no behavior - the unified streamer's dispatch loop (StreamPump.SendNext)
+        // is what will branch on it in a later step.
+        public string Directive { get; set; }
+        public bool IsDirective { get { return Directive != null; } }
 
         // Outline grouping: set when the Fusion add-in's own section-marker comments are recognized in a
         // loaded file (see rxSectionMarker below). Null for a file with no section markers (the Program list
@@ -231,6 +253,24 @@ namespace CNC.Core
         // INotifyCollectionChanged/IList; callers that need the bulk API (GCode.cs's load/Pop paths) cast.
         public ObservableCollection<GCodeBlock> blocks = new BulkObservableCollection<GCodeBlock>();
 
+        /// <summary>
+        /// Hold back the block collection's change notifications while a program is built a block at a
+        /// time, raising one Reset at the end. Always returns something disposable, so a caller need not
+        /// know what the collection actually is.
+        /// </summary>
+        /// <remarks>
+        /// AddBlock parses each line as it arrives, so neither AddRange nor ReplaceAll fits - they want the
+        /// finished list. Without this, a 43,000-block rebuild spent thirty seconds notifying a bound
+        /// DataGrid once per block, showing an empty program list throughout (2026-09-18).
+        /// </remarks>
+        public IDisposable DeferBlockNotifications()
+        {
+            var bulk = blocks as BulkObservableCollection<GCodeBlock>;
+            return bulk != null ? bulk.DeferNotifications() : (IDisposable)new NoDefer();
+        }
+
+        private sealed class NoDefer : IDisposable { public void Dispose() { } }
+
         public Queue<string> commands = new Queue<string>();
 
         public delegate bool ToolChangedHandler(int toolNumber);
@@ -274,6 +314,248 @@ namespace CNC.Core
             CurrentSection = name;
             sectionStartPending = true;
             HasSections = true;
+        }
+
+        // How far above an M6 to look for a name, as a backstop for a file that opens with a long comment
+        // header and no executable line to stop at. The real bound is the executable line - see below.
+        private const int ToolChangeNameLookback = 10;
+
+        // Everything before the first tool change: the preamble, the modal setup, the initial positioning.
+        // It belongs to no tool, but it must belong to SOMETHING - a null Section would group under a blank
+        // header, which reads as a bug rather than as "this is the lead-in".
+        public const string LeadInSectionName = "Program start";
+
+        // ...and its counterpart: the wind-down after the last cut - spindle off, park, M30.
+        public const string EpilogueSectionName = "Program end";
+
+        // Spindle stop, which is what a program's wind-down opens with. Matched as text for the same reason
+        // as the T word below: this runs over already-emitted blocks, and a line that failed to parse still
+        // has to be readable here.
+        private static readonly Regex rxSpindleStop = new Regex(@"(?:^|[^A-Za-z])M0*5(?:[^\d]|$)", RegexOptions.IgnoreCase);
+
+        /// <summary>
+        /// Fallback outline: derive sections from the program's TOOL CHANGES when it carries none of the
+        /// Fusion add-in's (--- name ---) markers.
+        ///
+        /// Applied AFTER the parse rather than during it, deliberately. Add-in output has both markers and
+        /// M6s, and sectioning on both interleaved would split every operation in two - once at the marker
+        /// and again a line or two later at the tool change. Running afterwards, gated on HasSections, makes
+        /// the markers win by construction rather than by getting the ordering right.
+        ///
+        /// The name is the T-number, which is always true, plus the first comment of the contiguous comment
+        /// run immediately above the M6 - so a post (or a person) that writes
+        ///
+        ///     (Finish contour)
+        ///     T2 M6
+        ///
+        /// gets "T2 - Finish contour", and one that writes nothing gets "T2". The comment is a SUFFIX, never
+        /// the identity: a file whose header comments run straight into its first M6 will produce something
+        /// like "T1 - Program 1001", which is noise, but the section is still correctly identified.
+        ///
+        /// The search stops at the first line that DOES anything. A comment separated from the tool change
+        /// by g-code belongs to that g-code, not to the tool change - that boundary, not a line count, is
+        /// what keeps this from wandering up the file. The line cap only covers the case where there is no
+        /// executable line to stop at.
+        /// </summary>
+        private void ApplyToolChangeSections()
+        {
+            if (HasSections || blocks == null || blocks.Count == 0)
+                return;
+
+            var starts = new List<int>();
+            for (int i = 0; i < blocks.Count; i++)
+                if (blocks[i].HasToolChange)
+                    starts.Add(i);
+
+            if (starts.Count == 0)
+                return;
+
+            // What each T-number IS, from the program's own (TOOL T=n ... - description) declarations. Read
+            // from the HEADER - everything above the first tool change - because that is where a program
+            // declares its tools ("so it's clear what each T-number is before the first M6 asks for it", the
+            // Work Order compiler's own words), and scanning the whole program would mean a regex over every
+            // one of 43,000 blocks for no gain. Not read from GCodeProgramComments: that is refreshed on
+            // FileChanged, which this runs BEFORE, so it would still describe the PREVIOUS program.
+            var declared = GCodeProgramComments.ParseTools(HeaderLines(starts[0]));
+
+            string current = LeadInSectionName;
+            int next = 0;
+
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                if (next < starts.Count && i == starts[next])
+                {
+                    current = ToolChangeSectionName(i, declared);
+                    blocks[i].IsSectionStart = true;
+                    next++;
+                }
+                blocks[i].Section = current;
+            }
+
+            // Only the lead-in exists if the very first block is the tool change; harmless either way.
+            if (starts[0] > 0)
+                blocks[0].IsSectionStart = true;
+
+            ApplyEpilogueSection(starts[starts.Count - 1]);
+
+            HasSections = true;
+            DebugLog.Write("gcode", string.Format("Outline: no section markers - derived {0} section(s) from tool changes", starts.Count));
+        }
+
+        /// <summary>
+        /// Split the program's wind-down off the last toolpath, so "Program end" is its own section: spindle
+        /// stop, the park, M30.
+        ///
+        /// Anchored on the spindle stop, which is what a wind-down opens with - but searched only AFTER the
+        /// LAST tool change, and that restriction is the whole safety of it. Programs routinely stop the
+        /// spindle between every toolpath (the sample file does), so "the last M5 in the file" without that
+        /// anchor would be right by luck; with a program whose final toolpath has no M5 of its own it would
+        /// reach back and swallow a real cutting section into the epilogue.
+        ///
+        /// If the last toolpath emits no spindle stop at all there is simply no epilogue section - the
+        /// wind-down stays part of that toolpath, which is where it already was.
+        /// </summary>
+        private void ApplyEpilogueSection(int lastToolChangeIndex)
+        {
+            int start = -1;
+            for (int i = lastToolChangeIndex + 1; i < blocks.Count; i++)
+                if (!blocks[i].IsComment && rxSpindleStop.IsMatch(blocks[i].Data ?? string.Empty))
+                    start = i;      // keep the LAST one after the last tool change
+
+            if (start < 0)
+                return;
+
+            for (int i = start; i < blocks.Count; i++)
+                blocks[i].Section = EpilogueSectionName;
+
+            blocks[start].IsSectionStart = true;
+        }
+
+        // "T2", plus the first comment of the run immediately above the tool change when there is one.
+        // The program's lines above its first tool change.
+        private IEnumerable<string> HeaderLines(int firstToolChangeIndex)
+        {
+            for (int i = 0; i < firstToolChangeIndex && i < blocks.Count; i++)
+                yield return blocks[i].Data ?? string.Empty;
+        }
+
+        private string ToolChangeSectionName(int toolChangeIndex, IReadOnlyDictionary<int, GCodeToolInfo> declared)
+        {
+            // Plenty of posts put the T word on its own line ahead of the M6 rather than on it - "T2" then
+            // "M6" - so a T on the tool-change line is the common case, not the only one. Walk back over the
+            // same window for the most recent one before giving up.
+            string tool = ToolNumberOf(blocks[toolChangeIndex].Data);
+            if (tool == null)
+                for (int i = toolChangeIndex - 1; i >= Math.Max(0, toolChangeIndex - ToolChangeNameLookback) && tool == null; i--)
+                    if (!blocks[i].IsComment)
+                        tool = ToolNumberOf(blocks[i].Data);
+
+            if (tool == null)
+                tool = "Tool change";
+
+            // What the tool IS beats what its first operation is called. A section is one TOOL's worth of
+            // the program - with Group by tool a single section holds every operation that shares the bit -
+            // so naming it after the first of them ("T1 - Contour - contour, 19.5 mm deep") describes a
+            // fraction of what is in it and hides the one thing the operator needs at a tool change: which
+            // bit to fit. Asked for 2026-09-18, looking at exactly that outline.
+            if (declared != null && tool.Length > 1 && int.TryParse(tool.Substring(1), out int toolNumber) &&
+                 declared.TryGetValue(toolNumber, out var info) && !string.IsNullOrEmpty(info.Description))
+                return tool + " - " + info.Description;
+
+            string name = null;
+
+            int limit = Math.Max(0, toolChangeIndex - ToolChangeNameLookback);
+            for (int i = toolChangeIndex - 1; i >= limit; i--)
+            {
+                string text = (blocks[i].Data ?? string.Empty).Trim();
+
+                if (text.Length == 0)
+                    continue;               // blank lines do not break the run
+
+                if (!blocks[i].IsComment)
+                    break;                  // an executable line: anything above it is not about this tool change
+
+                // Keep walking: we want the FIRST comment of the run, not the closest. Where a post emits an
+                // operation name and then a tool description, the operation name is the outer one and is the
+                // one worth showing.
+                string inner = CommentTextOf(text);
+                if (inner.Length > 0)
+                    name = inner;
+            }
+
+            name = TidySectionName(name, tool);
+
+            return string.IsNullOrEmpty(name) ? tool : tool + " - " + name;
+        }
+
+        // The text INSIDE a comment line, which is not the same as the line with its outer parens trimmed:
+        // blocks carry their N-number prefix when line numbering is on, so "N3952(TOOLPATH ...)" trimmed of
+        // '(' at the front loses nothing and keeps "N3952" in the name. Cut from the first '(' to the last
+        // ')' instead, and fall back to the line minus any leading N-word when there are no parens at all.
+        private static readonly Regex rxLeadingLineNumber = new Regex(@"^\s*N\d+\s*", RegexOptions.IgnoreCase);
+
+        private static string CommentTextOf(string line)
+        {
+            int open = line.IndexOf('(');
+            int close = line.LastIndexOf(')');
+
+            if (open >= 0 && close > open)
+                return line.Substring(open + 1, close - open - 1).Trim();
+
+            return rxLeadingLineNumber.Replace(line, string.Empty).Trim();
+        }
+
+        // Our own Work Order compiler writes "(TOOLPATH T6 LogoSVG - v-carve Snowflake - 31387 lines)". The
+        // useful part is the middle: the word TOOLPATH is scaffolding, the tool number is already the label
+        // we are appending to, and the line count is bookkeeping. Stripping them turns
+        // "T6 - TOOLPATH T6 LogoSVG - v-carve Sno..." into "T6 - LogoSVG - v-carve Snowflake".
+        //
+        // The T-number rule is general rather than a special case for that one format: plenty of posts emit
+        // "(T2 D=6.35 flat end mill)", which would read just as redundantly.
+        private static readonly Regex rxToolpathPrefix = new Regex(@"^TOOLPATH\s+", RegexOptions.IgnoreCase);
+        private static readonly Regex rxLineCountSuffix = new Regex(@"\s*-\s*\d+\s*lines?\s*$", RegexOptions.IgnoreCase);
+
+        private static string TidySectionName(string name, string tool)
+        {
+            if (string.IsNullOrEmpty(name))
+                return name;
+
+            name = rxToolpathPrefix.Replace(name, string.Empty);
+            name = rxLineCountSuffix.Replace(name, string.Empty);
+
+            // Drop a leading repeat of the tool we are already labelling with, plus whatever separates it.
+            if (!string.IsNullOrEmpty(tool) && name.StartsWith(tool, StringComparison.OrdinalIgnoreCase))
+            {
+                string rest = name.Substring(tool.Length);
+                if (rest.Length == 0 || !char.IsLetterOrDigit(rest[0]))
+                    name = rest.TrimStart(' ', '-', ':', '–').Trim();
+            }
+
+            name = System.Text.RegularExpressions.Regex.Replace(name, @"\s+", " ").Trim();
+
+            // Truncate on a word boundary where there is one reasonably near the limit - cutting mid-word
+            // ("v-carve Sno...") reads as corruption rather than as an abbreviation.
+            const int cap = 44;
+            if (name.Length > cap)
+            {
+                string cut = name.Substring(0, cap);
+                int space = cut.LastIndexOf(' ');
+                name = (space > cap / 2 ? cut.Substring(0, space) : cut).TrimEnd() + "…";
+            }
+
+            return name;
+        }
+
+        // The T word on the tool-change line. Text rather than the parsed token because this runs over
+        // already-emitted blocks, whose Tokens may be empty for a line that failed to parse - and a line
+        // that failed to parse can still be the one carrying the tool change.
+        private static readonly Regex rxToolWord = new Regex(@"(?:^|[^A-Za-z])T\s*(\d+)", RegexOptions.IgnoreCase);
+
+        // null when the line carries no T word, so the caller can keep looking rather than settling.
+        private static string ToolNumberOf(string block)
+        {
+            var m = rxToolWord.Match(block ?? string.Empty);
+            return m.Success ? "T" + m.Groups[1].Value.TrimStart('0').PadLeft(1, '0') : null;
         }
 
         // Whether AddBlock prepends N<line> numbers (when GrblInfo.UseLinenumbers is also set).
@@ -350,20 +632,42 @@ namespace CNC.Core
                         tSanitize += System.Diagnostics.Stopwatch.GetTimestamp() - t0;
                     }
 
+                    // O-word / #-expression / $-command passthrough, ported from AddBlock (which had it
+                    // all along for GENERATED programs - Load File never did, so a FILE with a #-line
+                    // was unloadable: ParseBlock THROWS on expression syntax, and the per-line error
+                    // dialog below then blew up cross-thread from the background loader. Found loading
+                    // the unified engine's own prompt-test file, 2026-08-08. Same rules as AddBlock:
+                    // verbatim only when the controller evaluates expressions; $-commands always.
+                    // Constants first: a resolved line has no '#' left, so the passthrough test below
+                    // sees the line as it will actually be parsed and streamed.
+                    block = ResolveConstants(block, (int)LineNumber + 1);
+
+                    string ts_ = block.TrimStart();
+                    bool isOword = ts_.Length > 1 && (ts_[0] == 'o' || ts_[0] == 'O') && ts_[1] == '<';
+                    bool isSystemCommand = ts_.Length > 0 && ts_[0] == '$';
+                    bool passThrough = isSystemCommand || (GrblInfo.ExpressionsSupported && (isOword || block.IndexOf('#') >= 0));
+
                     int tokenStart = Parser.Tokens.Count;
                     t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-                    bool parsed = Parser.ParseBlock(ref block, false, out ln, out isComment);
+                    bool parsed;
+                    try { parsed = Parser.ParseBlock(ref block, false, out ln, out isComment); }
+                    catch { if (!passThrough) throw; parsed = false; ln = 0; isComment = false; }
                     tParse += System.Diagnostics.Stopwatch.GetTimestamp() - t0;
 
                     t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-                    if (parsed)
+                    if (parsed || passThrough)
                     {
+                        // Captured BEFORE the addLineNumber branch below can prepend "N123" onto block -
+                        // that would break the leading-"(" check a directive is recognized by. DRAFT, see
+                        // GCodeBlock.Directive's own comment.
+                        string directiveKeyword = isComment ? MacroRunner.RecognizeDirective(block) : null;
+
                         if (ln > 0)
                         {
                             LineNumber = ln;
                             addLineNumber = false;
                         }
-                        else if (addLineNumber)
+                        else if (addLineNumber && parsed)   // never number a passthrough line (breaks O-word routing / #-assignments - see AddBlock)
                         {
                             LineNumber += 10;
                             block = "N" + LineNumber.ToString() + block;
@@ -380,7 +684,9 @@ namespace CNC.Core
                                 BeginSection(sm.Groups[1].Value);
                         }
 
-                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, Parser.ProgramEnd) { HasSpindleOrCoolantOn = CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = CurrentLineHasToolChange(tokenStart), Tokens = Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) });
+                        // parsed guards the token-derived flags, same as AddBlock: a failed parse leaves
+                        // Parser.Tokens stale from the last successful line - never trust it here.
+                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = parsed && CurrentLineHasToolChange(tokenStart), Directive = directiveKeyword, Tokens = parsed ? Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) : new List<GCodeToken>() });
                         while (commands.Count > 0)
                         {
                             block = commands.Dequeue();
@@ -398,7 +704,7 @@ namespace CNC.Core
                 }
                 catch (Exception e)
                 {
-                    if ((ok = AppDialogs.Show(string.Format(LibStrings.FindResource("LoadError").Replace("\\n", "\r"), e.Message, LineNumber, block), "ioSender", MessageBoxButton.YesNo) == MessageBoxResult.Yes))
+                    if ((ok = UserPrompt.Show(string.Format(LibStrings.FindResource("LoadError").Replace("\\n", "\r"), e.Message, LineNumber, block), "ioSender", PromptButtons.YesNo) == PromptResult.Yes))
                         block = sr.ReadLine();
                     else
                         block = null;
@@ -438,6 +744,10 @@ namespace CNC.Core
                 bool isComment = false;
                 uint ln;
 
+                // Kept for the diagnostics below: `block` is reassigned as it is trimmed, renumbered and
+                // rewritten, so by the time anything goes wrong it no longer says what the program said.
+                string sourceBlock = block;
+
                 block = block.Trim();
 
                 // O-word flow (O<name> CALL/IF/WHILE/...) and #-expression lines are evaluated by the CONTROLLER,
@@ -448,6 +758,10 @@ namespace CNC.Core
                 // no separating space isn't recognised as a parameter assignment) - so generated O-word programs
                 // (e.g. Load Stock's corner probe) and their #<_name>=value setup lines can be streamed with flow
                 // control instead of being forced onto the MDI path.
+                // Constants first, for the same reason as ParseFileLines: isParamLine and the
+                // passthrough test below must see the line as it will be parsed and streamed.
+                block = ResolveConstants(block, (int)LineNumber + 1);
+
                 string ts = block.TrimStart();
                 bool isOword = ts.Length > 1 && (ts[0] == 'o' || ts[0] == 'O') && ts[1] == '<';
                 bool isParamLine = ts.Length > 0 && ts[0] == '#';
@@ -459,15 +773,61 @@ namespace CNC.Core
                 // confirmed on real hardware 2026-07-27: a generated program's own "$TLR" line vanished
                 // entirely between the previous and next line in the actual wire transmission.
                 bool isSystemCommand = ts.Length > 0 && ts[0] == '$';
-                bool passThrough = isSystemCommand || (GrblInfo.ExpressionsSupported && (isOword || block.IndexOf('#') >= 0));
+
+                // EVERY block this parser cannot make sense of is passed through verbatim. It used to be a
+                // short list of known exceptions ($-commands, O-words, #-expressions) and everything else
+                // was silently discarded - which meant this parser's own gaps quietly EDITED the operator's
+                // program, with no error, no log, and nothing on the wire.
+                //
+                // That is not a theoretical risk. 2026-07-27: a generated "$TLR" vanished. 2026-08-11, on
+                // real hardware: "G59.3" was dropped from a Setup run, so the very next line - "G0 Z0",
+                // meant as "the toolsetter's top of travel" - executed in the still-active G54 and became
+                // "go to WORK zero", a 128 mm rapid straight down into the touch plate. It pulled the
+                // bearings out of the v-wheels. The identical program had run safely an hour earlier only
+                // because G54's Z was shallower then; that run set the origin deeper, which is what made
+                // the next one destructive. Three "G65 P5 Q<n>" probe-input selects were lost the same way.
+                //
+                // The controller is the authority on what is valid g-code, not this parser. A line it
+                // cannot execute comes back as an error the sender already surfaces and the run stops -
+                // loud, attributable, and harmless. A line omitted is a DIFFERENT PROGRAM than the one the
+                // operator read and approved, and it fails as motion. Between "send something the parser
+                // did not recognise" and "quietly change the program", only one of those is survivable.
+                //
+                // With ONE exception, and it is not a stylistic one: '!', '~' and '?' are grblHAL REALTIME
+                // characters. The controller acts on them the moment they appear in the stream - anywhere
+                // in a line, not just at the start - so they are not text destined for the parser at all.
+                // Passing those through would turn a stray character in a file into a feed hold mid-cut or
+                // an unexpected cycle start. They stay out of the program, but they are now LOGGED rather
+                // than discarded in silence, which is the property that was actually missing.
+                // '$' is deliberately NOT in this set: system commands are legitimate and already passed.
+                bool isRealtimeChar = ts.Length > 0 && (ts[0] == '!' || ts[0] == '~' || ts[0] == '?');
+                bool passThrough = !isRealtimeChar;
 
                 int tokenStart = Parser.Tokens.Count;
                 bool parsed;
                 try { parsed = Parser.ParseBlock(ref block, false, out ln, out isComment); }
-                catch { if (!passThrough) throw; parsed = false; }
+                catch (Exception pe)
+                {
+                    // Also no longer fatal-and-silent: the block is still emitted below, verbatim.
+                    parsed = false;
+                    if (DebugLog.Enabled)
+                        DebugLog.Write("gcode", string.Format("AddBlock: ParseBlock threw ({0}: {1}), passing verbatim >>{2}<<",
+                            pe.GetType().Name, pe.Message, sourceBlock));
+                }
+
+                // Kept as a diagnostic now rather than a filter: with passThrough always true this cannot
+                // silently drop anything, but a line this parser fails on is still worth knowing about -
+                // it is a gap in the parser, and it is how the program view and the bounding box end up
+                // missing information the controller acts on.
+                if (!parsed && !isComment && DebugLog.Enabled)
+                    DebugLog.Write("gcode", string.Format("AddBlock: not parsed, passing verbatim >>{0}<<", sourceBlock));
 
                 if (parsed || passThrough)
                 {
+                    // Captured BEFORE the AddLineNumbers branch below can prepend "N123" onto block - see
+                    // the ParseFileLines call site's identical comment. DRAFT, see GCodeBlock.Directive.
+                    string directiveKeyword = isComment ? MacroRunner.RecognizeDirective(block) : null;
+
                     // Don't add a line number to a block that already carries one (e.g. a generated program that
                     // numbered its own lines) - two N-words make a malformed block (the controller rejects it
                     // with error:25). Also never number an O-word, #-parameter, or $-command line (see above -
@@ -484,7 +844,7 @@ namespace CNC.Core
                     // parsed guards Tokens here too: a failed parse (O-word/#-expression passthrough, see
                     // `passThrough` above) leaves Parser.Tokens stale from whatever line last parsed
                     // successfully - only trust it right after ParseBlock itself returned true.
-                    AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = parsed && CurrentLineHasToolChange(tokenStart), Tokens = parsed ? Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) : new List<GCodeToken>() });
+                    AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = parsed && CurrentLineHasToolChange(tokenStart), Directive = directiveKeyword, Tokens = parsed ? Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) : new List<GCodeToken>() });
                     while (commands.Count > 0)
                     {
                         block = commands.Dequeue();
@@ -494,15 +854,29 @@ namespace CNC.Core
                         AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, false, false));
                     }
                 }
+                else if (DebugLog.Enabled)
+                    // The only remaining way out without emitting, and it is deliberate: a realtime
+                    // control character, which the controller would act on rather than execute. Logged,
+                    // because "the program contains a line the machine never sees" must never again be
+                    // something that happens without a word being said about it.
+                    DebugLog.Write("gcode", string.Format(
+                        "AddBlock: NOT SENT - realtime control character, not g-code >>{0}<<", sourceBlock));
             }
-            catch //(Exception e)
+            catch (Exception e)
             {
-                // 
+                // Was an empty catch: a block lost here vanished as silently as one lost to the old
+                // discard branch - same symptom, different cause, no way to tell which. Nothing inside
+                // the try should throw now that ParseBlock's own faults are handled where they happen,
+                // so reaching this is a bug worth seeing rather than a case worth swallowing.
+                if (DebugLog.Enabled)
+                    DebugLog.Write("gcode", string.Format("AddBlock: THREW ({0}: {1}) - BLOCK LOST >>{2}<<",
+                        e.GetType().Name, e.Message, block));
             }
 
             if (action == Action.End)
             {
                 ComputeLimits();
+                ApplyToolChangeSections();   // markers already won if there were any - see the method
                 FileChanged?.Invoke(filename);
             }
         }
@@ -515,12 +889,28 @@ namespace CNC.Core
         {
             BoundingBox.Reset();
 
+            // Which program line pushed each extreme of the box. "The 3D view is wonky - the toolpath is
+            // nowhere near the stock" is a recurring report, and the box alone cannot say why: one G53 park,
+            // one move the rotation never reached, one parameter that resolved to the wrong number is enough
+            // to stretch it, and on a 43,000-block program there is no finding that line by eye. Debug-log
+            // only, and the cost is three array reads per token.
+            bool trace = DebugLog.Enabled;
+            var extreme = new uint[6];    // minX maxX minY maxY minZ maxZ - the line that set it
+            var before = new double[6];
+
             try
             {
                 GCodeEmulator emu = new GCodeEmulator(true);
 
                 foreach (var cmd in emu.Execute(Tokens))
                 {
+                    if (trace)
+                        for (int i = 0; i < 3; i++)
+                        {
+                            before[i * 2] = BoundingBox.Min[i];
+                            before[i * 2 + 1] = BoundingBox.Max[i];
+                        }
+
                     if (cmd.Token is GCArc)
                         BoundingBox.AddBoundingBox((cmd.Token as GCArc).GetBoundingBox(emu.Plane, new double[] { cmd.Start.X, cmd.Start.Y, cmd.Start.Z }, emu.DistanceMode == DistanceMode.Incremental));
                     else if (cmd.Token is GCCubicSpline)
@@ -534,17 +924,37 @@ namespace CNC.Core
                         else
                             BoundingBox.AddPoint(cmd.End, (cmd.Token as GCAxisCommand9).AxisFlags);
                     }
+
+                    if (trace)
+                        for (int i = 0; i < 3; i++)
+                        {
+                            if (BoundingBox.Min[i] != before[i * 2])
+                                extreme[i * 2] = cmd.Token.LineNumber;
+                            if (BoundingBox.Max[i] != before[i * 2 + 1])
+                                extreme[i * 2 + 1] = cmd.Token.LineNumber;
+                        }
                 }
             }
             catch { /* unparseable expression program - leave whatever box was accumulated */ }
 
             BoundingBox.Conclude();
+
+            if (trace)
+                DebugLog.Write("gcode", string.Format(
+                    "ComputeLimits: X {0:0.###}..{1:0.###} (set at lines {2}/{3})  Y {4:0.###}..{5:0.###} ({6}/{7})  Z {8:0.###}..{9:0.###} ({10}/{11})",
+                    BoundingBox.Min[0], BoundingBox.Max[0], extreme[0], extreme[1],
+                    BoundingBox.Min[1], BoundingBox.Max[1], extreme[2], extreme[3],
+                    BoundingBox.Min[2], BoundingBox.Max[2], extreme[4], extreme[5]));
         }
 
         // Fire FileChanged on demand - used by the background loader to raise it on the UI thread, after the
         // buffered blocks have been flushed to the bound collection and the limits computed.
         public void RaiseFileChanged()
         {
+            // Background load: the blocks are in the bound collection by now, so the tool-change outline can
+            // be derived over them exactly as on the foreground path. Must run BEFORE FileChanged, which is
+            // what ultimately drives HasOutline and the grouping.
+            ApplyToolChangeSections();
             FileChanged?.Invoke(filename);
         }
 
@@ -553,8 +963,107 @@ namespace CNC.Core
             AddBlock(block, Action.Add);
         }
 
+        // Constant #<name> parameters declared by the program being loaded, in declaration order. Reset
+        // with the rest of the job state when a new program starts.
+        private readonly NgcConstants.Resolver constants = new NgcConstants.Resolver();
+
+        // The source form of the block currently being added, when substitution actually changed it.
+        // Set by ResolveConstants and consumed by AddStamped - every block reaches AddStamped through
+        // one of the two per-line loops, and both call ResolveConstants first.
+        private string pendingRaw;
+
+        /// <summary>
+        /// Substitute constant <c>#&lt;name&gt;</c> parameters when the controller cannot evaluate them.
+        ///
+        /// A controller reporting EXPR gets the line untouched - it does this itself, and better. Without
+        /// EXPR the choice used to be binary: pass a '#' line through unparsed, or throw. Neither is much
+        /// good for a file whose exposure values are declared at the top, so resolve the ones that are
+        /// provably constant and keep refusing everything else.
+        ///
+        /// Throws rather than returning a flag: the per-line handlers in both loops already surface a
+        /// GCodeException with the line number and the offending block, and let the operator abort. A
+        /// program that is half-substituted must never reach the machine.
+        /// </summary>
+        private string ResolveConstants(string block, int lineNumber)
+        {
+            pendingRaw = null;
+
+            if (block == null || block.IndexOf('#') < 0)
+                return block;
+
+            string source = block;
+
+            // A (PROMPT) field answered at load wins over the declaration the file carries, on EVERY
+            // controller: the rewritten "#<_name> = <answer>" is what an EXPR controller is sent and
+            // what a non-EXPR one resolves below. Without this the file's own default would either be
+            // re-declared after the preamble (EXPR) or baked into Data here (non-EXPR), and the answer
+            // would silently never reach the wire - which is exactly what happened on the laser before
+            // 2026-09-06.
+            if (PromptFields != null)
+                block = NgcConstants.RewriteAssignment(block, PromptValueFor);
+
+            if (GrblInfo.ExpressionsSupported)
+            {
+                if (!ReferenceEquals(block, source))
+                    pendingRaw = source;
+                return block;
+            }
+
+            string resolved, reason;
+            if (!constants.TryLine(lineNumber, block, out resolved, out reason))
+                throw new GCodeException(reason);
+
+            // Only remember a source form when there IS one. An unchanged line - a comment mentioning
+            // '#', say - must not get a redundant second copy of itself; on a large program that would
+            // be a string per line for nothing.
+            if (!string.Equals(resolved, source, StringComparison.Ordinal))
+                pendingRaw = source;
+
+            return resolved;
+        }
+
+        // ------------------------------------------------------------------ (PROMPT) fields at load
+
+        /// <summary>
+        /// The (PROMPT param, default[, label]) fields this program declared, with the operator's answers
+        /// (or the declared defaults on an unattended load), as collected by GCodeProgram when the
+        /// program was loaded. Null when the program has none or was not prompted at load. JobRunner
+        /// reads this to skip its own Cycle-Start dialog and, on an EXPR controller, to send the preamble.
+        /// </summary>
+        public List<MacroRunner.PromptField> PromptFields { get; private set; }
+
+        public bool PromptedAtLoad { get { return PromptFields != null; } }
+
+        /// <summary>
+        /// Install the answered fields before the program's lines are parsed: each one seeds the constant
+        /// resolver, so references resolve from line 1 on a non-EXPR controller, and its declaration in
+        /// the file - if it has one - is rewritten to the answer (see ResolveConstants).
+        /// </summary>
+        public void ApplyPromptFields(List<MacroRunner.PromptField> fields)
+        {
+            PromptFields = fields != null && fields.Count > 0 ? fields : null;
+            if (PromptFields != null)
+                foreach (var f in PromptFields)
+                    constants.Seed(f.Inner, f.Value);
+        }
+
+        private string PromptValueFor(string name)
+        {
+            if (PromptFields == null)
+                return null;
+            foreach (var f in PromptFields)
+                if (f.Inner.Equals(name, StringComparison.OrdinalIgnoreCase))
+                    return f.Value;
+            return null;
+        }
+
         private void AddStamped(GCodeBlock b)
         {
+            // What the line said before substitution, so Save can write it back out. Cleared either way,
+            // so a block added without going through ResolveConstants cannot inherit the previous line's.
+            b.Raw = pendingRaw;
+            pendingRaw = null;
+
             b.Section = CurrentSection;
             if (sectionStartPending)
             {
@@ -661,6 +1170,8 @@ namespace CNC.Core
             HasSections = false;
             AddLineNumbers = true;
             Parser.Reset();
+            constants.Reset();
+            PromptFields = null;    // a new program starts with no answered fields; ApplyPromptFields re-seeds
         }
     }
 

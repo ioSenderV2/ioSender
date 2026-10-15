@@ -2,7 +2,7 @@
  * RtspCamerasControl.xaml.cs - part of CNC Controls library
  *
  * Demo-shoot RTSP camera recording panel (see docs/demo-videos). One row per
- * CNC.Core.ObsBridge.Cameras entry plus a master "All" row, each a record/stop
+ * CNC.Controls.ObsBridge.Cameras entry plus a master "All" row, each a record/stop
  * glyph toggle (red circle = idle, red square = recording) that starts/stops that
  * camera's OBS Source Record filter independent of the main Record button. Only
  * meaningful with -demomarker's OBS bridge armed - see MainPanelRegistry

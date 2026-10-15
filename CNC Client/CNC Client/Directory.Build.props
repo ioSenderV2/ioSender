@@ -1,0 +1,9 @@
+<Project>
+  <!-- Same fix as CNC Contracts/Directory.Build.props, applied preemptively here: keep the net8
+       probe's NuGet restore out of the shared obj\, or the legacy CNC.Client.csproj build breaks
+       with "does not reference .NETFramework,Version=v4.6.2" the first time the probe runs first. -->
+  <PropertyGroup Condition="'$(MSBuildProjectFile)' == 'CNC.Client.net8.csproj'">
+    <MSBuildProjectExtensionsPath>$(MSBuildThisFileDirectory)obj\net8probe\</MSBuildProjectExtensionsPath>
+    <BaseIntermediateOutputPath>obj\net8probe\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+</Project>
