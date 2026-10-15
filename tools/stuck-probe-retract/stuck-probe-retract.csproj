@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    stuck-probe-retract - exercises MacroProcessor.ClearStuckProbe, the automatic Z retract that
+    fires when a run aborts with the probe still touching. Against the real grblHAL simulator on
+    loopback; no UI, no test server, no real hardware.
+
+    This feature MOVES THE MACHINE without being asked, which is why it is worth a harness even
+    though the trigger itself needs a real aborted probe cycle. The two properties that matter are
+    both decidable headlessly:
+
+      * it must NOT fire unless the probe reads asserted RIGHT NOW and the run actually failed -
+        a spurious fire is an unexpected Z move; and
+      * when it cannot confirm the state it is moving from, it must refuse and SAY SO, rather than
+        leaving the operator watching nothing happen, which is the original 18-second failure.
+
+    The retract carries (PREREQ, connected, homed, noalarm) and the simulator here is deliberately
+    left UNHOMED, so the refusal path is the one that runs end to end - no motion is commanded, and
+    the operator-facing message is observable. The success path still needs hardware.
+
+    net462 for the same reason render-harness is: MacroProcessor is in CNC.Controls.WPF and a net8
+    host cannot load net462 WPF types. AppDialogs.CustomMessageBox is redirected to a recorder so
+    nothing can pop a modal and block the run.
+
+    Build:  pwsh -File build.ps1 -Configuration Debug     (this references its bin\Debug output)
+            then, in this folder:  dotnet build
+    Run:    tools\stuck-probe-retract\bin\Debug\net462\stuck-probe-retract.exe   (exit 0 = passed)
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net462</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>stuck-probe-retract</AssemblyName>
+    <RootNamespace>StuckProbeRetract</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="CNC.Core">
+      <HintPath>..\..\CNC Core\CNC Core\bin\Debug\CNC.Core.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="CNC.Controls.WPF">
+      <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\CNC.Controls.WPF.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="CNC.Common">
+      <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\CNC.Common.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="CNC.Contracts">
+      <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\CNC.Contracts.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="RP.Math">
+      <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\RP.Math.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="SyncAppBinaries" AfterTargets="Build">
+    <ItemGroup>
+      <SourceDlls Include="..\..\CNC Controls\CNC Controls\bin\Debug\*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SourceDlls)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="..\..\ioSender XL\ioSender XL\bin\Debug\ioSender.exe.config" DestinationFiles="$(OutDir)stuck-probe-retract.exe.config" SkipUnchangedFiles="true" Condition="Exists('..\..\ioSender XL\ioSender XL\bin\Debug\ioSender.exe.config')" />
+  </Target>
+
+</Project>
