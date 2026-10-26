@@ -1947,26 +1947,37 @@ namespace CNC.Controls
             b.AppendLine(string.Format("G38.2 Z-{0} F{1}", search.ToInvariantString("0.0##"), searchF));
             b.AppendLine("G0 Z2");
             b.AppendLine(string.Format("G38.2 Z-5 F{0}", latchF));
-            b.AppendLine("#<_probe_z> = #5063");
+            // No #<_probe_z> = #5063 here any more: nothing read it once the print stopped carrying a value,
+            // and leaving a named parameter set on the controller is a hazard rather than a free diagnostic -
+            // a later reader cannot tell this program's leftover from its own fresh probe.
             b.AppendLine("G0 Z10");
             b.AppendLine("G90");
             b.AppendLine(string.Format(GrblCommand.ProbeSelect, 0));
+            // A MARKER, NOT A VALUE. This used to print "TLOREF_Z=<#5063>", which is a WORK Z - and after
+            // the baseline started being stored from the PRB machine Z, the console showed 65.471 on one
+            // line and "machine Z -50.002" on the next. Two numbers under one name, one of them wrong, and
+            // the wrong one printed first and looked like the measurement.
+            //
+            // This program cannot print the machine Z: it never selects a coordinate system (deliberately -
+            // that is what stopped it leaving G59.3 active), so converting #5063 would need the ACTIVE
+            // system's offset, which means indexing a parameter by #5220 and a streamed program cannot
+            // branch. The sender already has the right number from the PRB report and now says it, so the
+            // Z is not lost from the log - only the misleading copy of it is.
+            //
             // Flat parentheses, no nesting: a NESTED paren silently kills a grblHAL PRINT comment, which is
             // how tlo.macro's touch-plate TLO03 print stayed dead in exactly the branch that was failing.
-            b.AppendLine("(TLOREF_Z below is a WORK Z and is only the success signal - the stored baseline is the machine Z from PRB)");
-            b.AppendLine("(PRINT, TLOREF_Z=#<_probe_z>)");
+            b.AppendLine("(PRINT, TLOREF_DONE)");
             // Only reached when the probe touched - an alarm ends the program above this line.
             MacroProcessor.EmitWcsWrite(l => b.AppendLine(l), string.Format(CultureInfo.InvariantCulture,
                 "G10 L2 P9 X{0:0.0###} Y{1:0.0###} Z{2:0.0###}", here.X, here.Y, zTop));
 
-            double? captured = null;
+            bool reachedPrint = false;
             PropertyChangedEventHandler zHandler = (s2, pe) =>
             {
                 if (pe.PropertyName != nameof(GrblViewModel.Message) || string.IsNullOrEmpty(model.Message))
                     return;
-                var m = rxTloRefZ.Match(model.Message);
-                if (m.Success && double.TryParse(m.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double v))
-                    captured = v;
+                if (rxTloRefDone.IsMatch(model.Message))
+                    reachedPrint = true;
             };
             model.PropertyChanged += zHandler;
 
@@ -1986,7 +1997,7 @@ namespace CNC.Controls
                 model.PropertyChanged -= zHandler;
 
                 bool alarmed = model.GrblState.State == GrblStates.Alarm;
-                if (alarmed || !captured.HasValue || !model.IsProbeSuccess)
+                if (alarmed || !reachedPrint || !model.IsProbeSuccess)
                 {
                     model.Message = "Probe did not touch - nothing recorded.";
                     return;
@@ -1995,10 +2006,11 @@ namespace CNC.Controls
                 // The MACHINE Z of the touch, from the controller's own PRB report, not arithmetic on the
                 // work position - the same reasoning the surface button already used for reading Z.
                 //
-                // BOTH of these now, and that is the fix. TloRefBaseline used to be stored from
-                // captured.Value - the TLOREF_Z print, which is #5063, the probe result expressed in
-                // whatever WCS happened to be ACTIVE. EmitTloSeekDepth subtracts this baseline from G59.3's
-                // MACHINE Z offset, so a work Z here is not a small error, it is a different quantity.
+                // BOTH of these now, and that is the fix. TloRefBaseline used to be stored from the value in
+                // the old TLOREF_Z print, which was #5063 - the probe result expressed in whatever WCS
+                // happened to be ACTIVE. EmitTloSeekDepth subtracts this baseline from G59.3's MACHINE Z
+                // offset, so a work Z here is not a small error, it is a different quantity. That print
+                // carries no value at all now, for the same reason.
                 //
                 // Measured on the simulator 2026-10-26: a probe at machine Z -50.002, under G54 with a WCO Z
                 // of -115.473, stored 65.471. A POSITIVE baseline drives EmitTloSeekDepth's depth negative,
@@ -2536,10 +2548,15 @@ namespace CNC.Controls
             RefreshMacroStatus();
         }
 
-        // Picks up (PRINT, TLOREF_Z=..) below - same (PRINT, TAG=value) idiom StartJobView.rxResult already
-        // uses for LS_X/LS_Y.
-        private static readonly System.Text.RegularExpressions.Regex rxTloRefZ =
-            new System.Text.RegularExpressions.Regex(@"TLOREF_Z\s*=\s*(-?\d+(?:\.\d+)?)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        // Picks up (PRINT, TLOREF_DONE) below. A MARKER, not a value: it says "the program got past its
+        // probe", which is all this is needed for - an alarm ends the program before this line. The value
+        // itself comes from the PRB report, in machine coordinates.
+        //
+        // It used to be TLOREF_Z=<number> and that number was a WORK Z, so it disagreed with the stored
+        // baseline by whatever the active WCS offset happened to be. Carrying a value here invited reading
+        // it as the measurement, twice, on two different days.
+        private static readonly System.Text.RegularExpressions.Regex rxTloRefDone =
+            new System.Text.RegularExpressions.Regex(@"TLOREF_DONE", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
         private void UpdateTloRefValueDisplay()
         {
@@ -2717,26 +2734,37 @@ namespace CNC.Controls
             b.AppendLine(string.Format("G38.2 Z-{0} F{1}", searchZ, searchF));
             b.AppendLine("G0 Z2");
             b.AppendLine(string.Format("G38.2 Z-5 F{0}", latchF));
-            b.AppendLine("#<_probe_z> = #5063");
+            // No #<_probe_z> = #5063 here any more: nothing read it once the print stopped carrying a value,
+            // and leaving a named parameter set on the controller is a hazard rather than a free diagnostic -
+            // a later reader cannot tell this program's leftover from its own fresh probe.
             b.AppendLine("G0 Z10");
             b.AppendLine("G90");
             b.AppendLine(string.Format(GrblCommand.ProbeSelect, 0));
+            // A MARKER, NOT A VALUE. This used to print "TLOREF_Z=<#5063>", which is a WORK Z - and after
+            // the baseline started being stored from the PRB machine Z, the console showed 65.471 on one
+            // line and "machine Z -50.002" on the next. Two numbers under one name, one of them wrong, and
+            // the wrong one printed first and looked like the measurement.
+            //
+            // This program cannot print the machine Z: it never selects a coordinate system (deliberately -
+            // that is what stopped it leaving G59.3 active), so converting #5063 would need the ACTIVE
+            // system's offset, which means indexing a parameter by #5220 and a streamed program cannot
+            // branch. The sender already has the right number from the PRB report and now says it, so the
+            // Z is not lost from the log - only the misleading copy of it is.
+            //
             // Flat parentheses, no nesting: a NESTED paren silently kills a grblHAL PRINT comment, which is
             // how tlo.macro's touch-plate TLO03 print stayed dead in exactly the branch that was failing.
-            b.AppendLine("(TLOREF_Z below is a WORK Z and is only the success signal - the stored baseline is the machine Z from PRB)");
-            b.AppendLine("(PRINT, TLOREF_Z=#<_probe_z>)");
+            b.AppendLine("(PRINT, TLOREF_DONE)");
             b.AppendLine("G53 G0 Z-5");
             b.AppendLine("G53 G0 X#5181 Y#5182");
             b.AppendLine("G53 G0 Z#5183");
 
-            double? captured = null;
+            bool reachedPrint = false;
             PropertyChangedEventHandler zHandler = (s, pe) =>
             {
                 if (pe.PropertyName != nameof(GrblViewModel.Message) || string.IsNullOrEmpty(model.Message))
                     return;
-                var m = rxTloRefZ.Match(model.Message);
-                if (m.Success && double.TryParse(m.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double v))
-                    captured = v;
+                if (rxTloRefDone.IsMatch(model.Message))
+                    reachedPrint = true;
             };
             model.PropertyChanged += zHandler;
 
@@ -2758,7 +2786,7 @@ namespace CNC.Controls
                     model.PropertyChanged -= zHandler;
                     bool alarmed = model.GrblState.State == GrblStates.Alarm;
 
-                    // The MACHINE Z from the controller's own PRB report, not captured.Value - see the long
+                    // The MACHINE Z from the controller's own PRB report - see the long
                     // remark on the other writer of this setting for the whole story. In short: the print is
                     // #5063, which is the probe result in the ACTIVE WCS, and EmitTloSeekDepth consumes this
                     // baseline against G59.3's MACHINE Z. This program drives in G53 and never selects a WCS,
@@ -2768,9 +2796,9 @@ namespace CNC.Controls
                     //
                     // IsProbeSuccess is required BECAUSE of that change, not as an extra: ProbePosition is
                     // the last PRB the controller reported, so without it a cycle that never touched would
-                    // quietly store a STALE touch from an earlier probe. captured.HasValue stays as the
+                    // quietly store a STALE touch from an earlier probe. reachedPrint stays as the
                     // "the program really did reach its print" signal.
-                    if (!alarmed && captured.HasValue && model.IsProbeSuccess)
+                    if (!alarmed && reachedPrint && model.IsProbeSuccess)
                     {
                         AppConfig.Settings.Base.TloRefBaseline = model.ProbePosition.Z;
                         AppConfig.Settings.Save();
