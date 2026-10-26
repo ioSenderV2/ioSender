@@ -4,10 +4,15 @@
  * Settings > User Interface > Sound. Three machine events, a sound each, all None by default.
  *
  * The ComboBoxes are NOT bound two-way to the settings, unlike every other panel here, because one
- * of the entries is not a value but an action: picking "Browse for a .wav file..." has to open a
+ * of the entries is not a value but an action: picking "Browse for a sound file..." has to open a
  * dialog and then store whatever it returns - or put the previous choice back when the dialog is
- * cancelled. A TwoWay binding would have already written "Browse" into the setting by the time that
- * was known. So selection is handled here and written through explicitly.
+ * cancelled, or when the player cannot load the file that was chosen. A TwoWay binding would have
+ * already written "Browse" into the setting by the time any of that was known. So selection is
+ * handled here and written through explicitly.
+ *
+ * There is no summary line under the rows. There was one, and it read like debug output; what it
+ * was there to say - that a custom file has gone missing - is now said by the list itself, which is
+ * where the operator is already looking.
  */
 
 using System;
@@ -60,8 +65,6 @@ namespace CNC.Controls
             {
                 loading = false;
             }
-
-            UpdateChosenText();
         }
 
         /// <summary>The setting, if it is a custom file path rather than None or a built-in id.</summary>
@@ -87,7 +90,7 @@ namespace CNC.Controls
 
             if (id == UiSounds.Browse)
             {
-                string picked = BrowseForWav();
+                string picked = BrowseForSound();
                 loading = true;
                 try
                 {
@@ -108,7 +111,6 @@ namespace CNC.Controls
             }
 
             Store(combo, cfg, string.IsNullOrEmpty(id) ? UiSounds.None : id);
-            UpdateChosenText();
 
             // PLAY WHAT WAS JUST CHOSEN. This replaced a Test button per row, at the user's request
             // 2026-10-26: picking from a list of nine sounds whose names you do not know is exactly
@@ -119,16 +121,22 @@ namespace CNC.Controls
         }
 
         /// <summary>
-        /// Ask for a .wav. Returns null when cancelled, or when the file is not something
-        /// SoundPlayer can play - refused HERE, where the operator is choosing it and can see why,
-        /// rather than silently going quiet later when a limit switch is actually hit.
+        /// Ask for a sound file. Returns null when cancelled, or when the player cannot load what
+        /// was chosen - in which case the operator is told why, here, while they are choosing it,
+        /// rather than finding out by silence when a limit switch is actually hit.
         /// </summary>
-        private string BrowseForWav()
+        /// <remarks>
+        /// The dialog does NOT filter to .wav. Whether a file can be played is a question only the
+        /// player can answer, so it is asked directly: the file is loaded, and a failure is reported
+        /// with the reason the API gave. An extension filter would both exclude files the operator
+        /// might reasonably try and wave through a .wav that is really something else renamed.
+        /// </remarks>
+        private string BrowseForSound()
         {
             var dlg = new OpenFileDialog
             {
                 Title = "Choose a sound",
-                Filter = "Wave files (*.wav)|*.wav",
+                Filter = "Sound files|*.wav;*.mp3;*.wma;*.aac;*.m4a;*.ogg;*.flac;*.aiff;*.aif|All files (*.*)|*.*",
                 CheckFileExists = true,
                 Multiselect = false
             };
@@ -136,10 +144,11 @@ namespace CNC.Controls
             if (dlg.ShowDialog() != true)
                 return null;
 
-            if (!UiSounds.IsPlayable(dlg.FileName))
+            string error;
+            if (!UiSounds.TryLoad(dlg.FileName, out error))
             {
-                AppDialogs.Show("That file cannot be used as a sound. ioSender plays .wav files only - "
-                              + "anything else would need a codec that may not be installed on this machine.",
+                AppDialogs.Show("That file cannot be played, so it has not been used:\n\n"
+                              + dlg.FileName + "\n\n" + error,
                                 "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return null;
             }
@@ -160,22 +169,6 @@ namespace CNC.Controls
             if (combo == cboLimit) cfg.SoundOnLimit = id;
             else if (combo == cboProbe) cfg.SoundOnProbe = id;
             else if (combo == cboAlarm) cfg.SoundOnAlarm = id;
-        }
-
-        /// <summary>
-        /// Spell out what is actually set, including a file that has gone missing. The ComboBox shows
-        /// a label; it cannot show that the file behind it is no longer there, and a sound that never
-        /// arrives is indistinguishable from one that is switched off.
-        /// </summary>
-        private void UpdateChosenText()
-        {
-            var cfg = AppConfig.Settings?.Base;
-            if (cfg == null || txtChosen == null)
-                return;
-
-            txtChosen.Text = "Limit: " + UiSounds.Describe(cfg.SoundOnLimit)
-                           + "    Probe: " + UiSounds.Describe(cfg.SoundOnProbe)
-                           + "    Alarm: " + UiSounds.Describe(cfg.SoundOnAlarm);
         }
 
         /// <summary>Back to factory: silence, as the sibling panels' own ResetToDefaults do.</summary>

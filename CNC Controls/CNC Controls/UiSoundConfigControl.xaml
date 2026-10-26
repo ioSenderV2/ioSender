@@ -55,10 +55,8 @@
                            SelectionChanged="Sound_SelectionChanged"/>
             </Grid>
 
-            <TextBlock x:Uid="lbl_soundChosen" x:Name="txtChosen" Margin="24,8,0,0" TextWrapping="Wrap" Opacity="0.75"/>
-
-            <TextBlock x:Uid="lbl_soundCustomNote" Margin="5,10,0,0" TextWrapping="Wrap" Opacity="0.75"
-                       Text="The list offers the sounds Windows ships with. Choose &quot;Browse for a .wav file...&quot; to use your own - .wav only, because that is what can be played without a codec that may not be installed. A file that is later moved or deleted simply goes quiet; it is reported as missing above rather than failing while the machine is running."/>
+            <TextBlock x:Uid="lbl_soundCustomNote" Margin="5,12,0,0" TextWrapping="Wrap" Opacity="0.75"
+                       Text="The list offers the sounds Windows ships with. Choose &quot;Browse for a sound file...&quot; to use your own: the file is loaded there and then, and if it cannot be played you are told why and the previous choice is put back. A file that is later moved or deleted is marked &quot;(missing)&quot; in the list and simply goes quiet, rather than failing while the machine is running."/>
         </StackPanel>
     </GroupBox>
 </UserControl>

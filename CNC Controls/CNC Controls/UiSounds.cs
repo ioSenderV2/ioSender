@@ -94,7 +94,7 @@ namespace CNC.Controls
                         }
                         catch { }   // an unreadable media folder means no built-in sounds, not a crash
                     }
-                    list.Add(new Sound { Id = Browse, Label = "Browse for a .wav file...", File = null });
+                    list.Add(new Sound { Id = Browse, Label = "Browse for a sound file...", File = null });
                     _items = list;
                 }
                 return _items;
@@ -119,6 +119,12 @@ namespace CNC.Controls
             string label;
             try { label = Path.GetFileName(path); }
             catch { label = path; }
+
+            // MARKED IN THE LIST, not in a line underneath it. A custom file can be moved or deleted
+            // between sessions, and the ComboBox would otherwise show its name as though it still
+            // worked. The list is the one place the operator looks, so the truth belongs in it.
+            if (ResolveFile(path) == null)
+                label += " (missing)";
 
             var entry = new Sound { Id = path, Label = label, File = null };
             var items = (ObservableCollection<Sound>)Items;
@@ -166,35 +172,46 @@ namespace CNC.Controls
             catch { return null; }
         }
 
-        /// <summary>How a stored setting should READ in the UI - the catalogue label, or the file's
-        /// own name for a custom pick, with a marker when it cannot be found.</summary>
-        public static string Describe(string setting)
+        /// <summary>
+        /// Actually try to load the file through the player, and say why if it will not go. This is
+        /// the real test, not the file extension: the question is whether this API can play this
+        /// file, and only the API can answer it. Load() reads and validates the whole stream
+        /// synchronously, so a file that loads here will play later.
+        /// </summary>
+        /// <remarks>
+        /// SoundPlayer is a WAV-only API, so in practice an mp3 or a wma fails here however it is
+        /// named - and a .wav that is really a renamed mp3 fails too, which an extension check would
+        /// have waved through. The file dialog deliberately does NOT filter to .wav: the operator
+        /// picks what they like and is told plainly if it cannot be used, rather than being given a
+        /// list that silently excludes most of their sound files.
+        /// </remarks>
+        public static bool TryLoad(string path, out string error)
         {
-            if (string.IsNullOrEmpty(setting) || setting == None)
-                return "None";
+            error = null;
 
-            var known = Find(setting);
-            if (known != null && known.File != null)
-                return known.Label;         // a built-in: its label is the whole story
-
-            string name;
-            try { name = Path.GetFileName(setting); }
-            catch { name = setting; }
-
-            return ResolveFile(setting) == null ? name + " (missing)" : name;
-        }
-
-        /// <summary>True if the file is something SoundPlayer can actually play.</summary>
-        public static bool IsPlayable(string path)
-        {
             if (string.IsNullOrEmpty(path))
+            {
+                error = "No file was chosen.";
                 return false;
+            }
+
             try
             {
-                return File.Exists(path) &&
-                       string.Equals(Path.GetExtension(path), ".wav", StringComparison.OrdinalIgnoreCase);
+                if (!File.Exists(path))
+                {
+                    error = "That file no longer exists.";
+                    return false;
+                }
+
+                var player = new SoundPlayer(path);
+                player.Load();              // synchronous, and throws on anything it cannot decode
+                return true;
             }
-            catch { return false; }
+            catch (Exception e)
+            {
+                error = e.Message;
+                return false;
+            }
         }
 
         /// <summary>
