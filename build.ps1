@@ -465,6 +465,65 @@ if ($Clean) {
     }
 }
 
+# ---------------------------------------------------------------------------------------------
+# The wasted-pair warning. A -Scratch build whose only successor is a -Launch build with the same
+# sources bought nothing: its output is discarded, the app is rebuilt from scratch, and the user
+# waited through both for one result. A compile error surfaces identically from the -Launch build,
+# so the -Launch build IS the compile check - build first, then commit and write up while the user
+# tests. -Scratch earns its place only when a live instance is mid-test AND the turn is not ending.
+#
+# Measured 2026-10-26: -Scratch, a commit, then -Launch, nothing else in between. The user's words:
+# "You ran build.ps1 twice and the only thing in between was the commit... Wasting my time. I can be
+# testing ui while you do the commit and summary." A rule was already written and was not enough, so
+# this is the mechanical half - it keys off the SOURCE FINGERPRINT, not git state, because a commit
+# changes HEAD while leaving the tree byte-identical, which is exactly the case being caught.
+# ---------------------------------------------------------------------------------------------
+$buildStateFile = Join-Path $env:TEMP 'ioSender-build-last.json'
+
+# Returns $null if it cannot be computed. FAILS OPEN on purpose: this is a convenience warning, and
+# a warning that can stop the build is worse than the waste it is warning about. $ErrorActionPreference
+# is 'Stop' in this script, so without the try/catch a single unreadable path would end the run.
+function Get-SourceFingerprint {
+    try {
+        $newest = [datetime]::MinValue
+        $count = 0
+        Get-ChildItem -Path $root -Recurse -File -Include *.cs, *.xaml, *.csproj, *.resx, *.config `
+                      -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch '\\(bin|obj|node_modules|\.git|\.vs)\\' } |
+            ForEach-Object {
+                $count++
+                if ($_.LastWriteTimeUtc -gt $newest) { $newest = $_.LastWriteTimeUtc }
+            }
+        if ($count -eq 0) { return $null }
+        return "{0}|{1}" -f $count, $newest.ToString('o')
+    }
+    catch { return $null }
+}
+
+$fingerprint = Get-SourceFingerprint
+
+if (-not $Scratch -and $fingerprint -and (Test-Path $buildStateFile)) {
+    try {
+        $last = Get-Content $buildStateFile -Raw | ConvertFrom-Json
+        if ($last.Scratch -and $last.Fingerprint -eq $fingerprint) {
+            $mins = [math]::Round(((Get-Date).ToUniversalTime() - [datetime]::Parse($last.TimeUtc)).TotalMinutes, 1)
+            Write-Host ""
+            Write-Host "  !! WASTED BUILD: the -Scratch build $mins min ago compiled these exact sources." -ForegroundColor Yellow
+            Write-Host "     Nothing changed since, so it bought nothing - this -Launch build is the compile check." -ForegroundColor Yellow
+            Write-Host "     Order is: edits -> build.ps1 -Launch -> commit -> summary, so the user tests while you write." -ForegroundColor Yellow
+            Write-Host "     -Scratch is only for a compile check that must not disturb a live mid-test instance." -ForegroundColor Yellow
+            Write-Host ""
+        }
+    }
+    catch { }   # a corrupt or half-written state file must never be the reason a build does not run
+}
+
+try {
+    @{ Scratch = [bool]$Scratch; TimeUtc = (Get-Date).ToUniversalTime().ToString('o'); Fingerprint = $fingerprint } |
+        ConvertTo-Json | Set-Content -Path $buildStateFile -Encoding UTF8
+}
+catch { }
+
 switch ($Configuration) {
     'Both'  {
         Invoke-Build 'Debug' $(if ($Scratch) { ScratchOutDir 'Debug' })

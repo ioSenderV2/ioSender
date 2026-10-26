@@ -16,20 +16,35 @@ powershell -File c:\github\claude-hub\hooks\test-gates.ps1       # 21-case gate 
 
 ## Builds — the part that is ioSender-specific
 
-**Interim builds** — only when you must compile-check while a live instance is mid-test:
-```powershell
-.\build.ps1 -Scratch
-```
-Not reflexively before every `-Launch`. Most changes compile clean; when a turn has one build to
-do, that build is the `-Launch` one.
+### 🔴 The `-Launch` build IS the compile check. Build FIRST, then commit and summarise.
 
-**The final build**, after the last commit, is the only one that gets `-Launch`:
 ```powershell
 .\build.ps1 -Launch -message="what we're testing"
 ```
 The message tells the user, the instant the window appears, what they're looking at. This is the
 project's `verify.command` — the Stop gate blocks the turn without it once `.cs`/`.xaml`/`.csproj`/
 `.resx`/`.config` files have changed.
+
+**Order: edits → `-Launch` → commit → summary.** Not edits → `-Scratch` → commit → `-Launch`. A
+compile error surfaces identically either way, so a `-Scratch` run whose only successor is a
+`-Launch` run **bought nothing and cost a whole build**: the output is discarded, the app is rebuilt
+from scratch, and the user sat through both. **The user can be testing the UI while the commit and
+the write-up happen** — that is the point. Hold the commit until the build is green, then commit
+while they test.
+
+**Measured 2026-10-26:** `-Scratch`, then a commit, then `-Launch`, nothing else in between. The
+user's words: *"You ran build.ps1 twice and the only thing in between was the commit… Wasting my
+time. I can be testing ui while you do the commit and summary."* `build.ps1` now warns when it sees
+that pair (see **the wasted-pair warning** below).
+
+**`-Scratch` is for exactly one situation**: a live instance is mid-test **and the turn is not about
+to end**, so you need a compile check that cannot disturb it:
+```powershell
+.\build.ps1 -Scratch
+```
+If the next thing you intend to run is `-Launch`, you did not need it. "The user has an instance
+running" is **not** on its own a reason — `-Launch` kills and replaces that instance anyway, which
+is what you want when the turn is ending.
 
 **Locale pass**, while the user tests:
 ```powershell
