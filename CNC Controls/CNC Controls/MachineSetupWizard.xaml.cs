@@ -1991,8 +1991,25 @@ namespace CNC.Controls
 
                 // The MACHINE Z of the touch, from the controller's own PRB report, not arithmetic on the
                 // work position - the same reasoning the surface button already used for reading Z.
+                //
+                // BOTH of these now, and that is the fix. TloRefBaseline used to be stored from
+                // captured.Value - the TLOREF_Z print, which is #5063, the probe result expressed in
+                // whatever WCS happened to be ACTIVE. EmitTloSeekDepth subtracts this baseline from G59.3's
+                // MACHINE Z offset, so a work Z here is not a small error, it is a different quantity.
+                //
+                // Measured on the simulator 2026-10-26: a probe at machine Z -50.002, under G54 with a WCO Z
+                // of -115.473, stored 65.471. A POSITIVE baseline drives EmitTloSeekDepth's depth negative,
+                // into its own "depth <= 0" refusal, so it emitted nothing and tlo.macro fell back to the 90
+                // literal - the very number that threw ALARM:5 against this plate and started all of this.
+                // It fails safe, which is the clamp doing its job, but the derived seek is then silently OFF
+                // and nothing on screen says so.
+                //
+                // Why it ever worked: the probe used to run with G59.3 SELECTED and a G59.3 Z offset of 0,
+                // where the work Z and the machine Z are the same number. Moving this program to G53 moves
+                // (correct in itself - it stopped leaving G59.3 active) left the READ in an arbitrary frame.
+                // The print is still the success signal; it is no longer the stored value.
                 AppConfig.Settings.Base.TloSurfaceZ = model.ProbePosition.Z;
-                AppConfig.Settings.Base.TloRefBaseline = captured.Value;
+                AppConfig.Settings.Base.TloRefBaseline = model.ProbePosition.Z;
                 AppConfig.Settings.Save();
 
                 UpdateTloRefValueDisplay();
@@ -2522,7 +2539,18 @@ namespace CNC.Controls
         private void UpdateTloRefValueDisplay()
         {
             double v = AppConfig.Settings.Base.TloRefBaseline;
-            txtTloRefValue.Text = v == 0d ? "Never referenced" : string.Format("Baseline: {0:0.0##} mm", v);
+
+            // The baseline is a MACHINE Z, on a machine whose Z travel runs from 0 downwards, so a real one
+            // can only ever be NEGATIVE. A positive value is not a tight number, it is the wrong quantity -
+            // a work Z, which is what the writers above stored until 2026-10-26 - and EmitTloSeekDepth will
+            // refuse it and leave tlo.macro on its own 90 literal.
+            //
+            // That refusal is correct and completely invisible, which is the part worth fixing here:
+            // "Baseline: 65.471 mm" reads like a measurement that works. An unusable stored value has to
+            // survive to the screen as unusable.
+            txtTloRefValue.Text = v == 0d ? "Never referenced"
+                                : v > 0d  ? string.Format("Baseline: {0:0.0##} mm - NOT USABLE (work Z, not machine Z) - re-reference", v)
+                                          : string.Format("Baseline: {0:0.0##} mm", v);
             UpdateTloRefControls();
         }
 
@@ -2721,9 +2749,22 @@ namespace CNC.Controls
                     model.PropertyChanged -= doneHandler;
                     model.PropertyChanged -= zHandler;
                     bool alarmed = model.GrblState.State == GrblStates.Alarm;
-                    if (!alarmed && captured.HasValue)
+
+                    // The MACHINE Z from the controller's own PRB report, not captured.Value - see the long
+                    // remark on the other writer of this setting for the whole story. In short: the print is
+                    // #5063, which is the probe result in the ACTIVE WCS, and EmitTloSeekDepth consumes this
+                    // baseline against G59.3's MACHINE Z. This program drives in G53 and never selects a WCS,
+                    // so the frame the print came back in is whatever the operator left active - G54 with a
+                    // WCO Z of -115.473 on the run that exposed this, turning a probe at machine -50.002 into
+                    // a stored 65.471.
+                    //
+                    // IsProbeSuccess is required BECAUSE of that change, not as an extra: ProbePosition is
+                    // the last PRB the controller reported, so without it a cycle that never touched would
+                    // quietly store a STALE touch from an earlier probe. captured.HasValue stays as the
+                    // "the program really did reach its print" signal.
+                    if (!alarmed && captured.HasValue && model.IsProbeSuccess)
                     {
-                        AppConfig.Settings.Base.TloRefBaseline = captured.Value;
+                        AppConfig.Settings.Base.TloRefBaseline = model.ProbePosition.Z;
                         AppConfig.Settings.Save();
                         UpdateTloRefValueDisplay();
                         model.Message = "TLO baseline referenced.";
