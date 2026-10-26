@@ -367,6 +367,10 @@ namespace CNC.Controls
         private string _remoteIdlePrimary = "None", _remoteIdleSecondary = "None";
         private bool _remoteOnAlarm = true;
         private string _remoteAlarmPrimary = "ResetUnlock", _remoteAlarmSecondary = "None";
+        // Settings > User Interface > Sound. All three OFF by default: a sender that starts making
+        // noises nobody asked for is a sender people turn the speakers off for, and then the one
+        // they did want is inaudible too.
+        private string _soundOnLimit = "None", _soundOnProbe = "None", _soundOnAlarm = "None";
         private int _statusWindowAutoCloseSeconds = 10;
         private double _jobSplitRatio = 0.5d;
         // Serial is the default transport (2026-08-12). Off means a serial/USB link is left alone; a user
@@ -621,6 +625,13 @@ namespace CNC.Controls
         public bool RemoteOnAlarm { get { return _remoteOnAlarm; } set { if (_remoteOnAlarm != value) { _remoteOnAlarm = value; OnPropertyChanged(); } } }
         public string RemoteAlarmPrimary { get { return _remoteAlarmPrimary; } set { if (_remoteAlarmPrimary != value) { _remoteAlarmPrimary = value ?? "None"; OnPropertyChanged(); } } }
         public string RemoteAlarmSecondary { get { return _remoteAlarmSecondary; } set { if (_remoteAlarmSecondary != value) { _remoteAlarmSecondary = value ?? "None"; OnPropertyChanged(); } } }
+        // Each of these holds one of three things: "None", a UiSounds catalogue id, or a full path to
+        // the operator's own .wav - see UiSounds for why a custom pick does not get its own setting.
+        // Null coalesces to "None" for the same reason the remote ones do: a half-written config must
+        // read as silence, not as an unhandled null on a status report.
+        public string SoundOnLimit { get { return _soundOnLimit; } set { if (_soundOnLimit != value) { _soundOnLimit = value ?? "None"; OnPropertyChanged(); } } }
+        public string SoundOnProbe { get { return _soundOnProbe; } set { if (_soundOnProbe != value) { _soundOnProbe = value ?? "None"; OnPropertyChanged(); } } }
+        public string SoundOnAlarm { get { return _soundOnAlarm; } set { if (_soundOnAlarm != value) { _soundOnAlarm = value ?? "None"; OnPropertyChanged(); } } }
         // Where the splitter sits, as the program view's share of the split (0..1). Persisted so a layout
         // the operator has dragged to suit their screen survives a restart, like every other placement here.
         public double JobSplitRatio { get { return _jobSplitRatio < 0.1d || _jobSplitRatio > 0.9d ? 0.5d : _jobSplitRatio; } set { _jobSplitRatio = value; } }

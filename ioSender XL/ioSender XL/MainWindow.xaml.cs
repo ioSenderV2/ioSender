@@ -220,6 +220,11 @@ namespace GCode_Sender
             {
                 CNC.Core.Grbl.GrblViewModel = viewModel;
                 CNC.Controls.GamepadInput.Attach(viewModel);   // one gamepad stack, bound to the main model
+                // Settings > User Interface > Sound. Attached to the model rather than to the run
+                // strip that shows the same lamps, so a sound configured for a limit or the probe
+                // still happens while you are on another tab - which is the whole point of wanting
+                // one. Does nothing at all until a sound is chosen; all three default to None.
+                CNC.Controls.UiSoundWatcher.Attach(viewModel);
 
                 // The state stream (client/server split, step 6a): MachineState -> MachineDelta
                 // messages, pumped per status report. Nothing in the app consumes it yet - the client

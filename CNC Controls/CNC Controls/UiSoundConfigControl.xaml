@@ -1,0 +1,71 @@
+﻿<UserControl x:Class="CNC.Controls.UiSoundConfigControl"
+             x:Uid="ctl_uiSoundConfig"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:CNC.Controls"
+             mc:Ignorable="d"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+    <!-- Settings > User Interface > Sound. Attaches a sound to a machine event you would otherwise
+         have to be looking at the run strip to notice: a limit lamp lighting, the probe lamp lighting,
+         the machine dropping into alarm. All three start at None on purpose - a sender that makes
+         noises nobody asked for is one people mute, and then the sound they DID want is inaudible too.
+         The sounds fire on the transition into asserted, not on a signal that is already on when
+         ioSender connects, and each has a floor on how often it can repeat so a chattering switch
+         cannot machine-gun. See UiSoundWatcher. -->
+    <GroupBox x:Uid="grp_uiSound" Header="Sound" Margin="5">
+        <StackPanel Margin="5">
+            <TextBlock x:Uid="lbl_soundIntro" Margin="5,0,0,0" TextWrapping="Wrap" Opacity="0.75"
+                       Text="Pick a sound for the things worth hearing about while you are looking at the work instead of the screen. Each one plays when the state arrives - not while it stays - so a switch that stays closed sounds once, not continuously."/>
+
+            <Grid Margin="24,10,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock x:Uid="lbl_soundHdrWhen" Grid.Row="0" Grid.Column="0" Text="When" FontWeight="Bold" Margin="0,0,18,4"/>
+                <TextBlock x:Uid="lbl_soundHdrPlay" Grid.Row="0" Grid.Column="1" Text="Play" FontWeight="Bold" Margin="0,0,10,4"/>
+
+                <TextBlock x:Uid="lbl_soundRowLimit" Grid.Row="1" Grid.Column="0" Text="A limit switch is hit" Margin="0,0,18,4" VerticalAlignment="Center"
+                           ToolTip="Any limit input asserting - the X, Y and Z lamps in the run strip, and the limits of any other axis this machine has."/>
+                <ComboBox  x:Uid="cbo_soundLimit" x:Name="cboLimit" Grid.Row="1" Grid.Column="1" Margin="0,0,10,4" MinWidth="200"
+                           ItemsSource="{Binding Source={x:Static local:UiSounds.Items}}"
+                           DisplayMemberPath="Label" SelectedValuePath="Id"
+                           SelectionChanged="Sound_SelectionChanged"/>
+                <Button    x:Uid="btn_soundTestLimit" Grid.Row="1" Grid.Column="2" Content="Test" Margin="0,0,0,4" Padding="12,2"
+                           Click="TestLimit_Click" ToolTip="Play the chosen sound now."/>
+
+                <TextBlock x:Uid="lbl_soundRowProbe" Grid.Row="2" Grid.Column="0" Text="The probe or tool setter touches" Margin="0,0,18,4" VerticalAlignment="Center"
+                           ToolTip="The probe input asserting - whichever of the P and T lamps is lit for it, since both report the same input and which one lights depends on where the probe is currently routed."/>
+                <ComboBox  x:Uid="cbo_soundProbe" x:Name="cboProbe" Grid.Row="2" Grid.Column="1" Margin="0,0,10,4" MinWidth="200"
+                           ItemsSource="{Binding Source={x:Static local:UiSounds.Items}}"
+                           DisplayMemberPath="Label" SelectedValuePath="Id"
+                           SelectionChanged="Sound_SelectionChanged"/>
+                <Button    x:Uid="btn_soundTestProbe" Grid.Row="2" Grid.Column="2" Content="Test" Margin="0,0,0,4" Padding="12,2"
+                           Click="TestProbe_Click" ToolTip="Play the chosen sound now."/>
+
+                <TextBlock x:Uid="lbl_soundRowAlarm" Grid.Row="3" Grid.Column="0" Text="The machine goes into alarm" Margin="0,0,18,4" VerticalAlignment="Center"
+                           ToolTip="The controller entering the alarm state - the motors are disabled and it will not take commands until it is unlocked."/>
+                <ComboBox  x:Uid="cbo_soundAlarm" x:Name="cboAlarm" Grid.Row="3" Grid.Column="1" Margin="0,0,10,4" MinWidth="200"
+                           ItemsSource="{Binding Source={x:Static local:UiSounds.Items}}"
+                           DisplayMemberPath="Label" SelectedValuePath="Id"
+                           SelectionChanged="Sound_SelectionChanged"/>
+                <Button    x:Uid="btn_soundTestAlarm" Grid.Row="3" Grid.Column="2" Content="Test" Margin="0,0,0,4" Padding="12,2"
+                           Click="TestAlarm_Click" ToolTip="Play the chosen sound now."/>
+            </Grid>
+
+            <TextBlock x:Uid="lbl_soundChosen" x:Name="txtChosen" Margin="24,8,0,0" TextWrapping="Wrap" Opacity="0.75"/>
+
+            <TextBlock x:Uid="lbl_soundCustomNote" Margin="5,10,0,0" TextWrapping="Wrap" Opacity="0.75"
+                       Text="The list offers the sounds Windows ships with. Choose &quot;Browse for a .wav file...&quot; to use your own - .wav only, because that is what can be played without a codec that may not be installed. A file that is later moved or deleted simply goes quiet; it is reported as missing above rather than failing while the machine is running."/>
+        </StackPanel>
+    </GroupBox>
+</UserControl>

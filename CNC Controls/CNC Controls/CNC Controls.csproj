@@ -398,6 +398,11 @@
     <Compile Include="UiRemoteConfigControl.xaml.cs">
       <DependentUpon>UiRemoteConfigControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="UiSoundConfigControl.xaml.cs">
+      <DependentUpon>UiSoundConfigControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UiSounds.cs" />
+    <Compile Include="UiSoundWatcher.cs" />
     <Compile Include="PanelFlyout.xaml.cs">
       <DependentUpon>PanelFlyout.xaml</DependentUpon>
     </Compile>
@@ -579,6 +584,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="UiRemoteConfigControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UiSoundConfigControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
