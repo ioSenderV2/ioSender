@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """gen-sim-macros.py - regenerate the Simulator repo's embedded ATC macro strings.
 
-Reads ioSender's canonical ATC macros (macros/tc.macro, pcorner.macro, pvisecorner.macro - the
-same files AtcMacros.cs embeds to provision a real controller) and emits a C header,
+Reads ioSender's canonical ATC macros - the MACROS list below, which must match AtcMacros.Required,
+the same files AtcMacros.cs embeds to provision a real controller - and emits a C header,
 src/embedded_macros.h, in the sibling Simulator repo. driver.c writes these into littlefs at boot
 (sim_seed_atc_macros), so every simulator this repo builds is ATC-macro-ready out of the box -
 matching a correctly-provisioned real machine, with no runtime transfer step needed.
@@ -18,8 +18,21 @@ import os
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Order matters: it is the order AtcMacros.Required uses, and the checksum below hashes them in it.
-MACROS = ["tc.macro", "pcorner.macro", "pvisecorner.macro", "pcenter.macro"]
+# Order matters: it is the order AtcMacros.Required uses, and the manifest below lists them in it.
+#
+# tlo.macro was MISSING from this list from 2026-09-14 - when it was extracted out of tc.macro into its
+# own file and added to AtcMacros.Required - until 2026-10-26. Every simulator this project builds is
+# generated from this list, so none of them ever had tlo.macro on its littlefs, and a named-sub CALL for
+# a file that is not there fails with error:81, which says nothing whatsoever about a missing file.
+#
+# That is why tlo.macro's o130 seek-depth branch could never be exercised on the simulator: not an
+# untested branch, an UNTESTABLE one. The sender recovers at runtime (it reports the macro Missing and
+# offers to upload it), which is why this never broke hardware - it broke the one route that could have
+# verified the macro without hardware.
+#
+# Adding a macro means adding it in THREE places: here, AtcMacros.Required, and driver.c's
+# sim_seed_atc_macros table in the Simulator repo. Miss the third and it is embedded but never written.
+MACROS = ["tc.macro", "pcorner.macro", "pvisecorner.macro", "pcenter.macro", "tlo.macro"]
 
 # Sidecar AtcMacros writes next to the macros. Without it the sim has no checksum to compare, so
 # ioSender falls back to comparing SIZES - which is what made a one-byte generator bug visible as
@@ -65,16 +78,32 @@ def c_string_literal(data):
     return '\n'.join(out) if out else '    ""'
 
 
-def atc_checksum(bodies):
-    """Reproduce AtcMacros.EmbeddedChecksum: for each required macro, in order, hash
-    name + "\\n", then the body bytes, then a single 0 byte. Lowercase hex SHA-256."""
+def atc_manifest(bodies):
+    """Reproduce AtcMacros.EmbeddedManifest: one "<sha256>  <name>" row per macro, in Required order,
+    every row newline-terminated. Two spaces between hash and name, as the sender writes it.
+
+    This used to emit AtcMacros' OLDER format - a single aggregate hash over the whole set. The sender
+    still accepts that (LegacySumMatches), so this is not a correctness fix, it is a cost one: an
+    aggregate that disagrees re-uploads all five macros over YModem (~500 128-byte packets, ~23 s
+    measured), where a per-file manifest re-uploads only the file that actually changed.
+
+    SHA-256 over the macro's RAW BYTES, which is what the sender's hash is over: it hashes the UTF8
+    bytes of the embedded resource, the resource IS the file, and no macro carries a BOM - checked, so
+    StreamReader's BOM stripping cannot make the two disagree. Non-ASCII is present (tc 9 bytes, tlo 4)
+    and round-trips identically. Read in BINARY regardless: text mode would normalise any CRLF away,
+    which is the bug that once cost tc.macro four bytes. The working tree is all-LF today, so that
+    hazard is currently dormant rather than gone - a .macro authored on Windows would wake it up.
+
+    One row this cannot reproduce, by construction: under the -notoolsetter flag the sender rewrites
+    tc.macro's #<_tc_touchplate> value before hashing it, so that run's tc.macro row legitimately
+    differs from this one and tc.macro gets re-uploaded once. Per-file is exactly what keeps that
+    disagreement down to the one file instead of the whole set.
+    """
     import hashlib
-    h = hashlib.sha256()
+    out = ''
     for name, body in bodies:
-        h.update((name + "\n").encode('utf-8'))
-        h.update(body)
-        h.update(b'\x00')
-    return h.hexdigest()
+        out += hashlib.sha256(body).hexdigest() + '  ' + name + '\n'
+    return out
 
 
 def main():
@@ -107,11 +136,14 @@ def main():
         parts.append('')
 
     # The sidecar, so the simulator comes up looking exactly like a machine ioSender provisioned.
-    parts.append('// Checksum of the macro SET, computed the way AtcMacros.EmbeddedChecksum does.')
-    parts.append('// Seeded as atc.sum so ioSender\'s checksum comparison short-circuits instead of')
-    parts.append('// falling back to comparing file sizes.')
+    # Built through c_string_literal like every macro above, so the row newlines are real bytes and
+    # one C literal appears per manifest row - readable in the header, and byte-exact either way.
+    manifest = atc_manifest(bodies)
+    parts.append('// The atc.sum sidecar, byte-for-byte as AtcMacros.EmbeddedManifest builds it: one')
+    parts.append('// "<sha256>  <name>" row per macro, in AtcMacros.Required order. Seeded so the sender')
+    parts.append('// compares checksums and short-circuits, instead of falling back to comparing file sizes.')
     parts.append('static const char *embedded_atc_sum =')
-    parts.append('    "' + atc_checksum(bodies) + '\\n";')
+    parts.append(c_string_literal(manifest.encode('ascii')) + ';')
     parts.append('')
 
     parts.append('#endif // EMBEDDED_MACROS_H')
@@ -123,7 +155,9 @@ def main():
     print('wrote', dest)
     for name, content in bodies:
         print('  %-20s %6d bytes' % (name, len(content)))
-    print('  %-20s %s' % (CHECKSUM_FILE, atc_checksum(bodies)))
+    print('  %-20s %6d bytes, %d row(s)' % (CHECKSUM_FILE, len(manifest), len(bodies)))
+    for row in manifest.rstrip('\n').split('\n'):
+        print('      ' + row)
 
 
 if __name__ == '__main__':
