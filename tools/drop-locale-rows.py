@@ -12,9 +12,15 @@ Nothing here re-encodes anything.
 It also refuses to drop a prefix that is still referenced by a XAML file, so a typo cannot quietly
 delete rows that are still in use.
 
+It is also the way to REFRESH a string whose English text has changed. locadd.py adds a row only
+when one is absent, so editing Text= in a XAML leaves the old wording in the CSVs - and a localized
+build takes the CSV's value, so the screen would still show the superseded text. Drop the row with
+--force and re-run locadd.py to have it re-added as the XAML now reads.
+
 Usage:
     python tools/drop-locale-rows.py <uid-prefix> [<uid-prefix> ...]
     python tools/drop-locale-rows.py --dry-run btn_soundTest
+    python tools/drop-locale-rows.py --force lbl_soundIntro   # then: python tools/locadd.py
 """
 
 import os
@@ -61,12 +67,19 @@ def main():
         print(__doc__)
         return 2
 
+    force = '--force' in args
+
     for p in prefixes:
         hit = still_referenced(p)
-        if hit:
+        if hit and not force:
             print('REFUSED: "%s" is still used by %s' % (p, os.path.relpath(hit, REPO)))
             print('         Rows for a live control must not be dropped.')
+            print('         To REFRESH a changed string, drop with --force then re-run locadd.py,')
+            print('         which re-adds the row from the XAML as it now reads.')
             return 1
+        if hit and force:
+            print('--force: "%s" is live (%s) - dropping anyway; re-run locadd.py to re-add it.'
+                  % (p, os.path.relpath(hit, REPO)))
 
     total = 0
     for path in sorted(csv_files()):
