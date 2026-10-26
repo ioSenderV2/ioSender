@@ -586,13 +586,23 @@ namespace GCode_Sender
                                 DebugLog.Write("connect", string.Format("InitSystem() -> {0}, GrblInfo.IsLoaded={1}", initOK, GrblInfo.IsLoaded));
                             break;
 
+                        // RETURN, not break. Both of these end the application, and everything below -
+                        // the connect-outcome message, InitSystem's follow-up, the run-control activate
+                        // and the focus restore - then runs against a window that has been told to go
+                        // away. On 2026-10-25 17:34:37 that cost a startup: an NRE at the focus restore
+                        // (which reached the dispatcher through Application.Current) came out of
+                        // CompleteStartup, so the key hooks, the global shortcuts, the tab shortcuts and
+                        // the console restore that follow it never ran. The half-initialised process then
+                        // stayed up, polling, for nine hours - and because it still held the
+                        // single-instance lock, every later launch forwarded to it and exited, which
+                        // looks exactly like an app that will not start.
                         case Controller.RestartResult.Close:
                             MainWindow.ui.Close();
-                            break;
+                            return;
 
                         case Controller.RestartResult.Exit:
                             Environment.Exit(-1);
-                            break;
+                            return;
                     }
 
                     // Close the loop opened by "Waiting for controller (...)". That notice pops the status log,
@@ -776,7 +786,13 @@ namespace GCode_Sender
             if (MainWindow.ui.RunControl.Activate(activate)) {
                 showProgramLimits();
                 Task.Delay(500).ContinueWith(t => _dro?.EnableFocus());
-                Application.Current.Dispatcher.BeginInvoke(new System.Action(() =>
+                // This view's OWN dispatcher, as everything else in this method uses (see the
+                // Restart/OnBooted and check-mode BeginInvoke calls above). It used to go through
+                // Application.Current, which is null once the application has begun shutting down -
+                // and this line is reachable on exactly that path, since the Close case above closed
+                // the main window. Same dispatcher either way on a single-UI-thread app; the
+                // difference is that this one cannot be null here.
+                Dispatcher.BeginInvoke(new System.Action(() =>
                 {
                     // focusedControl is only ever assigned on the DEACTIVATE path above, where it records
                     // what had focus so it can be given back. On the activate path - including the very

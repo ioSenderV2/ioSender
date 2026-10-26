@@ -332,7 +332,11 @@ namespace CNC.Controls
             else if (data == "ok")
                 read_status = false;
             else if (read_status)
-                Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, addData, data);
+                // This control's own dispatcher, not Application.Current's: these two are called from
+                // comms data arrival, which keeps delivering while the application shuts down, and
+                // Application.Current is null by then. Cost a startup in JobView.Activate on
+                // 2026-10-25; same pattern, so fixed here too rather than left to be found later.
+                Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, addData, data);
         }
 
         private void PlotSGValue(int value, int value2)
@@ -395,7 +399,7 @@ namespace CNC.Controls
                 int v1 = int.Parse(sg_result[0]);
                 int v2 = sg_result.Length == 2 ? int.Parse(sg_result[1]) : -1;
 
-                Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new System.Action(() => PlotSGValue(v1, v2)));
+                Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new System.Action(() => PlotSGValue(v1, v2)));
             }
         }
     }

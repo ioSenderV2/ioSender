@@ -960,7 +960,26 @@ namespace GCode_Sender
             {
                 System.Threading.Thread.Sleep(50);
                 Comms.com.PurgeQueue();
-                UIViewModel.CurrentView.Activate(true, ViewType.Startup);
+                // LOG AND CARRY ON, rather than let the connect path abort the rest of startup. What
+                // follows this block is not optional: the key hooks, the global shortcut dispatcher, the
+                // tab shortcuts and the console restore. On 2026-10-25 an NRE in here took all of them
+                // out, and the result was not a dead process but a worse thing - a window that stayed up
+                // and kept polling with no keyboard handling at all, holding the single-instance lock, so
+                // every later launch quietly forwarded to it and exited. A connect that fails is survivable;
+                // a half-initialised application that looks like it will not start is not.
+                try
+                {
+                    UIViewModel.CurrentView.Activate(true, ViewType.Startup);
+                }
+                catch (System.Exception e)
+                {
+                    DebugLog.Write("connect", "CompleteStartup: Activate THREW - " + e.GetType().Name + ": " + e.Message
+                                            + " - carrying on so the window is still usable\n" + e.StackTrace);
+                    ConsoleLog.Write("[startup] the controller handshake failed with " + e.GetType().Name
+                                   + " - the window is up but this connection is not initialised; reconnect before running anything.");
+                    (DataContext as GrblViewModel).Message = "Startup handshake failed (" + e.GetType().Name
+                                                           + ") - reconnect before running anything.";
+                }
             }
 
             // Restore preserved console preferences
