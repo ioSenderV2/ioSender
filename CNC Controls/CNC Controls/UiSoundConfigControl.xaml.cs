@@ -109,6 +109,13 @@ namespace CNC.Controls
 
             Store(combo, cfg, string.IsNullOrEmpty(id) ? UiSounds.None : id);
             UpdateChosenText();
+
+            // PLAY WHAT WAS JUST CHOSEN. This replaced a Test button per row, at the user's request
+            // 2026-10-26: picking from a list of nine sounds whose names you do not know is exactly
+            // when you want to hear one, and a button you must press afterwards is a second step for
+            // something that has only one sensible outcome. None is silence, by definition.
+            if (!string.IsNullOrEmpty(id) && id != UiSounds.None)
+                UiSounds.Play(id);
         }
 
         /// <summary>
@@ -169,36 +176,6 @@ namespace CNC.Controls
             txtChosen.Text = "Limit: " + UiSounds.Describe(cfg.SoundOnLimit)
                            + "    Probe: " + UiSounds.Describe(cfg.SoundOnProbe)
                            + "    Alarm: " + UiSounds.Describe(cfg.SoundOnAlarm);
-        }
-
-        private void TestLimit_Click(object sender, RoutedEventArgs e) { Test(cboLimit); }
-        private void TestProbe_Click(object sender, RoutedEventArgs e) { Test(cboProbe); }
-        private void TestAlarm_Click(object sender, RoutedEventArgs e) { Test(cboAlarm); }
-
-        /// <summary>
-        /// Play what this row is set to. Says so when there is nothing to play, rather than leaving
-        /// the operator pressing a button that appears to do nothing - the difference between "None"
-        /// and "the file is gone" is exactly what a Test button is for.
-        /// </summary>
-        private void Test(ComboBox combo)
-        {
-            string id = combo?.SelectedValue as string;
-
-            if (string.IsNullOrEmpty(id) || id == UiSounds.None)
-            {
-                AppDialogs.Show("That event is set to None, so there is nothing to play.", "ioSender",
-                                MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            if (UiSounds.ResolveFile(id) == null)
-            {
-                AppDialogs.Show("That sound file cannot be found, so this event would be silent:\n\n" + id,
-                                "ioSender", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            UiSounds.Play(id);
         }
 
         /// <summary>Back to factory: silence, as the sibling panels' own ResetToDefaults do.</summary>

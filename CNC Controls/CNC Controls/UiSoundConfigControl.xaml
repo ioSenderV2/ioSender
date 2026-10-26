@@ -16,11 +16,10 @@
     <GroupBox x:Uid="grp_uiSound" Header="Sound" Margin="5">
         <StackPanel Margin="5">
             <TextBlock x:Uid="lbl_soundIntro" Margin="5,0,0,0" TextWrapping="Wrap" Opacity="0.75"
-                       Text="Pick a sound for the things worth hearing about while you are looking at the work instead of the screen. Each one plays when the state arrives - not while it stays - so a switch that stays closed sounds once, not continuously."/>
+                       Text="Pick a sound for the things worth hearing about while you are looking at the work instead of the screen. Each one plays when the state arrives - not while it stays - so a switch that stays closed sounds once, not continuously. Choosing from a list plays it straight away, so you can hear what you are picking."/>
 
             <Grid Margin="24,10,0,0">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
@@ -40,8 +39,6 @@
                            ItemsSource="{Binding Source={x:Static local:UiSounds.Items}}"
                            DisplayMemberPath="Label" SelectedValuePath="Id"
                            SelectionChanged="Sound_SelectionChanged"/>
-                <Button    x:Uid="btn_soundTestLimit" Grid.Row="1" Grid.Column="2" Content="Test" Margin="0,0,0,4" Padding="12,2"
-                           Click="TestLimit_Click" ToolTip="Play the chosen sound now."/>
 
                 <TextBlock x:Uid="lbl_soundRowProbe" Grid.Row="2" Grid.Column="0" Text="The probe or tool setter touches" Margin="0,0,18,4" VerticalAlignment="Center"
                            ToolTip="The probe input asserting - whichever of the P and T lamps is lit for it, since both report the same input and which one lights depends on where the probe is currently routed."/>
@@ -49,8 +46,6 @@
                            ItemsSource="{Binding Source={x:Static local:UiSounds.Items}}"
                            DisplayMemberPath="Label" SelectedValuePath="Id"
                            SelectionChanged="Sound_SelectionChanged"/>
-                <Button    x:Uid="btn_soundTestProbe" Grid.Row="2" Grid.Column="2" Content="Test" Margin="0,0,0,4" Padding="12,2"
-                           Click="TestProbe_Click" ToolTip="Play the chosen sound now."/>
 
                 <TextBlock x:Uid="lbl_soundRowAlarm" Grid.Row="3" Grid.Column="0" Text="The machine goes into alarm" Margin="0,0,18,4" VerticalAlignment="Center"
                            ToolTip="The controller entering the alarm state - the motors are disabled and it will not take commands until it is unlocked."/>
@@ -58,8 +53,6 @@
                            ItemsSource="{Binding Source={x:Static local:UiSounds.Items}}"
                            DisplayMemberPath="Label" SelectedValuePath="Id"
                            SelectionChanged="Sound_SelectionChanged"/>
-                <Button    x:Uid="btn_soundTestAlarm" Grid.Row="3" Grid.Column="2" Content="Test" Margin="0,0,0,4" Padding="12,2"
-                           Click="TestAlarm_Click" ToolTip="Play the chosen sound now."/>
             </Grid>
 
             <TextBlock x:Uid="lbl_soundChosen" x:Name="txtChosen" Margin="24,8,0,0" TextWrapping="Wrap" Opacity="0.75"/>

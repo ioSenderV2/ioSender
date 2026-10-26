@@ -203,20 +203,44 @@ namespace CNC.Controls
         /// status-report handler, so an exception here would surface as the app falling over while
         /// the machine is moving.
         /// </summary>
+        /// <remarks>
+        /// PLAYSYNC, ON ITS OWN THREAD - and the SoundPlayer must stay reachable for the whole
+        /// sound, which is the entire reason this is not three lines.
+        ///
+        /// The first version called Play() on a SoundPlayer held in a local. Play() is asynchronous:
+        /// it hands the buffer to Windows and returns at once, the local goes out of scope
+        /// immediately, and when the player is finalised it tears that buffer down - cutting the
+        /// sound off a few milliseconds in. Reported 2026-10-26 as "a really faint tink, like the
+        /// speaker on the motherboard", with the same files playing fine from the Windows Sound app.
+        /// That is not a quiet sound, it is a TRUNCATED one, and nothing about the call looks wrong.
+        ///
+        /// So: a short-lived background thread, where the player stays rooted on that thread's stack
+        /// until PlaySync returns. The UI thread is not held - which was the real requirement - and
+        /// the sound gets to finish. IsBackground so a long sample can never keep the app alive at
+        /// exit.
+        /// </remarks>
         public static void Play(string setting)
         {
             string path = ResolveFile(setting);
             if (path == null)
                 return;
 
-            try
+            var worker = new System.Threading.Thread(() =>
             {
-                // Play, not PlaySync: PlaySync holds the calling thread until the sound finishes,
-                // and the caller is the UI thread handling a status report.
-                var player = new SoundPlayer(path);
-                player.Play();
-            }
-            catch { }
+                try
+                {
+                    var player = new SoundPlayer(path);
+                    player.PlaySync();
+                }
+                catch { }   // an unreadable or malformed wav is silence, never an exception on a status report
+            })
+            {
+                IsBackground = true,
+                Name = "ioSender UI sound"
+            };
+
+            try { worker.Start(); }
+            catch { }       // out of threads: still not a reason to fall over
         }
     }
 }
