@@ -151,10 +151,29 @@ G38.2 Z-[#<_tlo_seekd>] F500
 ; itself (motion_control.c), so unlike a queued G0/G1 the parser cannot race past a G38.2. That is
 ; why the existing read below has always worked. Do NOT copy this reasoning to a read that follows
 ; ordinary motion - see pcorner.macro's probe-release gate for what happens then.
-#<_tlo_seek_z> = #5063
+; MACHINE Z, NOT #5063 AS IT STANDS. #5061-#5069 return the probe position with the G5x offset of the
+; coordinate system that was ACTIVE WHEN THE PROBE RAN already subtracted (grblHAL ngc_params.c,
+; probe_coord) - and nothing else: not G92, not the tool length offset. This macro probes with G59.3
+; selected, so #5063 comes back in the G59.3 work frame, and #5383 is G59.3's own Z offset. Adding it
+; back cancels it identically and leaves a pure machine Z.
+;
+; Why that matters, 2026-10-26: #<_probe_z> is compared against #<_tlo_ref>, which the sender fills
+; from its stored TloRefBaseline - and that is a MACHINE Z. The two agreed only while G59.3's Z offset
+; happened to be 0, which is exactly how this read correctly for months; that offset has been both
+; 0.000 and -42.000 inside one week on this machine, and at -42 the G43.1 below would have been out by
+; 42 mm. The same single number also feeds MacroProcessor.EmitTloSeekDepth, which measures it against
+; G59.3's machine Z offset to derive the seek depth, so there was never a frame that satisfied both.
+;
+; So the rule is now: EVERY Z this macro stores or publishes is a MACHINE Z, and the result does not
+; depend on G59.3's offsets at all. Do not "simplify" these back to a bare #5063.
+;
+; The seek/latch pair below would have been safe either way - it is a DIFFERENCE, so the offset
+; cancels - but both are converted so the numbers that reach the log are machine Zs and can be read
+; straight against MPos and against the stored baseline.
+#<_tlo_seek_z> = [#5063 + #5383]
 G0 Z2
 G38.2 Z-5 F25
-#<_probe_z> = #5063
+#<_probe_z> = [#5063 + #5383]
 ; 0.3 mm: above the worst healthy gap measured (0.143) by 2x, below the best false one (0.411) by 1.4x.
 o160 IF [ABS[[#<_probe_z> - #<_tlo_seek_z>]] GT 0.3]
   (PRINT, TLO05 PROBE REJECTED seek=#<_tlo_seek_z> latch=#<_probe_z>)

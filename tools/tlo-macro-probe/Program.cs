@@ -283,30 +283,57 @@ static class TloMacroProbe
     /// </summary>
     static bool SetPark(GrblViewModel model, double z, out double readBack, out string note)
     {
-        Clear();
         string cmd = "G10 L2 P9 X0 Y0 Z" + z.ToString("0.###", CultureInfo.InvariantCulture);
-        Comms.com.WriteCommand(cmd);
-        Thread.Sleep(300);
-        string wrote = Transcript();            // an error: here must never be invisible
-
         readBack = double.NaN;
-        int reads = 0;
-        string csNote = "no G59.3 row";
-        for (; reads < 3; reads++)
+        note = "";
+
+        // REQUIRE THE OK, and retry. Sending this straight after a macro that ended in (ABORT, ...)
+        // failed once with "error:253", which is Status_UserException - the MACRO'S OWN abort reply
+        // arriving late, not a rejection of this G10. The abort flushes the input buffer, so the write
+        // was discarded and got no ok of its own, while the stale 253 landed in the transcript and
+        // read as a refusal of a command the controller had never seen.
+        //
+        // The missing ok is the tell. Draining first and then demanding an ok that is not an error is
+        // what separates "the controller refused this" from "the controller never got this".
+        for (int attempt = 1; attempt <= 3; attempt++)
         {
-            GrblWorkParameters.Get(model);
-            var cs = GrblWorkParameters.GetCoordinateSystem("G59.3");
-            if (cs != null)
-                csNote = "G59.3 row present, " + cs.Values.Length + " value(s)";
-            readBack = cs == null ? double.NaN : cs.Values[2];
-            if (!double.IsNaN(readBack) && Math.Abs(readBack - z) < 0.0005)
-                break;
-            Thread.Sleep(250);
+            string ready;
+            EnsureReady(model, out ready);
+
+            Clear();                                   // drop anything still arriving from before
+            Thread.Sleep(400);
+            Clear();
+
+            Comms.com.WriteCommand(cmd);
+            Thread.Sleep(400);
+            string wrote = Transcript();
+
+            bool acked = wrote.IndexOf("ok", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                         wrote.IndexOf("error", StringComparison.OrdinalIgnoreCase) < 0;
+
+            string csNote = "no G59.3 row";
+            int reads = 0;
+            for (; reads < 3; reads++)
+            {
+                GrblWorkParameters.Get(model);
+                var cs = GrblWorkParameters.GetCoordinateSystem("G59.3");
+                if (cs != null)
+                    csNote = "G59.3 row present, " + cs.Values.Length + " value(s)";
+                readBack = cs == null ? double.NaN : cs.Values[2];
+                if (!double.IsNaN(readBack) && Math.Abs(readBack - z) < 0.0005)
+                    break;
+                Thread.Sleep(250);
+            }
+
+            note = cmd + " -> " + wrote + "; " + ready + "; " + csNote + "; reads " + Num(readBack)
+                 + " after " + (reads + 1) + " $# fetch(es)"
+                 + (attempt > 1 ? "; attempt " + attempt : "");
+
+            if (acked && !double.IsNaN(readBack) && Math.Abs(readBack - z) < 0.0005)
+                return true;
         }
 
-        note = cmd + " -> " + wrote + "; " + csNote + "; reads " + Num(readBack)
-             + " after " + (reads + 1) + " $# fetch(es)";
-        return !double.IsNaN(readBack) && Math.Abs(readBack - z) < 0.0005;
+        return false;
     }
 
     /// <summary>
@@ -581,6 +608,56 @@ static class TloMacroProbe
         else
             Skip("the seek/latch agreement gate",
                  "the simulated probe produced " + prbs.Count + " PRB report(s), two are needed");
+
+        // ---- the FRAME: is the Z the macro publishes a MACHINE Z? -------------------------------
+        // Every arm above ran with G59.3's Z offset at 0, where a work Z and a machine Z are THE SAME
+        // NUMBER - so none of them can tell the two apart, and tlo.macro's #5063 + #5383 conversion is
+        // a no-op in all of them. A test that cannot fail when the thing under test is wrong is not a
+        // test, so this moves the park to -42 (a value G59.3 really has held on this machine, inside
+        // the same week as 0.000) and makes the two frames differ by exactly 42 mm.
+        //
+        // The assertion compares what the MACRO published against the machine Z in the controller's
+        // OWN [PRB:] report - two numbers from the same run, so wherever the simulated probe happens
+        // to trigger is irrelevant. A bare #5063 would come back 42 mm out, and since #<_probe_z> is
+        // differenced against the stored TloRefBaseline (a machine Z), that 42 mm would land directly
+        // in the G43.1 tool length offset.
+        Console.WriteLine("\nthe frame - G59.3 moved to -42 so work and machine Z differ by 42mm:");
+        bool moved = SetPark(model, -42d, out readBack, out note);
+        Check(moved, "G59.3 Z offset moved to -42 and re-read through $#", note);
+
+        if (moved)
+        {
+            double emitted42;
+            string line42 = EmittedLine(-122.473, out emitted42);
+            double used42 = CallMacro(model, line42, out transcript, out ran);
+
+            // 90.473 by hand: -42 - (-122.473 - 10). Proves the park is read, and keeps this run's seek
+            // honest rather than reusing a depth derived for a different park.
+            Check(!double.IsNaN(used42) && Math.Abs(used42 - 90.473) < 0.0005,
+                  "the seek depth follows the moved park (90.473, not 132.473)",
+                  "macro used " + Num(used42));
+
+            var prb = Regex.Matches(transcript, @"\[PRB:[-0-9.]+,[-0-9.]+,(-?[0-9.]+):1\]");
+            var rejected = Regex.Match(transcript, @"TLO05 PROBE REJECTED seek=(-?[0-9.]+) latch=(-?[0-9.]+)");
+            var accepted = Regex.Match(transcript, @"TLO04 probe_z=(-?[0-9.]+)");
+
+            if (prb.Count == 0 || (!rejected.Success && !accepted.Success))
+                Skip("the macro publishes a MACHINE Z",
+                     "this run produced no [PRB:..:1] and published Z pair to compare - "
+                     + "nothing was recording the thing under test, so this is not a pass");
+            else
+            {
+                double prbMachineZ = double.Parse(prb[prb.Count - 1].Groups[1].Value, CultureInfo.InvariantCulture);
+                double published = rejected.Success
+                    ? double.Parse(rejected.Groups[2].Value, CultureInfo.InvariantCulture)
+                    : double.Parse(accepted.Groups[1].Value, CultureInfo.InvariantCulture);
+
+                Check(Math.Abs(published - prbMachineZ) < 0.0005,
+                      "the macro's published Z is the controller's [PRB:] MACHINE Z, not the work Z",
+                      "published " + Num(published) + ", PRB machine Z " + Num(prbMachineZ)
+                      + ", a bare #5063 would have read " + Num(prbMachineZ + 42d));
+            }
+        }
 
         // ---- what was observed but is NOT asserted ----------------------------------------------
         Console.WriteLine("\nobserved, not asserted:");

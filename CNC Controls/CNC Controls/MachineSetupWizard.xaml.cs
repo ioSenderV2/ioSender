@@ -1951,6 +1951,9 @@ namespace CNC.Controls
             b.AppendLine("G0 Z10");
             b.AppendLine("G90");
             b.AppendLine(string.Format(GrblCommand.ProbeSelect, 0));
+            // Flat parentheses, no nesting: a NESTED paren silently kills a grblHAL PRINT comment, which is
+            // how tlo.macro's touch-plate TLO03 print stayed dead in exactly the branch that was failing.
+            b.AppendLine("(TLOREF_Z below is a WORK Z and is only the success signal - the stored baseline is the machine Z from PRB)");
             b.AppendLine("(PRINT, TLOREF_Z=#<_probe_z>)");
             // Only reached when the probe touched - an alarm ends the program above this line.
             MacroProcessor.EmitWcsWrite(l => b.AppendLine(l), string.Format(CultureInfo.InvariantCulture,
@@ -2016,7 +2019,9 @@ namespace CNC.Controls
                 UpdateReferencePositions();
                 RefreshStoredPositionsAfterWrite();
                 RefreshStepColors();
-                model.Message = "Target surface, tool-length baseline and G59.3 all set from one probe.";
+                model.Message = string.Format(
+                    "Target surface, tool-length baseline and G59.3 all set from one probe: machine Z {0:0.0##} mm.",
+                    model.ProbePosition.Z);
             };
             model.PropertyChanged += doneHandler;
 
@@ -2716,6 +2721,9 @@ namespace CNC.Controls
             b.AppendLine("G0 Z10");
             b.AppendLine("G90");
             b.AppendLine(string.Format(GrblCommand.ProbeSelect, 0));
+            // Flat parentheses, no nesting: a NESTED paren silently kills a grblHAL PRINT comment, which is
+            // how tlo.macro's touch-plate TLO03 print stayed dead in exactly the branch that was failing.
+            b.AppendLine("(TLOREF_Z below is a WORK Z and is only the success signal - the stored baseline is the machine Z from PRB)");
             b.AppendLine("(PRINT, TLOREF_Z=#<_probe_z>)");
             b.AppendLine("G53 G0 Z-5");
             b.AppendLine("G53 G0 X#5181 Y#5182");
@@ -2767,7 +2775,13 @@ namespace CNC.Controls
                         AppConfig.Settings.Base.TloRefBaseline = model.ProbePosition.Z;
                         AppConfig.Settings.Save();
                         UpdateTloRefValueDisplay();
-                        model.Message = "TLO baseline referenced.";
+                        // SAY THE NUMBER THAT WAS STORED. The program's own TLOREF_Z print is #5063, a WORK
+                        // Z, and it is kept only as the "the program reached its print" signal - so after the
+                        // frame fix the console shows one number and the config holds another. That is
+                        // exactly how this bug stayed invisible: a run printed 65.471, looked like a pass,
+                        // and nothing on screen was the value anything downstream would actually use.
+                        model.Message = string.Format("TLO baseline referenced: machine Z {0:0.0##} mm.",
+                                                      model.ProbePosition.Z);
                     }
                     else
                         model.Message = "Reference TLO failed or alarmed - baseline not changed.";
