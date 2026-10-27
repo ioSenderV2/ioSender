@@ -1663,8 +1663,33 @@ namespace CNC.Controls
             // as a result. Showing only the first would leave the operator no confirmation that the part
             // with consequences for every tool change actually landed.
             double surface = AppConfig.Settings.Base.TloSurfaceZ;
+
+            // THE TWO STORED NUMBERS FOR THIS ONE SURFACE MUST AGREE, AND SAY SO WHEN THEY DO NOT.
+            // TloSurfaceZ and TloRefBaseline are both the machine Z of the same plate top, written by
+            // different buttons - and before 2026-10-27 only one of them refreshed the surface, so they
+            // drifted 19.5 mm apart (baseline -123.211, surface still -142.671) with nothing on screen
+            // saying anything was wrong.
+            //
+            // It is the SURFACE that guards a missed trigger: ComputeTloSearchDistance uses
+            // originZ - surface - 2, and a surface that is stale and too LOW inflates the seek past the
+            // plate and into whatever is under it. A disagreement here is the only cheap, non-circular
+            // signal of that - the surface cannot check itself, but a second measurement of the same
+            // thing can check it.
+            //
+            // A WARNING, NOT A REFUSAL, deliberately: re-probing is what clears this, and the run that
+            // clears it is itself computed from the stale value. A gate that blocked it would be a guard
+            // that cannot be cleared - see pcorner's auto-retract deadlock for that exact mistake.
+            double baseline = AppConfig.Settings.Base.TloRefBaseline;
+            bool bothKnown = surface != 0d && baseline != 0d;
+            double disagreement = bothKnown ? Math.Abs(surface - baseline) : 0d;
+
             txtTloSurfaceValue.Text = (surface == 0d ? "top not set" : "top Z" + surface.ToString("0.0", CultureInfo.CurrentCulture))
-                                    + "   G59.3 " + DescribeStoredPosition("G59.3");
+                                    + "   G59.3 " + DescribeStoredPosition("G59.3")
+                                    + (disagreement > 1d
+                                        ? string.Format(CultureInfo.CurrentCulture,
+                                            "   STALE - disagrees with the tool-length baseline ({0:0.0##}) by {1:0.0##} mm; re-probe",
+                                            baseline, disagreement)
+                                        : "");
 
             // Placing G30 relative to G59.3 needs G59.3 to exist.
             var g593known = GrblWorkParameters.GetCoordinateSystem("G59.3");
@@ -1689,10 +1714,19 @@ namespace CNC.Controls
 
             double search = ComputeTloSearchDistance(ProbeDefinitions.TloTarget);
             if (txtTloSearchValue != null)
-                txtTloSearchValue.Text = search > 0d
-                    ? string.Format(CultureInfo.CurrentCulture,
-                        "Tool-length probe searches up to {0:0.#} mm down - far enough to reach the target, stopping 2 mm above the surface if nothing triggers.", search)
-                    : "Tool-length probe searches a fixed 90 mm down. Set the target surface above and it becomes a real limit instead of a guess.";
+                // The "stopping 2 mm above the surface" half of this is a PROMISE ABOUT THE SURFACE, so a
+                // stale surface voids it - and stating it anyway is worse than saying nothing, because it
+                // is read as the reassurance that makes the descent safe to start. On 2026-10-27 that line
+                // claimed a 2 mm standoff while the arithmetic had the seek passing 17.5 mm BELOW the
+                // plate top. Never print a safety property that the current inputs do not support.
+                txtTloSearchValue.Text = search <= 0d
+                    ? "Tool-length probe searches a fixed 90 mm down. Set the target surface above and it becomes a real limit instead of a guess."
+                    : disagreement > 1d
+                        ? string.Format(CultureInfo.CurrentCulture,
+                            "Tool-length probe searches up to {0:0.#} mm down - but that comes off a target surface that disagrees with the baseline by {1:0.0##} mm, so the 2 mm standoff is NOT reliable. Re-probe the target before trusting it.",
+                            search, disagreement)
+                        : string.Format(CultureInfo.CurrentCulture,
+                            "Tool-length probe searches up to {0:0.#} mm down - far enough to reach the target, stopping 2 mm above the surface if nothing triggers.", search);
         }
 
         private static string DescribeStoredPosition(string code)
@@ -2800,16 +2834,54 @@ namespace CNC.Controls
                     // "the program really did reach its print" signal.
                     if (!alarmed && reachedPrint && model.IsProbeSuccess)
                     {
-                        AppConfig.Settings.Base.TloRefBaseline = model.ProbePosition.Z;
+                        double touchZ = model.ProbePosition.Z;
+                        AppConfig.Settings.Base.TloRefBaseline = touchZ;
+
+                        // AND THE SURFACE, from the same touch. These are two stored numbers for ONE
+                        // physical surface, and until 2026-10-27 only ProbeTloTarget_Click refreshed the
+                        // surface - so referencing HERE moved the baseline and left the surface on a
+                        // previous fixture's value. Measured that day: baseline -123.211 against a surface
+                        // still reading -142.671. 19.5 mm apart, describing the same plate top.
+                        //
+                        // That is not cosmetic, because the surface is the MISS GUARD.
+                        // ComputeTloSearchDistance builds the seek as originZ - surface - 2, and that 2 mm
+                        // is the only thing between a disconnected plate and the spoilboard. The stale
+                        // surface inflated the seek to 140.671 against a plate top at -123.192, so a probe
+                        // that failed to trigger would have gone 17.5 mm BELOW the plate instead of
+                        // stopping 2 mm above it - while the page said, in as many words, "stopping 2 mm
+                        // above the surface if nothing triggers". A guard whose datum can go stale behind
+                        // it is not a guard.
+                        //
+                        // This probe just touched that exact surface, so the two are the same number by
+                        // construction now rather than by someone remembering to press both buttons.
+                        //
+                        // PLATE ONLY, matching the sibling writer: its button lives inside the "Target
+                        // surface" row, which UpdateReferencePositions HIDES for a dedicated toolsetter,
+                        // so TloSurfaceZ has only ever been a plate concept. Writing it unconditionally
+                        // would switch toolsetter machines from the conservative 90 literal to a derived
+                        // seek, which is a behaviour change nobody asked for.
+                        if (usingPlate)
+                            AppConfig.Settings.Base.TloSurfaceZ = touchZ;
+
                         AppConfig.Settings.Save();
+
                         UpdateTloRefValueDisplay();
+                        // The surface readout and the "searches up to N mm down" line both come off
+                        // UpdateReferencePositions, and this handler never called it - so the number that
+                        // just changed would have carried on displaying its old value until the page was
+                        // rebuilt. RefreshStepColors because a surface going from unset to set completes
+                        // a step.
+                        UpdateReferencePositions();
+                        RefreshStepColors();
+
                         // SAY THE NUMBER THAT WAS STORED. The program's own TLOREF_Z print is #5063, a WORK
                         // Z, and it is kept only as the "the program reached its print" signal - so after the
                         // frame fix the console shows one number and the config holds another. That is
                         // exactly how this bug stayed invisible: a run printed 65.471, looked like a pass,
                         // and nothing on screen was the value anything downstream would actually use.
-                        model.Message = string.Format("TLO baseline referenced: machine Z {0:0.0##} mm.",
-                                                      model.ProbePosition.Z);
+                        model.Message = usingPlate
+                            ? string.Format("TLO baseline and target surface referenced: machine Z {0:0.0##} mm.", touchZ)
+                            : string.Format("TLO baseline referenced: machine Z {0:0.0##} mm.", touchZ);
                     }
                     else
                         model.Message = "Reference TLO failed or alarmed - baseline not changed.";
