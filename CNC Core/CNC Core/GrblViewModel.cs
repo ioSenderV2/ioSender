@@ -1783,7 +1783,21 @@ namespace CNC.Core
                         break;
 
                     case "MSG":
-                        var msg = data.Substring(5).Trim().TrimEnd(']');
+                        // ONE closing bracket, not every trailing one. TrimEnd(']') ate the PAYLOAD'S
+                        // own bracket whenever a message happened to end in one, which is exactly what
+                        // a g-code PRINT of a bracketed expression does:
+                        //
+                        //   on the wire   [MSG:TLO06 TLO APPLIED tlo=[-123.192 - -123.205]]
+                        //   in the console      TLO06 TLO APPLIED tlo=[-123.192 - -123.205
+                        //
+                        // Verified against latest_wire.log 2026-10-27 - the controller sent both
+                        // brackets and this line dropped one. Silent, and it corrupts the console
+                        // copy of precisely the diagnostic line someone reads when a probe goes
+                        // wrong, while the wire log looks fine. The last character is the wrapper's;
+                        // anything before it belongs to the message.
+                        var msg = data.Substring(5).Trim();
+                        if (msg.EndsWith("]", StringComparison.Ordinal))
+                            msg = msg.Substring(0, msg.Length - 1);
                         // Everything this case writes to Message came from the controller - tag
                         // the status log accordingly (reset below, same case, every path).
                         _messageSource = "firmware";

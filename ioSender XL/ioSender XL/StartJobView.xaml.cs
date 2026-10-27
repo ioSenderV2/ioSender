@@ -4114,8 +4114,16 @@ namespace GCode_Sender
             if (!setTloRef)
                 return rawZ;
 
-            L(string.Format("#<_ozw> = [{0} - {1}]", rawZ, ProbeTloExpr));
-            L("(PRINT, LS_ORIGIN_Z raw=" + rawZ + " tlo=" + ProbeTloExpr + " origin=#<_ozw>)");
+            // BOTH terms into parameters first, then print the PARAMETERS. A (PRINT, ..) substitutes on
+            // # but does not evaluate brackets, so the old form logged "tlo=[-123.192 - -123.205]" - the
+            // expression with its operands filled in, never the answer - and the applied offset is the
+            // number that decides whether this origin is right or cuts. Same fix as tlo.macro's TLO06;
+            // read its remark. Printing the parameters also means the logged terms are the ones the
+            // origin was actually computed from, not a second derivation that ought to match.
+            L("#<_ozraw> = " + rawZ);
+            L("#<_tlo_applied> = " + ProbeTloExpr);
+            L("#<_ozw> = [#<_ozraw> - #<_tlo_applied>]");
+            L("(PRINT, LS_ORIGIN_Z raw=#<_ozraw> tlo=#<_tlo_applied> origin=#<_ozw>)");
             return "[#<_ozw>]";
         }
 

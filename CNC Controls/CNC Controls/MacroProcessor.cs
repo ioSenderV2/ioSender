@@ -1455,8 +1455,14 @@ namespace CNC.Controls
         public static void EmitTloRestore(System.Action<string> L)
         {
             L("(--- restore the tool length offset the probe measured ---)");
-            L("G43.1 Z[#<_probe_z> - #<_tlo_ref>]");
-            L("(PRINT, LS_TLO_RESTORED tlo=[#<_probe_z> - #<_tlo_ref>])");
+            // Into a parameter first, then apply and print THAT - a (PRINT, ..) substitutes on # but
+            // does not evaluate brackets, so "tlo=[#<_probe_z> - #<_tlo_ref>]" logged the expression
+            // with its operands filled in and never the answer. Same fix as tlo.macro's TLO06; read
+            // its remark. Applying the parameter also makes the logged number the one G43.1 actually
+            // got, rather than a second derivation of it.
+            L("#<_tlo_applied> = [#<_probe_z> - #<_tlo_ref>]");
+            L("G43.1 Z#<_tlo_applied>");
+            L("(PRINT, LS_TLO_RESTORED tlo=#<_tlo_applied> probe_z=#<_probe_z> ref=#<_tlo_ref>)");
             L("#<_tlo_ref> = #<_tlo_saved>");
         }
 

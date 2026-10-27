@@ -393,7 +393,13 @@ static class TloMacroProbe
         return false;
     }
 
-    static double CallMacro(GrblViewModel model, string seekLine, out string transcript, out bool ran)
+    /// <param name="tloRef">
+    /// What to set #&lt;_tlo_ref&gt; to. "0" means "this tool BECOMES the reference", which is the o200 IF
+    /// arm - so every arm that passes 0 leaves the o200 ELSE arm, and its TLO06 print, unexercised.
+    /// Pass a real baseline to reach it.
+    /// </param>
+    static double CallMacro(GrblViewModel model, string seekLine, out string transcript, out bool ran,
+                            string tloRef = "0")
     {
         string ready;
         bool wasReady = EnsureReady(model, out ready);
@@ -405,7 +411,8 @@ static class TloMacroProbe
         // The pcorner convention: globals set before a no-arg CALL. #<_tc_touchplate> = 1 selects the
         // touch-plate branch, which is this machine's actual configuration since 2026-09 and is the
         // branch whose TLO03 print was silently dead until fabdb321.
-        var globals = new List<string> { "#<_tlo_toolid> = 1", "#<_tc_touchplate> = 1", "#<_tlo_ref> = 0" };
+        var globals = new List<string> { "#<_tlo_toolid> = 1", "#<_tc_touchplate> = 1",
+                                         "#<_tlo_ref> = " + tloRef };
         if (seekLine != null)
             globals.Add(seekLine);
 
@@ -657,6 +664,40 @@ static class TloMacroProbe
                       "published " + Num(published) + ", PRB machine Z " + Num(prbMachineZ)
                       + ", a bare #5063 would have read " + Num(prbMachineZ + 42d));
             }
+        }
+
+        // ---- the o200 ELSE arm: TLO06 must print a NUMBER ---------------------------------------
+        // Every arm above passes #<_tlo_ref> = 0, which takes o200's IF arm - "this tool BECOMES the
+        // reference" - so not one of them reaches the ELSE arm where an offset is actually APPLIED, and
+        // the TLO06 print sat there unexercised. It had been logging "tlo=[-123.192 - -123.205]": a
+        // (PRINT, ..) substitutes on # but does NOT evaluate brackets, so the applied tool length
+        // offset - the most consequential number this macro produces - was the one number never in the
+        // log, and every reading of it was somebody doing the subtraction by hand.
+        //
+        // The regex IS the assertion: a bracketed expression cannot match "tlo=<number>".
+        Console.WriteLine("\nthe o200 ELSE arm - TLO06 prints the APPLIED offset as a number:");
+        Check(SetPark(model, 0d, out readBack, out note), "G59.3 Z offset back to 0", note);
+
+        double emittedRef;
+        string lineRef = EmittedLine(-122.473, out emittedRef);
+        CallMacro(model, lineRef, out transcript, out ran, "-122.473");
+
+        var applied = Regex.Match(transcript,
+                                  @"TLO06 TLO APPLIED tlo=(-?[0-9.]+) probe_z=(-?[0-9.]+) ref=(-?[0-9.]+)");
+        if (!applied.Success)
+            Skip("TLO06 prints the applied offset as a number",
+                 transcript.IndexOf("TLO06", StringComparison.Ordinal) >= 0
+                    ? "TLO06 printed but NOT as a number - " + transcript
+                    : "the macro never reached TLO06: this simulator's probe pair disagrees, so the "
+                      + "agreement gate aborts first. Verify on hardware, where the pair agrees to 0.150mm.");
+        else
+        {
+            double tlo = double.Parse(applied.Groups[1].Value, CultureInfo.InvariantCulture);
+            double pz = double.Parse(applied.Groups[2].Value, CultureInfo.InvariantCulture);
+            double rf = double.Parse(applied.Groups[3].Value, CultureInfo.InvariantCulture);
+            Check(Math.Abs(tlo - (pz - rf)) < 0.0005,
+                  "TLO06's offset is a number, and equals probe_z - ref",
+                  "tlo " + Num(tlo) + " vs " + Num(pz) + " - " + Num(rf) + " = " + Num(pz - rf));
         }
 
         // ---- what was observed but is NOT asserted ----------------------------------------------

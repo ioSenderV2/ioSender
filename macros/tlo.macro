@@ -217,8 +217,20 @@ o200 IF [#<_tlo_ref> EQ 0]
   #<_tlo_ref> = #<_probe_z>
   (PRINT, TLO05 TLO REF SET ref=#<_tlo_ref>)
 o200 ELSE
-  G43.1 Z[#<_probe_z> - #<_tlo_ref>]
-  (PRINT, TLO06 TLO APPLIED tlo=[#<_probe_z> - #<_tlo_ref>])
+  ; COMPUTE IT INTO A PARAMETER, THEN APPLY AND PRINT THAT PARAMETER.
+  ;
+  ; (PRINT, ..) substitutes on # but does NOT evaluate brackets, so the old
+  ; "tlo=[#<_probe_z> - #<_tlo_ref>]" printed the EXPRESSION with its operands filled in -
+  ; "tlo=[-123.192 - -123.205]" - and never the answer. The applied tool length offset is the
+  ; most consequential number this macro produces and it was the one number not in the log;
+  ; every reading of it this far has been somebody doing the subtraction by hand.
+  ;
+  ; Applying the parameter rather than re-writing the expression also means the number PRINTED is
+  ; by construction the number G43.1 received, instead of a second derivation that merely ought to
+  ; agree with it. The operands stay on the line because a wrong offset is diagnosed from them.
+  #<_tlo_applied> = [#<_probe_z> - #<_tlo_ref>]
+  G43.1 Z#<_tlo_applied>
+  (PRINT, TLO06 TLO APPLIED tlo=#<_tlo_applied> probe_z=#<_probe_z> ref=#<_tlo_ref>)
 o200 ENDIF
 
 ; $TLR - the REAL grblHAL system command that commits the tool length reference to the controller's
