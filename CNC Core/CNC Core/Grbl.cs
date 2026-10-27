@@ -899,6 +899,14 @@ namespace CNC.Core
         public static string DriverSha { get; private set; } = string.Empty;
         public static string Options { get; private set; } = string.Empty;
         public static string NewOptions { get; private set; } = string.Empty;
+        // $I's [DRIVER:..] and [DRIVER VERSION:..]. Captured because nothing at connect could answer
+        // "WHICH build am I talking to?": [VER:] is the grbl CORE version, which is identical across
+        // every build of a given core, and these two lines fell through to SystemInfo where nothing
+        // read them. On the simulator that question is the common one - it is the thing being rebuilt -
+        // and its driver version now carries its build stamp (YYYYMMDD.HHMMSS) rather than a frozen
+        // literal, so this is what distinguishes one simulator binary from another.
+        public static string Driver { get; private set; } = string.Empty;
+        public static string DriverVersion { get; private set; } = string.Empty;
         public static string TrinamicDrivers { get; private set; } = string.Empty;
         public static int SerialBufferSize { get; private set; } = 128;
         public static int PlanBufferSize { get; private set; } = 16;
@@ -1163,6 +1171,12 @@ namespace CNC.Core
 
             PollGrbl.Suspend();
             SystemInfo.Clear();
+
+            // CLEARED PER $I, not left to be overwritten. A controller that does not report these lines
+            // would otherwise leave the PREVIOUS controller's values standing - and switching between
+            // the real machine and the simulator inside one session is routine here, which is exactly
+            // the case where a stale driver version is read as the truth about what is connected.
+            Driver = DriverVersion = string.Empty;
 
             // Not Silent: the $I/$IE response is the controller's initial "who am I" reply at connect -
             // show it in the console rather than hiding it as boilerplate (was model.Silent = true; see
@@ -1654,6 +1668,19 @@ namespace CNC.Core
 
                     case "FIRMWARE":
                         Firmware = valuepair[1];
+                        SystemInfo.Add(data);
+                        break;
+
+                    case "DRIVER":
+                        Driver = valuepair[1];
+                        SystemInfo.Add(data);
+                        break;
+
+                    case "DRIVER VERSION":
+                        // valuepair[1] only, which is why the simulator's build stamp is COLON-FREE:
+                        // the split above is on every colon in the line, so a "15:46:18" would arrive
+                        // here as "Oct 27 2026 15". grbl's own driver versions are colon-free too.
+                        DriverVersion = valuepair[1];
                         SystemInfo.Add(data);
                         break;
 

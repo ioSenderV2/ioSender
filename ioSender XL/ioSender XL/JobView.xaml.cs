@@ -924,6 +924,21 @@ namespace GCode_Sender
                 GrblInfo.Build > 0 ? " build " + GrblInfo.Build : string.Empty,
                 caps));
 
+            // WHICH BUILD, on its own line. The line above cannot answer it: GrblInfo.Version and Build
+            // are the grbl CORE version, identical across every binary built from a given core - so
+            // connecting to a freshly built simulator logged "1.1f.20260602 build 20260602" exactly as
+            // the previous one had, and there was no way from the console to tell them apart. Asked on
+            // 2026-10-27 after a connect, and neither this line nor $I could answer it.
+            //
+            // The simulator now reports its build stamp as its driver version (YYYYMMDD.HHMMSS), so this
+            // is the line that distinguishes one simulator binary from the next. On a real board the
+            // driver version is a driver revision, which is worth seeing here for the same reason.
+            if (!string.IsNullOrWhiteSpace(GrblInfo.Driver) || !string.IsNullOrWhiteSpace(GrblInfo.DriverVersion))
+                model.LogDetail(string.Format("- driver: {0}{1}",
+                    string.IsNullOrWhiteSpace(GrblInfo.Driver) ? "(not reported)" : GrblInfo.Driver,
+                    string.IsNullOrWhiteSpace(GrblInfo.DriverVersion) ? string.Empty
+                                                                      : " version " + GrblInfo.DriverVersion));
+
             // An alarm latched before we connected is not reported anywhere else at connect time, and it
             // blocks g-code AND filesystem access ($F answers error:79) until it is cleared - which reads
             // as "the ATC macros are missing" rather than "the machine is in alarm".
