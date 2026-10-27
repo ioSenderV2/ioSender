@@ -1318,13 +1318,35 @@ namespace CNC.Controls
         /// and lets the macro fall back to its own conservative literal - an unknown must not be turned into
         /// a confident deep plunge.
         /// </remarks>
+        /// <summary>
+        /// How much SHORTER than the referenced tool a tool may be and still be found, in mm. Beyond this
+        /// the seek gives up (Alarm 5) rather than descending further, because on the current setup there
+        /// is only about 15 mm between the plate's surface and the table it stands on.
+        /// </summary>
+        /// <remarks>
+        /// SHARED, deliberately. The Machine Setup page derives the same descent for its own Reference TLO
+        /// program (MachineSetupWizard.ComputeTloSearchDistance) and the two must bound a miss identically:
+        /// they are the same probe against the same plate, differing only in who emits the g-code. Two
+        /// copies of this number is how the seek came to be wrong three times already - and the previous
+        /// divergence was worse than a wrong value, because the page was still subtracting a standoff from
+        /// a stored Z whose MEANING had changed under it, which put its seek 2 mm SHORT of the trigger and
+        /// made the probe refuse in mid-air every time.
+        ///
+        /// Raise this to cover a wider range of tool lengths without re-referencing, at the cost of a
+        /// deeper descent when nothing triggers: a miss bottoms out this far past the reference tool's
+        /// trigger point. Measured 2026-10-27, a 1/4in probing pin and a 1/4in endmill differed by
+        /// 14.58 mm, so 10 does NOT cover swapping between those two without a re-reference - which is a
+        /// refusal, not a crash, and is the side to err on.
+        /// </remarks>
+        public const double ShortToolAllowance = 10d;
+
+        /// <summary>Never seek into the last 5 mm of Z travel. Shared with the page, as above.</summary>
+        public const double EnvelopeMargin = 5d;
+
         public static void EmitTloSeekDepth(System.Action<string> L, double baseline)
         {
-            // How much SHORTER than the referenced tool a tool may be and still be found. Beyond this the
-            // seek gives up (Alarm 5) rather than descending further, because on the current setup there is
-            // only about 15mm between the plate's surface and the table it stands on.
-            const double shortToolAllowance = 10d;
-            const double envelopeMargin = 5d;      // never seek into the last 5mm of Z travel
+            double shortToolAllowance = ShortToolAllowance;
+            double envelopeMargin = EnvelopeMargin;
 
             if (baseline == 0d)
                 return;                            // never referenced - nothing to derive from

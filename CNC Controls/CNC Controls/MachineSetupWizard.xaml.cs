@@ -1664,20 +1664,24 @@ namespace CNC.Controls
             // with consequences for every tool change actually landed.
             double surface = AppConfig.Settings.Base.TloSurfaceZ;
 
-            // THE TWO STORED NUMBERS FOR THIS ONE SURFACE MUST AGREE, AND SAY SO WHEN THEY DO NOT.
-            // TloSurfaceZ and TloRefBaseline are both the machine Z of the same plate top, written by
-            // different buttons - and before 2026-10-27 only one of them refreshed the surface, so they
-            // drifted 19.5 mm apart (baseline -123.211, surface still -142.671) with nothing on screen
-            // saying anything was wrong.
+            // THESE TWO ARE THE SAME MEASUREMENT, SO SAY SO WHEN THEY DISAGREE.
+            // Since the field's meaning migrated to "the machine Z at which the reference tool triggers",
+            // TloSurfaceZ and TloRefBaseline hold the same quantity, and both buttons now write both from
+            // one touch. A gap between them means one of them predates something.
             //
-            // It is the SURFACE that guards a missed trigger: ComputeTloSearchDistance uses
-            // originZ - surface - 2, and a surface that is stale and too LOW inflates the seek past the
-            // plate and into whatever is under it. A disagreement here is the only cheap, non-circular
-            // signal of that - the surface cannot check itself, but a second measurement of the same
-            // thing can check it.
+            // It is not merely untidy: ComputeTloSearchDistance derives the probe's descent from the
+            // surface, so a surface left behind at a value that is too LOW asks for a deeper seek than the
+            // plate needs. The surface cannot check itself; a second measurement of the same thing can,
+            // which is the cheapest non-circular signal available here.
+            //
+            // ⚠️ A value LEFT OVER FROM THE OLD MEANING is exactly what this catches. It used to mean the
+            // spoilboard the plate stands on - a floor, deliberately well below any tool's trigger - so a
+            // pre-migration install carries a surface tens of mm below its baseline and looks fine. On
+            // 2026-10-27 that was -142.671 against a baseline of -123.211, and I read the 19.5 mm as
+            // staleness within one meaning rather than as the two meanings disagreeing.
             //
             // A WARNING, NOT A REFUSAL, deliberately: re-probing is what clears this, and the run that
-            // clears it is itself computed from the stale value. A gate that blocked it would be a guard
+            // clears it is itself computed from the suspect value. A gate that blocked it would be a guard
             // that cannot be cleared - see pcorner's auto-retract deadlock for that exact mistake.
             double baseline = AppConfig.Settings.Base.TloRefBaseline;
             bool bothKnown = surface != 0d && baseline != 0d;
@@ -1687,7 +1691,7 @@ namespace CNC.Controls
                                     + "   G59.3 " + DescribeStoredPosition("G59.3")
                                     + (disagreement > 1d
                                         ? string.Format(CultureInfo.CurrentCulture,
-                                            "   STALE - disagrees with the tool-length baseline ({0:0.0##}) by {1:0.0##} mm; re-probe",
+                                            "   STALE - disagrees with the tool-length baseline ({0:0.0##}) by {1:0.0##} mm, and they are the same measurement; re-probe",
                                             baseline, disagreement)
                                         : "");
 
@@ -1714,19 +1718,20 @@ namespace CNC.Controls
 
             double search = ComputeTloSearchDistance(ProbeDefinitions.TloTarget);
             if (txtTloSearchValue != null)
-                // The "stopping 2 mm above the surface" half of this is a PROMISE ABOUT THE SURFACE, so a
-                // stale surface voids it - and stating it anyway is worse than saying nothing, because it
-                // is read as the reassurance that makes the descent safe to start. On 2026-10-27 that line
-                // claimed a 2 mm standoff while the arithmetic had the seek passing 17.5 mm BELOW the
-                // plate top. Never print a safety property that the current inputs do not support.
+                // SAY WHERE A MISS ENDS UP, in the terms the arithmetic actually uses. This line used to
+                // promise "stopping 2 mm above the surface", which stopped being true when the stored Z
+                // changed meaning from a floor to a trigger point - and a sentence like that is read as
+                // the reassurance that makes the descent safe to start, so a wrong one is worse than
+                // none. It is now the allowance, which is what the seek is really bounded by.
                 txtTloSearchValue.Text = search <= 0d
-                    ? "Tool-length probe searches a fixed 90 mm down. Set the target surface above and it becomes a real limit instead of a guess."
+                    ? "Tool-length probe searches a fixed 90 mm down. Set the target above, and give the machine a Z travel, and it becomes a real limit instead of a guess."
                     : disagreement > 1d
                         ? string.Format(CultureInfo.CurrentCulture,
-                            "Tool-length probe searches up to {0:0.#} mm down - but that comes off a target surface that disagrees with the baseline by {1:0.0##} mm, so the 2 mm standoff is NOT reliable. Re-probe the target before trusting it.",
+                            "Tool-length probe searches up to {0:0.#} mm down - but the target and the tool-length baseline disagree by {1:0.0##} mm, and they should be the same measurement. Re-probe the target before trusting it.",
                             search, disagreement)
                         : string.Format(CultureInfo.CurrentCulture,
-                            "Tool-length probe searches up to {0:0.#} mm down - far enough to reach the target, stopping 2 mm above the surface if nothing triggers.", search);
+                            "Tool-length probe searches up to {0:0.#} mm down - enough to find a tool up to {1:0.#} mm shorter than the one that set the baseline. A tool shorter than that runs out of travel in air and alarms, which is a refusal rather than a crash.",
+                            search, MacroProcessor.ShortToolAllowance);
         }
 
         private static string DescribeStoredPosition(string code)
@@ -2083,26 +2088,31 @@ namespace CNC.Controls
         /// How far the tool-length probe should search downward from the G59.3 origin, or 0 to say "cannot
         /// work it out - use the caller's own default".
         ///
-        /// search = (G59.3 origin Z) - (surface Z) - standoff
+        /// search = (G59.3 origin Z) - (surface Z - MacroProcessor.ShortToolAllowance), envelope-clamped.
         ///
-        /// A FLOOR, not a prediction of where the target top is. That distinction is the whole design, and
-        /// the first version got it wrong.
+        /// IDENTICAL IN SHAPE TO MacroProcessor.EmitTloSeekDepth, and sharing its constants, because it is
+        /// the same probe against the same plate - only the emitter differs. Read that method's remarks for
+        /// why the allowance and the clamp are the safety property rather than the depth.
         ///
-        /// The tempting arithmetic is "surface + the target's height = where the top is, probe to just past
-        /// that". It is exact, and it is exact only for the tool that was in the spindle when the surface
-        /// was captured. Every stored Z here is the machine's AXIS position, and the tip hangs a
-        /// tool-length below it - so the same physical surface reads 30 mm lower with a bit 30 mm shorter.
-        /// Predicting the target top therefore mis-predicts by the tool-length difference, and the error
-        /// can point either way.
+        /// WHAT THIS USED TO SAY, AND WHY IT WAS WRONG BY 2026-10-27. It described the stored Z as a FLOOR -
+        /// the spoilboard the plate stands on - and computed "surface - 2 mm standoff" so the probe could
+        /// travel to just above it and no further: a long enough tool touches the target first, a too-short
+        /// tool runs out of travel in air and alarms. Coherent, tool-agnostic, and correct FOR THAT MEANING.
         ///
-        /// As a floor it cannot. The probe is allowed to travel to just above the SURFACE and no further:
-        ///   - a tool long enough to reach touches the target well before the floor and stops there;
-        ///   - a tool too short to reach runs out of travel in AIR and alarms.
-        /// Both are survivable, and neither depends on knowing which tool is fitted - which is the property
-        /// that matters, since this firmware has no tool table to ask.
+        /// But the field's meaning was deliberately migrated (see UpdateReferencePositions) to "the top of
+        /// whatever measures tool length - the surface the probe actually touches", i.e. the machine Z at
+        /// which the REFERENCE TOOL triggers. The same number TloRefBaseline holds. This arithmetic was
+        /// never updated, and subtracting a standoff from a trigger Z puts the seek 2 mm SHORT of the
+        /// trigger - so the probe refuses in mid-air, every time, for the very tool that recorded it.
         ///
-        /// The target's height is not used here any more. It is still worth knowing, and the row shows what
-        /// it implies, but it is no longer load-bearing.
+        /// It stayed latent only because the stored value was still a floor-era number; the first button to
+        /// write a trigger Z made it live. A stale COMMENT is not harmless when the arithmetic it justifies
+        /// outlives the meaning of its input.
+        ///
+        /// So the allowance replaces the standoff and its sign flips: the seek now goes PAST the recorded
+        /// trigger, far enough to find a tool up to the allowance shorter. A miss therefore bottoms out that
+        /// far past the reference tool's trigger point rather than stopping short of it - bounded descent
+        /// instead of guaranteed refusal, which is the trade EmitTloSeekDepth already made.
         /// </summary>
         internal static double ComputeTloSearchDistance(ProbeDefinition p)
         {
@@ -2119,26 +2129,30 @@ namespace CNC.Controls
 
             double originZ = cs.Values[2];
 
-            // How far above the surface the probe is allowed to get. Small: it is the gap left when
-            // NOTHING triggers, so it is the only thing between a disconnected plate and the spoilboard.
-            const double standoff = 2d;
-            double search = originZ - surface - standoff;
+            // PAST the recorded trigger by the allowance, not short of it by a standoff - see the remarks.
+            // This is MacroProcessor.EmitTloSeekDepth's arithmetic, using its constant, so the two cannot
+            // disagree about how deep a missed trigger is allowed to go.
+            double search = originZ - (surface - MacroProcessor.ShortToolAllowance);
 
             // Backwards means the G59.3 origin is at or below the surface, which is not a search-distance
             // problem - it is a G59.3 that has been set wrong. Say nothing and let the literal apply.
             if (search <= 0d)
                 return 0d;
 
-            // Never ask for more Z than the machine has below the start point, whatever the arithmetic
-            // says. Soft limits would refuse it anyway; this turns that into a shorter search rather than
-            // an alarm partway through one.
+            // REFUSE rather than guess when the envelope is unknown, exactly as EmitTloSeekDepth does: the
+            // clamp is the safety property here, so an unclamped descent must not be the fallback. 0 sends
+            // the caller to its own conservative literal.
             double travel = GrblSettings.GetDouble(GrblSetting.MaxTravelBase + 2);
-            if (!double.IsNaN(travel) && travel > 0d)
-            {
-                double available = originZ + travel;     // origin is negative, travel positive
-                if (available > 0d && search > available)
-                    search = available;
-            }
+            if (double.IsNaN(travel) || travel <= 0d)
+                return 0d;
+
+            // Never into the last few mm of travel. origin is negative, travel positive, so this is the
+            // distance from the start point down to the margin above the floor.
+            double available = originZ + travel - MacroProcessor.EnvelopeMargin;
+            if (available <= 0d)
+                return 0d;
+            if (search > available)
+                search = available;
 
             return search;
         }
