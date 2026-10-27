@@ -82,6 +82,10 @@ static class TloMacroProbe
 
     static int skipped = 0;
 
+    // Set in Main once the landmark climb has found it. Needed in Checks() so the premise can compare
+    // the controller's copy of tlo.macro against this repo's bytes.
+    static string repoRoot = null;
+
     static void Check(bool ok, string what, string detail = "")
     {
         Console.WriteLine((ok ? "  ok    " : "  FAIL  ") + what + (detail.Length > 0 ? "   [" + detail + "]" : ""));
@@ -122,6 +126,8 @@ static class TloMacroProbe
         // build tree, and the installed simulator last. The installed one is option-matched to the
         // real controller and is NOT rebuilt by this work, so it is the most likely to predate the
         // tlo.macro seeding fix - which the premise check below will say out loud if it is picked.
+        repoRoot = repo;
+
         var candidates = new List<string>();
         if (repo != null)
         {
@@ -149,7 +155,12 @@ static class TloMacroProbe
 
         Console.WriteLine("simulator: " + Path.Combine(simSrc, "grblHAL_sim.exe"));
 
-        string simDir = Path.Combine(Path.GetTempPath(), "tlo-macro-probe-sim");
+        // PER-RUN directory. A shared one fails on the exe copy with "being used by another process"
+        // whenever a previous run left the simulator alive - which happens the moment anything kills
+        // this harness before its cleanup runs (a truncated pipeline is enough). That error names a
+        // file lock and says nothing about an orphaned simulator, so it reads as a broken harness.
+        string simDir = Path.Combine(Path.GetTempPath(),
+                                     "tlo-macro-probe-sim-" + Process.GetCurrentProcess().Id);
         Directory.CreateDirectory(simDir);
         File.Copy(Path.Combine(simSrc, "grblHAL_sim.exe"), Path.Combine(simDir, "grblHAL_sim.exe"), true);
 
@@ -477,24 +488,63 @@ static class TloMacroProbe
         // Asserted from the simulator's own boot report rather than assumed. A sim built before
         // 2026-10-26 seeds four macros and not this one, and the only symptom of its absence is
         // "error:81 Unknown flow statement" - which names neither a file nor a path.
-        Console.WriteLine("\nthe premise - tlo.macro present on the controller:");
+        // ASK THE CONTROLLER, DO NOT READ ITS LOG. This used to regex the simulator's boot report on
+        // stderr for "seed: tlo.macro <n> bytes -> <path>", which is asserting on the ANNOUNCEMENT
+        // rather than the EVENT - the thing this project's own rules say not to do, and which I had
+        // quoted twice the same day before doing it here. A reword of that log line breaks a passing
+        // test, and the coupling is invisible from both ends.
+        //
+        // $F is the authoritative answer to the actual question. It is also better in two ways I did
+        // not get from the log: it is PATH-AGNOSTIC (the simulator mounts littlefs at /, a real board
+        // at /littlefs, and matching on the name covers both), and the SIZE lets this compare the
+        // controller's copy against the repo's bytes - the file being present is weaker than the file
+        // being the one we think it is.
+        //
+        // The boot report is still captured, and still printed, as context. It just no longer decides
+        // anything.
+        Console.WriteLine("\nthe premise - tlo.macro present on the controller ($F, not the boot log):");
         string seeded;
         lock (seedText) seeded = string.Join("\n", seedText.ToArray());
         try { File.WriteAllText(seedLog, seeded); } catch { }
 
-        var seedMatch = Regex.Match(seeded, @"seed: tlo\.macro\s+(\d+) bytes -> (\S+)");
-        Check(seedMatch.Success, "the simulator seeded tlo.macro into littlefs",
-              seedMatch.Success ? seedMatch.Groups[1].Value + " bytes -> " + seedMatch.Groups[2].Value
-                                : "NOT SEEDED - this simulator predates the fix; rebuild the Simulator repo");
+        long wantBytes = -1;
+        if (repoRoot != null)
+            try { wantBytes = new FileInfo(Path.Combine(repoRoot, "macros", "tlo.macro")).Length; } catch { }
 
-        bool mountOk = seeded.IndexOf("[match]", StringComparison.Ordinal) >= 0;
-        Check(mountOk, "the mount point and the named-sub resolver agree (no error:81 by construction)",
-              mountOk ? "boot report says [match]" : "boot report says MISMATCH - O<tlo>CALL cannot resolve");
+        Clear();
+        Comms.com.WriteCommand("$F");
+        Thread.Sleep(900);                                  // the listing arrives in one burst
+        string listing = Transcript();
 
-        if (!seedMatch.Success || !mountOk)
+        var fileMatch = Regex.Match(listing, @"\[FILE:(\S*tlo\.macro)\|SIZE:(\d+)\]",
+                                    RegexOptions.IgnoreCase);
+        Check(fileMatch.Success, "the controller's own filesystem listing has tlo.macro",
+              fileMatch.Success
+                ? fileMatch.Groups[1].Value + ", " + fileMatch.Groups[2].Value + " bytes"
+                : "NOT PRESENT - a named-sub CALL for it would give error:81, which names neither the "
+                  + "file nor the path. Rebuild/redeploy the Simulator. $F said: " + listing);
+
+        bool sizeOk = false;
+        if (fileMatch.Success && wantBytes > 0)
         {
-            Console.WriteLine("\n  tlo.macro is not reachable on this simulator - every check below would be");
-            Console.WriteLine("  testing the absence of a file rather than the o130 branch. Stopping.");
+            long onFs = long.Parse(fileMatch.Groups[2].Value, CultureInfo.InvariantCulture);
+            sizeOk = onFs == wantBytes;
+            Check(sizeOk, "and it is the same size as this repo's macros/tlo.macro",
+                  "controller " + onFs + " vs repo " + wantBytes
+                  + (sizeOk ? "" : " - the controller is running a DIFFERENT version of the macro"));
+        }
+        else
+            Skip("the controller's copy matches this repo's macros/tlo.macro",
+                 wantBytes > 0 ? "no listing to compare" : "could not read macros/tlo.macro to compare against");
+
+        if (!fileMatch.Success || !sizeOk)
+        {
+            Console.WriteLine("\n  tlo.macro is not reachable, or is not the version in this repo - every check");
+            Console.WriteLine("  below would be testing the wrong macro rather than the o130 branch. Stopping.");
+            Console.WriteLine("\n  the simulator's boot report, for context:");
+            foreach (var l in seeded.Split('\n'))
+                if (l.Trim().Length > 0)
+                    Console.WriteLine("    " + l.TrimEnd());
             return 1;
         }
 
