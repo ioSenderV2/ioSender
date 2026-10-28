@@ -23,6 +23,30 @@
     the live bin\<Configuration>\ tree and a running instance is asked to close first, because that
     is the instance you are about to replace. Without it, nothing running is disturbed.
 
+.PARAMETER PreloadSimulator
+    Make sure the simulator ioSender will run is the latest one built locally. Only acts with
+    -Launch; on its own it would have nothing to be ahead of.
+
+    WHY THIS COPIES A FILE RATHER THAN STARTING ONE. SimulatorManager kills every grblHAL_sim
+    process and launches its own copy, so a freshly started simulator gets killed on connect -
+    "preload" has to mean "update the exe ioSender is about to launch".
+
+    And there are TWO simulator homes, which is the trap this exists for: the app folder's
+    simulator\ subfolder (auto-matched to the connected controller's options, and already a
+    deploy target of the Simulator repo's CMake build) and %AppData%\ioSender\Simulator - the
+    MANUALLY built one from Settings > Simulator, which nothing deploys to. A connection made
+    through the Connect dialog's Simulator tab uses the second one, so an afternoon of simulator
+    work can land in the repo and the app still runs a months-old binary. Measured 2026-10-27: the
+    installed copy was dated 11 August while the repo copies were minutes old.
+
+    So this finds the newest locally built grblHAL_sim.exe, compares it by hash with the installed
+    one, and if they differ kills any running instance (the file is locked while it runs) and
+    copies over it, keeping one .bak. It does NOT build the C simulator - that would drag
+    cmake/mingw into an ioSender build; build the Simulator repo yourself first.
+
+    After connecting, the console's "- driver: Simulator version <stamp>" line is what confirms
+    which binary you got.
+
 .PARAMETER NoKill
     Skip killing a running ioSender.exe first. Only skips the kill step - it can't release the
     OS file lock a running instance holds on its own DLLs/EXE, so this alone still fails
@@ -175,6 +199,14 @@ param(
     # Implies -Launch; never touches your own config (see the -configpath seeding below).
     [Alias('review-config')]
     [switch]$ReviewConfig,
+    # Make sure the simulator ioSender launches is the latest one BUILT LOCALLY, not whatever was
+    # installed weeks ago. See Update-InstalledSimulator for why this copies a file rather than
+    # starting a process. Only does anything with -Launch.
+    # No [Alias('preloadSimulator')]: parameter matching is already case-insensitive, and an alias
+    # that differs only in case is rejected outright ("conflicts with the parameter alias of the
+    # same name"). The aliases elsewhere in this block exist to add a HYPHEN (-default-config),
+    # which is a spelling PowerShell cannot reach on its own.
+    [switch]$PreloadSimulator,
     # Target name in docs\manual\img for the screenshot taken during a -DefaultConfig session.
     [string]$Shot,
     # Any trailing tokens are forwarded verbatim to the launched ioSender.exe, e.g.
@@ -387,6 +419,13 @@ if (-not $scratchExplicit) {
     }
 }
 
+# Said rather than silently ignored: -PreloadSimulator refreshes the exe the app is ABOUT to launch,
+# so without a launch there is nothing for it to be ahead of - and silently doing nothing is how
+# somebody concludes the switch works and goes on testing an old binary.
+if ($PreloadSimulator -and -not ($Launch -or $DefaultConfig)) {
+    Write-Host "==> -PreloadSimulator needs -Launch (it refreshes the simulator the launched app will start) - ignored." -ForegroundColor Yellow
+}
+
 # Ask a running instance to close itself over the single-instance pipe (PipeServer.ShutdownRequested,
 # added 2026-08-08) before ever force-killing it - a blind Stop-Process is exactly how a rebuild killed
 # a live job out from under the operator mid-jog-test the same session this was added in. Idle: closes
@@ -483,6 +522,88 @@ $buildStateFile = Join-Path $env:TEMP 'ioSender-build-last.json'
 # Returns $null if it cannot be computed. FAILS OPEN on purpose: this is a convenience warning, and
 # a warning that can stop the build is worse than the waste it is warning about. $ErrorActionPreference
 # is 'Stop' in this script, so without the try/catch a single unreadable path would end the run.
+# Make the simulator ioSender is about to launch the newest one built locally.
+#
+# It copies a FILE rather than starting a process, and that is not a shortcut: SimulatorManager
+# kills every grblHAL_sim process and launches its own copy, so anything started here would be
+# killed on connect. "Preload" therefore means "update the exe it is about to launch".
+#
+# The target is %AppData%\ioSender\Simulator - the MANUALLY built simulator from Settings >
+# Simulator, which is what a connection through the Connect dialog's Simulator tab uses, and which
+# nothing deploys to. The app folder's own simulator\ subfolder is already a deploy target of the
+# Simulator repo's CMake build, so it keeps itself current; this one does not. That split is the
+# whole reason the switch exists - on 2026-10-27 an afternoon of simulator work sat in the repo
+# while the app ran an 11 August binary, and nothing on screen said so until $I started reporting
+# the simulator's build stamp as its driver version.
+function Update-InstalledSimulator {
+    $simName = 'grblHAL_sim.exe'
+    $installed = Join-Path $env:APPDATA (Join-Path 'ioSender\Simulator' $simName)
+
+    # Newest locally built copy, in preference order: the Simulator repo's own build tree, then the
+    # folder its CMake deploys into here. Both are "what I just built"; neither is what runs.
+    $candidates = @(
+        (Join-Path (Split-Path $root -Parent) (Join-Path 'Simulator\build' $simName)),
+        (Join-Path $root (Join-Path 'simulator' $simName))
+    ) | Where-Object { Test-Path $_ }
+
+    if (-not $candidates) {
+        Write-Host "==> -PreloadSimulator: no locally built $simName found - build the Simulator repo first." -ForegroundColor Yellow
+        return
+    }
+
+    $latest = $candidates | Sort-Object { (Get-Item $_).LastWriteTime } -Descending | Select-Object -First 1
+    $latestTime = (Get-Item $latest).LastWriteTime
+
+    if (-not (Test-Path $installed)) {
+        Write-Host "==> -PreloadSimulator: nothing installed at $installed - build one via Settings > Simulator first," -ForegroundColor Yellow
+        Write-Host "    so its options match your controller. This switch refreshes that copy, it does not create it." -ForegroundColor Yellow
+        return
+    }
+
+    # By HASH, not by timestamp. A copy makes the installed file newer than its source, so a
+    # timestamp comparison would report "up to date" on the first run and "stale" forever after
+    # depending on which way the clock fell. The hash answers the actual question: are these the
+    # same binary?
+    $same = (Get-FileHash $latest).Hash -eq (Get-FileHash $installed).Hash
+    if ($same) {
+        Write-Host "==> -PreloadSimulator: installed simulator already matches the local build ($latestTime)." -ForegroundColor DarkGray
+        return
+    }
+
+    # Kill only now that an update is actually going to happen - the file is locked while it runs,
+    # and killing a simulator somebody is using to test something else would be rude otherwise.
+    $running = @(Get-Process -Name ([System.IO.Path]::GetFileNameWithoutExtension($simName)) -ErrorAction SilentlyContinue)
+    foreach ($p in $running) {
+        Write-Host "==> -PreloadSimulator: stopping running simulator (pid $($p.Id)) to replace its exe." -ForegroundColor Yellow
+        try { $p.Kill(); $p.WaitForExit(3000) | Out-Null } catch { }
+    }
+
+    # ONE backup, overwritten each time. Enough to undo a bad local build by hand; not a history,
+    # because the authoritative copy is a CI release that can always be re-downloaded.
+    try { Copy-Item $installed "$installed.bak" -Force } catch { }
+
+    try {
+        Copy-Item $latest $installed -Force
+        Write-Host "==> -PreloadSimulator: installed simulator updated from $latest" -ForegroundColor Green
+        Write-Host "    built $latestTime  ->  $installed  (previous kept as .bak)" -ForegroundColor Green
+        Write-Host "    After connecting, the console's '- driver: Simulator version <stamp>' line confirms which binary ran." -ForegroundColor DarkGray
+        # SAY WHAT WAS TRADED AWAY. The copy that was there was built to MATCH the connected
+        # controller's options; a local build carries the Simulator repo's defaults. ioSender will
+        # not notice the swap - it checks a recorded signature, not the file - so nothing else is
+        # going to mention that the simulator may no longer mirror the machine. Rebuild via
+        # Settings > Simulator to get a matched one back.
+        Write-Host "    NOTE: the replaced copy was option-matched to your controller; this one carries the" -ForegroundColor Yellow
+        Write-Host "    Simulator repo's default options. Settings > Simulator rebuilds a matched one when you need it." -ForegroundColor Yellow
+    }
+    catch {
+        # Say it and carry on. A simulator that could not be refreshed must not stop the launch -
+        # but it must not be silent either, or the next connect quietly tests the old binary again,
+        # which is the exact failure this switch was added to prevent.
+        Write-Host "==> -PreloadSimulator: could NOT update $installed - $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "    The app will launch the OLD simulator. Check the driver version after connecting." -ForegroundColor Red
+    }
+}
+
 function Get-SourceFingerprint {
     try {
         $newest = [datetime]::MinValue
@@ -544,6 +665,9 @@ if ($Launch -or $DefaultConfig) {
     else {
         $exe = Join-Path $root ($exeRel -f $Configuration)
         if (Test-Path $exe) {
+            # Before the launch, so the app finds the refreshed exe when it goes to start a simulator.
+            if ($PreloadSimulator) { Update-InstalledSimulator }
+
             $finalArgs = @($AppArgs)
             if ($Headless -and -not ($finalArgs -contains '-headless')) { $finalArgs += '-headless' }
 
