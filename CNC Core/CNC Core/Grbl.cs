@@ -872,6 +872,29 @@ namespace CNC.Core
         public static string PositionFormatString { get; private set; } = string.Empty;
         public static string Version { get; private set; } = string.Empty;
         public static int Build { get; private set; } = 0;
+        // The firmware's semantic version, non-null ONLY when [VER:] carries the git-tag scheme
+        // (all-numeric dotted, e.g. "2.0.0"). grblHAL deleted the hand-typed GRBL_VERSION/GRBL_BUILD
+        // in firmware 2.0.0 and derives the version from the nearest v*.*.* git tag, so the trailing
+        // ".YYYYMMDD" build date that Build was parsed out of is GONE. Classic grbl ("1.1f") and the
+        // old grblHAL scheme ("1.1f.20250901") do not parse here and leave this null.
+        public static System.Version FirmwareVersion { get; private set; } = null;
+        // True when the controller reports the git-tag semver scheme rather than a date-stamped build.
+        public static bool HasSemanticVersion { get { return FirmwareVersion != null; } }
+        // "Is the firmware at least as new as this old-scheme build date?" - the ONE place the
+        // disappearance of the build date is absorbed. A semver-scheme controller answers true for
+        // every such date (the scheme postdates all of them); a date-stamped build compares
+        // numerically; classic grbl, which never reported a date at all, answers false as before.
+        // NOTE: two callers gate a workaround for a controller bug on the NEGATION of this - with Build
+        // stuck at 0 they were switching the workaround ON against firmware that does not have the bug.
+        public static bool BuildAtLeast(int buildDate)
+        {
+            return HasSemanticVersion || Build >= buildDate;
+        }
+        // $I's [NVSVER:<major>.<minor>-<layout fingerprint>] - the settings-storage layout version,
+        // DELIBERATELY independent of the firmware version above (a git-derived firmware version
+        // changes on every commit, so keying NVS migration on it would rewrite all of NVS on every
+        // flash). Empty on firmware that does not report it.
+        public static string NvsVersion { get; private set; } = string.Empty;
         public static bool IsGrblHAL { get; internal set; }
         public static string Firmware { get; internal set; } = "Grbl";
         public static bool ExtendedProtocol { get; internal set; }
@@ -971,7 +994,7 @@ namespace CNC.Core
         public static bool AtcMacrosRequired { get; private set; }
         public static bool HasEnums { get; private set; }
         public static bool HasSettingDescriptions { get; private set; }
-        public static bool HasSimpleProbeProtect { get { return _probeProtect & IsGrblHAL && Build >= 20200924; } internal set { _probeProtect = value; } }
+        public static bool HasSimpleProbeProtect { get { return _probeProtect & IsGrblHAL && BuildAtLeast(20200924); } internal set { _probeProtect = value; } }
         public static bool ManualToolChange { get; private set; }
         public static bool UseLinenumbers { get; internal set; }
         public static bool HasFS { get; private set; }
@@ -1176,7 +1199,7 @@ namespace CNC.Core
             // would otherwise leave the PREVIOUS controller's values standing - and switching between
             // the real machine and the simulator inside one session is routine here, which is exactly
             // the case where a stale driver version is read as the truth about what is connected.
-            Driver = DriverVersion = string.Empty;
+            Driver = DriverVersion = NvsVersion = string.Empty;
 
             // Not Silent: the $I/$IE response is the controller's initial "who am I" reply at connect -
             // show it in the console rather than hiding it as boilerplate (was model.Silent = true; see
@@ -1426,6 +1449,35 @@ namespace CNC.Core
             }
         }
 
+        // "2.0.0" -> 2.0.0; anything else -> null. DELIBERATELY STRICT: three or four all-numeric
+        // dot-separated parts, nothing else. System.Version.TryParse alone would accept a bare "1.1",
+        // and accepting that would read an ANCIENT classic-grbl controller as the new git-tag scheme
+        // and switch every date gate below on for it. The old schemes - "1.1f" and "1.1f.20250901" -
+        // fail on the letter; a two-part version fails on the part count.
+        private static System.Version ParseSemanticVersion(string version)
+        {
+            if (string.IsNullOrEmpty(version))
+                return null;
+
+            string[] parts = version.Split('.');
+            if (parts.Length < 3 || parts.Length > 4)
+                return null;
+
+            foreach (string part in parts)
+            {
+                if (part.Length == 0)
+                    return null;
+                foreach (char c in part)
+                {
+                    if (c < '0' || c > '9')
+                        return null;
+                }
+            }
+
+            System.Version parsed;
+            return System.Version.TryParse(version, out parsed) ? parsed : null;
+        }
+
         // Extract "drv:<branch>@<sha>" from the raw build stamp (see touch_build_stamp.py's ref() format).
         // Format: "<timestamp> drv:<ref> grbl:<ref>" - split on whitespace rather than ':' since the
         // timestamp and the branch name itself can both contain colons/slashes.
@@ -1496,7 +1548,13 @@ namespace CNC.Core
                         Version = valuepair[1];
                         if (valuepair.Count() > 2)
                             Identity = valuepair[2];
-                        if (Version.LastIndexOf('.') > 0)
+                        // Assigned on EVERY $I, both branches, so switching between a semver controller
+                        // and a date-stamped one inside a session cannot leave the previous controller's
+                        // scheme standing - the same stale-across-controllers trap the [DRIVER:] clear
+                        // in Get() exists for, and here it would silently re-arm the spindle workaround.
+                        Build = 0;
+                        FirmwareVersion = ParseSemanticVersion(Version);
+                        if (FirmwareVersion == null && Version.LastIndexOf('.') > 0)
                         {
                             int build = 0;
                             int.TryParse(Version.Substring(Version.LastIndexOf('.') + 1), out build);
@@ -1723,6 +1781,8 @@ namespace CNC.Core
                             IpAddress = data.Substring(data.IndexOf(':') + 1).TrimEnd(']');
                         else if (data.StartsWith("[BUILD:"))
                             ParseBuildStamp(data.Substring(7).TrimEnd(']'));
+                        else if (data.StartsWith("[NVSVER:"))
+                            NvsVersion = data.Substring(8).TrimEnd(']');
                         break;
                 }
             }
@@ -2548,7 +2608,7 @@ namespace CNC.Core
         public Spindle(string data)
         {
             string[] values = data.Split('|');
-            if (GrblInfo.IsGrblHAL && GrblInfo.Build < 20240812) // Workaround for controller bug
+            if (GrblInfo.IsGrblHAL && !GrblInfo.BuildAtLeast(20240812)) // Workaround for controller bug
             {
                 SpindleId = int.Parse(values[1]);
                 SpindleNum = int.Parse(values[0]);
@@ -2582,7 +2642,7 @@ namespace CNC.Core
         {
             bool? res = null;
 
-            if (GrblInfo.IsGrblHAL && GrblInfo.Build >= 20240307 && Spindles.Count == 0)
+            if (GrblInfo.IsGrblHAL && GrblInfo.BuildAtLeast(20240307) && Spindles.Count == 0)
             {
                 target = SyncTarget.Capture();
                 dataReceived += process;
@@ -3636,7 +3696,7 @@ namespace CNC.Core
         public static bool Load(GrblViewModel model)
         {
             bool? res = null;
-            bool load, getExtended = !GrblInfo.IsLegacyController && GrblInfo.IsGrblHAL && GrblInfo.Build >= 20200716;
+            bool load, getExtended = !GrblInfo.IsLegacyController && GrblInfo.IsGrblHAL && GrblInfo.BuildAtLeast(20200716);
             CancellationToken cancellationToken = new CancellationToken();
 
             PollGrbl.Suspend();

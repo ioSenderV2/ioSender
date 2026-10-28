@@ -107,8 +107,8 @@ namespace CNC.Controls
                 // controller (HasFS without HasSDCard) has no SD mount status, so don't require one there.
                 CanUpload = GrblInfo.UploadProtocol != string.Empty && GrblInfo.HasFS
                             && (!GrblInfo.HasSDCard || (DataContext as GrblViewModel).SDCardMountStatus != SDState.Undetected);
-                CanDelete = GrblInfo.Build >= 20210421;
-                CanViewAll = GrblInfo.Build >= 20230312;
+                CanDelete = GrblInfo.BuildAtLeast(20210421);
+                CanViewAll = GrblInfo.BuildAtLeast(20230312);
                 CanRewind = GrblInfo.IsGrblHAL;
 
                 // Undetected just means "haven't asked the controller this session" - it is NOT the same as
@@ -621,7 +621,7 @@ namespace CNC.Controls
                 {
                     model.Message = (string)FindResource("Uploading");
 
-                    if (GrblInfo.Build > 20260308)
+                    if (GrblInfo.BuildAtLeast(20260309))   // was Build > 20260308 - same test for a YYYYMMDD int
                     {
                         bool? res = null;
                         CancellationToken cancellationToken = new CancellationToken();

@@ -3423,6 +3423,10 @@ namespace CNC.Controls
             sb.AppendLine("Firmware:         " + GrblInfo.Firmware + (GrblInfo.IsGrblHAL ? " (grblHAL)" : ""));
             if (!string.IsNullOrEmpty(GrblInfo.Version)) sb.AppendLine("Version:          " + GrblInfo.Version);
             if (GrblInfo.Build > 0) sb.AppendLine("Build:            " + GrblInfo.Build);
+            // Settings-storage layout version, independent of the firmware version - see GrblInfo.NvsVersion.
+            // Worth having in the copyable firmware block: it is what says whether a settings image on this
+            // board matches the layout the running firmware expects.
+            if (!string.IsNullOrEmpty(GrblInfo.NvsVersion)) sb.AppendLine("NVS layout:       " + GrblInfo.NvsVersion);
             if (!string.IsNullOrEmpty(GrblInfo.Identity)) sb.AppendLine("Board / identity: " + GrblInfo.Identity);
             sb.AppendLine("Axes:             " + GrblInfo.NumAxes + (string.IsNullOrEmpty(axes) ? "" : " (" + axes + ")"));
             if (!string.IsNullOrEmpty(GrblInfo.Options)) sb.AppendLine("Options (OPT):    " + GrblInfo.Options);

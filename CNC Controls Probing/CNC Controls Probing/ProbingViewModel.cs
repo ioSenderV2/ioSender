@@ -483,7 +483,7 @@ namespace CNC.Controls.Probing
         public bool HasToolTable { get { return _hasToolTable; } set { _hasToolTable = value; OnPropertyChanged(); } }
         public bool HasCoordinateSystem9 { get { return _hasCs9; } set { _hasCs9 = value; OnPropertyChanged(); } }
         public bool ReferenceToolOffset { get { return _referenceToolOffset && CanReferenceToolOffset; } set { _referenceToolOffset = value; OnPropertyChanged(); OnPropertyChanged(nameof(FixtureHeightEnable)); } }
-        public bool CanReferenceToolOffset { get { return GrblInfo.Build >= 20200805 && GrblInfo.IsGrblHAL; } }
+        public bool CanReferenceToolOffset { get { return GrblInfo.BuildAtLeast(20200805) && GrblInfo.IsGrblHAL; } }
         public double TloReference { get { return Grbl.IsTloReferenceSet ? _tloReferenceOffset : double.NaN; } set { _tloReferenceOffset = value; OnPropertyChanged(); } }
         public bool AddAction { get { return _addAction; } set { _addAction = value; OnPropertyChanged(); } }
   

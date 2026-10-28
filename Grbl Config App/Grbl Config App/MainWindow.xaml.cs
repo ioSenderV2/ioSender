@@ -86,8 +86,8 @@ namespace Grbl_Config_App
                 GrblSettings.Load();
             }
 
-            halsettings.IsEnabled = grblsettings.IsEnabled = GrblInfo.IsGrblHAL && GrblInfo.Build >= 20210819;
-            grblalarms.IsEnabled = grblerrors.IsEnabled = GrblInfo.IsGrblHAL && GrblInfo.Build >= 20210823;
+            halsettings.IsEnabled = grblsettings.IsEnabled = GrblInfo.IsGrblHAL && GrblInfo.BuildAtLeast(20210819);
+            grblalarms.IsEnabled = grblerrors.IsEnabled = GrblInfo.IsGrblHAL && GrblInfo.BuildAtLeast(20210823);
 
             configView.Activate(true, ViewType.Startup);
         }
@@ -118,7 +118,7 @@ namespace Grbl_Config_App
 
         private void getHalSettingsItem_Click(object sender, RoutedEventArgs e)
         {
-            bool getExtended = GrblInfo.ExtendedProtocol && GrblInfo.Build >= 20200716;
+            bool getExtended = GrblInfo.ExtendedProtocol && GrblInfo.BuildAtLeast(20200716);
 
             var g = new Settings();
 
@@ -140,7 +140,7 @@ namespace Grbl_Config_App
 
         private void getGrblSettingsItem_Click(object sender, RoutedEventArgs e)
         {
-            bool getExtended = GrblInfo.ExtendedProtocol && GrblInfo.Build >= 20200716;
+            bool getExtended = GrblInfo.ExtendedProtocol && GrblInfo.BuildAtLeast(20200716);
 
             var g = new Settings();
 
@@ -162,7 +162,7 @@ namespace Grbl_Config_App
 
         private void getGrblAlarmsItem_Click(object sender, RoutedEventArgs e)
         {
-            bool getExtended = GrblInfo.ExtendedProtocol && GrblInfo.Build >= 20200716;
+            bool getExtended = GrblInfo.ExtendedProtocol && GrblInfo.BuildAtLeast(20200716);
 
             var g = new Settings();
 
@@ -184,7 +184,7 @@ namespace Grbl_Config_App
 
         private void getGrblErrorsItem_Click(object sender, RoutedEventArgs e)
         {
-            bool getExtended = GrblInfo.ExtendedProtocol && GrblInfo.Build >= 20200716;
+            bool getExtended = GrblInfo.ExtendedProtocol && GrblInfo.BuildAtLeast(20200716);
 
             var g = new Settings();
 
