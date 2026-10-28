@@ -582,6 +582,30 @@ function Update-InstalledSimulator {
     # because the authoritative copy is a CI release that can always be re-downloaded.
     try { Copy-Item $installed "$installed.bak" -Force } catch { }
 
+    # AND THE NVS, because a mismatched binary may not be able to READ IT. Measured 2026-10-27, the
+    # first real use of this switch: the local build could not read the coordinate-system area of
+    # the installed simulator's EEPROM.DAT written by the CI-matched build - two settings failed at
+    # boot, $# returned [G54:0.000,0.000,0.000] against real offsets of X128.649 Y-661.888
+    # Z-101.818, and "error:7 - A settings read failed. Auto-restoring affected settings to default
+    # values" appeared three times per connect. Travel and steps read fine, and ioSender restored
+    # the offsets from its own copy, so nothing was lost - but only because something else happened
+    # to hold a second copy.
+    #
+    # A timestamped copy rather than a single .bak: the exe can be re-downloaded from CI, a
+    # simulator NVS that has been auto-defaulted cannot be reconstructed from anywhere.
+    $eeprom = Join-Path (Split-Path $installed -Parent) 'EEPROM.DAT'
+    if (Test-Path $eeprom) {
+        $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+        try {
+            Copy-Item $eeprom "$eeprom.pre-preload-$stamp" -Force
+            Write-Host "==> -PreloadSimulator: EEPROM.DAT backed up as EEPROM.DAT.pre-preload-$stamp" -ForegroundColor DarkGray
+        } catch {
+            Write-Host "==> -PreloadSimulator: could NOT back up EEPROM.DAT - $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "    Not proceeding: a build that cannot read the existing NVS would auto-default it." -ForegroundColor Red
+            return
+        }
+    }
+
     try {
         Copy-Item $latest $installed -Force
         Write-Host "==> -PreloadSimulator: installed simulator updated from $latest" -ForegroundColor Green
@@ -594,6 +618,10 @@ function Update-InstalledSimulator {
         # Settings > Simulator to get a matched one back.
         Write-Host "    NOTE: the replaced copy was option-matched to your controller; this one carries the" -ForegroundColor Yellow
         Write-Host "    Simulator repo's default options. Settings > Simulator rebuilds a matched one when you need it." -ForegroundColor Yellow
+        Write-Host "    EXPECT error:7 'A settings read failed' if the options differ enough: a build that disagrees" -ForegroundColor Yellow
+        Write-Host "    about the NVS layout cannot read the EEPROM the matched build wrote, and auto-defaults what it" -ForegroundColor Yellow
+        Write-Host "    cannot read. Seen 2026-10-27 on the coordinate systems. Restore with:" -ForegroundColor Yellow
+        Write-Host "      Copy-Item '$installed.bak' '$installed' -Force   (stop the simulator first)" -ForegroundColor Yellow
     }
     catch {
         # Say it and carry on. A simulator that could not be refreshed must not stop the launch -
