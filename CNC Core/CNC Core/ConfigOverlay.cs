@@ -87,11 +87,25 @@ namespace CNC.Core
         // applying it elsewhere produced an arrangement that was only half the one exported, with nothing
         // reporting the difference. Same class of omission as TabsKeys itself (see above). The lists are
         // persisted as comma-joined *Keys strings for the XmlSerializer-append reason given in AppConfig.
+        // The test for membership is "does this change the ARRANGEMENT of the screen", not "is it a UI
+        // preference" - a preset has to be able to reproduce a look, and must not drag the operator's
+        // working habits along with it when they try another one out.
+        //
+        // In: the tab bar and panel lists, and the four Settings > User Interface switches that decide what
+        // the Job tab and the run bar are MADE of - split view vs the centre tab strip, the jog pad, the
+        // pad's go-to buttons, and the run-strip density. Without those a "classic" preset cannot actually
+        // produce the classic screen: the centre would still be split and the pad still absent.
+        //
+        // Deliberately out: UiScale, which is a fact about the monitor in front of you, not about the
+        // arrangement - a preset shared between a laptop and a shop PC must not force one machine's zoom
+        // onto the other. Also out: KeepMdiFocus, EscClosesTab, KeepWindowSize, the auto-save pair and the
+        // status-window timeout, which are habits rather than layout.
         public static readonly string[] UiLayoutCoreElements =
         {
             "TabsKeys", "HiddenViewsKeys",
             "MainPanelsKeys", "FlyoutItemsKeys", "LeftPanelsKeys",
-            "ClassicRunStrip"
+            "ClassicRunStrip", "ShowJobSplitView", "ShowJobJogPad", "ShowJogTargetButtons",
+            "UseFriendlyRunLabels"
         };
 
         // True if the document looks like something Apply can consume: a v2 <AppConfig> root with at
