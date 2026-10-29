@@ -197,6 +197,26 @@ namespace CNC.Controls.Viewer
             Dispatcher.BeginInvoke(new System.Action(() =>
             {
                 buildScheduled = false;
+
+                // DO NOT BUILD WHILE A PROGRAM IS LOADING. A background load parses on a WORKER thread
+                // (GCodeProgram.BackgroundLoad -> Task.Run -> GCodeJob.ParseFileLines) and APPENDS to
+                // GCodeParser.Tokens for the whole parse. That is the very List GCodeJob.Tokens hands out
+                // by reference and that BuildToolpath walks with a foreach, so a build started now races
+                // the loader and the enumerator throws "Collection was modified; enumeration operation may
+                // not execute" - issue #24, from a large program plus a click on this view. Reproduced in
+                // tools/carve-race-probe: 716 builds into a single background load before it threw, and
+                // the same list walks 80,008 actions clean once the load has finished.
+                //
+                // The FileName hook in Model_PropertyChanged schedules a build into exactly this window -
+                // FileName is set by AddBlock(Action.New) at the START of a load, before the worker begins.
+                //
+                // A snapshot is NOT the fix. new List<>(GCode.File.Tokens) enumerates the list to copy it,
+                // so it carries the same race in a shorter window: a reliable crash becomes a rare one.
+                // Skipping costs nothing, because the IsLoading hook below rebuilds the moment the load
+                // completes - which is also when the token count is final and worth building from.
+                if (model != null && model.IsLoading)
+                    return;
+
                 if (IsVisible)
                     BuildScene();
             }), DispatcherPriority.Background);
@@ -229,6 +249,12 @@ namespace CNC.Controls.Viewer
             // Cheap to call on every notification: BuildScene's signature check already includes the
             // offset, so an unchanged one returns early instead of re-adding the carve mesh.
             else if (e.PropertyName == nameof(GrblViewModel.WorkPositionOffset) && IsVisible)
+                ScheduleBuild();
+            // The load has finished, so the token list is complete and nothing is appending to it. This is
+            // the other half of the guard in ScheduleBuild: the FileName notification that would normally
+            // have built this view arrives at the START of a load and is now skipped, so without this hook
+            // the view would sit empty until something else happened to ask for a rebuild.
+            else if (e.PropertyName == nameof(GrblViewModel.IsLoading) && model != null && !model.IsLoading && IsVisible)
                 ScheduleBuild();
         }
 
