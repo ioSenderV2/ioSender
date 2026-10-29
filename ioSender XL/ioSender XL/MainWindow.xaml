@@ -27,6 +27,11 @@
         <system:String x:Uid="str_runTime" x:Key="RunTime">Run time: {0}</system:String>
         <cnccontrols:BlocksToStringConverter x:Key="BlocksToStringConverter" />
         <cnccontrols:LogicalNotConverter x:Key="BooleanConverter" />
+        <!-- Run-strip density (Settings > User Interface > General > Classic run strip): the classic bar
+             shows only the run buttons / Home-Unlock-Reset / State-Check / block counter / MDI box, so
+             everything this build added to the strip binds Collapsed to it and the MDI box binds Visible. -->
+        <cnccontrols:BoolToVisibleConverter x:Key="IsVisibleConverter" />
+        <cnccontrols:NotBoolToVisibleConverter x:Key="IsNotVisibleConverter" />
     </Window.Resources>
     <Window.DataContext>
         <cnccore:GrblViewModel />
@@ -175,8 +180,19 @@
                                     </MultiBinding>
                                 </TextBlock.Text>
                             </TextBlock>
+                            <!-- Classic run strip: the inline MDI entry box the original ioSender had at the
+                                 bottom of its Grbl tab, back on the strip in place of the button below. Bare
+                                 mode drops the "MDI" group header so it reads as one line; the control is
+                                 otherwise the one the side panels use, so it keeps its command history and
+                                 Send button. Capped rather than left to stretch: the star column runs all
+                                 the way to the jog pad, and a 900px-wide command box looks absurd. -->
+                            <cnccontrols:MDIControl x:Name="mdiStrip" Grid.Column="2" Bare="True"
+                                                    HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                    MaxWidth="600" Margin="18,0,0,0"
+                                                    Visibility="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.ClassicRunStrip, Converter={StaticResource IsVisibleConverter}}"/>
                             <Button x:Uid="btn_mdiConsole" x:Name="btnMdiConsole" Grid.Column="3" Content="MDI"
                                     Padding="10,3" VerticalAlignment="Center" Click="MdiConsole_Click"
+                                    Visibility="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.ClassicRunStrip, Converter={StaticResource IsNotVisibleConverter}}"
                                     ToolTip="Open the console with the caret in its input box. Esc closes it."/>
                         </Grid>
                         <!-- Button line: the row stretches to fill the star column so its right edge (Program) meets
@@ -203,7 +219,12 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                            <!-- Collapsed by the classic run strip: coolant was a panel on the Grbl tab, not
+                                 part of the classic bar. The Status button beside it STAYS - classic had a
+                                 message line in its status bar, and this button is what replaced it, so
+                                 hiding it would drop function rather than restore an old arrangement. -->
+                            <StackPanel x:Name="stripCoolantGroup" Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                        Visibility="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.ClassicRunStrip, Converter={StaticResource IsNotVisibleConverter}}">
                                 <!-- Coolant as ONE line. Built here rather than hosting CoolantControl,
                                      which stacks its two switches vertically inside its own group box -
                                      right for a panel, too tall for a strip. The toggles are the same
@@ -271,13 +292,18 @@
                      riding at the left of the right-hand group, just past the button-row column. -->
                 <!-- DRO sits immediately left of the jog pad: where you are, right beside the thing
                      that moves you. Scaled to the strip like the pad is. -->
-                <cnccontrols:DROControl Grid.Column="1" x:Name="stripDro" VerticalAlignment="Center" Margin="14,0,0,0">
+                <cnccontrols:DROControl Grid.Column="1" x:Name="stripDro" VerticalAlignment="Center" Margin="14,0,0,0"
+                                        Visibility="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.ClassicRunStrip, Converter={StaticResource IsNotVisibleConverter}}">
                     <cnccontrols:DROControl.LayoutTransform>
                         <ScaleTransform ScaleX="0.72" ScaleY="0.72"/>
                     </cnccontrols:DROControl.LayoutTransform>
                 </cnccontrols:DROControl>
 
-                <StackPanel Grid.Column="2" Orientation="Vertical" Margin="14,0,10,0" VerticalAlignment="Center">
+                <!-- Collapsed by the classic run strip. The pad's keyboard handlers are NOT lost with it:
+                     JobBaseControl.keyboardMappingsOk is a static one-shot and the Job tab hosts the same
+                     class, so whichever instance loads first registers the jog keys for both. -->
+                <StackPanel x:Name="stripJogColumn" Grid.Column="2" Orientation="Vertical" Margin="14,0,10,0" VerticalAlignment="Center"
+                            Visibility="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.ClassicRunStrip, Converter={StaticResource IsNotVisibleConverter}}">
                     <cnccontrols:JogBaseControl x:Name="jogPad" ArrowsOnly="True" HorizontalAlignment="Center">
                         <cnccontrols:JogBaseControl.LayoutTransform>
                             <ScaleTransform ScaleX="0.65" ScaleY="0.65"/>
@@ -292,7 +318,8 @@
                      KbdDefaultSpeedControl, SignalsControl and FeedControl that used to occupy these
                      columns - see that spec for why none of them fitted the shape asked for. -->
                 <cnccontrols:RunStripPanel Grid.Column="3" Grid.ColumnSpan="2" x:Name="runStripPanel"
-                                           Margin="4,0,4,0" VerticalAlignment="Center"/>
+                                           Margin="4,0,4,0" VerticalAlignment="Center"
+                                           Visibility="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.ClassicRunStrip, Converter={StaticResource IsNotVisibleConverter}}"/>
             </Grid>
         </Border>
         <!-- Top margin clears the main-nav tab STRIP (header row only) so the always-visible flyout panels

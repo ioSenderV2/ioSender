@@ -771,9 +771,12 @@ namespace GCode_Sender
         // The single fixed run control + MDI at the main-window bottom (Phase 2c). JobView and other tabs
         // reach them here instead of hosting their own.
         public CNC.Controls.JobControl RunControl { get { return runControl; } }
-        // The run strip no longer hosts an MDI box (2026-08-10); null keeps the one caller
-        // (JobView's "is the MDI focused" keyboard-jog guard) working without a special case.
-        public CNC.Controls.MDIControl MdiControl { get { return null; } }
+        // The strip's MDI box, back as of the classic run strip (Base.ClassicRunStrip). Returned
+        // unconditionally rather than gated on the setting: IsFocused asks whether keyboard focus is inside
+        // the control, and a Collapsed control can never hold focus, so the answer is already correct with
+        // the box hidden. The caller is JobView's keyboard-jog guard - it must read true while g-code is
+        // being typed, or arrow keys would jog the machine instead of moving the caret.
+        public CNC.Controls.MDIControl MdiControl { get { return mdiStrip; } }
 
         public string BaseWindowTitle { get; set; }
 

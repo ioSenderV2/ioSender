@@ -356,6 +356,7 @@ namespace CNC.Controls
         private bool _showJogTargetButtons = false;
         private bool _showJobJogPad = true;
         private bool _showJobSplitView = false;
+        private bool _classicRunStrip = false;
         private bool _shutterRemote = false;
         private string _shutterRemoteDevice = string.Empty;
         private string _shutterRemoteName = string.Empty;
@@ -544,6 +545,21 @@ namespace CNC.Controls
         //
         // Notifies, so the checkbox takes effect immediately rather than on restart.
         public bool ShowJobSplitView { get { return _showJobSplitView; } set { if (_showJobSplitView != value) { _showJobSplitView = value; OnPropertyChanged(); } } }
+        // Classic run strip: strip the bottom bar back to what the original ioSender had for running a job -
+        // the run buttons, Home/Unlock/Reset, State/Check, the block counter and an MDI entry box. Hides this
+        // build's additions to the bar: the Jogging/Signals/Overrides columns, the DRO, the compact jog pad
+        // and the coolant toggles.
+        //
+        // The MDI is the one thing that comes BACK rather than being hidden. The bar's "MDI" button (which
+        // opens the console) is replaced by an inline entry box in classic mode - MDIControl in Bare mode,
+        // the same control the side panels use, so it keeps its command history and Send button. That box
+        // carries the Tag="MDI" its code-behind sets, which is what KeypressHandler.ProcessKeypress gates
+        // jogging on, so arrow keys typed into it can never move the machine.
+        //
+        // NOT a general "classic UI" switch: it governs the run strip only. Tab bar and panel arrangement
+        // are already data (Layout/TabsKeys, MainPanels/LeftPanels) and belong in a config overlay, not in
+        // a code path. Notifies, so the checkbox takes effect immediately rather than on restart.
+        public bool ClassicRunStrip { get { return _classicRunStrip; } set { if (_classicRunStrip != value) { _classicRunStrip = value; OnPropertyChanged(); } } }
         // Let a Bluetooth camera shutter remote drive the machine from arm's length: answer a prompt, feed
         // hold a running job, resume or stop a held one - see RemoteActions for exactly what a press means
         // where. It began as "release a height-map hold" (hence the old HeightMapRemote name, renamed when
