@@ -53,6 +53,9 @@ def read(rel):
 
 def array_items(source, name):
     """The string literals of a `static readonly string[] <name> = { ... };` declaration."""
+    # Strip // comments first: the declarations are commented heavily and the prose quotes words
+    # ("classic", "the 3.0 default"), which a bare literal scan would read as list entries.
+    source = re.sub(r'//[^\n]*', '', source)
     m = re.search(r'\b' + re.escape(name) + r'\s*=\s*\{(.*?)\}\s*;', source, re.S)
     if not m:
         raise SystemExit('could not find %s in %s' % (name, OVERLAY))

@@ -193,6 +193,11 @@
     <Content Include="Presets\ioSenderClassic.ioconfig">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- GENERATED from Default-App.config by tools/make-default-preset.py - do not hand-edit. A shipped
+         preset called "the 3.0 default" has to BE the default, and a snapshot of it goes stale silently. -->
+    <Content Include="Presets\DefaultV3.0.ioconfig">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\CNC Controls Camera\CNC Controls Camera\CNC Controls Camera.csproj">

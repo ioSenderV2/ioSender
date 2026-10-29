@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AppConfig version="2" name="DefaultV3.0">
+  <section key="Layout">
+    <LayoutNode>
+      <Component>MainWindow</Component>
+      <Slots>
+        <LayoutSlot>
+          <Name>tabs</Name>
+          <Items>
+            <LayoutNode>
+              <Component>GRBLConfig</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>FeedsAndSpeeds</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>StartJob</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>GRBL</Component>
+              <Slots>
+                <LayoutSlot>
+                  <Name>center</Name>
+                  <Items>
+                    <LayoutNode>
+                      <Component>Program</Component>
+                      <Slots />
+                    </LayoutNode>
+                    <LayoutNode>
+                      <Component>Toolpath3D</Component>
+                      <Slots />
+                    </LayoutNode>
+                    <LayoutNode>
+                      <Component>Console</Component>
+                      <Slots />
+                    </LayoutNode>
+                  </Items>
+                </LayoutSlot>
+              </Slots>
+            </LayoutNode>
+            <LayoutNode>
+              <Component>Offsets</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>SDCard</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>WorkOrder</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>MachineSetup</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>LatheWizards</Component>
+              <Slots />
+            </LayoutNode>
+          </Items>
+        </LayoutSlot>
+        <LayoutSlot>
+          <Name>menuFile</Name>
+          <Items />
+        </LayoutSlot>
+        <LayoutSlot>
+          <Name>menuTools</Name>
+          <Items>
+            <LayoutNode>
+              <Component>Probing</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>HeightMap</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>ToolTable</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>Trinamic</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>PID</Component>
+              <Slots />
+            </LayoutNode>
+          </Items>
+        </LayoutSlot>
+      </Slots>
+    </LayoutNode>
+  </section>
+  <section key="TabOrder">
+    <TabOrder />
+  </section>
+  <section key="Core" mode="merge">
+    <Config>
+      <TabsKeys>GRBLConfig,FeedsAndSpeeds,StartJob,GRBL,Offsets,SDCard,WorkOrder,MachineSetup,LatheWizards</TabsKeys>
+      <HiddenViewsKeys />
+      <MainPanelsKeys>UIJogging,KeyboardJogging,Goto,WorkParameters,Macros</MainPanelsKeys>
+      <FlyoutItemsKeys>ProgramLimits</FlyoutItemsKeys>
+      <LeftPanelsKeys>DRO,MachinePosition,Feed,Spindle,Coolant</LeftPanelsKeys>
+      <ClassicRunStrip>false</ClassicRunStrip>
+      <ShowJobSplitView>false</ShowJobSplitView>
+      <ShowJobJogPad>true</ShowJobJogPad>
+      <ShowJogTargetButtons>false</ShowJogTargetButtons>
+      <UseFriendlyRunLabels>false</UseFriendlyRunLabels>
+      <KeepMdiFocus>true</KeepMdiFocus>
+      <KeepWindowSize>true</KeepWindowSize>
+      <EscClosesTab>false</EscClosesTab>
+      <StatusWindowAutoCloseSeconds>10</StatusWindowAutoCloseSeconds>
+      <AutoSaveSettings>false</AutoSaveSettings>
+      <PromptOnSave>false</PromptOnSave>
+      <SoundOnLimit>None</SoundOnLimit>
+      <SoundOnProbe>None</SoundOnProbe>
+      <SoundOnAlarm>None</SoundOnAlarm>
+    </Config>
+  </section>
+</AppConfig>
