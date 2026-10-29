@@ -13,7 +13,9 @@
        marker embedded (as an HTML comment) in its body.
     2. Parses Overview.html's at-a-glance tables for every #N entry (description, tag),
        and picks out the ones numbered higher than the previous release's marker.
-    3. Computes the next version (2.1, 2.2, ... - seeds at 2.1 if there's no prior release).
+    3. Computes the next version (2.1, 2.2, ... - seeds at 2.1 if there's no prior release),
+       unless MainWindow's legacyVersion declares a HIGHER one, which is how a major bump
+       (2.41 -> 3.0) is expressed - see the block itself.
     4. Writes release notes (Markdown) listing the new entries, ending with the new
        "changelog-through:N" marker for the *next* run to read back.
     5. Stamps the TOC "ver" column in Overview.html for those newly-included entries.
@@ -93,11 +95,51 @@ if (-not $DryRun) {
 }
 
 # --- 2. Next version ---------------------------------------------------------
+# The default is minor+1 off the last published release, which is the rolling model: every push to
+# master is a release and nobody has to remember to bump anything.
+#
+# That alone CANNOT express a major bump. On 2026-10-28 the operator's call was that what leaves V2
+# is 3.0, not 2.42 - and with v2.41 published, this block could only ever compute 2.42, so a push
+# carrying a 3.0 binary would have been cut and tagged "2.41 + 1".
+#
+# So MainWindow's legacyVersion gets a vote: if it is HIGHER than the rolling number, it wins. That
+# is the same constant beta-release.yml reads to stamp a beta, so the beta a change was tested under
+# and the release it ships as cannot drift apart. It is deliberately one-directional - legacyVersion
+# can only push the version UP, never hold it back - so it self-heals: once 3.0 is published, the
+# rolling number becomes 3.1, which outranks a legacyVersion still reading "3.0", and the normal
+# behaviour resumes with nothing to clean up.
 if ($prevVersion) {
     $parts = $prevVersion.Split('.')
     $newVersion = "$($parts[0]).$([int]$parts[1] + 1)"
 } else {
     $newVersion = '2.1'   # seed - first versioned release
+}
+
+$mwPath = Join-Path (Split-Path $PSScriptRoot -Parent) 'ioSender XL\ioSender XL\MainWindow.xaml.cs'
+if (Test-Path $mwPath) {
+    $m = [regex]::Match([System.IO.File]::ReadAllText($mwPath), 'legacyVersion\s*=\s*"([^"]+)"')
+    if ($m.Success) {
+        $declared = $m.Groups[1].Value
+        # Same per-component integer compare the app's own CompareVersions uses, so "3.0" vs "2.42"
+        # is [3,0] vs [2,42] and the major wins - never a string compare, which would read "3.0"
+        # as lower than "2.42" on the second character.
+        function Compare-Ver($a, $b) {
+            $pa = @($a.Split('.') | ForEach-Object { $n = 0; [void][int]::TryParse($_, [ref]$n); $n })
+            $pb = @($b.Split('.') | ForEach-Object { $n = 0; [void][int]::TryParse($_, [ref]$n); $n })
+            for ($i = 0; $i -lt [Math]::Max($pa.Count, $pb.Count); $i++) {
+                $va = if ($i -lt $pa.Count) { $pa[$i] } else { 0 }
+                $vb = if ($i -lt $pb.Count) { $pb[$i] } else { 0 }
+                if ($va -ne $vb) { return $va - $vb }
+            }
+            return 0
+        }
+        if ((Compare-Ver $declared $newVersion) -gt 0) {
+            Write-Host "legacyVersion ($declared) outranks the rolling next version ($newVersion) - cutting $declared." -ForegroundColor Cyan
+            $newVersion = $declared
+        }
+    } else {
+        Write-Host "WARN: legacyVersion not found in MainWindow.xaml.cs - a major bump declared there would be missed." -ForegroundColor Yellow
+    }
 }
 
 # --- 3. Parse Overview.html: TOC rows are the authoritative "which entries exist" list -----

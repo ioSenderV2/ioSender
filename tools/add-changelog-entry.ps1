@@ -37,7 +37,7 @@ param(
     # Label for the "not released yet" TOC header created above the first entry added after a
     # release. Generic by default because this script runs locally and cannot derive the next
     # version number (that comes from the releases API at release time, in cut-release.ps1) or a
-    # PR number. Pass something specific - e.g. -PendingLabel 'Pending 2.42 (PR 20)' - when the
+    # PR number. Pass something specific - e.g. -PendingLabel 'Pending 3.0 (PR 20)' - when the
     # target version is actually known.
     [string]$PendingLabel = 'Unreleased',
     [switch]$Pdf

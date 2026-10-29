@@ -3,7 +3,7 @@ namespace GCode_Sender
     // Overwritten immediately before the CI build so the compiled binary can identify exactly which
     // commit/version it was built from - by .github/workflows/release.yml for a real release (the
     // version tools/cut-release.ps1 computed for that push), and by beta-release.yml for a PR beta
-    // ("<legacyVersion>.beta-pr<N>", e.g. 2.42.beta-pr20, which is what puts the beta's identity in
+    // ("<legacyVersion>.beta-pr<N>", e.g. 3.0.beta-pr20, which is what puts the beta's identity in
     // the window title). Local/dev builds keep the "dev" placeholders - Check for Updates treats
     // CommitSha == "dev" as "can't compare".
     //

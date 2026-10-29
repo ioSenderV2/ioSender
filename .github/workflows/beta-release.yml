@@ -28,17 +28,18 @@ jobs:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
-      # Without this a beta reported the same "2.42" as a local dev build and as the eventual real
-      # 2.42 release, so a tester could not tell what they were running. Mirrors release.yml's
+      # Without this a beta reported the same "3.0" as a local dev build and as the eventual real
+      # 3.0 release, so a tester could not tell what they were running. Mirrors release.yml's
       # "Embed build commit + version" step.
       #
       # The base number is READ from MainWindow's legacyVersion rather than hardcoded here, so it
       # follows the dev version automatically instead of silently going stale.
       #
       # Format is "<base>.beta-pr<N>" - DOTTED, deliberately. MainWindow.CompareVersions splits on
-      # "." and treats any unparseable part as 0, so "2.42.beta-pr20" reads as [2,42,0] and stays
-      # correctly newer than 2.41. A hyphenated "2.42-beta-pr20" would read as [2,0] - older than
-      # the last release - and the app would offer to "update" the beta back down to it.
+      # "." and treats any unparseable part as 0, so "3.0.beta-pr20" reads as [3,0,0] and stays
+      # correctly newer than 2.41. A hyphenated "3.0-beta-pr20" would read as [3,0] - which happens
+      # to compare equal here, but at 2.42 it read as [2,0], OLDER than the last release, and the
+      # app offered to "update" the beta back down to it. Keep the dot.
       - name: Embed build commit + beta version
         id: betaver
         shell: pwsh
