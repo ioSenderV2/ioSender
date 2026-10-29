@@ -87,26 +87,59 @@ namespace CNC.Core
         // applying it elsewhere produced an arrangement that was only half the one exported, with nothing
         // reporting the difference. Same class of omission as TabsKeys itself (see above). The lists are
         // persisted as comma-joined *Keys strings for the XmlSerializer-append reason given in AppConfig.
-        // The test for membership is "does this change the ARRANGEMENT of the screen", not "is it a UI
-        // preference" - a preset has to be able to reproduce a look, and must not drag the operator's
-        // working habits along with it when they try another one out.
-        //
-        // In: the tab bar and panel lists, and the four Settings > User Interface switches that decide what
-        // the Job tab and the run bar are MADE of - split view vs the centre tab strip, the jog pad, the
-        // pad's go-to buttons, and the run-strip density. Without those a "classic" preset cannot actually
-        // produce the classic screen: the centre would still be split and the pad still absent.
-        //
-        // Deliberately out: UiScale, which is a fact about the monitor in front of you, not about the
-        // arrangement - a preset shared between a laptop and a shop PC must not force one machine's zoom
-        // onto the other. Also out: KeepMdiFocus, EscClosesTab, KeepWindowSize, the auto-save pair and the
-        // status-window timeout, which are habits rather than layout.
+        // THE RULE: everything Settings > User Interface can change belongs to a preset, EXCEPT the four
+        // kinds of thing listed in UiLayoutExcluded below. Stated as "everything under that node, minus a
+        // named list" rather than as a hand-picked set, because a hand-picked set is unguessable from the
+        // outside and rots silently - which is how TabsKeys, then the three panel lists, then the Job-tab
+        // switches each came to be missing, each discovered only when a preset failed to reproduce a
+        // screen. tools/check-preset-coverage.py enforces it: a setting that appears on one of those pages
+        // and is in NEITHER list fails the check, so the next one cannot go missing quietly.
         public static readonly string[] UiLayoutCoreElements =
         {
+            // Tab bar and panel arrangement.
             "TabsKeys", "HiddenViewsKeys",
             "MainPanelsKeys", "FlyoutItemsKeys", "LeftPanelsKeys",
+            // What the Job tab and the run bar are MADE of. Without these a "classic" preset cannot produce
+            // the classic screen: the centre stays split and the pad stays absent.
             "ClassicRunStrip", "ShowJobSplitView", "ShowJobJogPad", "ShowJogTargetButtons",
-            "UseFriendlyRunLabels"
+            "UseFriendlyRunLabels",
+            // How the app behaves for you. Habits rather than layout, but they ARE user-interface settings,
+            // and switching presets is lossless - whatever you had is written back under the name you left.
+            "KeepMdiFocus", "KeepWindowSize", "EscClosesTab", "StatusWindowAutoCloseSeconds",
+            "AutoSaveSettings", "PromptOnSave",
+            // Feedback.
+            "SoundOnLimit", "SoundOnProbe", "SoundOnAlarm"
         };
+
+        // Settings on those same pages that a preset must NOT carry, each for a stated reason. The guard
+        // reads this list, so an exclusion is a decision on the record rather than an omission.
+        public static readonly string[] UiLayoutExcluded =
+        {
+            // PERSONAL INPUT BINDINGS. What a key or a button does is the operator's own muscle memory, and
+            // a preset arriving from somebody else must not reassign it. The shutter remote is in this class
+            // and not merely a preference: its buttons feed-hold and resume a RUNNING MACHINE, so a cosmetic
+            // preset switch has no business changing what a press does.
+            "ShutterRemoteEnabled", "ShutterRemoteSwapButtons",
+            "RemoteOnPrompt", "RemoteOnHeightMap", "RemoteOnRun", "RemoteOnHold", "RemoteOnIdle", "RemoteOnAlarm",
+            "RemoteRunPrimary", "RemoteRunSecondary", "RemoteHoldPrimary", "RemoteHoldSecondary",
+            "RemoteIdlePrimary", "RemoteIdleSecondary", "RemoteAlarmPrimary", "RemoteAlarmSecondary",
+            // HARDWARE IDENTITY. The raw-input path of one remote on one machine - the same class as
+            // NetworkHost and PortParams above, and meaningless anywhere else.
+            "ShutterRemoteDevice", "ShutterRemoteName", "ShutterRemotePrimaryCode",
+            // KEYBOARD SHORTCUTS, same reasoning as the KeyMap section below - these two live in Core
+            // rather than in it (tab-switch keys and the UI-zoom keys), so excluding the section is not
+            // enough to exclude them.
+            "TabShortcuts", "ActionShortcuts",
+            // PER-MONITOR. A preset shared between a laptop and a shop PC must not force one machine's zoom
+            // onto the other.
+            "UiScale"
+        };
+
+        // Whole App.config sections on the User Interface node that a preset does not carry, same reasoning.
+        // KeyMap is the keyboard bindings; Controller is the gamepad map (folded in from the old standalone
+        // ControllerMap.xml, so a section-level rule would otherwise sweep it in unnoticed). Macros are
+        // CONTENT - g-code the operator wrote - and live under that node only because the editor does.
+        public static readonly string[] UiLayoutExcludedSections = { "KeyMap", "Controller", "Macros" };
 
         // True if the document looks like something Apply can consume: a v2 <AppConfig> root with at
         // least one keyed <section>. (A legacy v1 <Config> document has no sections to layer.)
