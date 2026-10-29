@@ -9,7 +9,7 @@ the verify command, and the deny rules. Change behaviour there, not in the hook 
 
 ```powershell
 c:\github\claude-hub\tools\turn.ps1 status                       # what this turn has done
-powershell -File c:\github\claude-hub\hooks\test-gates.ps1       # 21-case gate regression suite
+pwsh -File c:\github\claude-hub\hooks\test-gates.ps1            # 21-case gate regression suite
 ```
 
 ---

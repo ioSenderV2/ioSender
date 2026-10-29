@@ -10,6 +10,26 @@
 Run these **in order**. The conversation-log step is LAST because the user's next prompt is almost
 always `/clear`.
 
+## 🔴 FIRST: which session is this? The sequence below assumes `integration` → `master`
+
+**Check the branch before step 1.** On a `pr/*` branch the steps below are not merely inapplicable —
+**step 3.6 is destructive**, and it was only skipped by hand on 2026-10-28 because someone noticed.
+
+| | **integration session** (the sequence below) | **PR / beta session** (`pr/*`) |
+|---|---|---|
+| **3 · push** | `origin/integration` + `v2/master`, via `tools\push-all.ps1` | **`v2 <branch>`**, e.g. `git push v2 pr/portable-core`. `push-all.ps1` names the wrong branches entirely. ⚠️ **While PR 20 carries the beta label, this push REPUBLISHES `vbeta-pr20`** — so a docs-only change is not worth a push on its own; ride it along with real work. |
+| **3.5 · wait for CI** | `release.yml` (`Rolling release`), via `tools\wait-for-release.ps1` | **`beta-release.yml`** — a PR push does not trigger `release.yml`, so `wait-for-release.ps1` waits for a run that will never appear. Watch the beta workflow instead (`gh run list --workflow beta-release.yml -L 3`). |
+| **3.6 · bump `legacyVersion`** | yes, as written | 🔴 **SKIP IT ENTIRELY.** |
+| **gate before step 6** | `tools\verify-pushed.ps1` | by hand — the gate cannot pass on a `pr/*` branch. See [capture_conversation_log.md](capture_conversation_log.md). |
+
+**Why 3.6 must be skipped, since "skip a version bump" sounds harmless.** On a beta branch
+`legacyVersion` is the **declared NEXT version** and the release has not happened yet, so the rule in
+3.6 computes the wrong thing from the right inputs: it says "latest GitHub release tag, minor+1", the
+latest release is still `v2.41`, and that yields **2.42** — silently reverting a deliberate **3.0**
+bump made minutes earlier, along with the beta version string `beta-release.yml` derives from that
+same constant. The constant is a declaration on a PR branch and a consequence on `master`; only the
+second one is what 3.6 describes.
+
 ## The sequence
 
 1. **Everything committed** on `integration`.
@@ -41,7 +61,7 @@ always `/clear`.
 5. **Write the end-of-session summary to chat** — the recap of what shipped (the message the user reads).
    Include the CI result from step 3.5.
 6. **THEN capture the conversation log** — → [capture_conversation_log.md](capture_conversation_log.md).
-   One command, ~1 s: it writes this session's HTML into `claude-hub\conversations\ioSender\`,
+   One command, ~1 s: it writes this session's HTML into `claude-hub\projects\ioSender\conversations\`,
    appends its record to that project's `sessions.json`, re-renders that index plus the
    cross-project roll-up, and commits itself into `claude-hub` (no push).
    **Running it is what defines the session boundary** — everything since
@@ -111,6 +131,26 @@ So:
 > is to **build the check into `convo-sessions.ps1`** (does the final turn's text appear in the HTML?)
 > so the script itself answers it. Until then: verify in the *next* session, not after the run.
 >
+> 🔴 **If a capture was INTERRUPTED and you cannot tell whether it ran — do not guess, and do not
+> re-run it blind. Ask:**
+>
+> ```powershell
+> pwsh -File c:\github\claude-hub\tools\capture-status.ps1
+> ```
+>
+> It writes nothing, and its "unfiled" figure comes from `convo-sessions.ps1 -Probe`, so it cannot
+> disagree with what a real capture would do. It resolves the project from the current directory, so
+> it works unchanged from an ioSender session.
+>
+> **Why it exists:** 2026-10-12, a capture was running, the user hit Escape thinking he was in a
+> different window, and the call was cancelled. **An interrupted capture and a failed capture look
+> identical from outside** — no record printed, nothing to say whether the session was filed. It was
+> restarted twice 48 seconds apart, and there was then no way to know whether that produced one
+> record, two, or a session folded onto the wrong one; answering it afterwards took a git-log
+> reconstruction and a hand-read of `sessions.json`. Escape cannot be made to confirm first — Claude
+> Code has no confirm-before-cancel action — so the fix is **observable state after the fact**, not a
+> harder interruption.
+>
 > Use **`-Amend`** only when a capture already ran for THIS sitting and turns need folding into it;
 > `-Amend` extends the most recent session, so on a first capture it would wrongly extend the previous
 > one.
@@ -122,17 +162,25 @@ message — so text written earlier *in the message* than the capture call is al
 sandwiched between tool calls. Never run the capture first and write the summary as trailing text — that
 pushed the summary into the following run, which is the original bug this ordering fixed (2026-07-08).
 
-## Ready command (step 3.5)
+## Ready command (step 3.5 — integration sessions only)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\wait-for-release.ps1
+pwsh -ExecutionPolicy Bypass -File tools\wait-for-release.ps1
 ```
 
 ## Ready command (step 6)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File c:\github\claude-hub\tools\convo-sessions.ps1
+cd c:\github\ioSender
+pwsh -ExecutionPolicy Bypass -File c:\github\claude-hub\tools\convo-sessions.ps1 -Project ioSender
 ```
+
+🔴 **`pwsh`, and `-Project ioSender`, and the `cd` — all three.** A bare `powershell` is Windows
+PowerShell **5.1**, whose `ConvertTo-Json` rewrites all of `sessions.json` in a different format;
+`-Project` defaults from the **current directory**, not from this playbook. Both failures print `OK`
+and commit, exactly as a correct run does. The full story, and the hand-check that replaces
+`verify-pushed.ps1` on a `pr/*` branch, is in
+[capture_conversation_log.md](capture_conversation_log.md).
 
 ## Notes
 
