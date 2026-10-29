@@ -279,3 +279,4 @@ ioSender.g.en-US.resources:mainwindow.baml,mnu_presetDelete:System.Windows.Contr
 ioSender.g.en-US.resources:mainwindow.baml,mnu_presetDelete:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Delete your copy of this layout. A layout that shipped with ioSender comes back when your copy is removed.
 ioSender.g.en-US.resources:mainwindow.baml,mnu_presetUndo:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Undo last switch
 ioSender.g.en-US.resources:mainwindow.baml,mnu_presetUndo:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Restore the configuration as it was immediately before the last layout switch. ioSender restarts.
+ioSender.g.en-US.resources:mainwindow.baml,lbl_classicStatusMessage:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,The most recent status message. Click to see the whole history since launch.
