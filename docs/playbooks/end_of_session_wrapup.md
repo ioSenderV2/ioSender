@@ -58,6 +58,36 @@ second one is what 3.6 describes.
    commits) so this metadata-only change doesn't itself trigger a release.
 4. **New docs published to gh-pages** (only if the manual changed).
    → [publish_manual_site.md](publish_manual_site.md).
+4a. **Queue anything this session found that belongs to ANOTHER project.** This is the moment you know
+   about it and the only moment you will — one project per session means you cannot go and fix it, and a
+   memory note is the wrong place because it is recalled by relevance, so it will not be in front of
+   anyone when that project opens.
+
+   ```powershell
+   pwsh -File c:\github\claude-hub\tools\pending.ps1 -Project <them> -Add "<what, and why it matters>"
+   ```
+
+   Write it so it is actionable **months** later: what to change, where, and what goes wrong if it is
+   not done. Add `-Now` only for something small and already agreed. The capture (step 6) commits the
+   hub, so there is nothing else to do here.
+4b. **Push the hub.** Steps 3/3.6 push ioSender's remotes; the hub is a second one, and nothing above
+   touches it. Since 2026-10-09 the capture pushes it too, so this is a backstop rather than the only
+   thing that does — run it anyway.
+
+   ```powershell
+   pwsh -File c:\github\claude-hub\tools\hub-push.ps1 -Project ioSender
+   ```
+
+   🔴 **`-Project ioSender`, spelled out — for a sharper reason than the capture's.** It stages only
+   this project's slice of the hub and reports what it left alone. Omitted, the project is
+   `git rev-parse --show-toplevel` of the working directory — and the Bash tool's working directory
+   **persists for the whole session**, so one `cd` into the hub to run a git command moves it for good.
+   That resolves `claude-hub`, which is the one project that **excludes nothing**, so the run sweeps up
+   exactly the other projects' half-written memory notes the scoping exists to leave alone — 30 such
+   files were measured dirty on 2026-09-30, none belonging to the session that would have pushed them.
+   `convo-sessions.ps1` now refuses the equivalent capture mistake; `hub-push.ps1` has **no such
+   guard**, and a named project cannot be guessed wrong in the first place. Never `git add -A` in the
+   hub from an ioSender session.
 5. **Write the end-of-session summary to chat** — the recap of what shipped (the message the user reads).
    Include the CI result from step 3.5.
 6. **THEN capture the conversation log** — → [capture_conversation_log.md](capture_conversation_log.md).
