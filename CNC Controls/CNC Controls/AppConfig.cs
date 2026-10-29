@@ -357,6 +357,7 @@ namespace CNC.Controls
         private bool _showJobJogPad = true;
         private bool _showJobSplitView = false;
         private bool _classicRunStrip = false;
+        private string _activePreset = string.Empty;
         private bool _shutterRemote = false;
         private string _shutterRemoteDevice = string.Empty;
         private string _shutterRemoteName = string.Empty;
@@ -560,6 +561,15 @@ namespace CNC.Controls
         // are already data (Layout/TabsKeys, MainPanels/LeftPanels) and belong in a config overlay, not in
         // a code path. Notifies, so the checkbox takes effect immediately rather than on restart.
         public bool ClassicRunStrip { get { return _classicRunStrip; } set { if (_classicRunStrip != value) { _classicRunStrip = value; OnPropertyChanged(); } } }
+        // The named screen arrangement this profile is currently tracking - see UiPresets. Empty means it
+        // is tracking none, which the selector shows as "Custom"; that is a real preset name there, so an
+        // unnamed arrangement is still written out before a switch replaces it.
+        //
+        // Deliberately NOT one of ConfigOverlay.UiLayoutCoreElements: a preset document must not carry the
+        // name of the preset it was exported from, or applying someone else's arrangement would relabel
+        // your own profile as theirs - and on a switch, the incoming Core merge would overwrite the very
+        // field that records which preset was just switched to.
+        public string ActivePreset { get { return _activePreset; } set { if (_activePreset != value) { _activePreset = value; OnPropertyChanged(); } } }
         // Let a Bluetooth camera shutter remote drive the machine from arm's length: answer a prompt, feed
         // hold a running job, resume or stop a held one - see RemoteActions for exactly what a press means
         // where. It began as "release a height-map hold" (hence the old HeightMapRemote name, renamed when

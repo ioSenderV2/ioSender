@@ -401,6 +401,7 @@
     <Compile Include="UiSoundConfigControl.xaml.cs">
       <DependentUpon>UiSoundConfigControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="UiPresets.cs" />
     <Compile Include="UiSounds.cs" />
     <Compile Include="UiSoundWatcher.cs" />
     <Compile Include="PanelFlyout.xaml.cs">
