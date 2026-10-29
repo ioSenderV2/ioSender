@@ -263,3 +263,19 @@ ioSender.g.en-US.resources:startjobview.baml,ls_scribesquare:System.Windows.Cont
 ioSender.g.en-US.resources:startjobview.baml,ls_scribesquare:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"CUTS a shallow square into the stock with the selected V-bit, inset 10mm from every edge of the measured frame, following the probed surface. Measure the scribed line against each stock edge afterwards: if the rotation is right the gap to the front edge is a constant 10mm end to end. Needs four probed corners and a V-bit selected."
 ioSender.g.en-US.resources:mainwindow.baml,mnu_manual:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_User manual
 ioSender.g.en-US.resources:mainwindow.baml,mnu_manual:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Open the user manual at the page for whatever you are looking at - the same thing F1 does. Assign a key to it under Settings &gt; Keyboard &gt; Top Level Menu Items.
+ioSender.g.en-US.resources:mainwindow.baml,lbl_presetCaption:System.Windows.Controls.TextBlock.Text,Text,True,True,,Layout:
+ioSender.g.en-US.resources:mainwindow.baml,cbo_preset:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"The screen arrangement in use. Switching saves the one you are leaving under its own name first, so nothing you changed is lost. Right-click for save, export and folder."
+ioSender.g.en-US.resources:mainwindow.baml,mnu_presetSave:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Save changes to this layout
+ioSender.g.en-US.resources:mainwindow.baml,mnu_presetSave:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Write the arrangement as it stands now into this preset's own file.
+ioSender.g.en-US.resources:mainwindow.baml,mnu_presetSaveAs:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Save as _new layout...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_presetSaveAs:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Keep the current arrangement under a new name, and switch to tracking that name. No restart - nothing on screen changes."
+ioSender.g.en-US.resources:mainwindow.baml,mnu_presetExport:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Export to a file...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_presetExport:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,"Save this layout as a file you can send to someone else. The connection port, network host and machine are never included."
+ioSender.g.en-US.resources:mainwindow.baml,mnu_presetImport:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Import from a file...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_presetImport:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Add a layout file someone sent you. A copy is kept in your Presets folder; nothing is applied until you pick it from the list.
+ioSender.g.en-US.resources:mainwindow.baml,mnu_presetFolder:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,Open layouts _folder
+ioSender.g.en-US.resources:mainwindow.baml,mnu_presetFolder:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Open the folder holding your saved layouts.
+ioSender.g.en-US.resources:mainwindow.baml,mnu_presetDelete:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Delete this layout...
+ioSender.g.en-US.resources:mainwindow.baml,mnu_presetDelete:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Delete your copy of this layout. A layout that shipped with ioSender comes back when your copy is removed.
+ioSender.g.en-US.resources:mainwindow.baml,mnu_presetUndo:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Undo last switch
+ioSender.g.en-US.resources:mainwindow.baml,mnu_presetUndo:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Restore the configuration as it was immediately before the last layout switch. ioSender restarts.
