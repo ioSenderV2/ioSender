@@ -22,19 +22,23 @@ namespace CNC.Core
 
         public static string BackupsFolder { get { return System.IO.Path.Combine(ConfigPath, "Backups"); } }
 
-        // The operator's own library of configuration overlays (.ioconfig fragments - see
-        // CNC Core/ConfigOverlay.cs), listed by Settings > User Interface > Overlay. "Browse PC..." copies
-        // what it is handed in here, so an overlay someone emailed survives being applied from the
-        // Downloads folder and can be re-applied later without hunting for the original.
+        // UI presets - named screen arrangements the operator switches between (the selector in the menu
+        // row; see UiPresets.cs). One file per preset, in the .ioconfig document format ConfigOverlay
+        // already defines, so a preset IS shareable as an overlay and "Export" is a straight file copy.
         //
-        // Not seeded from anything: overlays that ship with the build are listed from their own folder
-        // beside the executable and never copied here, so this folder only ever holds what the operator
-        // put in it. (A "copy it in if absent" step is how a deleted file comes back on the next launch.)
-        public static string OverlaysFolder { get { return System.IO.Path.Combine(ConfigPath, "Overlays"); } }
+        // A preset differs from an overlay in lifetime, not in format: an overlay is a patch applied once
+        // and then indistinguishable from the profile, whereas the file under here stays the live copy of
+        // that named arrangement and is written back whenever the operator switches away from it.
+        public static string PresetsFolder { get { return System.IO.Path.Combine(ConfigPath, "Presets"); } }
 
-        // Overlays shipped with the build, listed read-only alongside the operator's own. Absent in a
-        // normal checkout - nothing ships one yet.
-        public static string ShippedOverlaysFolder { get { return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Overlays"); } }
+        // Presets shipped with the build, offered read-only alongside the operator's own. Editing one and
+        // switching away writes the edited copy into PresetsFolder under the same name, which SHADOWS the
+        // shipped file - the install folder is never written to (it may not even be writable), and the
+        // original stays recoverable by deleting the shadow.
+        //
+        // Deliberately not copied into the per-user folder at startup: a "copy it in if absent" step is
+        // exactly how a file the operator deleted comes back on the next launch.
+        public static string ShippedPresetsFolder { get { return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Presets"); } }
 
         // Shared by the crash log, debug log and console log: resolve (and create) the "logs"
         // subfolder under the config dir, falling back to %AppData%\ioSender\logs (ConfigPath may

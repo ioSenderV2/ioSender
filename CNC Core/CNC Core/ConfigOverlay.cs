@@ -81,7 +81,18 @@ namespace CNC.Core
         //
         // Note the element names: Tabs/HiddenViews are [XmlIgnore] List<string>; what is actually persisted
         // are the comma-joined TabsKeys/HiddenViewsKeys strings, and those are what an overlay must carry.
-        public static readonly string[] UiLayoutCoreElements = { "TabsKeys", "HiddenViewsKeys" };
+        //
+        // 2026-10-28: the three panel lists and the run-strip density joined them. They were missing, which
+        // meant an exported "screen layout" carried the TAB BAR but not the panels inside the tabs - so
+        // applying it elsewhere produced an arrangement that was only half the one exported, with nothing
+        // reporting the difference. Same class of omission as TabsKeys itself (see above). The lists are
+        // persisted as comma-joined *Keys strings for the XmlSerializer-append reason given in AppConfig.
+        public static readonly string[] UiLayoutCoreElements =
+        {
+            "TabsKeys", "HiddenViewsKeys",
+            "MainPanelsKeys", "FlyoutItemsKeys", "LeftPanelsKeys",
+            "ClassicRunStrip"
+        };
 
         // True if the document looks like something Apply can consume: a v2 <AppConfig> root with at
         // least one keyed <section>. (A legacy v1 <Config> document has no sections to layer.)
