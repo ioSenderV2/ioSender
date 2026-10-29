@@ -1802,11 +1802,36 @@ namespace GCode_Sender
             if (flat.HasValue)
                 sb.AppendFormat("\nFlatness (Z range): {0}", FormatLen(flat.Value));
 
+            // TWO DIFFERENT QUANTITIES, on two lines, because they were one line reading as a number and its
+            // restatement - "Squareness: skew -0.009° (diagonal Δ 0.361)" - and an operator cannot tell from
+            // that which one to believe when they disagree. Reported 2026-10-28 on stock measured 319.743 x
+            // 199.518, where the two were ALSO bit-identical to the Flatness Z range above, so it read like
+            // the parenthetical was printing the wrong variable.
+            //
+            // It was not. Recomputed from that run's own stored corners (App.config's v1| measurement string):
+            // flatness 0.3610, skew -0.00948°, diagonal delta 0.3612 - every reported figure reproduces, and
+            // the match with flatness is a coincidence at three decimals, from unrelated arithmetic.
+            //
+            // They disagree because they measure different things. Skew is the angle at the FL corner, from
+            // corners 1/2/3 - what Verify skew writes as the WCS rotation. The diagonal delta needs all four
+            // and catches the whole quad's departure from a rectangle, which on that board was its back edge
+            // running 0.346 mm longer than its front: a skew of -0.009° on its own predicts a delta of 0.056,
+            // not 0.361. So the edge lengths go out too - they are free, they are what makes a nonzero delta
+            // mean something, and without them the number is unactionable.
             double? skew = SkewDegrees(), diag = DiagonalDelta();
-            if (skew.HasValue && diag.HasValue)
-                sb.AppendFormat("\nSquareness: skew {0}°   (diagonal Δ {1})",
-                    skew.Value.ToString("0.###", CultureInfo.InvariantCulture),
-                    FormatLen(diag.Value));
+            if (skew.HasValue)
+                sb.AppendFormat("\nSquareness: corner skew {0}°", skew.Value.ToString("0.###", CultureInfo.InvariantCulture));
+
+            // Gated on its own, not on skew: the delta needs corner 4, the angle does not.
+            if (diag.HasValue)
+            {
+                sb.AppendFormat("\nDiagonals differ: {0}", FormatLen(diag.Value));
+                sb.AppendFormat("   (front {0} / back {1}, left {2} / right {3})",
+                    FormatLen(cornerX[2].Value - cornerX[1].Value),
+                    FormatLen(cornerX[4].Value - cornerX[3].Value),
+                    FormatLen(cornerY[3].Value - cornerY[1].Value),
+                    FormatLen(cornerY[4].Value - cornerY[2].Value));
+            }
 
             // Vise-only: SkewDegrees()/DiagonalDelta() need a full 4-corner XY quad, which the vise never has
             // (corners 1/3 are Y-face-blocked - see BuildViseProgram). This is its own left-edge-vs-jaw-Y-face
