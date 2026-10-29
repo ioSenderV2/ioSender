@@ -186,6 +186,13 @@
     <Content Include="Default-App.config">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- Shipped UI presets, copied into a "Presets" folder beside the exe - which is exactly
+         Resources.ShippedPresetsFolder, so the Layout selector lists them read-only alongside the
+         operator's own without anything being copied into their profile. Editing one and switching away
+         writes the edit into %AppData%\ioSender\Presets under the same name, shadowing this copy. -->
+    <Content Include="Presets\ioSenderClassic.ioconfig">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\CNC Controls Camera\CNC Controls Camera\CNC Controls Camera.csproj">

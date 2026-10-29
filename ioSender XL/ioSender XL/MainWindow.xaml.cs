@@ -860,18 +860,12 @@ namespace GCode_Sender
                 AppConfig.LastLoadWarnings = null;
             }
 
-            // Confirm an overlay actually landed, naming the sections it changed. Without this the operator
-            // restarts into a screen that looks different and has only the layout itself as evidence - and an
-            // overlay that silently applied NOTHING (wrong file) would look identical to one that worked.
-            if (AppConfig.LastOverlayApplied?.Count > 0)
-            {
-                AppDialogs.Show(this,
-                    (string.IsNullOrEmpty(AppConfig.LastOverlayName) ? "A configuration overlay" : "\"" + AppConfig.LastOverlayName + "\"")
-                    + " has been applied. It changed:\n\n    " + string.Join("\n    ", AppConfig.LastOverlayApplied)
-                    + "\n\nHelp > Support > Undo configuration overlay puts your previous configuration back.",
-                    "Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Information);
-                AppConfig.LastOverlayApplied = new List<string>();
-            }
+            // The "a configuration overlay has been applied" notice that stood here is gone. It existed
+            // because an overlay left no trace: you restarted into a different-looking screen with only the
+            // layout itself as evidence, and one that silently applied NOTHING looked identical to one that
+            // worked. The Layout selector answers both questions permanently - it names the preset in the
+            // menu row and in the window title, so a switch that did not take is visible without a modal
+            // standing between the operator and the machine on every launch.
 
             // Lathe Wizards is never added to the tab bar at all while lathe mode is off (SetTabPresent
             // proactively omits it, rather than adding-then-pruning like other IAvailabilityGated views) -

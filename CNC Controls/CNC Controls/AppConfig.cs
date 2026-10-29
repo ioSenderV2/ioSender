@@ -1316,10 +1316,9 @@ namespace CNC.Controls
         private static string _overlayPath;
         private static bool _overlayPersist;
 
-        // Section keys the last load actually applied from an overlay, for the post-restart notice and the
-        // log. Empty when no overlay was layered - "nothing applied" must be distinguishable from "applied".
-        public static List<string> LastOverlayApplied = new List<string>();
-        public static string LastOverlayName;
+        // (The two statics that recorded what the last load applied are gone with the post-restart notice
+        //  they fed - see MainWindow's note where that dialog used to be. What a load layered on is still
+        //  recorded, in the debug log below, which is where a question about it is actually answered.)
 
         /// <summary>
         /// Stage <paramref name="sourceFile"/> to be layered onto this profile on the next launch, taking a
@@ -1439,10 +1438,10 @@ namespace CNC.Controls
                 applied = new List<string>();
             }
 
-            LastOverlayApplied = applied;
-            LastOverlayName = name;
-            CNC.Core.DebugLog.Write("config", string.Format("overlay {0}: {1} section(s) applied [{2}]",
-                                    Path.GetFileName(_overlayPath), applied.Count, string.Join(", ", applied)));
+            CNC.Core.DebugLog.Write("config", string.Format("overlay {0}{1}: {2} section(s) applied [{3}]",
+                                    Path.GetFileName(_overlayPath),
+                                    string.IsNullOrWhiteSpace(name) ? "" : " (\"" + name + "\")",
+                                    applied.Count, string.Join(", ", applied)));
 
             return applied.Count > 0;
         }
