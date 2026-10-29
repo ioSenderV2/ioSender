@@ -66,6 +66,45 @@ namespace GCode_Sender
         // Legacy fallback for local/dev builds (BuildInfo.Version == "dev", not embedded by CI).
         private const string legacyVersion = "3.0";
         public static string Version { get { return BuildInfo.Version == "dev" ? legacyVersion : BuildInfo.Version; } }
+
+        /// <summary>
+        /// Everything needed to identify exactly which build this is, as one line. Written as the first
+        /// status message at startup, because "which version is this" is the first question asked of any
+        /// log that gets handed over - and until now a status log carried no answer at all.
+        ///
+        /// Four parts, because they CAN disagree and each one answers a different question:
+        ///   - Version       what the title bar, splash and About box show. CI-stamped for a release or a
+        ///                   PR beta ("3.0.beta-pr20"), legacyVersion for a local dev build.
+        ///   - assembly      AssemblyVersion, which is what a crash report and the hang-watchdog report
+        ///                   identify themselves by - so this is the line that ties those to a release.
+        ///   - commit        the exact source. "dev" locally; a real sha only in a CI build.
+        ///   - Debug/x86     configuration and bitness. The app runs 32-bit under WOW64 (see the
+        ///                   GetWindowLongPtr comment below), which is the context an OutOfMemory needs.
+        /// </summary>
+        public static string VersionBanner
+        {
+            get
+            {
+                string asm = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "?";
+
+                // A CI sha is 40 characters and would dominate the line; 12 is unambiguous for git and
+                // still greppable. "dev" is left exactly as it is - truncating it would hide that this
+                // is an unstamped local build, which is the single most useful thing the field says.
+                string commit = BuildInfo.CommitSha;
+                if (commit != "dev" && commit.Length > 12)
+                    commit = commit.Substring(0, 12);
+
+#if DEBUG
+                const string config = "Debug";
+#else
+                const string config = "Release";
+#endif
+                return string.Format("ioSender {0} - assembly {1}, commit {2}, {3} build, {4}",
+                                      Version, asm, commit, config,
+                                      Environment.Is64BitProcess ? "x64" : "x86");
+            }
+        }
+
         public static MainWindow ui = null;
 
         /// <summary>
@@ -110,6 +149,16 @@ namespace GCode_Sender
             InitializeComponent();
 
             ui = this;
+
+            // The FIRST line into the status log, before anything else here can post one: which build
+            // this is. StatusLog.Init (App.OnStartup, well before this constructor) has already opened
+            // the file and written its run-started banner, so this lands immediately under it.
+            //
+            // Routed through the normal funnel rather than StatusLog.Write so it reaches BOTH the Status
+            // window and the durable file in one line. LogDetail, not Message: Message would also replace
+            // the one-line status readout, and the build identity is not a headline. Not an error either,
+            // so it cannot auto-pop the window - only isError does that (see FlashMessage).
+            (DataContext as GrblViewModel)?.LogDetail(VersionBanner);
 
             UpdateFusionAddinMenu();
             CheckFusionAddinUpdated();
