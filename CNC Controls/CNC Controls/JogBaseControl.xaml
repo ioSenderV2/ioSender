@@ -32,6 +32,8 @@
                 <ResourceDictionary>
                     <local:EnumValueToBooleanConverter x:Key="EnumToCheckedConverter" />
                     <local:BoolToVisibleConverter x:Key="IsVisibleConverter" />
+                    <!-- Hides without giving up the space - see the go-to button between Z+ and Z-. -->
+                    <local:BoolToVisibleHiddenConverter x:Key="IsVisibleHiddenConverter" />
                     <local:LogicalNotConverter x:Key="IsNotVisibleConverter">
                         <local:LogicalNotConverter.FinalConverter>
                             <local:BoolToVisibleConverter />
@@ -167,8 +169,16 @@
                          The list is built as it opens (GotoTargets_Click): which fixtures exist, which
                          stored positions are set, and which offsets are non-zero all change while this
                          control is on screen. -->
+                    <!-- Hidden with the corner/centre buttons by Show go-to buttons on the jog pad: it is one
+                         of them - it rapids to a stored place - so gating four of the five and leaving this
+                         one was the inconsistency, not a choice.
+                         HIDDEN, not Collapsed, unlike the corner buttons: those sit in fixed 60px grid cells
+                         that hold their space regardless, whereas this is in a StackPanel, so collapsing it
+                         would pull Z- up into the gap and move the pad's geometry. Hidden keeps the empty
+                         square this button was added into (see the margin note above). -->
                     <Button x:Uid="btn_jogGoto" x:Name="btnJogGoto" Style="{StaticResource JogButtonStyle}" Margin="0,5,0,0"
-                            Click="GotoTargets_Click" ToolTip="Go to a stored position - a fixture, G28/G30, or a work offset. Retracts Z first, then travels in X and Y.">
+                            Click="GotoTargets_Click" ToolTip="Go to a stored position - a fixture, G28/G30, or a work offset. Retracts Z first, then travels in X and Y."
+                            Visibility="{Binding Source={x:Static local:AppConfig.Settings}, Path=Base.ShowJogTargetButtons, Converter={StaticResource IsVisibleHiddenConverter}}">
                         <Button.ContextMenu>
                             <ContextMenu/>
                         </Button.ContextMenu>

@@ -3006,6 +3006,14 @@ namespace GCode_Sender
             ShowMessageLog(autoPopped: false);
         }
 
+        // The classic run strip's message line, which stands in for the Status button. A separate handler
+        // because MouseLeftButtonUp wants a MouseButtonEventHandler - ViewStatus_Click's RoutedEventArgs
+        // signature does not satisfy that delegate.
+        private void ClassicStatusMessage_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            ShowMessageLog(autoPopped: false);
+        }
+
         /// <summary>
         /// Update the log window's text if it happens to be open, and do nothing at all if it is not.
         /// The quiet counterpart to ShowMessageLog: a routine message keeps an already-open window

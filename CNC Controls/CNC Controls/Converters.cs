@@ -709,6 +709,21 @@ namespace CNC.Controls
         }
     }
 
+    // Like BoolToVisibleConverter but false -> HIDDEN, so the element keeps the space it occupies.
+    // For a control inside a StackPanel whose neighbours must not move when it is turned off - the jog
+    // pad's go-to button between Z+ and Z-, which collapsing would let Z- slide up into.
+    public class BoolToVisibleHiddenConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is bool && (bool)value ? Visibility.Visible : Visibility.Hidden;
+        }
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is Visibility && (Visibility)value == Visibility.Visible;
+        }
+    }
+
     // Inverse of BoolToVisibleConverter: false -> Visible, true -> Collapsed. Handy for the two-state
     // program-view header (Load buttons visible when NO file is loaded).
     public class NotBoolToVisibleConverter : IValueConverter

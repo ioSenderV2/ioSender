@@ -315,9 +315,22 @@
                                  reachable without a permanent strip of screen spent on it. It lives in the
                                  grid's Auto column, right-aligned: the right edge of the left group, hard
                                  against the DRO that starts the next column. -->
+                            <!-- Classic run strip: the message line the original ioSender carried in its status
+                                 bar, in the cell the coolant toggles vacate. Bound to the same Message the
+                                 classic status bar was, so it says the same thing at the same moment.
+                                 It is CLICKABLE and the tooltip says so: classic had no history at all, and
+                                 the Status button it replaces is the only route to the log, so making the
+                                 text itself open the log keeps the function while losing the button. Trimmed
+                                 rather than wrapped - a long message must not change the strip's height. -->
+                            <TextBlock x:Uid="lbl_classicStatusMessage" x:Name="lblClassicStatusMessage" Grid.Column="0"
+                                       Text="{Binding Path=Message}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                                       VerticalAlignment="Center" Cursor="Hand" MouseLeftButtonUp="ClassicStatusMessage_Click"
+                                       Visibility="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.ClassicRunStrip, Converter={StaticResource IsVisibleConverter}}"
+                                       ToolTip="The most recent status message. Click to see the whole history since launch."/>
                             <Button x:Uid="btn_viewStatus" x:Name="btnViewStatus" Grid.Column="1" Content="Status"
                                     Padding="10,2" Margin="16,0,0,0" HorizontalAlignment="Right" VerticalAlignment="Center"
                                     Click="ViewStatus_Click"
+                                    Visibility="{Binding Source={x:Static cnccontrols:AppConfig.Settings}, Path=Base.ClassicRunStrip, Converter={StaticResource IsNotVisibleConverter}}"
                                     ToolTip="Show the status message history since launch."/>
                             <!-- Jog distance / feed / kbd speed used to sit here, on the State line. They moved
                                  to their own "Jog config" column in the right-hand group (2026-08-09 layout
