@@ -40,6 +40,9 @@ second one is what 3.6 describes.
 1. **Everything committed** on `integration`.
 2. **Changelog updated** — new `#N` entry in `Overview.html` + `Overview.pdf` regen.
    → [add_changelog_entry.md](add_changelog_entry.md), [regenerate_overview_pdf.md](regenerate_overview_pdf.md).
+   Then `pwsh -File tools\check-release-notes-counts.ps1` — silent no-op unless a
+   `docs\release-notes\<version>.md` is pending, in which case the entry you just added has made its
+   opening sentence wrong.
 3. **Pushed all the way to remote** — `origin/integration` **and** `v2/master`. → `tools\push-all.ps1`
    (checks ahead/behind, pushes both, verifies both refs land; `-DryRun` to preview).
 3.5. **Wait for the rolling-release CI build to finish** — the push to `v2/master` triggers
