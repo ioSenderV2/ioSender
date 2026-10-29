@@ -202,6 +202,7 @@ namespace CNC.Controls
             model.ConfigControls.Add(new UiGeneralConfigControl());
             model.ConfigControls.Add(new UiSoundConfigControl());
             model.ConfigControls.Add(new UiRemoteConfigControl());
+            model.ConfigControls.Add(new UiOverlayConfigControl());
             model.ConfigControls.Add(new OddJobsSettingsControl());
             model.ConfigControls.Add(new JogUiConfigControl());
             model.ConfigControls.Add(new JogConfigControl());
