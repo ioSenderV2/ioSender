@@ -52,7 +52,11 @@
     "6. LOCALE, while the user tests: $env:PYTHONIOENCODING=\"utf-8\"; python tools/locadd.py",
     "7. HAND OFF - say plainly what to test. The turn ends here.",
     "",
-    "HARD RULES (hook-enforced, do not attempt): no -testserver unless asked THIS turn and only against",
-    "-simulator; no git push / release inside a turn (that is end-of-session); push remote is v2, not origin."
+    "HARD RULE (HOOK-ENFORCED, do not attempt): no -testserver unless asked THIS turn and only against",
+    "-simulator. That one is a real deny and four gate cases prove it.",
+    "NOT HOOKED - IT IS ON YOU: push and release are an END-OF-SESSION STEP, not a mid-turn action, and",
+    "the push remote is v2, never origin. Nothing blocks a push. The deny was deleted 2026-09-01 after it",
+    "refused four legitimate pushes by keying off the user's phrasing, so when the user ASKS for a push,",
+    "DO IT - three gate cases exist to keep that from being re-broken."
   ]
 }

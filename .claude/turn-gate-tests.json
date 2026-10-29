@@ -7,7 +7,18 @@
     "The testserver cases exist because on 2026-07-21 an unrequested -testserver run sent MDI",
     "commands to the real controller mid-homing. The push cases exist because ioSender once froze a",
     "restated copy of the hub's push rule and silently lost its later widening - 'lets get them",
-    "pushed' was denied for weeks. They guard the inherited rule, so a future restatement fails here."
+    "pushed' was denied for weeks. They guard the inherited rule, so a future restatement fails here.",
+    "",
+    "THE 'push mid-turn is blocked' CASE IS GONE (2026-10-29) AND MUST NOT COME BACK AS A DENY.",
+    "It expected DENY and had been FAILING since 2026-09-01, when the hub's push deny was deleted for",
+    "refusing four legitimate pushes - it keyed off the USER'S PHRASING, which is not a signal about",
+    "what is happening. So the case asserted a guard that no longer existed, which is working rule 2's",
+    "own shape (prose claiming a check exists is not a check) sitting in our turn config, and the",
+    "injected checklist said 'hook-enforced' on its authority. Both corrected together: turn-config.json",
+    "now files push under 'NOT HOOKED - IT IS ON YOU', an end-of-session step rather than a block.",
+    "The three allow cases BELOW are the live half and are what this file still guards: re-adding a",
+    "deny keyed on wording would fail them. If a push deny is ever wanted again it has to key on",
+    "something real - turn state, not the user's sentence."
   ],
   "cases": [
     {
@@ -41,10 +52,10 @@
       "expect": "allow"
     },
     {
-      "name": "push mid-turn is blocked",
+      "name": "push mid-turn is NOT blocked (the deny is gone - see the comment)",
       "prompt": "add a Feed Rate column to the job grid",
       "command": "git push v2 pr/portable-core",
-      "expect": "DENY"
+      "expect": "allow"
     },
     {
       "name": "inherited push rule: past tense (froze once, must not again)",
