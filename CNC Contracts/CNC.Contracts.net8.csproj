@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    PORTABILITY PROBE for CNC.Contracts - not part of ioSender XL.sln and never shipped, same
+    two-project pattern as CNC Core / CNC.Core.net8.csproj and for the same reason: the VS MSBuild
+    that builds the solution (17.6) cannot resolve SDK-style net8.0 projects, so those stay out of
+    the .sln and build with dotnet. CNC.Core.net8.csproj references this project, so the existing
+    probe build asserts the contracts compile for net8.0 too.
+
+    Build it alone with:  dotnet build "CNC Contracts/CNC.Contracts.net8.csproj"
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>CNC.Contracts</AssemblyName>
+    <RootNamespace>CNC.Contracts</RootNamespace>
+    <LangVersion>7.3</LangVersion>              <!-- match what the net462 compiler accepts -->
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <BaseOutputPath>bin\net8probe\</BaseOutputPath>
+    <!-- BaseIntermediateOutputPath + MSBuildProjectExtensionsPath come from Directory.Build.props in
+         this folder - set here they are too late for NuGet and its assets file lands in the shared
+         obj\, breaking the legacy CNC.Contracts.csproj build. See that file's comment. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="*.cs" Exclude="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,263 @@
+/*
+ * UiSounds.cs - part of CNC Controls library for Grbl
+ *
+ * The catalogue of sounds Settings > User Interface > Sound can attach to a machine event, and the
+ * player that sounds them.
+ *
+ * Modelled on RemoteFunctions: a static catalogue of Id/Label entries bound straight to a ComboBox,
+ * with "None" first and an unknown id resolving to it. Same reason, too - a setting that cannot be
+ * understood must read as "do nothing", never as something that happens.
+ *
+ * ONE SETTING PER EVENT, holding one of three things: "None", a catalogue id, or a full path to the
+ * operator's own .wav. A path is recognised by not being in the catalogue, which keeps a custom
+ * choice from needing a second setting beside each of the three (and a second to keep in step).
+ *
+ * .wav only, through System.Media.SoundPlayer. That is the format every sound Windows ships is in,
+ * it needs no reference beyond System, and it cannot pull in a media stack that might block the UI
+ * thread or need a codec the box does not have. An mp3 picked from the Browse dialog is refused
+ * where it is chosen, in the settings panel, rather than failing silently later when a limit trips.
+ */
+
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Media;
+
+namespace CNC.Controls
+{
+    public static class UiSounds
+    {
+        public class Sound
+        {
+            // PROPERTIES, NOT FIELDS - WPF binds only to properties. RemoteFunctions.cs carries the
+            // same note and the incident behind it: a ComboBox over a type whose Label is a field
+            // renders a popup of the right height full of blank rows, silently.
+            public string Id { get; set; }
+            public string Label { get; set; }
+            public string File { get; set; }        // null for None; a file name under the Windows media folder
+            public override string ToString() { return Label; }
+        }
+
+        public const string None = "None";
+
+        /// <summary>Marker id the panel's ComboBox uses for "Browse...", never stored in a setting.</summary>
+        public const string Browse = "Browse";
+
+        private static readonly string MediaDir =
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Media");
+
+        // Candidates, in the order they are offered. Every one of these ships with Windows 10 and 11,
+        // but the list is FILTERED BY EXISTENCE when the catalogue is built - a box with a trimmed
+        // install, or a future Windows that drops one, must not offer a sound that cannot play. The
+        // labels say what the sound is like, not what Microsoft called the file, because "Windows
+        // Notify System Generic" tells an operator nothing about what they are about to hear.
+        private static readonly Sound[] Candidates = new Sound[]
+        {
+            new Sound { Id = "Ding",      Label = "Ding - short and soft",        File = "ding.wav" },
+            new Sound { Id = "Notify",    Label = "Notify - two soft tones",      File = "Windows Notify System Generic.wav" },
+            new Sound { Id = "Chime",     Label = "Chime - three rising notes",   File = "chimes.wav" },
+            new Sound { Id = "Chord",     Label = "Chord - mellow, descending",   File = "chord.wav" },
+            new Sound { Id = "Exclaim",   Label = "Exclaim - attention",          File = "Windows Exclamation.wav" },
+            new Sound { Id = "Critical",  Label = "Critical - urgent, insistent", File = "Windows Critical Stop.wav" },
+            new Sound { Id = "Error",     Label = "Error - hard, two tones",      File = "Windows Error.wav" },
+            new Sound { Id = "Hardware",  Label = "Hardware - low thud",          File = "Windows Hardware Fail.wav" },
+            new Sound { Id = "Tada",      Label = "Tada - cheerful flourish",     File = "tada.wav" },
+        };
+
+        private static ObservableCollection<Sound> _items;
+
+        /// <summary>
+        /// The catalogue for binding a ComboBox's ItemsSource: None, then every candidate whose file
+        /// is actually present, then any file the operator has chosen, then Browse. Built once - the
+        /// Windows media folder does not change while the app runs, and a settings page should not
+        /// stat ten files every time it is shown.
+        ///
+        /// OBSERVABLE, and shared by all three rows, so that a file chosen for one event appears
+        /// immediately in the other two - wanting the same custom sound on two events is likely, and
+        /// browsing to the same file twice to get it would be silly. A plain list would need every
+        /// ComboBox rebound by hand after each Browse.
+        /// </summary>
+        public static IList<Sound> Items
+        {
+            get
+            {
+                if (_items == null)
+                {
+                    var list = new ObservableCollection<Sound> { new Sound { Id = None, Label = "None", File = null } };
+                    foreach (var s in Candidates)
+                    {
+                        try
+                        {
+                            if (File.Exists(Path.Combine(MediaDir, s.File)))
+                                list.Add(s);
+                        }
+                        catch { }   // an unreadable media folder means no built-in sounds, not a crash
+                    }
+                    list.Add(new Sound { Id = Browse, Label = "Browse for a sound file...", File = null });
+                    _items = list;
+                }
+                return _items;
+            }
+        }
+
+        /// <summary>
+        /// Make sure a chosen file path is IN the catalogue, so a ComboBox bound by SelectedValuePath
+        /// can actually select it - a SelectedValue with no matching item silently selects nothing,
+        /// which would read as "None" and lose the operator's choice. Returns the entry, existing or
+        /// new. Inserted before Browse, which stays last because it is an action, not a sound.
+        /// </summary>
+        public static Sound EnsureCustom(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return null;
+
+            var existing = Find(path);
+            if (existing != null)
+                return existing;
+
+            string label;
+            try { label = Path.GetFileName(path); }
+            catch { label = path; }
+
+            // MARKED IN THE LIST, not in a line underneath it. A custom file can be moved or deleted
+            // between sessions, and the ComboBox would otherwise show its name as though it still
+            // worked. The list is the one place the operator looks, so the truth belongs in it.
+            if (ResolveFile(path) == null)
+                label += " (missing)";
+
+            var entry = new Sound { Id = path, Label = label, File = null };
+            var items = (ObservableCollection<Sound>)Items;
+            items.Insert(items.Count > 0 && items[items.Count - 1].Id == Browse ? items.Count - 1 : items.Count, entry);
+            return entry;
+        }
+
+        /// <summary>The catalogue entry for an id, or null when the id is not in the catalogue
+        /// (which is how a stored custom file path is told apart from a built-in choice).</summary>
+        public static Sound Find(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+                return null;
+            foreach (var s in Items)
+                if (s.Id == id)
+                    return s;
+            return null;
+        }
+
+        /// <summary>
+        /// What a stored setting means: the file to play, or null for "say nothing". Null covers
+        /// None, an empty setting, Browse (never a stored value, but harmless if one appears), a
+        /// catalogue entry whose file has since gone, and a custom path that no longer exists.
+        /// </summary>
+        public static string ResolveFile(string setting)
+        {
+            if (string.IsNullOrEmpty(setting) || setting == None || setting == Browse)
+                return null;
+
+            // A BUILT-IN is the only kind with a File, and it names a file in the Windows media
+            // folder. Everything else here - a custom entry added by EnsureCustom, or a path from a
+            // config written on another machine that was never added at all - IS the path, so the
+            // test is "has a File", not "is in the catalogue". Those two came apart the moment
+            // custom picks started being inserted into the catalogue so they could be selected.
+            var known = Find(setting);
+            if (known != null && known.File != null)
+            {
+                string path = Path.Combine(MediaDir, known.File);
+                return File.Exists(path) ? path : null;
+            }
+
+            // A path the operator chose. It may have been renamed, deleted, or live on a drive that
+            // is not mounted today - all of which mean silence, not an exception on a status report.
+            try { return File.Exists(setting) ? setting : null; }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// Actually try to load the file through the player, and say why if it will not go. This is
+        /// the real test, not the file extension: the question is whether this API can play this
+        /// file, and only the API can answer it. Load() reads and validates the whole stream
+        /// synchronously, so a file that loads here will play later.
+        /// </summary>
+        /// <remarks>
+        /// SoundPlayer is a WAV-only API, so in practice an mp3 or a wma fails here however it is
+        /// named - and a .wav that is really a renamed mp3 fails too, which an extension check would
+        /// have waved through. The file dialog deliberately does NOT filter to .wav: the operator
+        /// picks what they like and is told plainly if it cannot be used, rather than being given a
+        /// list that silently excludes most of their sound files.
+        /// </remarks>
+        public static bool TryLoad(string path, out string error)
+        {
+            error = null;
+
+            if (string.IsNullOrEmpty(path))
+            {
+                error = "No file was chosen.";
+                return false;
+            }
+
+            try
+            {
+                if (!File.Exists(path))
+                {
+                    error = "That file no longer exists.";
+                    return false;
+                }
+
+                var player = new SoundPlayer(path);
+                player.Load();              // synchronous, and throws on anything it cannot decode
+                return true;
+            }
+            catch (Exception e)
+            {
+                error = e.Message;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Sound what this setting names. Never throws and never blocks: a bad file, a file that
+        /// vanished, or a header SoundPlayer cannot parse all end as silence. This is called from a
+        /// status-report handler, so an exception here would surface as the app falling over while
+        /// the machine is moving.
+        /// </summary>
+        /// <remarks>
+        /// PLAYSYNC, ON ITS OWN THREAD - and the SoundPlayer must stay reachable for the whole
+        /// sound, which is the entire reason this is not three lines.
+        ///
+        /// The first version called Play() on a SoundPlayer held in a local. Play() is asynchronous:
+        /// it hands the buffer to Windows and returns at once, the local goes out of scope
+        /// immediately, and when the player is finalised it tears that buffer down - cutting the
+        /// sound off a few milliseconds in. Reported 2026-10-26 as "a really faint tink, like the
+        /// speaker on the motherboard", with the same files playing fine from the Windows Sound app.
+        /// That is not a quiet sound, it is a TRUNCATED one, and nothing about the call looks wrong.
+        ///
+        /// So: a short-lived background thread, where the player stays rooted on that thread's stack
+        /// until PlaySync returns. The UI thread is not held - which was the real requirement - and
+        /// the sound gets to finish. IsBackground so a long sample can never keep the app alive at
+        /// exit.
+        /// </remarks>
+        public static void Play(string setting)
+        {
+            string path = ResolveFile(setting);
+            if (path == null)
+                return;
+
+            var worker = new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    var player = new SoundPlayer(path);
+                    player.PlaySync();
+                }
+                catch { }   // an unreadable or malformed wav is silence, never an exception on a status report
+            })
+            {
+                IsBackground = true,
+                Name = "ioSender UI sound"
+            };
+
+            try { worker.Start(); }
+            catch { }       // out of threads: still not a reason to fall over
+        }
+    }
+}

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * FeedsSpeedsAdvisor.cs - part of CNC Core library
  *
  * Decision engine for the Feeds & Speeds feature: given a FeedsSpeedsOperation (raw
@@ -22,6 +22,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace CNC.Core
@@ -192,6 +193,26 @@ namespace CNC.Core
                     MaxRadialFrac = 0.5,
                     Notes = "MDF dust is fine, abundant, and extremely abrasive - dust collection matters more than " +
                             "chip load. Higher RPMs help, but a sharp upcut bit + strong vacuum beats any chart value.",
+                    Drill = woodDrill,
+                    DrillHss = hssDrill,
+                },
+                // Bamboo: added 2026-08-07 for laminated cutting boards. Hard-maple-class density, but
+                // two things push the numbers below Hardwood rather than at it: silica content that
+                // dulls edges faster than any true hardwood (carbide only, and treat the bit as a
+                // consumable), and a char-instead-of-dust failure mode when a dulling bit dwells.
+                // ~15-20% under Hardwood's chip loads as the starting point - UNTUNED (no real-cut data
+                // yet, same disclaimer as Brass/Steel), refine from actual boards.
+                ["Bamboo"] = new MaterialRef
+                {
+                    RpmRange = (14000, 18000, 22000),
+                    ChipLoad = new Dictionary<double, double> { { 1.5, 0.020 }, { 3.0, 0.04 }, { 6.0, 0.085 }, { 9.5, 0.125 }, { 12.7, 0.17 }, { 25.0, 0.21 }, { 50.0, 0.24 } },
+                    MaxAxialFrac = 1.0,
+                    MaxRadialFrac = 0.4,
+                    Notes = "Bamboo (laminated boards) is hard-maple dense with abrasive silica - sharp CARBIDE " +
+                            "only, and expect faster edge wear than any hardwood. Long fibers fuzz when the edge " +
+                            "dulls or feed climbs; it chars rather than dusts if the bit dwells, so keep the feed " +
+                            "up instead of slowing down to be safe. Slight hardness jumps at each glue line. " +
+                            "UNTUNED starting point - refine from real boards.",
                     Drill = woodDrill,
                     DrillHss = hssDrill,
                 },
@@ -396,6 +417,76 @@ namespace CNC.Core
         /// Material-engine recommendation for one operation (no machine-limit check yet -
         /// call ApplyMachineLimits afterward to fold in the connected controller's limits).
         /// </summary>
+
+        /// <summary>
+        /// Hold the recommendation to what the machine can actually deliver, and keep the chip load when
+        /// doing so.
+        ///
+        /// The chart knows about the cutter and the material; it knows nothing about the machine. On a
+        /// gantry whose $110/$111 is 16510 mm/min it will happily recommend 24000 - and grblHAL clamps
+        /// rather than complains, so the number is quietly not the number. That alone would be tolerable,
+        /// except the chip load is computed from the feed that was ASKED for: at 24000 with 20000 rpm and 3
+        /// flutes the dialog says 0.400 mm/tooth, while the machine actually cuts 16510 -> 0.275. The
+        /// operator is told a figure the tool never sees, which in MDF is the difference between cutting and
+        /// rubbing.
+        ///
+        /// So the feed is capped at the axis maximum and the SPINDLE is brought down to match, restoring the
+        /// chip load the chart intended. Slowing the spindle is the correct lever: chip load is feed per
+        /// tooth per revolution, and the feed is the half that has hit a wall.
+        ///
+        /// Silent when the machine's limits are not known. GrblSettings returns NaN before the controller has
+        /// answered, and a limit invented from that would be far worse than no limit at all - the same
+        /// mistake that had Machine Setup showing a travel of zero.
+        /// </summary>
+        private static void ClampToMachine(FeedsSpeedsOperation op, OperationRecommendation rec)
+        {
+            double maxXY = MachineAxisRate(0), maxY = MachineAxisRate(1), maxZ = MachineAxisRate(2);
+            if (!double.IsNaN(maxY) && (double.IsNaN(maxXY) || maxY < maxXY))
+                maxXY = maxY;   // the slower of X and Y is what a contouring feed can hold
+
+            double flutes = op.Tool != null ? op.Tool.Flutes ?? 0d : 0d;
+
+            if (!double.IsNaN(maxXY) && maxXY > 0d && rec.CuttingFeed.Recommended > maxXY)
+            {
+                double wanted = rec.CuttingFeed.Recommended.Value;
+                double rpm = rec.Rpm.Recommended ?? (op.Current != null ? (op.Current.Rpm ?? 0d) : 0d);
+
+                rec.CuttingFeed.Recommended = maxXY;
+                rec.CuttingFeed.Notes.Insert(0, string.Format(CultureInfo.InvariantCulture,
+                    "Capped at this machine's maximum feed ({0:0} mm/min); the chart asked for {1:0}.", maxXY, wanted));
+
+                // Bring the spindle down so feed-per-tooth survives the cap.
+                if (flutes > 0d && rpm > 0d)
+                {
+                    double chipLoad = wanted / (rpm * flutes);
+                    double newRpm = chipLoad > 0d ? maxXY / (chipLoad * flutes) : 0d;
+
+                    if (newRpm > 0d)
+                    {
+                        rec.Rpm.Recommended = newRpm;
+                        rec.Rpm.Notes.Insert(0, string.Format(CultureInfo.InvariantCulture,
+                            "Lowered from {0:0} to hold {1:0.000} mm/tooth at the capped feed - the chip load the chart intended.",
+                            rpm, chipLoad));
+                    }
+                }
+            }
+
+            if (!double.IsNaN(maxZ) && maxZ > 0d && rec.PlungeFeed.Recommended > maxZ)
+            {
+                double wanted = rec.PlungeFeed.Recommended.Value;
+                rec.PlungeFeed.Recommended = maxZ;
+                rec.PlungeFeed.Notes.Insert(0, string.Format(CultureInfo.InvariantCulture,
+                    "Capped at this machine's maximum Z feed ({0:0} mm/min); the chart asked for {1:0}.", maxZ, wanted));
+            }
+        }
+
+        /// <summary>This machine's maximum feed for an axis ($110-$112), or NaN when it has not reported.</summary>
+        private static double MachineAxisRate(int axis)
+        {
+            double v = GrblSettings.GetDouble(GrblSetting.MaxFeedRateBase + axis);
+            return v > 0d ? v : double.NaN;
+        }
+
         public static OperationRecommendation Evaluate(FeedsSpeedsOperation op, string material)
         {
             var rec = new OperationRecommendation { Id = op.Id, ToolClass = ToolClass(op) };
@@ -416,6 +507,8 @@ namespace CNC.Core
             rec.RecommendedCoolant = coolLabel;
             rec.CoolantVerdict = coolVerdict;
             if (coolNote != null) rec.Notes.Add(coolNote);
+
+            ClampToMachine(op, rec);
             return rec;
         }
 

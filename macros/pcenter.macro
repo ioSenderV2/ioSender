@@ -34,6 +34,10 @@ O<pcenter> SUB
   #<mode>  = #<_ls_center_mode>
   #<clear> = #<_ls_clear>
   (PRINT, PCTR ENTER mode=#<mode> rx=#<rx> ry=#<ry> z=#<z> wpx=#<wpx> wpy=#<wpy>)
+  ; The rest of the inputs, before the first motion - same reasoning as pcorner.macro's IN2..IN7 block:
+  ; a probed centre that comes out wrong is otherwise indistinguishable from a caller that passed the
+  ; wrong numbers, and reading them here makes an unset one fail before the tool moves.
+  (PRINT, PCTR IN2 rad=#<rad> clear=#<clear> searchf=#<_ls_searchf> latchf=#<_ls_latchf>)
 
   G49
   G92.1

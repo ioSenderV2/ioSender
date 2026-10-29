@@ -20,7 +20,11 @@
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="407"/>
-            <ColumnDefinition Width="80"/>
+            <!-- Auto, not fixed 80: the bottom button row spans both columns, and a spanned cell's
+                 excess width can only grow an Auto/star column - with two fixed columns anything
+                 wider than their sum (e.g. longer localized captions, larger system fonts) was
+                 clipped at the window edge. The window is SizeToContent, so the grid drives it. -->
+            <ColumnDefinition Width="Auto" MinWidth="80"/>
         </Grid.ColumnDefinitions>
         <ComboBox x:Uid="cbxCamera" x:Name="cbxCamera" ItemsSource="{Binding Cameras}" DisplayMemberPath="Name" SelectedValuePath="Camera" MinWidth="400" SelectionChanged="cbxCamera_SelectionChanged" Margin="5,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Bottom"/>
         <Image Width="400" Height="300" HorizontalAlignment="Left" Name="frameHolder" VerticalAlignment="Top" Margin="5,5,0,0" Grid.Row="1"/>

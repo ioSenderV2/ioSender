@@ -46,7 +46,7 @@ namespace CNC.Controls
     public partial class SignalControl : UserControl
     {
         static readonly Brush LabelSet = Brushes.Black;
-        Brush LabelOff, EllOff;
+        Brush LabelOff, ShapeOff;
 
         // Most signals are alarm/limit-style (red = "triggered", a thing to notice/worry about) - the
         // default. A handful (e.g. TLO ref'd) are the OPPOSITE: set = good/ready, so red would read
@@ -62,9 +62,24 @@ namespace CNC.Controls
         {
             InitializeComponent();
 
-            btnLED.Visibility = Visibility.Collapsed;   // replaced by the red circle behind the letter
+            btnLED.Visibility = Visibility.Collapsed;   // replaced by the outlined box around the letter
             LabelOff = txtSignal.Foreground;
-            EllOff = ellSignal.Fill;                 // Transparent when clear
+            ShapeOff = shpSignal.Fill;               // Transparent when clear
+        }
+
+        // The lit fill: the set colour at low alpha, so the box reads as lit without the letter having to
+        // sit on a solid field. Derived from SetColor rather than being a second constant, so a per-instance
+        // colour (green for the TLO reference lamp) tints to match instead of reverting to the default.
+        private Brush TintOf(Brush b)
+        {
+            var solid = b as SolidColorBrush;
+            if (solid == null)
+                return Brushes.Transparent;
+
+            var c = solid.Color;
+            var tint = new SolidColorBrush(Color.FromArgb(48, c.R, c.G, c.B));
+            tint.Freeze();
+            return tint;
         }
 
         public static readonly DependencyProperty IsSetProperty = DependencyProperty.Register(nameof(IsSet), typeof(bool), typeof(SignalControl), new PropertyMetadata(false, new PropertyChangedCallback(OnIsSetChanged)));
@@ -77,9 +92,29 @@ namespace CNC.Controls
         {
             var c = d as SignalControl;
             bool set = (bool)e.NewValue;
-            c.ellSignal.Fill = set ? c.SetColor : c.EllOff;          // colored disc behind a triggered signal
+            c.shpSignal.Stroke = set ? c.SetColor : Brushes.Transparent;   // coloured box around a set signal
+            c.shpSignal.Fill = set ? c.TintOf(c.SetColor) : c.ShapeOff;    // ...with a light tint inside it
             c.txtSignal.Foreground = set ? LabelSet : c.LabelOff;    // bold black letter on top when set
             c.txtSignal.FontWeight = set ? FontWeights.Bold : FontWeights.Normal;
+        }
+
+        // Width of the lamp box. 19 (a square) for a single letter; wider for a label that spells
+        // something - the TLO reference lamp. The Viewbox shrinks the text to whatever this allows.
+        public static readonly DependencyProperty BoxWidthProperty = DependencyProperty.Register(
+            nameof(BoxWidth), typeof(double), typeof(SignalControl), new PropertyMetadata(19d, OnBoxWidthChanged));
+
+        public double BoxWidth
+        {
+            get { return (double)GetValue(BoxWidthProperty); }
+            set { SetValue(BoxWidthProperty, value); }
+        }
+
+        private static void OnBoxWidthChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var c = (SignalControl)d;
+            double w = (double)e.NewValue;
+            c.shpSignal.Width = w;
+            c.boxSignal.Width = w + 1;   // the grid carried 1px more than the shape before BoxWidth existed
         }
 
         public static readonly DependencyProperty LabelProperty = DependencyProperty.Register(nameof(Label), typeof(string), typeof(SignalControl), new PropertyMetadata());

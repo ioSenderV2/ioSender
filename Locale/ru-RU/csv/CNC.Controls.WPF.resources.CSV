@@ -302,9 +302,6 @@ CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,btn_stop:System.Windows.Contr
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,btn_stop:System.Windows.Controls.ContentControl.Content,Button,True,True,,Stop
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,btn_stop:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Alt+S
 CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,btn_stop:System.Windows.FrameworkElement.Margin,None,False,True,,"5,0,0,0"
-CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,btn_rewind:System.Windows.Controls.Button.$Content,Button,True,True,,
-CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,btn_rewind:System.Windows.Controls.ContentControl.Content,Button,True,True,,Rewind
-CNC.Controls.WPF.g.en-US.resources:jobcontrol.baml,btn_rewind:System.Windows.FrameworkElement.Margin,None,False,True,,"5,0,0,0"
 CNC.Controls.WPF.g.en-US.resources:macroexecutecontrol.baml,lbl_noMacrosDefined:System.Windows.Controls.Label.$Content,Label,True,True,,
 CNC.Controls.WPF.g.en-US.resources:macroexecutecontrol.baml,lbl_noMacrosDefined:System.Windows.Controls.ContentControl.Content,Label,True,True,,"No macros defined, use Edit button to add."
 CNC.Controls.WPF.g.en-US.resources:macroexecutecontrol.baml,lbl_noMacrosDefined:System.Windows.Controls.Control.HorizontalContentAlignment,None,False,True,,Center

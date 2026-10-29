@@ -73,26 +73,33 @@ Attach point: `ICNCView` (`CNC Controls/CNC Controls/ICNCView.cs`) — every tab
    the in-app `ErrorsAndAlarms` dialog; the manual's `#errors-alarms` complements it.
 5. All new UI strings get an `x:Uid` + a row in each `Locale/<loc>/csv/*.csv` (see CLAUDE.md).
 
-### Anchor map (ViewType → HelpTopic → manual anchor)
-| ViewType        | HelpTopic / anchor | Manual section            |
-|-----------------|--------------------|---------------------------|
-| StartJob        | `start-job`        | Start Job                 |
-| GRBL (job)      | `job`              | The Job screen            |
-| MachineSetup    | `machine-setup`    | Machine Setup             |
-| Tools           | `tools`            | Tools                     |
-| Probing         | `probing`          | Probing                   |
-| Offsets         | `offsets`          | Work offsets              |
-| GRBLConfig      | `settings`         | Settings                  |
-| SDCard          | `sdcard`           | SD card jobs              |
-| GCodeViewer     | `gcode-viewer`     | 3D viewer                 |
-| HeightMap       | `heightmap`        | Height map                |
-| LatheWizards    | `lathe`            | Lathe                     |
-| (connect dialog)| `connect`          | Connecting                |
-| (jog UI)        | `jogging`          | Jogging & the DRO         |
-| (errors dialog) | `errors-alarms`    | Errors & alarms           |
+### Anchor map (ViewType → manual anchor)
+The live map is `CNC Controls/CNC Controls/ManualHelp.cs`; this table mirrors it. **An anchor that
+stopped existing is worse than a missing one** — the browser opens the manual and silently does not
+scroll, so F1 looks like it worked. Two sat broken for six weeks (`start-job` after the topic was
+renamed `#setup`, `probing` after the topic was deleted). **Rename or delete a topic and grep
+`ManualHelp.cs` in the same edit.**
 
-## Status
-- **Scaffold + 3 seed topics written:** getting-started, connect, start-job (full).
-- All other topics are stubbed with correct anchors so deep-linking already resolves.
-- **TODO:** flesh stubs; capture screenshots; implement the in-app `HelpTopic`/F1 hook + repoint
-  the Help menu; optional PDF/Pages publish.
+| ViewType         | Anchor             | Manual section                   |
+|------------------|--------------------|----------------------------------|
+| StartJob         | `setup`            | Setup                            |
+| GRBL (job)       | `job`              | The Job screen                   |
+| MachineSetup     | `machine-setup`    | Machine Setup                    |
+| Tools            | `tools`            | Tools                            |
+| Probing          | `setup`            | Setup — no Probing topic since 2026-08-01 |
+| Offsets          | `offsets`          | Work offsets                     |
+| GRBLConfig       | `settings`         | Settings                         |
+| SDCard           | `sdcard`           | SD card jobs                     |
+| GCodeViewer      | `gcode-viewer`     | 3D viewer                        |
+| HeightMap        | `heightmap`        | Height Map                       |
+| LatheWizards     | `lathe`            | Lathe                            |
+| FeedsAndSpeeds   | `feeds-and-speeds` | Feeds & Speeds                   |
+| WorkOrder        | `work-order`       | Work Order                       |
+| Calibration      | `calibration`      | Calibration — the four wizards   |
+| TrinamicTuner    | `tools`            | Tools                            |
+| PIDTuner         | `tools`            | Tools                            |
+| (Help menu)      | `clean-results`    | Getting clean, repeatable results |
+| (Help menu)      | `intro-to-cnc`     | Intro to CNC                     |
+
+A ViewType absent from the map opens the manual's front page, which is the right fallback — but only
+for a view with genuinely no topic.

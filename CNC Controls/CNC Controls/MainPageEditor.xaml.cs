@@ -82,6 +82,13 @@ namespace CNC.Controls
         private readonly ObservableCollection<AssignableItem> Left = new ObservableCollection<AssignableItem>();
         private readonly ObservableCollection<AssignableItem> Flyouts = new ObservableCollection<AssignableItem>();
         private readonly ObservableCollection<PlacementRow> Placements = new ObservableCollection<PlacementRow>();
+
+        // Components the tree places but the editor does NOT list, because the controller cannot offer them
+        // (they are in the Unavailable list with their reason instead). Their placement is remembered here
+        // and written back unchanged on save: the slots are rebuilt from Placements alone, so without this
+        // merely opening and leaving this page would delete the lathe wizards' placement from the profile
+        // of anyone whose controller happened to be in mill mode at the time.
+        private readonly Dictionary<string, ViewPlacement> preservedPlacements = new Dictionary<string, ViewPlacement>(StringComparer.Ordinal);
         private string[] _origMain, _origLeft, _origFlyouts, _origTabs;   // baselines to detect changes on OK
 
         // True if OK applied any layout/tab change (the host enables its Restart button + status when set).
@@ -285,25 +292,50 @@ namespace CNC.Controls
                     order.Add(t.Name);
                 }
 
+            // A component this controller cannot offer is listed ONCE, in Unavailable, with the reason. It
+            // used to appear here as well, offering a tab-bar/menu/hidden choice that the next load would
+            // prune away regardless - the same kind of lie CanHide below refuses to tell for an essential
+            // view. Its placement is preserved rather than dropped (see preservedPlacements).
+            var unavailable = ComponentAvailability.UnavailableKeys();
+
             var labels = TabRegistry.AllTabs.GroupBy(t => t.Name).ToDictionary(g => g.Key, g => g.First().Label);
             foreach (var key in order)
             {
+                if (unavailable.Contains(key))
+                {
+                    preservedPlacements[key] = placed[key];
+                    continue;
+                }
+
                 string label;
                 if (!labels.TryGetValue(key, out label))
                     label = ComponentRegistry.Get(key)?.Label;
                 if (string.IsNullOrEmpty(label))
                     continue;   // a foreign key from another build - nothing to show, and nothing we can place
 
-                Placements.Add(new PlacementRow(key, label, placed[key], CanHide(key)));
+                Placements.Add(new PlacementRow(key, label, placed[key], CanHide(key), CanMenu(key)));
             }
         }
 
         // Settings, Machine Setup and the Job view must stay reachable: LayoutTree.EnsureEssentials puts any
         // of them back on the tab bar if the tree places them nowhere, so offering "Hidden" would be a lie -
-        // the choice would silently undo itself on the next load. They can still move between bar and menu.
+        // the choice would silently undo itself on the next load. Settings and Machine Setup can still move
+        // between bar and menu; the Job view cannot - see CanMenu.
         private static bool CanHide(string key)
         {
             return key != ProtectedTab && !LayoutKeys.Essential.Contains(key);
+        }
+
+        // The Job view is the one view that is not merely a place to put things: it boots the controller
+        // (Activate -> InitSystem -> $I and the settings load), owns the status poller, and hosts the run
+        // controls. A dozen call sites resolve it with getTab(ViewType.GRBL) and do nothing when that
+        // returns null - which is exactly what a menu-hosted Job view returns - so menuing it silently
+        // costs you the connect handshake. Rather than teach every one of those sites to open a window on
+        // connect, the invariant they already assume is made true here: Job lives on the tab bar.
+        // AppConfig.EnforceMenuPlacement repairs a profile that menued it under an earlier build.
+        private static bool CanMenu(string key)
+        {
+            return key != LayoutKeys.Grbl;
         }
 
         // Row identity + placement, flattened for change detection ("Job=TabBar|GRBLConfig=FileMenu|...").
@@ -340,8 +372,12 @@ namespace CNC.Controls
             if (Placements.Count == 0)
                 return;
 
-            cfg.Tabs = Placements.Where(p => p.Placement == ViewPlacement.TabBar).Select(p => p.Name).ToList();
-            cfg.HiddenViews = Placements.Where(p => p.Placement == ViewPlacement.Hidden).Select(p => p.Name).ToList();
+            // Preserved (unavailable) components are appended to whichever list they were already in, so a
+            // placement this editor deliberately did not show is handed back exactly as it was found.
+            cfg.Tabs = Placements.Where(p => p.Placement == ViewPlacement.TabBar).Select(p => p.Name)
+                                 .Concat(PreservedIn(ViewPlacement.TabBar)).ToList();
+            cfg.HiddenViews = Placements.Where(p => p.Placement == ViewPlacement.Hidden).Select(p => p.Name)
+                                 .Concat(PreservedIn(ViewPlacement.Hidden)).ToList();
 
             var root = AppConfig.Settings.Layout;
             if (root == null)
@@ -370,8 +406,16 @@ namespace CNC.Controls
 
             slot.Items = Placements
                 .Where(p => p.Placement == placement)
-                .Select(p => existing.TryGetValue(p.Name, out var n) ? n : new LayoutNode(p.Name))
+                .Select(p => p.Name)
+                .Concat(PreservedIn(placement))
+                .Select(name => existing.TryGetValue(name, out var n) ? n : new LayoutNode(name))
                 .ToList();
+        }
+
+        // Keys the editor withheld from its list (unavailable on this controller) that belong in this slot.
+        private IEnumerable<string> PreservedIn(ViewPlacement placement)
+        {
+            return preservedPlacements.Where(kv => kv.Value == placement).Select(kv => kv.Key);
         }
 
         // Save-on-leave: write the buckets back to config and persist. If anything changed since the tab was
@@ -426,19 +470,21 @@ namespace CNC.Controls
             get { return "Where " + Label + " appears. Applied on restart."; }
         }
 
-        // canHide == false drops the Hidden choice entirely rather than offering one that would be undone on
-        // the next load (see MainPageEditor.CanHide) - an unavailable option is better absent than a trap.
-        public PlacementRow(string name, string label, ViewPlacement placement, bool canHide)
+        // canHide/canMenu == false drop those choices entirely rather than offering one that would be undone
+        // on the next load (see MainPageEditor.CanHide / CanMenu) - an unavailable option is better absent
+        // than a trap. Each still keeps a choice the profile is CURRENTLY sitting on, so a row can always
+        // display its own state; the every-load invariant is what moves it back.
+        public PlacementRow(string name, string label, ViewPlacement placement, bool canHide, bool canMenu = true)
         {
             Name = name;
             Label = label;
             this.placement = placement;
 
-            Choices = new List<PlacementChoice> {
-                new PlacementChoice(ViewPlacement.TabBar, "Tab bar"),
-                new PlacementChoice(ViewPlacement.FileMenu, "File menu"),
-                new PlacementChoice(ViewPlacement.ToolsMenu, "Tools menu")
-            };
+            Choices = new List<PlacementChoice> { new PlacementChoice(ViewPlacement.TabBar, "Tab bar") };
+            if (canMenu || placement == ViewPlacement.FileMenu)
+                Choices.Add(new PlacementChoice(ViewPlacement.FileMenu, "File menu"));
+            if (canMenu || placement == ViewPlacement.ToolsMenu)
+                Choices.Add(new PlacementChoice(ViewPlacement.ToolsMenu, "Tools menu"));
             if (canHide || placement == ViewPlacement.Hidden)
                 Choices.Add(new PlacementChoice(ViewPlacement.Hidden, "Not shown"));
         }

@@ -153,7 +153,7 @@ namespace CNC.Controls
                 if ((DataContext as GrblViewModel).GrblError != 0)
                     (DataContext as GrblViewModel).ExecuteCommand("");
 
-                if (GrblInfo.IsGrblHAL && GrblInfo.Build < 20240812) // Workaround for controller bug
+                if (GrblInfo.IsGrblHAL && !GrblInfo.BuildAtLeast(20240812)) // Workaround for controller bug
                     (DataContext as GrblViewModel).ExecuteCommand(string.Format(GrblCommand.SpindleChange, ((Spindle)e.AddedItems[0]).SpindleId));
                 else
                     (DataContext as GrblViewModel).ExecuteCommand(string.Format(GrblCommand.SpindleChange, ((Spindle)e.AddedItems[0]).SpindleNum));

@@ -100,9 +100,6 @@ namespace CNC.Controls.Probing
                 return;
             }
 
-            if (!probing.VerifyProbe())
-                return;
-
             if (!probing.Program.Init())
                 return;
 
@@ -264,7 +261,7 @@ namespace CNC.Controls.Probing
                     if ((ok = !isCancelled && probing.GotoMachinePosition(pz, axisflags)))
                     {
                         ok = !isCancelled && probing.WaitForResponse(probing.FastProbe + "Z-" + probing.Depth.ToInvariantString());
-                        ok = ok && !isCancelled && probing.WaitForResponse(probing.RapidCommand + "Z" + probing.LatchDistance.ToInvariantString());
+                        ok = ok && !isCancelled && probing.WaitForResponse("G0Z" + probing.LatchDistance.ToInvariantString());
                         ok = ok && !isCancelled && probing.RemoveLastPosition();
                         if ((ok = ok && !isCancelled && probing.WaitForResponse(probing.SlowProbe + "Z-" + probing.Depth.ToInvariantString())))
                         {

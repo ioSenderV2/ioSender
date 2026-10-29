@@ -96,8 +96,7 @@ namespace CNC.Controls
         private bool _positionValidated = false;
         private double _jawWidth = 0d;
         private double _maxOpening = 0d;
-        private double _cornerOffsetX = 0d;
-        private double _cornerOffsetY = 0d;
+        private bool _cornerLocated = false;
         private ProbeType _probeType = ProbeType.ThreeDProbe;
 
         public string Name { get { return _name; } set { _name = value; OnChanged(); } }
@@ -111,17 +110,25 @@ namespace CNC.Controls
         // drawing places the moving jaw right at the stock's edge instead of at the vise's true throat depth.
         public double MaxOpening { get { return _maxOpening; } set { _maxOpening = value; OnChanged(); } }
 
-        // Edge-probing kinds only (CornerFence today - see FixtureKinds.ProbesEdges/Implemented). The true
-        // stock corner's XY, relative to Coords, captured ONCE by FixtureEditDialog's "Test position" via a
-        // real pcorner.macro probe (same as Start Job's own corner-1 DISCOVER pass used to do every run) -
-        // the fence is bolted down, so this offset is reproducible run to run. Start Job then points corner
-        // 1's SINGLE probe directly at the tight ~5mm-inset anchor (StartJobView.BuildProgram) instead of a
-        // loose locate pass followed by a tight re-probe - see the "double probe of corner 1" backlog item.
-        // 0/0 means "never captured under this scheme" (fresh fixture, or one saved before this feature) -
-        // BuildProgram refuses to generate until Test position has been re-run (real 0,0 offsets never occur
-        // in practice - Coords is always jogged well clear of the corner).
-        public double CornerOffsetX { get { return _cornerOffsetX; } set { _cornerOffsetX = value; OnChanged(); } }
-        public double CornerOffsetY { get { return _cornerOffsetY; } set { _cornerOffsetY = value; OnChanged(); } }
+
+        // ---- deserialization only: the pre-2026-09-22 corner correction -----------------------
+        //
+        // Test position used to leave the eyeballed reference in Coords and put the probe's correction
+        // here, and every consumer added the two. The corner lives in Coords itself now.
+        //
+        // These two survive for exactly one purpose: an App.config written by the old scheme still has the
+        // values, and deleting the properties outright would make the serializer discard them silently -
+        // Coords would keep pointing at the guess while the fixture still showed a validated tick, which is
+        // a quiet positional error of however far the operator's eye was out. So they are read back,
+        // FOLDED INTO COORDS as the library loads (Fixtures.SetItems), and zeroed.
+        //
+        // ShouldSerialize* keeps them out of everything written from here on, so the elements disappear
+        // from App.config the first time it is saved and never come back. Nothing but the serializer and
+        // the fold should ever touch them.
+        public double CornerOffsetX { get; set; }
+        public double CornerOffsetY { get; set; }
+        public bool ShouldSerializeCornerOffsetX() { return false; }
+        public bool ShouldSerializeCornerOffsetY() { return false; }
 
         // Which probe Set/Test position use for THIS fixture. Persisted rather than defaulting to 3D Probe on
         // every open: the dialog reopened in 3D-probe mode even for a fixture set up with a touch plate, so the
@@ -155,8 +162,8 @@ namespace CNC.Controls
             set
             {
                 _coords = value; PositionValidated = false;
-                // NOT the place to clear CornerOffsetX/Y (that was tried and broke on real hardware): this
-                // setter also runs during XML deserialization (XmlSerializer assigns CornerOffsetX/Y, then
+                // NOT the place to clear CornerLocated (clearing the corner data here was tried and broke
+                // on real hardware): this setter also runs during XML deserialization (the serializer assigns
                 // Coords, then PositionValidated, in declared order - see Fixture.cs's own property order),
                 // so clearing here would zero a just-loaded, perfectly valid offset EVERY app load, moments
                 // before PositionValidated's own element deserializes and restores "true" over top of it -
@@ -205,6 +212,16 @@ namespace CNC.Controls
         // Alarm:5 probe fail this was added to prevent.
         public bool PositionValidated { get { return _positionValidated; } set { _positionValidated = value; OnChanged(); } }
 
+        // Has the true corner been probed? Coords holds it directly - Test position writes the probed
+        // corner straight into Coords - so there is no value in Coords that could mean "not measured yet":
+        // a fixture always has SOME reference in it. Hence a flag of its own.
+        // Set only where the offsets are set (FixtureEditDialog.OnTestPositionDone) and cleared only
+        // where they are cleared, so the three move as one.
+        // Declared AFTER Coords deliberately: the Coords setter runs during XML deserialization, and
+        // anything it touches that deserializes EARLIER gets clobbered on every load - the trap that
+        // the fixture migration in AppConfig records. This property is not touched there either way.
+        public bool CornerLocated { get { return _cornerLocated; } set { _cornerLocated = value; OnChanged(); } }
+
         public Fixture Clone()
         {
             var c = new Fixture();
@@ -217,7 +234,7 @@ namespace CNC.Controls
             Name = o.Name; Kind = o.Kind; ProbeType = o.ProbeType;
             Coords = o.Coords; PositionValidated = o.PositionValidated;
             JawWidth = o.JawWidth; MaxOpening = o.MaxOpening;
-            CornerOffsetX = o.CornerOffsetX; CornerOffsetY = o.CornerOffsetY;
+            CornerLocated = o.CornerLocated;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -285,11 +302,69 @@ namespace CNC.Controls
                 _items.Clear();
             if (list?.Items != null)
                 foreach (var d in list.Items)
+                {
+                    FoldLegacyCorner(d);
                     _items.Add(d);
+                }
+        }
+
+        /// <summary>
+        /// Move a pre-2026-09-22 corner correction into Coords, where the corner now lives.
+        ///
+        /// Idempotent by construction: once folded the offsets are zero, and adding zero does nothing - so
+        /// this needs no "already migrated" marker and cannot run twice to any effect. That matters, because the
+        /// last thing to guard a fixture migration with a standing check silently un-validated freshly
+        /// probed fences on the next restart.
+        /// </summary>
+        private static void FoldLegacyCorner(Fixture fx)
+        {
+            if (fx == null || (fx.CornerOffsetX == 0d && fx.CornerOffsetY == 0d))
+                return;
+
+            // Assigning Coords sets PositionValidated FALSE - the setter says so, and it is right to: a
+            // re-jogged reference invalidates the probe that was measured against it. This fold is the one
+            // case where that is wrong. It is not a new reference, it is the SAME physical corner written
+            // against Coords directly instead of as a correction beside it, so the validation it already
+            // had still holds. Carried across explicitly.
+            bool wasValidated = fx.PositionValidated;
+
+            var coords = new CNC.Core.Position(fx.Coords);
+            double x = coords.X + fx.CornerOffsetX, y = coords.Y + fx.CornerOffsetY;
+            coords.X = x;
+            coords.Y = y;
+            fx.Coords = CoordsCsv(coords);
+            fx.PositionValidated = wasValidated;
+
+            CNC.Core.DebugLog.Write("fixture", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                "Fixture [{0}]: folded the saved corner correction X{1:0.0###} Y{2:0.0###} into Coords -> X{3:0.0###} Y{4:0.0###}",
+                fx.Name, fx.CornerOffsetX, fx.CornerOffsetY, x, y));
+
+            fx.CornerOffsetX = fx.CornerOffsetY = 0d;
+        }
+
+        /// <summary>
+        /// A Position as the stored-coords CSV - the same shape <see cref="CurrentCoordsCsv"/> writes and
+        /// Position.Parse reads back.
+        ///
+        /// This exists because Position has NO override of object.ToString() - only ToString(AxisFlags, ...)
+        /// overloads - so coords.ToString() quietly returns the TYPE NAME. Parse makes nothing of that and
+        /// leaves the position at zero. It cost the operator both fixtures on 2026-09-22, and the reason it
+        /// got through review is worth remembering: the debug line printed the right numbers one statement
+        /// EARLIER, so the log said the fold had worked while the value written was garbage.
+        /// </summary>
+        internal static string CoordsCsv(CNC.Core.Position pos)
+        {
+            var idx = GrblInfo.AxisFlags.ToIndices().ToList();
+            return string.Join(",", idx.Select(i => pos.Values[i].ToInvariantString("F3")));
         }
 
         // The enabled axes' current machine position as an invariant CSV (the stored-coords format), or null
         // when the position is unknown (disconnected / not homed).
+        //
+        // CACHED. GrblViewModel.MachinePosition holds whatever the last status report left there, which is
+        // fine for a readout that is about to be refreshed anyway and NOT fine for a capture - the value
+        // becomes a saved fixture that the machine will later rapid to. Callers that are recording a position
+        // should use RequestCoordsCsv below, which asks the controller instead of remembering.
         public static string CurrentCoordsCsv(GrblViewModel grbl)
         {
             if (grbl == null)
@@ -298,6 +373,85 @@ namespace CNC.Controls
             if (idx.Any(i => double.IsNaN(grbl.MachinePosition.Values[i])))
                 return null;
             return string.Join(",", idx.Select(i => grbl.MachinePosition.Values[i].ToInvariantString("F3")));
+        }
+
+        /// <summary>
+        /// The machine position as the CONTROLLER reports it right now: requests a status report and calls
+        /// back with the position from the reply.
+        /// </summary>
+        /// <remarks>
+        /// The distinction lives here, in the accessor, rather than being hand-rolled per caller - there are
+        /// already two hand-rolled versions in the app (OffsetView's "get machine position" button pumps its
+        /// own wait; the fixture dialog grew another), which is two chances to get it subtly different and no
+        /// single place to fix it.
+        ///
+        /// Why it exists at all: a fixture Set position captured 20,-20,-6 on real hardware 2026-09-18 with
+        /// the spindle nowhere near there - a position the head had been at earlier in the session. A stale
+        /// cached read is indistinguishable from a good one afterwards, because both are plausible machine
+        /// coordinates, and nothing on the wire records a capture.
+        ///
+        /// Asynchronous, and deliberately not a pumped wait: DoEvents spins have hung this app before (39
+        /// removed in 570fe017, two of them unconditionally). If no report arrives within the timeout the
+        /// cached value is handed back anyway - a fixture position set from a stale reading the log can
+        /// explain beats a button that silently does nothing - and <paramref name="done"/> is always called
+        /// exactly once, on the UI thread.
+        /// </remarks>
+        public static void RequestCoordsCsv(GrblViewModel grbl, System.Action<string> done)
+        {
+            if (grbl == null || done == null)
+            {
+                done?.Invoke(null);
+                return;
+            }
+
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher == null)
+            {
+                done(CurrentCoordsCsv(grbl));
+                return;
+            }
+
+            string cached = CurrentCoordsCsv(grbl);
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            bool finished = false;
+
+            System.Windows.Threading.DispatcherTimer timeout = null;
+            System.Action<string> onStatus = null;
+
+            System.Action<string> complete = why =>
+            {
+                if (finished)
+                    return;
+                finished = true;
+                if (onStatus != null)
+                    grbl.OnRealtimeStatusProcessed -= onStatus;
+                timeout?.Stop();
+
+                string fresh = CurrentCoordsCsv(grbl);
+                DebugLog.Write("fixture", string.Format(
+                    "position request: {0} after {1:0} ms - cached '{2}' fresh '{3}'{4}",
+                    why, clock.Elapsed.TotalMilliseconds, cached ?? "(none)", fresh ?? "(none)",
+                    cached != fresh ? "  *** THE CACHED POSITION WAS STALE ***" : string.Empty));
+
+                done(fresh);
+            };
+
+            // Raised on the comms thread immediately after ParseStatus has written the new position.
+            onStatus = data => dispatcher.BeginInvoke(new System.Action(() => complete("status report")));
+            grbl.OnRealtimeStatusProcessed += onStatus;
+
+            timeout = new System.Windows.Threading.DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(500) };
+            timeout.Tick += (s, e) => { timeout.Stop(); complete("NO REPORT - using the cached position"); };
+            timeout.Start();
+
+            try
+            {
+                Comms.com.WriteByte(GrblLegacy.ConvertRTCommand(GrblConstants.CMD_STATUS_REPORT));
+            }
+            catch
+            {
+                complete("could not request a report");
+            }
         }
     }
 }

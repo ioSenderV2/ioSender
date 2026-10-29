@@ -33,6 +33,16 @@
       <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\RP.Math.dll</HintPath>
       <Private>true</Private>
     </Reference>
+    <!-- SvgLaserDialog and JobParametersDialog live here, not in CNC.Controls.WPF. -->
+    <Reference Include="CNC.Converters">
+      <HintPath>..\..\CNC Converters\bin\Debug\CNC.Converters.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <!-- ViewModelBase, which SvgLaserSettings derives from - needed to touch its properties here. -->
+    <Reference Include="CNC.Common">
+      <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\CNC.Common.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
   </ItemGroup>
 
   <!-- Auto-sync transitive deps + the en-US satellite (BAML lives there, not the main assembly -
@@ -42,6 +52,11 @@
     <ItemGroup>
       <SourceDlls Include="..\..\CNC Controls\CNC Controls\bin\Debug\*.dll" />
       <SourceEnUS Include="..\..\CNC Controls\CNC Controls\bin\Debug\en-US\**\*.*" />
+      <!-- CNC.Converters' own satellite, for the same reason its DLL is referenced: the BAML for a
+           dialog lives in the satellite, so without this a Converters dialog renders as a blank
+           window rather than failing loudly. -->
+      <SourceDlls Include="..\..\CNC Converters\bin\Debug\CNC.Converters.dll" />
+      <SourceEnUS Include="..\..\CNC Converters\bin\Debug\en-US\**\*.*" />
     </ItemGroup>
     <Copy SourceFiles="@(SourceDlls)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(SourceEnUS)" DestinationFolder="$(OutDir)en-US\%(RecursiveDir)" SkipUnchangedFiles="true" />

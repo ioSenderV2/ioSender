@@ -37,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -64,7 +65,74 @@ namespace CNC.Controls
             btnHome.Tag = StatusButton.Home;
             btnReset.Tag = StatusButton.Reset;
             btnUnlock.Tag = StatusButton.Unlock;
+
+            // Re-hooked on every DataContext change, not just the first: this control is created before the
+            // model is attached, and the model is replaced on a reconnect. Subscribing once in the constructor
+            // would be correct at startup and stale ever after.
+            DataContextChanged += (s, e) => HookModel(e.NewValue as GrblViewModel);
         }
+
+        #region Job elapsed time
+
+        // The bottom status bar that used to carry the job timer is gone, so the elapsed time now sits beside
+        // State. It is LATCHED here rather than bound straight to GrblViewModel.RunTime, because that property's
+        // getter live-reads JobTimer, which reverts to "00:00:00" the moment the timer stops - a plain binding
+        // would blank the finished job's total on the next re-evaluation, which is the one number worth reading.
+        //
+        // So: a non-zero value is shown and kept; a zero one never overwrites it. The reset point is the START
+        // of the next job (IsJobRunning going true), which is a distinct notification and therefore immune to
+        // the question of whether a RunTime notification arrives before or after JobTimer.Stop().
+        private const string ZeroTime = "00:00:00";
+        private GrblViewModel hookedModel = null;
+
+        private void HookModel(GrblViewModel model)
+        {
+            if (hookedModel != null)
+                hookedModel.PropertyChanged -= Model_PropertyChanged;
+
+            if ((hookedModel = model) != null)
+                hookedModel.PropertyChanged += Model_PropertyChanged;
+
+            ShowRunTime(hookedModel == null ? null : hookedModel.RunTime);
+        }
+
+        private void Model_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(GrblViewModel.RunTime))
+                ShowRunTime((sender as GrblViewModel)?.RunTime);
+            else if (e.PropertyName == nameof(GrblViewModel.IsJobRunning) && (sender as GrblViewModel)?.IsJobRunning == true)
+                ClearRunTime();
+        }
+
+        private void ShowRunTime(string time)
+        {
+            // RunTime is pushed from the realtime status handler, which does not guarantee the UI thread.
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new System.Action(() => ShowRunTime(time)));
+                return;
+            }
+
+            if (string.IsNullOrEmpty(time) || time == ZeroTime)
+                return;     // nothing to say - leave the previous total (or nothing) on screen
+
+            txtRunTime.Text = time;
+            txtRunTime.Visibility = Visibility.Visible;
+        }
+
+        private void ClearRunTime()
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new System.Action(() => ClearRunTime()));
+                return;
+            }
+
+            txtRunTime.Text = string.Empty;
+            txtRunTime.Visibility = Visibility.Collapsed;
+        }
+
+        #endregion
 
         // The control has two parts - the state/check row and the Home/Unlock/Reset button row. These can be
         // shown independently so a host can place them separately (e.g. the fixed bottom run-control bar puts

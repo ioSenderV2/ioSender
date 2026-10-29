@@ -1,5 +1,8 @@
 # Manual audit — 2026-07-24
 
+> **SUPERSEDED — historical.** This wave (#134-#178) was paid off in v2.38/v2.40. The live
+> item list is **`MANUAL-AUDIT-2026-09-17.md`** (#216-#371). Open this one only for history.
+
 Read-only audit of `docs/manual/index.html` against everything shipped since the last manual pass
 (commit d65c94a, 2026-07-17, documented in `docs/manual/SCREENSHOT-REFRESH-2026-07.md`). That pass
 paid off `SCREENSHOT-AUDIT.md` (2026-07-16) through changelog entry **#133**. This audit covers

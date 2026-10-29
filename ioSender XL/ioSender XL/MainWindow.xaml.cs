@@ -1,4 +1,4 @@
-/*
+﻿/*
  * MainWindow.xaml.cs - part of ioSender
  *
  * v0.47 / 2026-04-29 / Io Engineering (Terje Io)
@@ -53,6 +53,7 @@ using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using System.Runtime.CompilerServices;
 #if ADD_CAMERA
 using CNC.Controls.Camera;
 #endif
@@ -63,8 +64,47 @@ namespace GCode_Sender
     public partial class MainWindow : Window
     {
         // Legacy fallback for local/dev builds (BuildInfo.Version == "dev", not embedded by CI).
-        private const string legacyVersion = "2.42";
+        private const string legacyVersion = "3.0";
         public static string Version { get { return BuildInfo.Version == "dev" ? legacyVersion : BuildInfo.Version; } }
+
+        /// <summary>
+        /// Everything needed to identify exactly which build this is, as one line. Written as the first
+        /// status message at startup, because "which version is this" is the first question asked of any
+        /// log that gets handed over - and until now a status log carried no answer at all.
+        ///
+        /// Four parts, because they CAN disagree and each one answers a different question:
+        ///   - Version       what the title bar, splash and About box show. CI-stamped for a release or a
+        ///                   PR beta ("3.0.beta-pr20"), legacyVersion for a local dev build.
+        ///   - assembly      AssemblyVersion, which is what a crash report and the hang-watchdog report
+        ///                   identify themselves by - so this is the line that ties those to a release.
+        ///   - commit        the exact source. "dev" locally; a real sha only in a CI build.
+        ///   - Debug/x86     configuration and bitness. The app runs 32-bit under WOW64 (see the
+        ///                   GetWindowLongPtr comment below), which is the context an OutOfMemory needs.
+        /// </summary>
+        public static string VersionBanner
+        {
+            get
+            {
+                string asm = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "?";
+
+                // A CI sha is 40 characters and would dominate the line; 12 is unambiguous for git and
+                // still greppable. "dev" is left exactly as it is - truncating it would hide that this
+                // is an unstamped local build, which is the single most useful thing the field says.
+                string commit = BuildInfo.CommitSha;
+                if (commit != "dev" && commit.Length > 12)
+                    commit = commit.Substring(0, 12);
+
+#if DEBUG
+                const string config = "Debug";
+#else
+                const string config = "Release";
+#endif
+                return string.Format("ioSender {0} - assembly {1}, commit {2}, {3} build, {4}",
+                                      Version, asm, commit, config,
+                                      Environment.Is64BitProcess ? "x64" : "x86");
+            }
+        }
+
         public static MainWindow ui = null;
 
         /// <summary>
@@ -81,6 +121,16 @@ namespace GCode_Sender
         public static UIViewModel UIViewModel { get; } = new UIViewModel();
 
         private bool saveWinSize = false;
+
+        // The in-process state stream (client/server split, step 6a) - held for the app's lifetime;
+        // see its construction below for why it exists before anything consumes it.
+        private CNC.Core.MachineStateStream stateStream;
+
+        // The in-process command channel (step 6a, the other direction): Jog + run control, wired to
+        // the REAL JobRunner instance the run bar drives. Same additive pattern as the state stream -
+        // nothing in the app calls it yet; constructing it proves the wiring and gives a future
+        // out-of-process transport its exact in-process reference behaviour.
+        private CNC.Core.MachineCommandChannel commandChannel;
 
         public MainWindow()
         {
@@ -99,6 +149,16 @@ namespace GCode_Sender
             InitializeComponent();
 
             ui = this;
+
+            // The FIRST line into the status log, before anything else here can post one: which build
+            // this is. StatusLog.Init (App.OnStartup, well before this constructor) has already opened
+            // the file and written its run-started banner, so this lands immediately under it.
+            //
+            // Routed through the normal funnel rather than StatusLog.Write so it reaches BOTH the Status
+            // window and the durable file in one line. LogDetail, not Message: Message would also replace
+            // the one-line status readout, and the build identity is not a headline. Not an error either,
+            // so it cannot auto-pop the window - only isError does that (see FlashMessage).
+            (DataContext as GrblViewModel)?.LogDetail(VersionBanner);
 
             UpdateFusionAddinMenu();
             CheckFusionAddinUpdated();
@@ -206,7 +266,28 @@ namespace GCode_Sender
             };
 
             if (DataContext is GrblViewModel viewModel)
+            {
                 CNC.Core.Grbl.GrblViewModel = viewModel;
+                CNC.Controls.GamepadInput.Attach(viewModel);   // one gamepad stack, bound to the main model
+                // Settings > User Interface > Sound. Attached to the model rather than to the run
+                // strip that shows the same lamps, so a sound configured for a limit or the probe
+                // still happens while you are on another tab - which is the whole point of wanting
+                // one. Does nothing at all until a sound is chosen; all three default to None.
+                CNC.Controls.UiSoundWatcher.Attach(viewModel);
+
+                // The state stream (client/server split, step 6a): MachineState -> MachineDelta
+                // messages, pumped per status report. Nothing in the app consumes it yet - the client
+                // mirror will - but constructing it here makes the wire protocol real and observable
+                // now: run with -debuglog=delta and every message appears in the debug log as its
+                // wire JSON.
+                stateStream = new CNC.Core.MachineStateStream(viewModel);
+                commandChannel = new CNC.Core.MachineCommandChannel(viewModel, RunControl.Runner);
+
+                // The ambient client (contracts-only discipline): views that have dropped their
+                // CNC Core reference read the machine through this wire-fed twin instead of
+                // Grbl.GrblViewModel. First consumer: the Camera tab.
+                CNC.Client.MachineClient.Attach(stateStream);
+            }
 
             // The run control is now fixed at the main-window bottom (always visible on every tab), so the
             // floating run-control panel is retired - leave MacroProcessor.RunControlPanel unset (its callers
@@ -242,9 +323,10 @@ namespace GCode_Sender
             // aligned) instead of stretching full height, so the popup itself shrinks - not just the grid.
             CNC.Controls.ProgramView.CompactChanged += ApplyOverlayCompact;
 
-            // Every streamed macro/wizard run goes here: stream the generated program through the flow-controlled
-            // streamer, in its own ProgramView, without leaving the current tab or touching the loaded job.
-            CNC.Controls.MacroProcessor.RunStreamedJobInPlace = (m, name, code, isFinalBurst, preferJobView, onDone) => RunStreamedJobInPlace(m, name, code, isFinalBurst, preferJobView, onDone);
+            // Step 7 (unified streaming engine): MacroProcessor.Run loads the macro as the job and starts
+            // it here - the run bar's JobControl instance lives in this assembly, hence the seam.
+            CNC.Controls.MacroProcessor.StartLoadedJob = unattended => RunControl.RunMacro(unattended);
+            CNC.Controls.MacroProcessor.RegisterPrompts();   // point the engine's (PROMPT)/(MBOX) seams at this assembly's dialogs
 
             // Matches App.xaml.cs's skip of the single-instance CHECK for a -testserver launch: this
             // instance must not become a pipe listener either, or a later normal launch would silently
@@ -255,6 +337,7 @@ namespace GCode_Sender
                 new PipeServer(App.Current?.Dispatcher ?? Dispatcher);
                 PipeServer.FileTransfer += Pipe_FileTransfer;
                 PipeServer.ActivateRequested += BringToForeground;
+                PipeServer.ShutdownRequested += Pipe_ShutdownRequested;
             }
             AttachBasePropertyChangedHandler();
             WireBarOverlays();
@@ -316,7 +399,7 @@ namespace GCode_Sender
             {
                 string msg = App.StartupMessage;
                 Dispatcher.BeginInvoke(new System.Action(() =>
-                    CNC.Core.AppDialogs.Show(this, msg, "Startup message", MessageBoxButton.OK, MessageBoxImage.None)),
+                    CNC.Controls.AppDialogs.Show(this, msg, "Startup message", MessageBoxButton.OK, MessageBoxImage.None)),
                     System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             }
         }
@@ -326,12 +409,11 @@ namespace GCode_Sender
 
         private void WireBarOverlays()
         {
-            // Console log overlay follows the command box: appears when it gets focus, dismisses once focus
-            // leaves BOTH the box and the log (so you can scroll/select/copy from the log), or on Esc.
-            mdiControl.GotKeyboardFocus += (s, e) => { _consoleOverlay = true; UpdateOverlay(); };
-            mdiControl.LostKeyboardFocus += (s, e) => ScheduleConsoleOverlayCheck();
+            // The console-log overlay used to follow the run strip's MDI box, appearing while you
+            // typed there. That box is gone (2026-08-10) - the MDI Console button opens the real
+            // console instead, which has the log, the history and multi-line paste - so only the
+            // overlay's own focus/Esc handling remains, for anything else that still shows it.
             overlayConsole.LostKeyboardFocus += (s, e) => ScheduleConsoleOverlayCheck();
-            mdiControl.PreviewKeyDown += ConsoleOverlay_Key;
             overlayConsole.PreviewKeyDown += ConsoleOverlay_Key;
 
             // A real file load creates the job's own program view and connects it (ProgramView refactor):
@@ -346,16 +428,32 @@ namespace GCode_Sender
                     else if (e.PropertyName == nameof(GrblViewModel.IsJobRunning))
                         OnJobRunningChanged((s as GrblViewModel)?.IsJobRunning == true);
                     else if (e.PropertyName == nameof(GrblViewModel.Message))
-                        FlashMessage((s as GrblViewModel)?.IsMessageError == true);
+                    {
+                        // Only for a message the log actually RECORDS - see GrblViewModel.IsLoggableMessage.
+                        // Clearing the message is a change to the property but is not a message, and views
+                        // clear it on activate, so every tab switch used to pop this window with nothing new
+                        // in it.
+                        var msgModel = s as GrblViewModel;
+                        if (msgModel != null && GrblViewModel.IsLoggableMessage(msgModel.Message))
+                            FlashMessage(msgModel.IsMessageError);
+                    }
                     else if (e.PropertyName == nameof(GrblViewModel.ConnectionTarget))
+                    {
                         UpdateConnectMenuHeader();   // keep the top-level Connect/Reconnect label current
+                        UpdateMenuBarInfo();
+                    }
+                    // The menu-bar summary says WHICH target, and nothing else. It used to append RunTime
+                    // as "for HH:MM:SS", but RunTime is the JOB timer (JobTimer, started at Cycle Start)
+                    // - not connection uptime - so it read 00:00:00 whenever a job wasn't streaming. The
+                    // elapsed time moved next to the State field, where it means something.
+                    else if (e.PropertyName == nameof(GrblViewModel.IsConnectionLost))
+                        UpdateMenuBarInfo();
                 };
 
             // Status message permanently shown at double size (was a 10s enlarge-then-shrink animation that
             // shifted the whole window layout up/down on every message - distracting; see FlashMessage for
             // the replacement notice mechanism). Doubled once here rather than hardcoding a size, so it
             // always tracks whatever the ambient/theme default actually is.
-            lblMessage.FontSize *= 2.0;
 
             // Demo-video timelapse toggle is a capture-only affordance: show it only when the demo
             // marker facility is armed (-demomarker), hidden in normal use.
@@ -365,7 +463,7 @@ namespace GCode_Sender
             // ObsBridge just like RtspCamerasControl's own "All" row, so either control reflects the
             // other's state regardless of which one (or a keyboard shortcut) triggered a change.
             btnAllRecord.Visibility = btnTimeLapse.Visibility;
-            CNC.Core.ObsBridge.CamerasChanged += AllRecord_Resync;
+            CNC.Controls.ObsBridge.CamerasChanged += AllRecord_Resync;
             AllRecord_Resync();
         }
 
@@ -375,8 +473,8 @@ namespace GCode_Sender
         {
             _suppressAllRecordToggled = true;
             bool allRecording = true;
-            for (int i = 0; i < CNC.Core.ObsBridge.Cameras.Length; i++)
-                allRecording &= CNC.Core.ObsBridge.IsCameraRecording(i);
+            for (int i = 0; i < CNC.Controls.ObsBridge.Cameras.Length; i++)
+                allRecording &= CNC.Controls.ObsBridge.IsCameraRecording(i);
             btnAllRecord.IsChecked = allRecording;
             _suppressAllRecordToggled = false;
         }
@@ -409,22 +507,23 @@ namespace GCode_Sender
                 return;
             }
 
-            if (msgFlashBorder == null || string.IsNullOrWhiteSpace((DataContext as GrblViewModel)?.Message))
-                return;
-
-            var color = isError ? FlashColorError : FlashColorNormal;
-            var brush = new SolidColorBrush(color);
-            msgFlashBorder.Background = brush;
-
-            var anim = new ColorAnimation
-            {
-                From = color,
-                To = Colors.Transparent,
-                Duration = TimeSpan.FromSeconds(5),
-                FillBehavior = FillBehavior.Stop   // Completed below sets the real final value
-            };
-            anim.Completed += (s, e) => msgFlashBorder.Background = Brushes.Transparent;
-            brush.BeginAnimation(SolidColorBrush.ColorProperty, anim);
+            // The message strip this used to flash is gone from the run strip (2026-08-10), so arriving
+            // text opens the log window instead - a message that nothing displays is a message lost.
+            //
+            // But only for something worth interrupting over. Popping a window in front of the operator
+            // is the strongest notification this app has, and spending it on "<name> ready - press Start
+            // to run" - a sentence the green Run button already says, posted every time a program becomes
+            // ready - made it noise. Errors and alarms still pop. Everything else is recorded in
+            // GrblViewModel.MessageLog exactly as before and is one Status click away, so nothing is lost;
+            // it just stops taking the screen.
+            //
+            // Deliberately NOT ShowMessageLog(autoPopped: false) for the quiet case: that means "the
+            // operator opened this", which CANCELS a pending auto-close (see ArmMessageLogAutoClose), so a
+            // routine message arriving behind an error window would strand it on screen indefinitely.
+            if (isError)
+                ShowMessageLog(autoPopped: true);
+            else
+                RefreshMessageLogText();
         }
 
         // ---- -testserver: make the window permanently non-activatable (see the constructor comment) ----
@@ -597,7 +696,7 @@ namespace GCode_Sender
         {
             Dispatcher.BeginInvoke(new System.Action(() =>
             {
-                if (!mdiControl.IsKeyboardFocusWithin && !overlayConsole.IsKeyboardFocusWithin)
+                if (!overlayConsole.IsKeyboardFocusWithin)
                 {
                     _consoleOverlay = false;
                     UpdateOverlay();
@@ -622,33 +721,15 @@ namespace GCode_Sender
         // doesn't pop the overlay open.
         private CNC.Controls.ProgramView jobProgramView;
 
-        // A plain streamed macro (not a tool that owns its own view) runs in this dedicated view, so it shows in
-        // its own overlay with live markers and never overwrites the loaded job. Reused across macro runs.
-        private CNC.Controls.ProgramView _macroRunView;
-        private System.Windows.Threading.DispatcherTimer _macroRunViewTimer;
-        private void EnsureMacroRunView()
-        {
-            if (_macroRunView == null)
-                _macroRunView = new CNC.Controls.ProgramView();
-            if (_macroRunViewTimer == null)
-            {
-                // The run view has no tab to close it and holds nothing useful once the run is done, so auto-
-                // dismiss it 20 s after it stops streaming (a new run/burst re-uses it and cancels the timer).
-                // On fire, disconnect it - the overlay reverts to the view beneath (the loaded job, or none).
-                _macroRunViewTimer = new System.Windows.Threading.DispatcherTimer { Interval = System.TimeSpan.FromSeconds(20) };
-                _macroRunViewTimer.Tick += (s, e) => { _macroRunViewTimer.Stop(); _macroRunView.Disconnect(); };
-            }
-        }
-
         private void OnJobFileChanged(string fileName)
         {
             if (string.IsNullOrEmpty(fileName))
             {
-                CNC.Core.ObsBridge.StopRecording();   // file closed: stop the demo recording (safety net)
+                CNC.Controls.ObsBridge.StopRecording();   // file closed: stop the demo recording (safety net)
                 jobProgramView?.Disconnect();   // file closed: drop the job view (overlay reverts to the empty state)
                 return;
             }
-            CNC.Core.ObsBridge.StartRecording();   // program loaded: begin the demo recording (no-op unless armed)
+            CNC.Controls.ObsBridge.StartRecording();   // program loaded: begin the demo recording (no-op unless armed)
             if (jobProgramView == null)
             {
                 jobProgramView = new CNC.Controls.ProgramView { AutoShow = false, IsLoadedJob = true };
@@ -690,18 +771,41 @@ namespace GCode_Sender
         // The single fixed run control + MDI at the main-window bottom (Phase 2c). JobView and other tabs
         // reach them here instead of hosting their own.
         public CNC.Controls.JobControl RunControl { get { return runControl; } }
-        public CNC.Controls.MDIControl MdiControl { get { return mdiControl; } }
+        // The strip's MDI box, back as of the classic run strip (Base.ClassicRunStrip). Returned
+        // unconditionally rather than gated on the setting: IsFocused asks whether keyboard focus is inside
+        // the control, and a Collapsed control can never hold focus, so the answer is already correct with
+        // the box hidden. The caller is JobView's keyboard-jog guard - it must read true while g-code is
+        // being typed, or arrow keys would jog the machine instead of moving the caret.
+        public CNC.Controls.MDIControl MdiControl { get { return mdiStrip; } }
 
         public string BaseWindowTitle { get; set; }
+
+        // " (Classic)" / " (Custom, modified)" - the UI preset, echoed in the window title because that is
+        // where it belongs and the OS title bar cannot hold the selector itself (see MainWindow.xaml).
+        // Kept OUT of BaseWindowTitle deliberately: that string is the caption for the About and
+        // Errors-and-alarms windows, which have nothing to do with which layout is loaded.
+        private string presetTitleSuffix = string.Empty;
+
+        // The last file-load title suffix, so re-rendering the title for a preset change does not drop the
+        // loaded file's name. The WindowTitle setter is write-only and callers do not re-send it.
+        private string fileTitleSuffix = string.Empty;
 
         public string WindowTitle
         {
             set
             {
-                ui.Title = BaseWindowTitle + (string.IsNullOrEmpty(value) ? "" : " - " + value);
-                // File open/save/close/transform state now lives on the program view + its right-click menu
-                // (menu overhaul), which self-gate on GCode.File - no menu-bar items to toggle here.
+                fileTitleSuffix = value ?? string.Empty;
+                RenderWindowTitle();
             }
+        }
+
+        private void RenderWindowTitle()
+        {
+            // File open/save/close/transform state now lives on the program view + its right-click menu
+            // (menu overhaul), which self-gate on GCode.File - no menu-bar items to toggle here.
+            ui.Title = BaseWindowTitle
+                     + presetTitleSuffix
+                     + (string.IsNullOrEmpty(fileTitleSuffix) ? "" : " - " + fileTitleSuffix);
         }
 
         public bool JobRunning
@@ -755,6 +859,13 @@ namespace GCode_Sender
                     "Settings", MessageBoxButton.OK, MessageBoxImage.Warning);
                 AppConfig.LastLoadWarnings = null;
             }
+
+            // The "a configuration overlay has been applied" notice that stood here is gone. It existed
+            // because an overlay left no trace: you restarted into a different-looking screen with only the
+            // layout itself as evidence, and one that silently applied NOTHING looked identical to one that
+            // worked. The Layout selector answers both questions permanently - it names the preset in the
+            // menu row and in the window title, so a switch that did not take is visible without a modal
+            // standing between the operator and the machine on every launch.
 
             // Lathe Wizards is never added to the tab bar at all while lathe mode is off (SetTabPresent
             // proactively omits it, rather than adding-then-pruning like other IAvailabilityGated views) -
@@ -818,7 +929,10 @@ namespace GCode_Sender
             // Publish the present tabs to the Edit Main Page > Tabs editor, then apply the saved order/visibility.
             PublishAndApplyTabs();
 
-            UIViewModel.ConfigControls.Add(new CNC.Controls.Viewer.ConfigControl());
+            // The GCode Viewer settings page was added here. It configured the OLD renderer, which the UI
+            // no longer has a way to reach, so nothing on it affected the 3D view in the Job tab - every
+            // option was inert. The four the carve view honours now live on the view itself, behind its
+            // View options button, next to the picture they describe.
 
             sidebarTabs.ItemsSource = UIViewModel.SidebarItems;
 
@@ -915,7 +1029,26 @@ namespace GCode_Sender
             {
                 System.Threading.Thread.Sleep(50);
                 Comms.com.PurgeQueue();
-                UIViewModel.CurrentView.Activate(true, ViewType.Startup);
+                // LOG AND CARRY ON, rather than let the connect path abort the rest of startup. What
+                // follows this block is not optional: the key hooks, the global shortcut dispatcher, the
+                // tab shortcuts and the console restore. On 2026-10-25 an NRE in here took all of them
+                // out, and the result was not a dead process but a worse thing - a window that stayed up
+                // and kept polling with no keyboard handling at all, holding the single-instance lock, so
+                // every later launch quietly forwarded to it and exited. A connect that fails is survivable;
+                // a half-initialised application that looks like it will not start is not.
+                try
+                {
+                    UIViewModel.CurrentView.Activate(true, ViewType.Startup);
+                }
+                catch (System.Exception e)
+                {
+                    DebugLog.Write("connect", "CompleteStartup: Activate THREW - " + e.GetType().Name + ": " + e.Message
+                                            + " - carrying on so the window is still usable\n" + e.StackTrace);
+                    ConsoleLog.Write("[startup] the controller handshake failed with " + e.GetType().Name
+                                   + " - the window is up but this connection is not initialised; reconnect before running anything.");
+                    (DataContext as GrblViewModel).Message = "Startup handshake failed (" + e.GetType().Name
+                                                           + ") - reconnect before running anything.";
+                }
             }
 
             // Restore preserved console preferences
@@ -923,10 +1056,20 @@ namespace GCode_Sender
             gvm.ResponseLogVerbose = AppConfig.Settings.Base.ConsoleVerbose;
             gvm.ResponseLogFilterRT = AppConfig.Settings.Base.ConsoleFilterRT;
             gvm.ResponseLogShowRTAll = AppConfig.Settings.Base.ConsoleShowRTAll;
+            // showConsole(), NOT openConsole() - that is a TOGGLE. This block runs on every connect AND
+            // on the re-initialisation a SOFT RESET triggers, so with the console already up it hid it:
+            // press the remote's Reset-and-unlock, or hit reset any other way, and the console you were
+            // reading vanished. The MDI button's own comment has warned about this toggle since
+            // 2026-08-13; this call site was simply missed.
             if (AppConfig.Settings.Base.ConsoleWindowOpen)
-                openConsole();
+                showConsole();
 
-            registerConsoleShortcut();
+            hookWindowKeyHandlers();
+            // Jog keys AND keyboard shortcuts, for every window in the application including dialogs opened
+            // later - registered once, here, so there is nothing to remember to wire up when a new dialog is
+            // added. Register the shortcut dispatcher before hooking, so no window can see a key first.
+            CNC.Controls.GlobalKeys.ShortcutDispatcher = dispatchGlobalShortcut;
+            CNC.Controls.GlobalKeys.Hook();
             registerTabShortcuts();
 
             // UI-zoom shortcuts (assignable in Keyboard & Controller, "UI zoom" group) - seed real defaults
@@ -939,12 +1082,12 @@ namespace GCode_Sender
 
             // Demo-shoot RTSP camera hotkeys - route through ObsBridge.SetCameraRecording, the same entry
             // point the RtspCamerasControl panel's toggles use, so either can drive the other's state.
-            ActionKeyBinder.Register("ObsCamAStart", k => { CNC.Core.ObsBridge.SetCameraRecording(0, true); return true; });
-            ActionKeyBinder.Register("ObsCamAStop", k => { CNC.Core.ObsBridge.SetCameraRecording(0, false); return true; });
-            ActionKeyBinder.Register("ObsCamBStart", k => { CNC.Core.ObsBridge.SetCameraRecording(1, true); return true; });
-            ActionKeyBinder.Register("ObsCamBStop", k => { CNC.Core.ObsBridge.SetCameraRecording(1, false); return true; });
-            ActionKeyBinder.Register("ObsAppStart", k => { CNC.Core.ObsBridge.SetCameraRecording(2, true); return true; });
-            ActionKeyBinder.Register("ObsAppStop", k => { CNC.Core.ObsBridge.SetCameraRecording(2, false); return true; });
+            ActionKeyBinder.Register("ObsCamAStart", k => { CNC.Controls.ObsBridge.SetCameraRecording(0, true); return true; });
+            ActionKeyBinder.Register("ObsCamAStop", k => { CNC.Controls.ObsBridge.SetCameraRecording(0, false); return true; });
+            ActionKeyBinder.Register("ObsCamBStart", k => { CNC.Controls.ObsBridge.SetCameraRecording(1, true); return true; });
+            ActionKeyBinder.Register("ObsCamBStop", k => { CNC.Controls.ObsBridge.SetCameraRecording(1, false); return true; });
+            ActionKeyBinder.Register("ObsAppStart", k => { CNC.Controls.ObsBridge.SetCameraRecording(2, true); return true; });
+            ActionKeyBinder.Register("ObsAppStop", k => { CNC.Controls.ObsBridge.SetCameraRecording(2, false); return true; });
 
 #if DEBUG
             ActionKeyBinder.Register("Screenshot", Screenshot_Action);
@@ -965,6 +1108,10 @@ namespace GCode_Sender
             GCode.File.AddConverter(c.GetType(), c.FileType, c.FileExtensions);
             c = new HpglToGCode();
             GCode.File.AddConverter(c.GetType(), c.FileType, c.FileExtensions);
+            // Outline-only SVG -> plain-Grbl laser g-code. Separate from the Work Order's SVG carving,
+            // which emits grblHAL and would be rejected outright by a diode laser controller.
+            c = new SvgToLaser();
+            GCode.File.AddConverter(c.GetType(), c.FileType, c.FileExtensions);
 
             GCode.File.AddTransformer(typeof(GCodeRotateViewModel), (string)FindResource("MenuRotate"), UIViewModel.TransformMenuItems);
             GCode.File.AddTransformer(typeof(ArcsToLines), (string)FindResource("MenuArcsToLines"), UIViewModel.TransformMenuItems);
@@ -982,6 +1129,12 @@ namespace GCode_Sender
             }
             else
                 RevealMainWindow();   // no controller / cancelled: show the normal UI disconnected
+
+            // Layout selector: here rather than in Window_Load because it reads AppConfig.Settings.Base
+            // (the active preset name) and compares the live config document against the preset file, and
+            // Base is only populated by the SetupAndOpen() above. It also has to run after the tabs are
+            // built, since the layout tree it fingerprints is what built them.
+            RefreshPresets();
 
             // Safety net: never leave the user staring at the splash if the controller never reports in.
             var revealSafety = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
@@ -1065,182 +1218,6 @@ namespace GCode_Sender
             timer.Start();
         }
 
-        // Stream a tool's generated program through the flow-controlled streamer WITHOUT leaving the current tab
-        // (the bottom run bar drives Feed Hold/Stop on any tab) and WITHOUT touching the loaded job: the program
-        // is built as a standalone transient IProgramSource and the streamer is pointed at it for the run, then
-        // reset to the job (GCode.File) when it finishes. So e.g. Load Stock's probe program never disturbs the job.
-        private void RunStreamedJobInPlace(GrblViewModel m, string name, string[] code, bool isFinalBurst, bool preferJobView, System.Action onDone)
-        {
-            if (code == null || code.Length == 0)
-            {
-                onDone?.Invoke();
-                return;
-            }
-
-            // preferJobView (Work Order, which already made itself the loaded job via GCode.File.Push/LoadText
-            // before streaming) opts OUT of the "never touch the Job tab" rule below and builds this burst
-            // straight into GCode.File itself instead of a disconnected transient copy. The Job tab's actual
-            // docked list (ProgramPanel's own GCodeListControl, in ProgramPanel.xaml) is permanently bound to
-            // GCode.File.Data (its own Loaded handler falls back to it and nothing ever redirects it away) -
-            // an EARLIER attempt at this fix routed the live burst into jobProgramView instead (a SEPARATE
-            // ProgramView instance, not the one ProgramPanel actually displays) and the docked status column
-            // never updated, confirmed on real hardware 2026-08-01. Rebuilding directly into GCode.File means
-            // the same collection ProgramPanel is already watching receives the live "ok"/"*"/"@" writes.
-            // Single-burst assumption: Work Order's compiled program has no (MBOX)/(WAITIDLE), so
-            // MacroProcessor.Run always flushes it as ONE burst - Action.New here replaces GCode.File's
-            // content wholesale, which would be wrong for a hypothetical FUTURE multi-burst preferJobView
-            // caller (each burst would wipe the previous one's). Fine for Work Order today; revisit if
-            // preferJobView ever gets a second caller that streams more than one burst.
-            var prog = preferJobView ? GCode.File : new CNC.Controls.GCode(m);   // else: transient, does not mutate the job/Model
-            prog.AddBlock(name, CNC.Core.Action.New);
-            for (int i = 0; i < code.Length - 1; i++)
-                prog.AddBlock(code[i], CNC.Core.Action.Add);
-            prog.AddBlock(code[code.Length - 1], CNC.Core.Action.End);
-
-            RunControl.Source = prog;          // stream this program instead of the loaded job
-            // Mark the ACTUAL streamed program in a ProgramView so the live per-line markers ("@"/"ok") and scroll
-            // track the run. A tool that owns its view (a wizard) marks its own; a plain macro - no tool view, or
-            // only the loaded-job view is active - gets a dedicated run view, so a run never overwrites the job.
-            // preferJobView needs none of this - prog IS GCode.File, already shown by the docked view.
-            if (!preferJobView)
-            {
-                var connected = CNC.Controls.ProgramView.Active;
-                if (connected != null && connected != jobProgramView)
-                    connected.SetProgram(prog.Data);
-                else
-                {
-                    EnsureMacroRunView();
-                    _macroRunViewTimer.Stop();     // a run is (re)using the view - cancel any pending auto-dismiss
-                    _macroRunView.Title = string.IsNullOrEmpty(name) ? "Program" : name;
-                    _macroRunView.SetProgram(prog.Data);
-                    _macroRunView.Connect();
-                }
-            }
-            RestoreSourceOnEnd(m, prog, isFinalBurst, onDone);   // revert to the job source when THIS burst ends, then signal completion
-
-            // Defer CycleStart to a clean dispatcher cycle. Starting it synchronously
-            // from inside MacroProcessor.Run's streaming flush re-enters the dispatcher (CycleStart pumps events
-            // in a DoEvents wait), which corrupts the run's state machine so it never reaches its terminal state -
-            // the UI then stays "job running" (unresponsive) until Stop. Deferring runs it after Run() unwinds.
-            //
-            // Background is the lowest priority above idle, so on a macro that streams several short bursts back
-            // to back (e.g. Start Job's park move, or Stepper Calibration's per-corner probes) this can be starved
-            // behind a stream of Normal-priority work (status-report handling, THIS burst's own onDone dispatch)
-            // long enough that it doesn't run until AFTER the burst it belongs to has already finished and
-            // RestoreSourceOnEnd already cleared RunControl.Source. Firing CycleStart at that point still starts
-            // real motion (StreamingState -> Send, GrblState -> Run) but with no RestoreSourceOnEnd handler left
-            // subscribed to catch it (it already unsubscribed at the real terminal state) - MacroProcessor's very
-            // next (WAITIDLE) then walks straight into that untracked stream and aborts ("controller did not
-            // return to idle"), even though the real burst completed cleanly. Confirmed via DebugLog("macro")
-            // tracing 2026-07-21: StreamProgram's wait loop exited with StreamingState already back to Send/Run,
-            // with no corresponding RestoreSourceOnEnd trace for that transition - i.e. nobody's handler was even
-            // watching it. Guard: only actually start if this burst's transient is still the active source: if
-            // RestoreSourceOnEnd already reverted it, this CycleStart is stale and must be skipped.
-            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
-                new System.Action(() =>
-                {
-                    if (RunControl.Source == prog)
-                        RunControl.Run(0, false);   // stream from the bottom run bar - no tab change, don't re-enter ActiveRun
-                    else
-                        CNC.Core.DebugLog.Write("macro", "RunStreamedJobInPlace: skipped stale deferred CycleStart - burst already finished");
-                }));
-        }
-
-        // When the current run finishes, revert the streamer to the loaded-job source. Mirrors RestoreTabOnJobEnd:
-        // arm on the first running state, fire on the next terminal one, then unsubscribe. onDone (may be null)
-        // is MacroProcessor's completion signal for THIS burst - see Flush's 'wait' parameter.
-        private void RestoreSourceOnEnd(GrblViewModel m, CNC.Controls.GCode prog, bool isFinalBurst, System.Action onDone)
-        {
-            bool started = false;
-            bool jobFinished = false;
-            System.ComponentModel.PropertyChangedEventHandler handler = null;
-            handler = (s, e) =>
-            {
-                if (e.PropertyName != nameof(GrblViewModel.StreamingState))
-                    return;
-                var st = m.StreamingState;
-                CNC.Core.DebugLog.Write("macro", string.Format("RestoreSourceOnEnd: StreamingState -> {0} (started={1}, GrblState={2})",
-                    st, started, m.GrblState.State));
-                if (st == StreamingState.Send || st == StreamingState.SendMDI)
-                    started = true;
-                // JobFinished is only ever raised on a genuine program end (M30/M2, see JobControl's
-                // StreamingHandler.Call(StreamingState.JobFinished, ...) call sites) - a Feed Hold + Stop
-                // instead routes through StreamingState.Stop on its way back to Idle. Both eventually land on
-                // the SAME terminal Idle/NoFile state below, so without this distinction a Feed Hold + Stop
-                // was indistinguishable from a clean finish and wrongly discarded the generated program
-                // (Run bar reverted to "Generate" mid-job with no way to resume) - confirmed on real
-                // hardware 2026-07-27 on the Odd Jobs Pocket tool.
-                if (st == StreamingState.JobFinished)
-                    jobFinished = true;
-                // Wait for the TRUE terminal state (Idle/NoFile = streamer fully finalized), not JobFinished: the
-                // streamer parks in AwaitIdle after the last ack until the controller reports Idle, and that final
-                // transition is delivered by GrblStateChanged only while a program is active. Tearing down (which
-                // clears ActiveRun) at JobFinished would close that gate mid-finalization and hang the run. Error/
-                // Halted are ALSO terminal here (a failed burst - e.g. a probe miss - stays in Error until the
-                // operator clicks Stop/Reset): MacroProcessor.Flush can block on onDone (see its 'wait' param), so
-                // this must fire on a failure too, or a mid-macro error would hang Run() until manual intervention.
-                //
-                // NOTE: deliberately fires on the FIRST Idle/NoFile report, not a debounced Nth one - a
-                // debounce here was tried (2026-07-21) and reverted: it requires a SECOND PropertyChanged
-                // notification for StreamingState, but that property only raises PropertyChanged when its
-                // VALUE actually changes - once it settles at Idle, no further report retriggers it, so a
-                // per-report debounce here gets permanently stuck (Flush hangs forever, no message, no
-                // timeout). The real "trailing motion after Idle" race this was trying to catch is instead
-                // handled at the WaitForIdle end (see its comment) using report-driven polling, which DOES
-                // correctly observe every incoming status report regardless of whether a property value
-                // technically changed.
-                if (!started || (st != StreamingState.Idle && st != StreamingState.NoFile && st != StreamingState.Error && st != StreamingState.Halted))
-                    return;
-
-                m.PropertyChanged -= handler;
-                Dispatcher.BeginInvoke(new System.Action(() =>
-                {
-                    // Revert the streamer to the loaded job, but ONLY if this burst's transient is still the
-                    // source. A stay-put run (Load Stock) streams several bursts back-to-back (the park move,
-                    // then each O<...> CALL); each reverts its own source at its idle, and the guard stops a
-                    // finishing burst from clobbering the source a later burst already set. The tool's own
-                    // ProgramView stays connected across ALL bursts (so each is marked in it and the Job view
-                    // is never touched); the full teardown - disconnect the view, clear the active program -
-                    // happens when the tool's tab is left (Activate(false)), not at a mid-run burst boundary.
-                    if (RunControl.Source == prog)
-                        RunControl.Source = null;
-
-                    // The macro's whole run just finished (isFinalBurst) with no error: hide the program view
-                    // completely rather than leaving it sitting in its Compact 3-line state showing wherever
-                    // the last executed line happened to land - there's nothing actionable left to look at.
-                    // Works uniformly for a tool's own preview pane (Start Job, Stepper Calibration, ...) and
-                    // the shared _macroRunView alike, since both go through the same ProgramView.Active/
-                    // Disconnect mechanism. On error (Halted/Error) the view is left up on purpose - see the
-                    // fallback branch below - so the operator can see where/what failed.
-                    if (isFinalBurst && (st == StreamingState.Idle || st == StreamingState.NoFile))
-                    {
-                        _macroRunViewTimer?.Stop();
-                        CNC.Controls.ProgramView.Active?.Disconnect();
-
-                        // A Generate-first tool tab's run just finished cleanly: drop the in-memory program and
-                        // revert the Run bar back to "Generate" (see MacroProcessor's Generate-mode plumbing) -
-                        // the operator re-generates for the next job rather than re-running a stale program.
-                        // Left alone on error/halt (same condition as the program-view dismiss above), AND on
-                        // a Feed Hold + Stop (jobFinished false - see its own comment above) so the operator
-                        // can still inspect/RESUME the SAME generated program, without redoing Generate.
-                        if (CNC.Controls.MacroProcessor.SupportsGenerateMode && jobFinished)
-                            CNC.Controls.MacroProcessor.DiscardGenerated?.Invoke();
-                    }
-                    // A plain macro's run view auto-dismisses 20 s after it stops streaming (a re-use resets
-                    // it); a tool's own view is left alone - it closes on tab-leave.
-                    else if (_macroRunViewTimer != null && CNC.Controls.ProgramView.Active == _macroRunView)
-                    {
-                        _macroRunViewTimer.Stop();
-                        _macroRunViewTimer.Start();
-                    }
-                    CNC.Core.DebugLog.Write("macro", string.Format("RestoreSourceOnEnd: about to invoke onDone, StreamingState={0} GrblState={1}",
-                        m.StreamingState, m.GrblState.State));
-                    onDone?.Invoke();
-                }));
-            };
-            m.PropertyChanged += handler;
-        }
-
         /// <summary>
         /// Bring Machine Setup up wherever the layout puts it - the tab when it is on the bar, its own window
         /// when it is a File-menu entry (the default since 2026-08-03) - and hand back the view so the caller
@@ -1262,8 +1239,16 @@ namespace GCode_Sender
                 return getView(tab) as CNC.Controls.MachineSetupView;
             }
 
+            // Machine Setup needs the run strip too - its Probe definitions and Fixture definitions steps
+            // jog the machine to locate things, and the jog pad lives on the strip - so it materializes as a
+            // tab rather than a window even when the operator has it in the File menu.
             var d = TabRegistry.DescriptorFor(ViewType.MachineSetup);
-            if (d == null || ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this) == null)
+            if (d == null)
+                return null;
+            if (d.RequiresRunStrip)
+                return showViewAsTab(d) as CNC.Controls.MachineSetupView;
+
+            if (ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this) == null)
                 return null;
 
             return ViewHostWindow.ViewInstance(ViewType.MachineSetup) as CNC.Controls.MachineSetupView;
@@ -1372,6 +1357,8 @@ namespace GCode_Sender
 
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
+            UpdateMenuBarInfo();   // the summary hides itself when the window gets too narrow
+
             if(saveWinSize && !(AppConfig.Settings.Base.WindowWidth == e.NewSize.Width && AppConfig.Settings.Base.WindowHeight == e.NewSize.Height))
             {
                 AppConfig.Settings.Base.WindowWidth = WindowState == WindowState.Maximized ? -1 : e.NewSize.Width;
@@ -1393,12 +1380,18 @@ namespace GCode_Sender
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            // A macro at an (MBOX)/(PROMPT) hold used to have IsJobRunning FALSE between its bursts (menu
+            // enabled), so an X-click (or a tooling shutdown request, which found this the hard way
+            // 2026-08-08) sailed through and abandoned the run mid-hold - MacroRunner.IsRunning was added
+            // to plug that. Step 7 closed the hole BY CONSTRUCTION: a macro is one continuous stream and a
+            // hold is a mid-stream barrier, so IsJobRunning stays true (menu disabled) for the whole run.
+            // Same predicate as Pipe_ShutdownRequested's ShutdownBlocked.
             if (!CNC.Core.Grbl.GrblViewModel.IsSDCardJob && !menuMain.IsEnabled)
             {
                 // JobRunning (menuMain disabled) blocks exit while a job is running/paused (e.g. HOLD) -
                 // used to just silently refuse the close with no explanation.
                 e.Cancel = true;
-                AppDialogs.Show("Cannot exit while a job is running or paused (e.g. in Hold).\n\nStop or finish the job first, then close ioSender.",
+                AppDialogs.Show("Cannot exit while a job or macro is running or paused (e.g. in Hold, or waiting at a macro prompt).\n\nStop or finish it first, then close ioSender.",
                     "Exit blocked", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -1450,6 +1443,12 @@ namespace GCode_Sender
                 System.Threading.Thread.Sleep(50);
             }
 
+            // Shutdown does not go through Disconnect() - that also clears ConnectionTarget, resets
+            // IsReady and rebuilds the job view for a reconnect that is never coming - but the log still
+            // needs its closing line, or the last connection in the file simply stops, which reads
+            // identically to a crash or a dropped link.
+            LogDisconnect("application closing");
+
             using (new UIUtils.WaitCursor())
             {
                 Comms.com.Close(); // disconnecting from websocket may take some time...
@@ -1485,6 +1484,362 @@ namespace GCode_Sender
                 AppDialogs.Show(ex.Message, "ioSender", MessageBoxButton.OK, MessageBoxImage.Exclamation);
             }
         }
+
+        #region Restart (Help > Support)
+
+        // The three configuration-overlay items this region used to serve are gone - they live on the
+        // Layout selector in the menu row now (see the UI presets region). Restart stayed: it is a
+        // RECOVERY action, not a configuration one.
+        private void menuSupport_SubmenuOpened(object sender, RoutedEventArgs e)
+        {
+        }
+
+        /// <summary>
+        /// Help > Support > Restart ioSender. Relaunches through the same GrblConfigView.DoRestart() the
+        /// settings footer and the config-overlay items use - the -self-relaunch handshake with the
+        /// single-instance probe lives there and must not be duplicated.
+        ///
+        /// Worth having as a menu entry rather than "close it and start it again": some state that wedges
+        /// a session exists only in memory and is cleared by nothing else. The check-mode lock JobView
+        /// takes when $I goes unanswered is the case that prompted this - it re-asserts $C every time the
+        /// controller leaves check mode, and $ queries answer error:8 in check mode, so the lock blocks the
+        /// very query that clears it. A fresh instance is the way out.
+        ///
+        /// No job-running guard here: menuMain is bound IsEnabled to IsJobRunning, so the whole menu bar is
+        /// dead while a job streams and this cannot be reached mid-burn.
+        /// </summary>
+        private void restartIoSender_Click(object sender, RoutedEventArgs e)
+        {
+            if (AppDialogs.Show(this,
+                    "Close and reopen ioSender?\n\n"
+                    + "Your settings are saved first, so nothing is lost. The connection is dropped and "
+                    + "remade, which clears anything held only in memory for this session.",
+                    "Restart ioSender", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            GrblConfigView.DoRestart();
+        }
+
+        #endregion
+
+        #region UI presets (the Layout selector in the menu row)
+
+        // Everything here is presentation - UiPresets owns the library, the modified check and the staging.
+        // See its header for why a preset is not an overlay, and AppConfig's overlay region for why a
+        // switch is staged-then-restart rather than written live.
+
+        // One row of the selector. The label is built once per refresh rather than bound, because
+        // "(modified)" belongs to the ACTIVE row only and is computed, not stored.
+        private sealed class PresetRow
+        {
+            public string Name { get; set; }
+            public string Label { get; set; }
+        }
+
+        // Guards the SelectionChanged handler while the list is being rebuilt. Without it, assigning
+        // SelectedItem during a refresh would read as the operator picking a preset - and a preset switch
+        // restarts the app, so a reentrant refresh would relaunch ioSender on its own.
+        private bool refreshingPresets;
+
+        private void RefreshPresets()
+        {
+            refreshingPresets = true;
+            try
+            {
+                string active = UiPresets.ActiveName;
+                bool modified = UiPresets.IsModified();
+
+                var rows = UiPresets.All().Select(p => new PresetRow
+                {
+                    Name = p.Name,
+                    Label = p.Name
+                          + (string.Equals(p.Name, active, StringComparison.OrdinalIgnoreCase) && modified ? "  (modified)" : "")
+                          + (p.Error != null ? "  (unreadable)" : "")
+                }).ToList();
+
+                cboPreset.ItemsSource = rows;
+                cboPreset.SelectedItem = rows.FirstOrDefault(r => string.Equals(r.Name, active, StringComparison.OrdinalIgnoreCase));
+
+                presetTitleSuffix = " (" + active + (modified ? ", modified" : "") + ")";
+                RenderWindowTitle();
+
+                menuPresetSave.Header = "_Save changes to \"" + active + "\"";
+                menuPresetDelete.Header = "_Delete \"" + active + "\"...";
+                menuPresetUndo.IsEnabled = AppConfig.CanUndoOverlay;
+            }
+            finally
+            {
+                refreshingPresets = false;
+            }
+        }
+
+        private void Preset_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (refreshingPresets)
+                return;
+
+            var row = cboPreset.SelectedItem as PresetRow;
+            if (row == null || string.Equals(row.Name, UiPresets.ActiveName, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            string leaving = UiPresets.ActiveName;
+
+            if (AppDialogs.Show(this,
+                    "Switch the screen layout to \"" + row.Name + "\"?\n\n"
+                    + "\"" + leaving + "\" is saved first, with any changes you have made to it, so you can "
+                    + "switch back and find it as you left it.\n\nioSender will restart.",
+                    "Switch Layout", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            {
+                RefreshPresets();           // put the selection back on the active preset
+                return;
+            }
+
+            string error;
+            if (!UiPresets.Switch(row.Name, out error))
+            {
+                AppDialogs.Show(this, "That layout could not be applied:\n\n" + error + "\n\nNothing has been changed.",
+                                "Switch Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                RefreshPresets();
+                return;
+            }
+
+            GrblConfigView.DoRestart();
+        }
+
+        private void presetSave_Click(object sender, RoutedEventArgs e)
+        {
+            string error;
+            if (!UiPresets.Save(UiPresets.ActiveName, out error))
+            {
+                AppDialogs.Show(this, "That layout could not be saved:\n\n" + error,
+                                "Save Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            RefreshPresets();
+        }
+
+        private void presetSaveAs_Click(object sender, RoutedEventArgs e)
+        {
+            string name;
+            if (!TextPromptDialog.Show(this, "Name for this screen layout:", UiPresets.ActiveName, out name))
+                return;
+
+            string clean = UiPresets.Sanitize(name);
+            if (UiPresets.Find(clean) != null &&
+                AppDialogs.Show(this, "A layout called \"" + clean + "\" already exists.\n\nReplace it?",
+                                "Save Layout", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            string error;
+            if (!UiPresets.Save(clean, out error))
+            {
+                AppDialogs.Show(this, "That layout could not be saved:\n\n" + error,
+                                "Save Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            // No restart and no staging: the arrangement on screen is already this one, so all that
+            // changes is which name the profile is tracking.
+            AppConfig.Settings.Base.ActivePreset = clean;
+            AppConfig.Settings.Save();
+            RefreshPresets();
+        }
+
+        private void presetExport_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = "Export screen layout",
+                FileName = UiPresets.Sanitize(UiPresets.ActiveName) + ConfigOverlay.FileExtension,
+                Filter = "ioSender layout|*" + ConfigOverlay.FileExtension,
+                DefaultExt = ConfigOverlay.FileExtension,
+                AddExtension = true
+            };
+            if (dlg.ShowDialog(this) != true)
+                return;
+
+            try
+            {
+                // Built from the live config (ConfigStore.WriteDocument), so what is exported is the
+                // arrangement on screen right now - not the last thing written to App.config, which with
+                // auto-save off can be hours stale.
+                var doc = ConfigOverlay.ExtractUiLayout(CNC.Core.ConfigStore.WriteDocument(),
+                                                        System.IO.Path.GetFileNameWithoutExtension(dlg.FileName));
+                var applied = ConfigOverlay.Describe(doc);
+
+                if (applied.Count == 0)
+                {
+                    AppDialogs.Show(this, "This configuration has no screen-layout sections to export.",
+                                    "Export Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    return;
+                }
+
+                doc.Save(dlg.FileName);
+
+                AppDialogs.Show(this,
+                    "Saved a layout file containing:\n\n"
+                    + string.Join("\n", applied.Select(s => "    " + (s.Merge ? s.Key + "  (merge)" : s.Key)))
+                    + "\n\nImporting it elsewhere adopts this screen layout and changes nothing else. "
+                    + "The connection port, network host and machine are deliberately not included.",
+                    "Export Layout", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show(this, "The layout could not be written:\n\n" + ex.Message,
+                                "Export Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+            }
+        }
+
+        private void presetImport_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Import screen layout",
+                Filter = "ioSender layout|*" + ConfigOverlay.FileExtension + ";*.config|All files|*.*",
+                DefaultExt = ConfigOverlay.FileExtension,
+                CheckFileExists = true
+            };
+            if (dlg.ShowDialog(this) != true)
+                return;
+
+            // Validate BEFORE copying, so a file that is not a layout can never sit in the library looking
+            // like one and fail only when it is picked.
+            List<ConfigOverlayEntry> sections;
+            string name;
+            try
+            {
+                var doc = System.Xml.Linq.XDocument.Load(dlg.FileName);
+                sections = ConfigOverlay.Describe(doc);
+                name = ConfigOverlay.NameOf(doc);
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show(this, "That file could not be read as a screen layout:\n\n" + ex.Message,
+                                "Import Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            if (sections.Count == 0)
+            {
+                AppDialogs.Show(this,
+                    "That file contains no configuration sections, so there is nothing to import.",
+                    "Import Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(name))
+                name = System.IO.Path.GetFileNameWithoutExtension(dlg.FileName);
+
+            string clean = UiPresets.Sanitize(name);
+            string target = UiPresets.PathFor(clean);
+
+            try
+            {
+                System.IO.Directory.CreateDirectory(CNC.Core.Resources.PresetsFolder);
+
+                if (System.IO.File.Exists(target) &&
+                    AppDialogs.Show(this, "You already have a layout called \"" + clean + "\".\n\nReplace it?",
+                                    "Import Layout", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                    return;
+
+                System.IO.File.Copy(dlg.FileName, target, true);
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show(this, "That layout could not be copied into your Presets folder:\n\n" + ex.Message,
+                                "Import Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            RefreshPresets();
+
+            // Deliberately not applied: importing is instant and reversible, switching restarts the app.
+            AppDialogs.Show(this,
+                "\"" + clean + "\" is now in your layout list.\n\n"
+                + "Pick it from the Layout selector to switch to it - that is when ioSender restarts.",
+                "Import Layout", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void presetFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.IO.Directory.CreateDirectory(CNC.Core.Resources.PresetsFolder);
+                System.Diagnostics.Process.Start("explorer.exe",
+                    "\"" + CNC.Core.Resources.PresetsFolder.TrimEnd('\\') + "\"");
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show(this, "That folder could not be opened:\n\n" + ex.Message,
+                                "Layouts Folder", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+            }
+        }
+
+        private void presetDelete_Click(object sender, RoutedEventArgs e)
+        {
+            string active = UiPresets.ActiveName;
+            var preset = UiPresets.Find(active);
+
+            if (preset == null || (preset.Shipped && !System.IO.File.Exists(UiPresets.PathFor(active))))
+            {
+                AppDialogs.Show(this, "\"" + active + "\" shipped with ioSender, so there is no copy of your own to delete.",
+                                "Delete Layout", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (AppDialogs.Show(this,
+                    "Delete your saved copy of \"" + active + "\"?\n\n"
+                    + "The screen stays exactly as it is - this removes the saved file, not the arrangement "
+                    + "you are looking at. The layout is simply no longer in the list to switch back to.",
+                    "Delete Layout", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+
+            string error;
+            if (!UiPresets.Delete(active, out error))
+            {
+                AppDialogs.Show(this, "That layout could not be deleted:\n\n" + error,
+                                "Delete Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            // The profile is no longer tracking a name it can reach, so it is back to being the operator's
+            // own arrangement - which is exactly what "Custom" means.
+            if (UiPresets.Find(active) == null)
+            {
+                AppConfig.Settings.Base.ActivePreset = string.Empty;
+                AppConfig.Settings.Save();
+            }
+
+            RefreshPresets();
+        }
+
+        private void presetUndo_Click(object sender, RoutedEventArgs e)
+        {
+            if (!AppConfig.CanUndoOverlay)
+            {
+                AppDialogs.Show(this, "There is no earlier configuration to go back to.",
+                                "Undo Layout Switch", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (AppDialogs.Show(this,
+                    "Restore your configuration as it was immediately before the last layout switch?\n\n"
+                    + "Any settings changed since then are lost. ioSender will restart.",
+                    "Undo Layout Switch", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+
+            if (!AppConfig.StageOverlayUndo())
+            {
+                AppDialogs.Show(this, "The backup could not be staged for restore - see the debug log. Nothing has been changed.",
+                                "Undo Layout Switch", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            GrblConfigView.DoRestart();
+        }
+
+        #endregion
 
         // Fusion's per-user AddIns folder - created by Fusion itself on first run, regardless of whether any
         // add-ins are installed yet, so its existence is a simple, good-enough "is Fusion 360 installed for
@@ -1704,6 +2059,52 @@ namespace GCode_Sender
             {
                 return ex.Message;
             }
+        }
+
+        /// <summary>
+        /// Open the manual at the topic for whatever view is current - the one implementation behind both
+        /// F1 and Help &gt; User manual, so the menu item and the key can never drift apart.
+        /// </summary>
+        private void OpenContextHelp()
+        {
+            ManualHelp.Open(CurrentHelpViewType());
+        }
+
+        /// <summary>
+        /// Which view context help should answer for.
+        /// </summary>
+        /// <remarks>
+        /// This deliberately does NOT read UIViewModel.CurrentView first, which is what it used to do and
+        /// why help opened the manual's front page instead of a topic. That property is only reassigned in
+        /// tabMode_SelectionChanged, and that assignment sits behind an <c>IsReady</c> gate - so with no
+        /// controller ready it keeps whatever it was given at startup for the whole session, however many
+        /// tabs you visit. "Which view is current" then stops being a question about the screen.
+        ///
+        /// The window is the authority instead: the focused view host if one is up (a menu-hosted view owns
+        /// the screen while it is), otherwise the SELECTED TAB, which is what the operator is looking at by
+        /// definition and needs no gate to stay true. CurrentView remains the last resort so nothing is
+        /// worse off than before.
+        /// </remarks>
+        private ViewType CurrentHelpViewType()
+        {
+            // A menu-hosted view in its own window - help there is about that window, not the tab behind it.
+            foreach (Window w in Application.Current.Windows)
+            {
+                if (w is CNC.Controls.ViewHostWindow host && w.IsActive && host.HostedViewType != ViewType.Startup)
+                    return host.HostedViewType;
+            }
+
+            var tab = tabMode?.SelectedItem as TabItem;
+            var tabView = tab != null ? getView(tab) : null;
+            if (tabView != null)
+                return tabView.ViewType;
+
+            return UIViewModel?.CurrentView?.ViewType ?? ViewType.Startup;
+        }
+
+        void userManual_Click(object sender, RoutedEventArgs e)
+        {
+            OpenContextHelp();
         }
 
         void aboutWikiItem_Click(object sender, EventArgs e)
@@ -2092,6 +2493,14 @@ namespace GCode_Sender
             ShowWorkOrder()?.Load();
         }
 
+        // Straight to the laser converter, rather than Load Program plus the right filter. The SVG laser
+        // path emits plain-Grbl and is a different job from the Work Order's SVG carving (grblHAL), which
+        // is why it gets its own entry instead of a mode on an existing one.
+        private void LoadSvgLaser_Click(object sender, RoutedEventArgs e)
+        {
+            GCode.File.OpenLaserSvg();
+        }
+
         /// <summary>
         /// Bring the Work Order composer up, wherever the layout puts it. Work Order ships as a tab, but
         /// the tabs/menu split is the user's to change in Settings > Main Page - so these menu entries
@@ -2119,6 +2528,8 @@ namespace GCode_Sender
             var d = TabRegistry.DescriptorFor(view);
             if (d == null)
                 return null;
+            if (d.RequiresRunStrip)
+                return showViewAsTab(d);
             ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this);
             return ViewHostWindow.ViewInstance(view);
         }
@@ -2127,7 +2538,7 @@ namespace GCode_Sender
         {
             // Reconnect: drop the current connection first so the dialog can switch targets/simulators.
             if (Comms.com != null && Comms.com.IsOpen)
-                Disconnect();
+                Disconnect("reconnecting");
 
             int res = AppConfig.Settings.Connect(Title, (GrblViewModel)DataContext, App.Current.Dispatcher);
             if (res == 0 && Comms.com != null && Comms.com.IsOpen)
@@ -2135,8 +2546,7 @@ namespace GCode_Sender
                 Comms.com.PurgeQueue();
                 // Activate the GRBL view to run the controller handshake (re-runs it after a disconnect
                 // because PrepareForReconnect() cleared its init state).
-                if (getView(getTab(ViewType.GRBL)) is ICNCView grbl)
-                    grbl.Activate(true, ViewType.Startup);
+                jobView()?.Activate(true, ViewType.Startup);
 
                 // A menu (re)connect can target a different controller than startup did (e.g. simulator ->
                 // real machine), so re-run the first-run wizard gate + ATC macro check against the now-
@@ -2149,10 +2559,51 @@ namespace GCode_Sender
             UpdateSimulatorTint();
         }
 
-        private void Disconnect()
+        /// <summary>
+        /// Re-run the connection after a handshake that came up without readable capabilities (see
+        /// JobView's own comment). Deliberately the SAME path as the Connect menu - drop the link, offer
+        /// the target, re-run the handshake - rather than a private reconnect of its own: that path is
+        /// proven, and it is the one that re-activates the GRBL view so $I is actually asked for again.
+        /// Must be invoked once the failing connect has unwound, not from inside it.
+        /// </summary>
+        internal void ReconnectAfterFailedHandshake()
+        {
+            connectMenuItem_Click(null, null);
+        }
+
+        /// <summary>
+        /// Drop the connection, recording WHY in status.log.
+        ///
+        /// Every caller here has a reason and none of them used to state it, so the log showed a
+        /// connection simply ceasing - and since a reconnect logs "Connecting to controller (...)"
+        /// immediately afterwards, an operator-initiated reconnect, a switch to the simulator and a
+        /// migration off serial all left the same trace. Which of those happened decides whether the
+        /// next connect is expected to reach the same machine at all.
+        ///
+        /// <paramref name="reason"/> is required rather than defaulted: a new call site that has not
+        /// thought about it should not silently log "unknown".
+        /// </summary>
+        /// <summary>
+        /// The one place the disconnect line is worded. Callers supply only the reason - they each know
+        /// why, and none of them should have to know how the sentence reads.
+        ///
+        /// Must be called BEFORE the port is closed: it reads the target from PortParams, which whatever
+        /// connects next rewrites - migration and the simulator switch both do exactly that - so naming
+        /// it afterwards would put the NEW target in the OLD connection's disconnect line.
+        /// </summary>
+        private void LogDisconnect(string reason)
+        {
+            (DataContext as GrblViewModel)?.LogDetail(
+                string.Format("Disconnected from controller ({0}) - reason: {1}",
+                              AppConfig.Settings.Base.PortParams, reason));
+        }
+
+        private void Disconnect(string reason)
         {
             if (Comms.com == null || !Comms.com.IsOpen)
                 return;
+
+            LogDisconnect(reason);
 
             Comms.com.Close(); // explicit close - cancels auto-reconnect (see StreamComms.Close)
 
@@ -2161,8 +2612,7 @@ namespace GCode_Sender
             model.IsReady = false;
 
             // Clear the GRBL view's controller state so the next Connect re-runs the handshake.
-            if (getView(getTab(ViewType.GRBL)) is JobView grbl)
-                grbl.PrepareForReconnect();
+            (jobView() as JobView)?.PrepareForReconnect();
 
             UpdateSimulatorTint();
         }
@@ -2183,7 +2633,7 @@ namespace GCode_Sender
             _preSimulateTarget = (Comms.com != null && Comms.com.IsOpen) ? AppConfig.Settings.Base.PortParams : null;
 
             if (Comms.com != null && Comms.com.IsOpen)
-                Disconnect();
+                Disconnect("switching to the simulator for a simulated run");
 
             var model = (GrblViewModel)DataContext;
             int res = AppConfig.Settings.ConnectToSimulator(Title, model, App.Current.Dispatcher);
@@ -2191,8 +2641,7 @@ namespace GCode_Sender
             if (ok)
             {
                 Comms.com.PurgeQueue();
-                if (getView(getTab(ViewType.GRBL)) is ICNCView grbl)
-                    grbl.Activate(true, ViewType.Startup);
+                jobView()?.Activate(true, ViewType.Startup);
             }
             UpdateSimulatorTint();
             return ok;
@@ -2208,7 +2657,7 @@ namespace GCode_Sender
             _preSimulateTarget = null;
 
             if (Comms.com != null && Comms.com.IsOpen)
-                Disconnect();
+                Disconnect("simulated run finished - restoring the previous connection");
 
             if (string.IsNullOrEmpty(target))
                 return;   // wasn't connected to anything real before Simulate - stay disconnected
@@ -2218,8 +2667,7 @@ namespace GCode_Sender
             if (res == 0 && Comms.com != null && Comms.com.IsOpen)
             {
                 Comms.com.PurgeQueue();
-                if (getView(getTab(ViewType.GRBL)) is ICNCView grbl)
-                    grbl.Activate(true, ViewType.Startup);
+                jobView()?.Activate(true, ViewType.Startup);
                 ForceMachineSetupIfNeeded();
             }
             UpdateSimulatorTint();
@@ -2310,10 +2758,31 @@ namespace GCode_Sender
         // known. The probe runs off the UI thread; the actual switch is marshalled back and deferred so it runs
         // after the serial handshake has fully settled. Guarded against re-entry while a migration is in flight.
         private bool migratingToNetwork = false;
+
+        // ONE attempt per ioSender run, win or lose.
+        //
+        // migratingToNetwork below is only a re-entry guard - it is cleared in the finally, so it stops two
+        // migrations overlapping and does nothing about the NEXT one. And this method is called from JobView
+        // every time the controller info loads, which includes every reconnect. That closes a loop:
+        //
+        //   serial connects -> info loads -> migrate -> the telnet link answers the TCP handshake but not
+        //   g-code -> $I goes unanswered -> the capabilities prompt -> back to serial -> info loads ->
+        //   migrate again...
+        //
+        // Observed 2026-09-15 during a network outage, and it ended with the controller in CHECK MODE: the
+        // capabilities prompt's "stay connected" option sends $C, so a connection loop eventually answers
+        // that prompt in a way that latches check mode. The user's own words: "Prefer network should be a
+        // one shot per ioSender startup".
+        //
+        // Latched where the attempt is COMMITTED, not where it succeeds, so an unreachable controller
+        // spends the shot too - otherwise a network that is down for the whole session re-probes on every
+        // reconnect, which is the same loop with a 1.5 s delay in it.
+        private bool networkMigrationTried = false;
+
         public void TryMigrateToNetwork()
         {
             var cfg = AppConfig.Settings;
-            if (migratingToNetwork || cfg.Base == null || !cfg.Base.PreferNetwork)
+            if (networkMigrationTried || migratingToNetwork || cfg.Base == null || !cfg.Base.PreferNetwork)
                 return;
             if (Comms.com == null || !Comms.com.IsOpen || !cfg.Base.PortParams.ToLower().StartsWith("com"))
                 return;   // only migrate away from a serial/USB link
@@ -2322,12 +2791,13 @@ namespace GCode_Sender
                 return;
 
             migratingToNetwork = true;
+            networkMigrationTried = true;   // the one shot is spent HERE - see the field's own comment
             string serialTarget = cfg.Base.PortParams;
             var model = (GrblViewModel)DataContext;
 
             new Thread(() =>
             {
-                bool reachable = ProbeTcp(ip, 23, 1500);
+                bool reachable = ProbeGrblTelnet(ip, 23, 1500);
                 Dispatcher.BeginInvoke(new System.Action(() =>
                 {
                     try
@@ -2335,7 +2805,7 @@ namespace GCode_Sender
                         // The link may have dropped or already moved off serial while we were probing.
                         if (reachable && Comms.com != null && Comms.com.IsOpen && cfg.Base.PortParams.ToLower().StartsWith("com"))
                         {
-                            Disconnect();
+                            Disconnect("migrating from serial to the network interface");
                             bool migrated = cfg.ConnectTo(Title, model, App.Current.Dispatcher, ip + ":23") == 0
                                             && Comms.com != null && Comms.com.IsOpen;
                             if (!migrated)   // network connect failed despite the probe - fall back to the serial port
@@ -2343,14 +2813,18 @@ namespace GCode_Sender
                             if (Comms.com != null && Comms.com.IsOpen)
                             {
                                 Comms.com.PurgeQueue();
-                                if (getView(getTab(ViewType.GRBL)) is ICNCView grbl)
-                                    grbl.Activate(true, ViewType.Startup);
+                                jobView()?.Activate(true, ViewType.Startup);
                             }
                             model.Message = migrated
                                 ? "Connection migrated to network (" + ip + ":23)"
-                                : "Network migration failed; staying on " + serialTarget;
+                                : "Network migration failed; staying on " + serialTarget + " - not retried until ioSender restarts.";
                             UpdateSimulatorTint();
                         }
+                        else if (!reachable)
+                            // Previously silent. An option that declines without a word reads as broken, and
+                            // now that the attempt is one-shot the operator needs to know it has been used.
+                            model.Message = "Prefer network: " + ip + ":23 did not answer - staying on " +
+                                            serialTarget + ", not retried until ioSender restarts.";
                     }
                     finally
                     {
@@ -2360,8 +2834,27 @@ namespace GCode_Sender
             }) { IsBackground = true }.Start();
         }
 
-        // Quick TCP reachability check: can we open a connection to host:port within timeoutMs?
-        private static bool ProbeTcp(string host, int port, int timeoutMs)
+        /// <summary>
+        /// Is there a grblHAL on host:port that actually TALKS - not merely something that accepts a socket?
+        /// </summary>
+        /// <remarks>
+        /// This used to be a TCP reachability check: connect, and if the handshake completed call it good.
+        /// That is not the question being asked. The caller is about to THROW AWAY A WORKING SERIAL LINK on
+        /// the strength of this answer, so the bar has to be "the controller responds", not "a port is open".
+        ///
+        /// 2026-09-15: during a network fault the controller had an IP and something completed the TCP
+        /// handshake on 23, but nothing answered g-code. The migration duly dropped serial, connected to a
+        /// mute socket, and the connect handshake's $I went unanswered five times - which raises the
+        /// "could not read capabilities" prompt, whose "stay connected" option sends $C. That is how the
+        /// machine ended up in CHECK MODE after a network outage.
+        ///
+        /// So: send '?' and require a status report back. '?' is a realtime command answered from the
+        /// controller's own input handler rather than the g-code queue, so it replies even on a machine
+        /// that is running, held or alarmed - there is no state in which a live grblHAL stays silent to it.
+        /// A report is anything between '&lt;' and '&gt;', which is cheap to recognise and impossible to
+        /// fake by a port merely being open.
+        /// </remarks>
+        private static bool ProbeGrblTelnet(string host, int port, int timeoutMs)
         {
             try
             {
@@ -2371,7 +2864,33 @@ namespace GCode_Sender
                     if (!ar.AsyncWaitHandle.WaitOne(timeoutMs))
                         return false;
                     client.EndConnect(ar);
-                    return client.Connected;
+                    if (!client.Connected)
+                        return false;
+
+                    var stream = client.GetStream();
+                    stream.WriteByte(0x3F);   // '?' - realtime status request
+                    stream.Flush();
+
+                    var buf = new byte[256];
+                    var sb = new System.Text.StringBuilder();
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    while (sw.ElapsedMilliseconds < timeoutMs)
+                    {
+                        if (!stream.DataAvailable)
+                        {
+                            System.Threading.Thread.Sleep(20);
+                            continue;
+                        }
+                        int n = stream.Read(buf, 0, buf.Length);
+                        if (n <= 0)
+                            break;
+                        sb.Append(System.Text.Encoding.ASCII.GetString(buf, 0, n));
+                        string seen = sb.ToString();
+                        int lt = seen.IndexOf('<');
+                        if (lt >= 0 && seen.IndexOf('>', lt) > lt)
+                            return true;   // a real status report - this is a grblHAL and it is listening
+                    }
+                    return false;   // accepted the socket and said nothing: NOT worth losing serial for
                 }
             }
             catch
@@ -2404,12 +2923,306 @@ namespace GCode_Sender
             ValidateProcessor.Run((GrblViewModel)DataContext);
         }
 
-        // Copy the full status-bar message to the clipboard (the line itself is single-line / can be truncated).
-        private void CopyMessage_Click(object sender, RoutedEventArgs e)
+        // Copy the full status-bar message to the clipboard (the line itself is single-line / can be truncated,
+        // so what is copied is the whole Message, not what happens to be visible).
+        //
+        // This used to be a bare Clipboard.SetText inside an empty catch, which gave the operator no way to
+        // tell a successful copy from a failed one. Two separate problems, both measured rather than assumed:
+        //   - an empty Message did NOT throw (checked: SetText("") succeeds) - it WIPED the clipboard, so
+        //     clicking the button with no message replaced whatever the operator had copied with nothing;
+        //   - the Win32 clipboard is a shared, lockable resource. Another app holding it (clipboard managers
+        //     and remote-desktop clients do this constantly) makes the call fail, transiently, and the empty
+        //     catch hid that completely - the previous clipboard content survives, so a later paste produces
+        //     older text and reads as "it copied the wrong thing".
+        // Hence: leave the clipboard alone when there is nothing to copy, SetDataObject with a short retry,
+        // and a visible confirmation ONLY on a call that actually succeeded.
+        // Click on the status line: every status message since launch, timestamped (errors marked "!"),
+        // in a plain scrollable window opened at the end (newest). The status line shows one message at a
+        // time and overwrites freely - this is the "what did it say a minute ago" answer. A snapshot, not
+        // live: click again for a fresh one.
+        // The one status-log window. Kept rather than recreated so a new message can refresh what is
+        // already on screen instead of stacking a second copy of it.
+        private Window messageLogWindow;
+        private TextBox messageLogText;
+
+        // An AUTO-POPPED log window is a notification - it appeared without being asked for, so it must
+        // not sit there covering the UI until someone dismisses it. It closes itself after this long.
+        // A window the operator opened from the Status button is NOT a notification and never self-closes,
+        // and an auto-popped one stops being a notification the moment they interact with it.
+        //
+        // Read fresh on every arm rather than captured once, so changing it in Settings takes effect on
+        // the next message instead of at the next launch. Clamped: below a second nobody can read it, and
+        // past a minute it has stopped being a notification and become a window that will not go away.
+        private static TimeSpan MessageLogAutoCloseDelay
         {
-            try { System.Windows.Clipboard.SetText((DataContext as GrblViewModel)?.Message ?? string.Empty); }
-            catch { /* clipboard may be locked by another app - ignore */ }
+            get
+            {
+                int seconds = AppConfig.Settings.Base.StatusWindowAutoCloseSeconds;
+                return TimeSpan.FromSeconds(Math.Min(Math.Max(seconds, 1), 60));
+            }
         }
+        private DispatcherTimer messageLogAutoClose;
+        private bool messageLogAutoPopped;
+
+        /// <summary>
+        /// The connection summary at the right end of the menu bar: "Connected: TARGET".
+        /// It shares that row with the menu, so it HIDES itself on a narrow window rather than
+        /// squeezing the menu - the menu is navigation, this is a readout, and a readout loses.
+        /// </summary>
+        private void UpdateMenuBarInfo()
+        {
+            if (lblMenuBarInfo == null)
+                return;
+
+            var model = DataContext as GrblViewModel;
+            string target = model?.ConnectionTarget;
+
+            if (string.IsNullOrEmpty(target) || (model != null && model.IsConnectionLost))
+            {
+                lblMenuBarInfo.Text = "Not connected";
+                lblMenuBarInfo.Foreground = Brushes.Red;
+            }
+            else
+            {
+                lblMenuBarInfo.Text = string.Format("Connected: {0}", target);
+                lblMenuBarInfo.Foreground = Brushes.ForestGreen;
+            }
+
+            // Below this the menu and the summary start to collide. Measured against the menu's own
+            // width rather than a guessed constant, so a longer menu (localised, or a new item) still
+            // gets the room it needs.
+            double needed = menuMain.ActualWidth + lblMenuBarInfo.DesiredSize.Width + 40;
+            lblMenuBarInfo.Visibility = ActualWidth >= needed ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void ViewStatus_Click(object sender, RoutedEventArgs e)
+        {
+            ShowMessageLog(autoPopped: false);
+        }
+
+        // The classic run strip's message line, which stands in for the Status button. A separate handler
+        // because MouseLeftButtonUp wants a MouseButtonEventHandler - ViewStatus_Click's RoutedEventArgs
+        // signature does not satisfy that delegate.
+        private void ClassicStatusMessage_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            ShowMessageLog(autoPopped: false);
+        }
+
+        /// <summary>
+        /// Update the log window's text if it happens to be open, and do nothing at all if it is not.
+        /// The quiet counterpart to ShowMessageLog: a routine message keeps an already-open window
+        /// current without opening one, and without touching the auto-close countdown either way.
+        /// </summary>
+        private void RefreshMessageLogText()
+        {
+            if (messageLogWindow == null || messageLogText == null)
+                return;
+
+            var log = (DataContext as GrblViewModel)?.MessageLog;
+            if (log == null)
+                return;
+
+            messageLogText.Text = string.Join(Environment.NewLine, log);
+            messageLogText.ScrollToEnd();
+        }
+
+        /// <summary>
+        /// Show the status-message log, creating it on first use and refreshing it after. Called both
+        /// by the Status button and whenever a message arrives - the run strip no longer carries a
+        /// message strip, so this window IS how a message gets seen.
+        /// </summary>
+        private void ShowMessageLog(bool autoPopped)
+        {
+            var log = (DataContext as GrblViewModel)?.MessageLog;
+            if (log == null || log.Count == 0)
+                return;
+
+            // Read BEFORE anything below mutates the state: a window that is already up and was NOT
+            // auto-popped belongs to the operator, so an arriving message may refresh it but must never
+            // start a countdown on it.
+            bool ownedByOperator = messageLogWindow != null && !messageLogAutoPopped;
+
+            if (messageLogWindow != null)
+            {
+                messageLogText.Text = string.Join(Environment.NewLine, log);
+                messageLogText.ScrollToEnd();
+                if (!messageLogWindow.IsVisible)
+                    messageLogWindow.Show();
+                ArmMessageLogAutoClose(autoPopped, ownedByOperator);
+                return;
+            }
+
+            var text = new TextBox
+            {
+                IsReadOnly = true,
+                IsUndoEnabled = false,
+                TextWrapping = TextWrapping.NoWrap,
+                FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Text = string.Join("\r\n", log)
+            };
+            var win = new Window
+            {
+                Title = "Status messages since launch",
+                Owner = this,
+                Width = 700,
+                Height = 440,
+                MinWidth = 300,
+                MinHeight = 200,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Content = text
+            };
+            // This window is closed and rebuilt on every show, so without this its size and position reset
+            // every time - and it shows itself unprompted whenever a message arrives, so it would keep
+            // reappearing wherever IT chose rather than where it was put. Same restore/save/clamp shape as
+            // ConsoleWindow.RestorePlacement/SavePlacement.
+            RestoreStatusWindowPlacement(win);
+            win.Closing += (s2, e2) => SaveStatusWindowPlacement(win);
+            win.Loaded += (s2, e2) => { text.CaretIndex = text.Text.Length; text.ScrollToEnd(); };
+            // Esc closes, like the console log and every other floating window here. Bubbling KeyDown,
+            // not PreviewKeyDown, for the reason ConsoleWindow.OnKeyDown documents: preview tunnels from
+            // the root and would steal the key from any child that wants it first.
+            win.KeyDown += (s2, e2) =>
+            {
+                if (e2.Key == System.Windows.Input.Key.Escape && !e2.Handled)
+                {
+                    e2.Handled = true;
+                    win.Close();
+                }
+            };
+            // Touching the window is the operator taking ownership of it: the countdown exists to clear an
+            // UNATTENDED notification, not to snatch the window away mid-scroll. Preview, not bubbling -
+            // the TextBox fills the window and handles most input itself (the wheel certainly), so a
+            // bubbling handler would simply never see it.
+            win.PreviewMouseDown += (s2, e2) => CancelMessageLogAutoClose();
+            win.PreviewKeyDown += (s2, e2) => CancelMessageLogAutoClose();
+            win.PreviewMouseWheel += (s2, e2) => CancelMessageLogAutoClose();
+            win.Closed += (s2, e2) =>
+            {
+                messageLogWindow = null;
+                messageLogText = null;
+                CancelMessageLogAutoClose();
+            };
+            messageLogWindow = win;
+            messageLogText = text;
+            win.Show();
+            ArmMessageLogAutoClose(autoPopped, ownedByOperator);
+        }
+
+        /// <summary>
+        /// Start, restart or stand down the auto-popped window's self-dismiss countdown.
+        /// </summary>
+        private void ArmMessageLogAutoClose(bool autoPopped, bool ownedByOperator)
+        {
+            if (!autoPopped)
+            {
+                // A deliberate open outranks any pending dismissal - including one already counting down
+                // on a window that popped by itself a moment ago.
+                CancelMessageLogAutoClose();
+                return;
+            }
+
+            if (ownedByOperator)
+                return;
+
+            messageLogAutoPopped = true;
+
+            if (messageLogAutoClose == null)
+            {
+                messageLogAutoClose = new DispatcherTimer();
+                messageLogAutoClose.Tick += (s, e) =>
+                {
+                    messageLogAutoClose.Stop();
+                    if (messageLogAutoPopped)
+                        messageLogWindow?.Close();
+                };
+            }
+
+            // Restart rather than let it run on, so the message that JUST arrived gets the full delay
+            // instead of inheriting the tail of the previous one's. The interval is set here, not at
+            // construction, so a change in Settings applies to the very next message.
+            messageLogAutoClose.Stop();
+            messageLogAutoClose.Interval = MessageLogAutoCloseDelay;
+            messageLogAutoClose.Start();
+        }
+
+        private void CancelMessageLogAutoClose()
+        {
+            messageLogAutoPopped = false;
+            messageLogAutoClose?.Stop();
+        }
+
+
+        // Clamped to the visible virtual desktop, so a window saved on a monitor that is no longer attached
+        // still comes back reachable rather than off-screen.
+        private static void RestoreStatusWindowPlacement(Window win)
+        {
+            var cfg = AppConfig.Settings.Base;
+
+            if (cfg == null)
+                return;
+
+            if (!double.IsNaN(cfg.StatusWindowWidth))
+                win.Width = Math.Max(Math.Min(cfg.StatusWindowWidth, SystemParameters.VirtualScreenWidth), win.MinWidth);
+            if (!double.IsNaN(cfg.StatusWindowHeight))
+                win.Height = Math.Max(Math.Min(cfg.StatusWindowHeight, SystemParameters.VirtualScreenHeight), win.MinHeight);
+
+            if (!double.IsNaN(cfg.StatusWindowLeft) && !double.IsNaN(cfg.StatusWindowTop))
+            {
+                win.WindowStartupLocation = WindowStartupLocation.Manual;
+                win.Left = Math.Max(Math.Min(cfg.StatusWindowLeft, SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - win.Width), SystemParameters.VirtualScreenLeft);
+                win.Top = Math.Max(Math.Min(cfg.StatusWindowTop, SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - win.Height), SystemParameters.VirtualScreenTop);
+            }
+        }
+
+        private static void SaveStatusWindowPlacement(Window win)
+        {
+            var cfg = AppConfig.Settings.Base;
+
+            if (cfg == null)
+                return;
+
+            Rect bounds = win.WindowState == WindowState.Normal ? new Rect(win.Left, win.Top, win.Width, win.Height) : win.RestoreBounds;
+
+            if (cfg.StatusWindowLeft == bounds.Left && cfg.StatusWindowTop == bounds.Top &&
+                 cfg.StatusWindowWidth == bounds.Width && cfg.StatusWindowHeight == bounds.Height)
+                return;     // nothing moved - don't write the config file for every close
+
+            cfg.StatusWindowLeft = bounds.Left;
+            cfg.StatusWindowTop = bounds.Top;
+            cfg.StatusWindowWidth = bounds.Width;
+            cfg.StatusWindowHeight = bounds.Height;
+
+            AppConfig.Settings.Save();
+        }
+
+        // True only if the text is verifiably on the clipboard. Retries because the failure is a transient
+        // lock, not a bad argument - the standard mitigation for CLIPBRD_E_CANT_OPEN.
+        private static bool CopyToClipboard(string text)
+        {
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                try
+                {
+                    // copy:true leaves the data on the clipboard after this process exits, which is what an
+                    // operator copying an error message to paste into a report actually wants.
+                    System.Windows.Clipboard.SetDataObject(text, true);
+                    return true;
+                }
+                catch
+                {
+                    System.Threading.Thread.Sleep(40);   // let the other app release the lock
+                }
+            }
+
+            CNC.Core.DebugLog.Write("ui", "CopyMessage: clipboard unavailable after 5 attempts");
+            return false;
+        }
+
+        // FlashCopied and its "Copied" label lived on the run strip's message widget, which was
+        // removed with that widget (2026-08-10). CopyMessage_Click is likewise unreachable now - the
+        // status log window is where a message gets read and copied from.
 
         private void AttachBasePropertyChangedHandler()
         {
@@ -2446,6 +3259,114 @@ namespace GCode_Sender
         {
             if(!JobRunning)
                 GCode.File.Load(filename);
+        }
+
+        // A watcher armed by a pending #SHUTDOWN# request (see Pipe_ShutdownRequested) - null when none
+        // is pending. A fresh request always replaces it (Stop the old one first), so re-asking simply
+        // resets the window rather than stacking watchers.
+        private DispatcherTimer shutdownWatcher;
+
+        // build.ps1 (or any other tooling) asking, over the single-instance pipe, to close gracefully
+        // within timeoutSeconds - added 2026-08-08 so a rebuild never kills a live job out from under the
+        // operator (see docs/Architecture-Unified-Streaming-Engine.md's own false-crash-alarm lesson from
+        // the same session this was built in). Idle: close now - Close() goes through Window_Closing the
+        // same as the operator clicking X, but that guard only matters while a job IS running, which we
+        // have already ruled out here. Busy: watch for JobRunning to clear and close the moment it does;
+        // if the window expires first, just stop watching and keep running - NEVER force-close past the
+        // timeout, that would recreate exactly the hazard this exists to prevent. The caller polls the
+        // PROCESS itself for up to its own timeout to learn whether this actually happened; nothing is
+        // written back over the one-way pipe.
+        // The one "is anything the operator cares about in flight" predicate for shutdown decisions.
+        // Under the retired two-engine design JobRunning alone was NOT enough: a macro streamed in BURSTS,
+        // and between them - at an (MBOX)/(PROMPT) hold, exactly when the operator is standing at the
+        // machine following its instructions - IsJobRunning was false. The first live test of this feature
+        // closed ioSender in the middle of the Setup macro's "install probe" MBOX hold that way
+        // (2026-08-08), abandoning the run; MacroRunner.IsRunning was the stopgap. Step 7 retired it BY
+        // CONSTRUCTION: a macro is one continuous stream and a hold is a mid-stream barrier, so
+        // IsJobRunning stays true across the whole run including its holds.
+        private bool ShutdownBlocked { get { return JobRunning; } }
+
+        private void Pipe_ShutdownRequested(int timeoutSeconds)
+        {
+            shutdownWatcher?.Stop();
+            shutdownWatcher = null;
+
+            // Operator visibility while the watcher waits (user feedback 2026-08-08: the idle path's
+            // instant close looked exactly like a crash - "I never saw a notification"). Message is the
+            // established status-bar text every wizard/macro already uses.
+            var model = DataContext as GrblViewModel;
+            if (model != null && ShutdownBlocked)
+                model.Message = "Shutdown requested - closing when the job finishes";
+
+            // EVERYTHING goes through the watcher - no instant-close special case - and it requires the
+            // predicate clear on TWO consecutive ticks before acting. That second tick is load-bearing:
+            // a macro's final burst is handed to the streamer with a DEFERRED Cycle Start (the audit's
+            // Finding #2 race), so there is a real window where Run() has returned but IsJobRunning is
+            // not yet true - a single instantaneous check can land inside it and read a busy system as
+            // idle. Two ticks a second apart is far wider than that handoff ever is.
+            int clearTicks = 0;
+            var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+            shutdownWatcher = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            shutdownWatcher.Tick += (s, e) =>
+            {
+                if (!ShutdownBlocked)
+                {
+                    if (++clearTicks >= 2)
+                    {
+                        shutdownWatcher.Stop();
+                        shutdownWatcher = null;
+                        ShowShutdownNoticeAndClose();
+                    }
+                }
+                else
+                {
+                    clearTicks = 0;
+                    if (DateTime.UtcNow >= deadline)
+                    {
+                        shutdownWatcher.Stop();
+                        shutdownWatcher = null;   // gave up - still busy, stay running, caller's own poll times out
+                        if (model != null)
+                            model.Message = "Shutdown request timed out - still running";
+                    }
+                }
+            };
+            shutdownWatcher.Start();
+        }
+
+        // The ~2s "why is this window about to disappear" notice, shown before EVERY shutdown-request
+        // close (idle-path immediate and busy-path job-finished alike). Chosen by the user over
+        // close-instantly and notice-with-Cancel: a vanishing window must always have a visible cause -
+        // the silent version was indistinguishable from a crash from the operator's seat, the exact
+        // confusion this whole feature exists to kill. Code-built on purpose (no XAML/x:Uid: LocBaml
+        // localization can't reach code-built UI, and a 2-second transient doesn't warrant a dialog
+        // class); costs every scripted rebuild ~2s, which build.ps1's poll window (timeout+5s) absorbs.
+        private void ShowShutdownNoticeAndClose()
+        {
+            var notice = new Window
+            {
+                WindowStyle = WindowStyle.None,
+                ResizeMode = ResizeMode.NoResize,
+                ShowInTaskbar = false,
+                Topmost = true,
+                SizeToContent = SizeToContent.WidthAndHeight,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                Content = new System.Windows.Controls.TextBlock
+                {
+                    Text = "Shutdown requested - closing...",
+                    FontSize = 16,
+                    Margin = new Thickness(28, 18, 28, 18)
+                }
+            };
+            notice.Show();
+            var t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            t.Tick += (s, e) =>
+            {
+                t.Stop();
+                notice.Close();
+                Close();
+            };
+            t.Start();
         }
 
         // Another launch was intercepted by the single-instance gate: surface this (the running) window.
@@ -2525,15 +3446,41 @@ namespace GCode_Sender
 
         public static void CloseFile ()
         {
-            ICNCView view, grbl = getView(getTab(ViewType.GRBL));
+            // grbl is closed FIRST (it owns the loaded program) and then skipped in the sweep below, so it
+            // must be resolved separately - but it was dereferenced unguarded, which is a straight
+            // NullReferenceException the moment the Job view is not a tab. It always is one now (see
+            // jobView), and the sweep closes every tab regardless, so a null here costs nothing but the
+            // ordering.
+            ICNCView view, grbl = jobView();
 
-            grbl.CloseFile();
+            grbl?.CloseFile();
 
             foreach (TabItem tabitem in UIUtils.FindLogicalChildren<TabItem>(ui.tabMode))
             {
                 if ((view = getView(tabitem)) != null && view != grbl)
                     view.CloseFile();
             }
+        }
+
+        /// <summary>
+        /// The Job view - the one view guaranteed to be on the tab bar. It is not merely a place to put
+        /// things: its Activate runs the controller handshake (InitSystem -> $I, settings, parser state) and
+        /// it owns the status poller, so MainPageEditor.CanMenu refuses to move it into a menu and
+        /// AppConfig.EnforceMenuPlacement puts back a profile that moved it under an earlier build.
+        ///
+        /// Resolving it therefore should never fail. It is worth a helper anyway, because the callers that
+        /// resolve it inline used `is ICNCView grbl` and no-opped on null: a missing Job view then looks
+        /// EXACTLY like a controller that never answered - no dialog, no log line, capabilities silently
+        /// unread. If the invariant is ever broken again, this says so instead of swallowing it.
+        /// </summary>
+        private static ICNCView jobView([CallerMemberName] string caller = null)
+        {
+            var view = getView(getTab(ViewType.GRBL));
+
+            if (view == null)
+                DebugLog.Write("connect", "jobView: Job view is not on the tab bar - " + caller + " had nothing to drive");
+
+            return view;
         }
 
         private static TabItem getTab(ViewType mode)
@@ -2645,14 +3592,16 @@ namespace GCode_Sender
             // tabs (Setup, Offsets, Probing, Height Map, SD Card, Lathe) need a live controller, so they are
             // disabled until connect and re-enabled by UpdateConnectionGatedViews on the connect transition.
             // --- the main tab bar: the three views used while a job is actually being run ---
-            TabRegistry.Register(new TabDescriptor(ViewType.StartJob, TabLabel("TabSetup", "Setup"), () => new StartJobView(), 30, enabledWhenDisconnected: false));
+            TabRegistry.Register(new TabDescriptor(ViewType.StartJob, TabLabel("TabSetup", "Setup"), () => new StartJobView(), 30, enabledWhenDisconnected: false,
+                requiresRunStrip: true));
             TabRegistry.Register(new TabDescriptor(ViewType.GRBL, TabLabel("TabJob", "Job"), () => new JobView(), 40, enabledWhenDisconnected: true, alwaysVisible: true));
-            TabRegistry.Register(new TabDescriptor(ViewType.WorkOrder, TabLabel("TabWorkOrder", "Work Order"), () => new WorkOrderView(), 45, enabledWhenDisconnected: true));
+            TabRegistry.Register(new TabDescriptor(ViewType.WorkOrder, TabLabel("TabWorkOrder", "Work Order"), () => new WorkOrderView(), 45, enabledWhenDisconnected: true,
+                requiresRunStrip: true));
             TabRegistry.Register(new TabDescriptor(ViewType.Offsets, TabLabel("TabOffsets", "Offsets"), () => new OffsetView(), 50, enabledWhenDisconnected: false));
 
             // --- File menu: the two configuration destinations ---
             TabRegistry.Register(new TabDescriptor(ViewType.MachineSetup, TabLabel("TabMachineSetup", "Machine"), () => new MachineSetupView(), 10, enabledWhenDisconnected: true, alwaysVisible: true,
-                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.File));
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.File, requiresRunStrip: true));
             TabRegistry.Register(new TabDescriptor(ViewType.GRBLConfig, TabLabel("TabSettings", "Settings"), () => new GrblConfigView(), 20, enabledWhenDisconnected: true, alwaysVisible: true,
                 presentation: ViewPresentation.MenuWindow, menu: ViewMenu.File));
 
@@ -2670,6 +3619,10 @@ namespace GCode_Sender
                 presentation: ViewPresentation.MenuWindow, menu: ViewMenu.Tools));
             TabRegistry.Register(new TabDescriptor(ViewType.LatheWizards, TabLabel("TabLatheWizards", "Lathe Tools"), () => new CNC.Controls.Lathe.LatheWizardsView(), 60, enabledWhenDisconnected: false,
                 presentation: ViewPresentation.MenuWindow, menu: ViewMenu.Tools));
+            // Was Machine Setup's step 8 until 2026-09-13. All three of its wizards are Generate-first, so it
+            // must be a tab when opened - see TabDescriptor.RequiresRunStrip and CalibrationView's header.
+            TabRegistry.Register(new TabDescriptor(ViewType.Calibration, TabLabel("TabCalibration", "Calibration"), () => new CalibrationView(), 30, enabledWhenDisconnected: false,
+                presentation: ViewPresentation.MenuWindow, menu: ViewMenu.Tools, requiresRunStrip: true));
             // ToolsView is dissolved: its three children (tool table, Trinamic tuner, PID tuner) are
             // listed directly in the Tools menu by BuildViewMenus, so the wrapper tab is gone.
         }
@@ -2707,47 +3660,32 @@ namespace GCode_Sender
                     var comp = ComponentRegistry.Get(node.Component);
                     var compCtl = comp?.Create?.Invoke();
                     if (compCtl == null)
-                        continue;   // unknown/foreign component key - skip (e.g. a tab not in this build)
+                    {
+                        // Unknown/foreign component key (e.g. a tab not in this build). Silent until now,
+                        // which made a placement that simply never appeared impossible to tell apart from
+                        // one that was never in the tree.
+                        CNC.Core.DebugLog.Write("config", "BuildTabs: no view or component registered for \"" + node.Component + "\" - not built");
+                        continue;
+                    }
                     (compCtl as ICNCView)?.Setup(UIViewModel, AppConfig.Settings);
-                    tabMode.Items.Add(new TabItem {
+                    var compTab = new TabItem {
                         Content = compCtl,
-                        Header = comp.Label,
                         Tag = node.Component,
                         Uid = "tab_" + node.Component
-                    });
+                    };
+                    // Same closability rule as a registered view. These carry no ViewType, so no shortcut
+                    // badge - TabHeaderControl takes a null id and simply never shows one.
+                    compTab.Header = new CNC.Controls.TabHeaderControl(comp.Label, null,
+                        isClosableComponent(node.Component) ? (System.Action)(() => closeTab(compTab)) : null);
+                    tabMode.Items.Add(compTab);
                     continue;
                 }
                 // No Presentation check here on purpose: the TREE is the placement authority. A view
                 // the registry defaults to a menu still becomes a tab if the user dragged it back to
                 // the tabs slot in Settings > Main Page.
-                var ctl = d.Create?.Invoke();
-                if (ctl == null)
+                var tabItem = buildViewTab(d, node.Component);
+                if (tabItem == null)
                     continue;
-                d.Configure?.Invoke(ctl);
-
-                var tabItem = new TabItem
-                {
-                    Content = ctl,
-                    IsEnabled = d.EnabledWhenDisconnected,
-                    Tag = node.Component,
-                    // x:Uid is a markup-only directive, and these tabs are built in code, so they have no
-                    // authored Uid. Set it explicitly from the registry key (unique + stable) so the UI test
-                    // server can address the nav tabs by Uid and select one via its SelectionItem peer.
-                    Uid = "tab_" + node.Component
-                };
-
-                // Bindable main-page tabs get a live shortcut badge (upper-right) + a right-click "Bind to Key"
-                // menu; other tabs (e.g. the Trinamic tuner, not an ICNCView) keep a plain text header.
-                string tabId = ctl is ICNCView icv
-                    ? tabViewIds.FirstOrDefault(kv => kv.Value == icv.ViewType).Key
-                    : null;
-                if (tabId != null)
-                {
-                    tabItem.Header = new CNC.Controls.TabHeaderControl(d.Label, tabId);
-                    TabKeyBinder.AttachBindMenu(tabItem, tabId);
-                }
-                else
-                    tabItem.Header = d.Label;
 
                 tabMode.Items.Add(tabItem);
             }
@@ -2819,6 +3757,145 @@ namespace GCode_Sender
             }
         }
 
+        // Build (but do not add) the TabItem for a registered view. Split out of BuildTabs 2026-09-13 so a
+        // tab can also be created ON DEMAND - see showViewAsTab.
+        private TabItem buildViewTab(TabDescriptor d, string componentKey)
+        {
+            var ctl = d.Create?.Invoke();
+            if (ctl == null)
+                return null;
+            d.Configure?.Invoke(ctl);
+
+            var tabItem = new TabItem
+            {
+                Content = ctl,
+                IsEnabled = d.EnabledWhenDisconnected,
+                Tag = componentKey,
+                // x:Uid is a markup-only directive, and these tabs are built in code, so they have no
+                // authored Uid. Set it explicitly from the registry key (unique + stable) so the UI test
+                // server can address the nav tabs by Uid and select one via its SelectionItem peer.
+                Uid = "tab_" + componentKey
+            };
+
+            // Bindable main-page tabs get a live shortcut badge (upper-right) + a right-click "Bind to Key"
+            // menu; other tabs (e.g. the Trinamic tuner, not an ICNCView) keep a plain text header.
+            string tabId = ctl is ICNCView icv
+                ? tabViewIds.FirstOrDefault(kv => kv.Value == icv.ViewType).Key
+                : null;
+
+            // Closable only when there is a menu entry to open it again - see isClosableTab. Evaluated per
+            // header rather than once, because the same method builds the startup tabs (where a view placed
+            // on the bar must NOT get an X) and the on-demand ones (where it must).
+            System.Action onClose = isClosableComponent(componentKey) ? (System.Action)(() => closeTab(tabItem)) : null;
+
+            tabItem.Header = new CNC.Controls.TabHeaderControl(d.Label, tabId, onClose);
+            if (tabId != null)
+                TabKeyBinder.AttachBindMenu(tabItem, tabId);
+
+            return tabItem;
+        }
+
+        /// <summary>
+        /// True when this component has a MENU entry that would open it again, which is exactly the
+        /// condition under which its tab may be closed.
+        /// </summary>
+        /// <remarks>
+        /// The rule is "can I get it back", not "was this tab created on demand". A tab the operator placed
+        /// on the bar has no menu entry - closing it would remove the view from the session with no way to
+        /// reopen it short of the layout editor - so it gets no close button and ESC will not touch it. The
+        /// layout tree is the placement authority for menus exactly as it is for tabs (BuildMenuSlot reads
+        /// the same two slots), so asking the tree is asking the same question the File/Tools menus answered.
+        /// </remarks>
+        private static bool isClosableComponent(string componentKey)
+        {
+            if (string.IsNullOrEmpty(componentKey))
+                return false;
+
+            var root = AppConfig.Settings.Layout;
+            return (root?.Slot(LayoutKeys.SlotMenuFile)?.Items.Any(n => n?.Component == componentKey) ?? false)
+                || (root?.Slot(LayoutKeys.SlotMenuTools)?.Items.Any(n => n?.Component == componentKey) ?? false);
+        }
+
+        /// <summary>True when this tab may be closed - see <see cref="isClosableComponent"/>.</summary>
+        private static bool isClosableTab(TabItem tab)
+        {
+            return tab != null && isClosableComponent(tab.Tag as string);
+        }
+
+        /// <summary>
+        /// Close a tab, leaving the view reachable from the menu it came from.
+        /// </summary>
+        /// <remarks>
+        /// Selecting a neighbour FIRST is not cosmetic: TabMode_SelectionChanged is what calls
+        /// Activate(false) on the outgoing view, and that is what releases MacroProcessor's shared
+        /// Generate-mode statics (ActiveRun/ActiveGenerate/SupportsGenerateMode). Removing the tab without
+        /// that would leave the Run bar still pointing its Generate button at a view that is no longer on
+        /// screen. Removing the SELECTED item also makes WPF pick the replacement itself, which is a second
+        /// way to end up never running the deactivation for the tab actually going away.
+        /// </remarks>
+        private void closeTab(TabItem tab)
+        {
+            if (!isClosableTab(tab))
+                return;
+
+            if (tabMode.SelectedItem == tab)
+            {
+                int i = tabMode.Items.IndexOf(tab);
+                TabItem next = null;
+                for (int step = 1; step < tabMode.Items.Count && next == null; step++)
+                {
+                    var before = i - step >= 0 ? tabMode.Items[i - step] as TabItem : null;
+                    var after = i + step < tabMode.Items.Count ? tabMode.Items[i + step] as TabItem : null;
+                    // Prefer the tab to the LEFT (where the permanent tabs live), then the right.
+                    next = (before != null && before.IsEnabled) ? before
+                         : (after != null && after.IsEnabled) ? after : null;
+                }
+                if (next == null)
+                    return;   // nothing else selectable - leave it open rather than show an empty window
+                tabMode.SelectedItem = next;
+            }
+
+            tabMode.Items.Remove(tab);
+        }
+
+        /// <summary>
+        /// Show a view as a TAB, creating the tab on demand if the operator's layout has it in a menu.
+        /// Returns the hosted control, or null if it could not be built.
+        /// </summary>
+        /// <remarks>
+        /// For a view whose descriptor sets RequiresRunStrip. The shared Run bar - Generate/Run, Feed Hold,
+        /// Stop, and the jog pad - is docked in THIS window and exists nowhere else, so opening such a view
+        /// in a ViewHostWindow puts it in a separate top-level window with none of that reachable: the
+        /// calibration wizards' only Generate button, and Machine Setup's Probe/Fixture steps' only jog
+        /// controls, are all on the strip. The menu entry stays exactly where the operator put it - it is
+        /// only the PRESENTATION that is forced, so the tab strip does not have to carry these permanently.
+        ///
+        /// A tab created here is not written to the layout tree: it lasts for the session, and the next
+        /// launch rebuilds from the saved placement as before.
+        /// </remarks>
+        private UserControl showViewAsTab(TabDescriptor d)
+        {
+            if (d == null)
+                return null;
+
+            TabItem tab = getTab(d.ViewType);
+            if (tab == null)
+            {
+                tab = buildViewTab(d, d.Name);
+                if (tab == null)
+                    return null;
+
+                // BuildTabs' own Setup pass has long since run over the tabs that existed at startup, so a
+                // tab added now has to be set up here or its view never receives the model at all.
+                (tab.Content as ICNCView)?.Setup(UIViewModel, AppConfig.Settings);
+                tabMode.Items.Add(tab);
+            }
+
+            tab.IsEnabled = true;
+            tabMode.SelectedItem = tab;
+            return tab.Content as UserControl;
+        }
+
         private MenuItem NewViewMenuItem(TabDescriptor d)
         {
             var item = new MenuItem
@@ -2830,7 +3907,15 @@ namespace GCode_Sender
                 Tag = d.Name,
                 IsEnabled = d.EnabledWhenDisconnected
             };
-            item.Click += (s, e) => ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this);
+            // A view that drives the shared Run bar opens as a TAB, not a window - the bar is docked in this
+            // window and nowhere else, so a popup would leave its Generate/jog/Feed Hold controls unreachable.
+            item.Click += (s, e) =>
+            {
+                if (d.RequiresRunStrip)
+                    showViewAsTab(d);
+                else
+                    ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this);
+            };
             // Show the view's shortcut here too. It is the SAME "Tab.<Name>" id a tab header badges, because
             // the binding names the view rather than its current home - so the key a user set while this was
             // a tab is the key this menu entry now advertises.
@@ -2910,11 +3995,75 @@ namespace GCode_Sender
         }
 #endif
 
+        // Tools > Machine mirror: the MachineMirror's first real WPF consumer (client/server split,
+        // 6a read-side proof) - a read-only window fed exclusively by the MachineDelta stream, never
+        // GrblViewModel. One instance at a time; a second click brings the open one forward.
+        private MirrorWindow mirrorWindow = null;
+        private void machineMirror_Click(object sender, RoutedEventArgs e)
+        {
+            if (mirrorWindow != null)
+            {
+                mirrorWindow.Activate();
+                return;
+            }
+            if (stateStream == null)
+                return;   // no view model at startup means no stream to mirror - nothing useful to show
+            mirrorWindow = new MirrorWindow(stateStream) { Owner = this };
+            mirrorWindow.Closed += (s, ev) => mirrorWindow = null;
+            mirrorWindow.Show();
+        }
+
         // Public entry point for the "pop out the console" gesture (double-clicking the Console tab -
         // JobWorkspace.BuildCenter wires it), replacing the removed "Open Console" menu item.
+        /// <summary>
+        /// Run strip's "MDI Console": open the console and put the caret in its input, so the button
+        /// leads straight into typing. Merely showing the window would leave focus wherever it was
+        /// and the first thing typed would go nowhere.
+        /// </summary>
+        /// <summary>
+        /// Run strip coolant toggles. Same commands CoolantControl sends - GrblCommand.Flood/Mist are
+        /// single realtime CONTROL CHARACTERS, not g-code text, so they go straight out rather than
+        /// being queued behind streamed lines.
+        /// </summary>
+        private void Coolant_Click(object sender, RoutedEventArgs e)
+        {
+            var model = DataContext as GrblViewModel;
+            if (model == null)
+                return;
+
+            string tag = (sender as FrameworkElement)?.Tag as string;
+            if (tag == "Flood")
+                model.ExecuteCommand(GrblCommand.Flood);
+            else if (tag == "Mist")
+                model.ExecuteCommand(GrblCommand.Mist);
+        }
+
+        private void MdiConsole_Click(object sender, RoutedEventArgs e)
+        {
+            // NOT openConsole(): that is a TOGGLE, so pressing this with the console already up hid
+            // it and FocusInput immediately showed it again - which read as a flicker and nothing
+            // else. Create it if it does not exist, then let FocusInput show and focus it.
+            if (UIViewModel.Console == null)
+                openConsole();
+            UIViewModel.Console?.FocusInput();
+        }
+
         public void OpenConsoleWindow()
         {
             openConsole();
+        }
+
+        /// <summary>
+        /// Show the console, creating it if need be, and NEVER hide it. For the callers that mean "make
+        /// sure it is up" rather than "flip it" - restoring the preserved open state, most of all, which
+        /// runs again on every re-initialisation and must be idempotent.
+        /// </summary>
+        private void showConsole()
+        {
+            if (UIViewModel.Console == null)
+                openConsole();          // creates it shown
+            else
+                UIViewModel.Console.Show();
         }
 
         private void openConsole()
@@ -2922,10 +4071,23 @@ namespace GCode_Sender
             if (UIViewModel.Console == null)
             {
                 UIViewModel.Console = new ConsoleWindow();
+
+                // OWNED by the main window, which is what stops it getting BURIED. It is a separate
+                // top-level window, and without an owner it is just another window in the z-order: a soft
+                // reset runs the whole connect-time re-initialisation, that does UI work which brings the
+                // main window forward, and the console dropped behind it. It read exactly like the console
+                // closing itself, and it is not - the visibility handler never fired once, which is what
+                // finally told us nothing was hiding anything.
+                //
+                // An owned window always floats above its owner, so this cannot happen again whatever the
+                // main window does. It also minimises and restores with it, which is the right behaviour
+                // for a tool window anyway.
+                UIViewModel.Console.Owner = this;
                 UIViewModel.Console.DataContext = DataContext;
                 UIViewModel.Console.IsVisibleChanged += Console_IsVisibleChanged;
-                // Same shortcut handler on the console window so the toggle also fires when the
-                // console (not the main window) has focus - lets one keypress hide it again.
+                // The same window-level key handler on the console window, so shortcuts still work while the
+                // console (not the main window) has focus. It carried the console TOGGLE until 2026-08-13 -
+                // that is gone, but F1 help, tab switches and every ActionKeyBinder action still need it here.
                 UIViewModel.Console.PreviewKeyDown += MainWindow_PreviewKeyDown;
                 UIViewModel.Console.Show();
             }
@@ -2948,29 +4110,23 @@ namespace GCode_Sender
             }
         }
 
-        private Key consoleKey = Key.None;
-        private ModifierKeys consoleModifiers = ModifierKeys.None;
+        private bool windowKeyHandlersHooked = false;
 
-        private bool consoleShortcutHooked = false;
-
-        private void registerConsoleShortcut()
+        // Attach the window-level key handlers. This used to be registerConsoleShortcut and also parsed the
+        // console toggle's key; that toggle was removed 2026-08-13 (the run strip's MDI button is bindable
+        // now - ActionKeyBinder "Program.Mdi"). The HOOKUP itself must stay: this preview is what dispatches
+        // F1 context help, tab-switch shortcuts, every ActionKeyBinder action, and the jog forwarding that
+        // keeps keyboard jogging alive when focus has drifted off the Job view. Deleting the method with the
+        // toggle would have taken all of that with it.
+        private void hookWindowKeyHandlers()
         {
-            // Parse the configurable console shortcut into key + modifiers. Parsed manually (not via
-            // KeyGesture) so a modifier-less key such as Esc is allowed. Default is Esc.
-            ShortcutKey.TryParse(AppConfig.Settings.Base.ConsoleShortcut, out consoleKey, out consoleModifiers);
+            if (windowKeyHandlersHooked)
+                return;
 
-            if (!consoleShortcutHooked)
-            {
-                // Tunneling preview so the key is seen before child controls (jog/keypress handlers) consume it.
-                PreviewKeyDown += MainWindow_PreviewKeyDown;
-                PreviewKeyUp += MainWindow_PreviewKeyUp;   // so a jog started while the Job view is unfocused still stops
-                // Re-register live when the shortcut is changed in the Key Mappings editor.
-                AppConfig.ConsoleShortcutChanged += registerConsoleShortcut;
-                consoleShortcutHooked = true;
-            }
-
-            // (The "Open Console" menu item that used to show this shortcut hint was removed in the menu
-            //  overhaul; the shortcut still toggles the console, and the Console tab tooltip mentions it.)
+            // Tunneling preview so the key is seen before child controls (jog/keypress handlers) consume it.
+            PreviewKeyDown += MainWindow_PreviewKeyDown;
+            PreviewKeyUp += MainWindow_PreviewKeyUp;   // so a jog started while the Job view is unfocused still stops
+            windowKeyHandlersHooked = true;
         }
 
         // --- tab-switch shortcuts ----------------------------------------------------------------
@@ -2988,19 +4144,54 @@ namespace GCode_Sender
             registerMenuAction("Menu.LoadProgram", menuLoadFile, () => LoadFile_Click(null, null));
             registerMenuAction("Menu.LoadWorkOrder", menuLoadWorkOrder, () => LoadWorkOrder_Click(null, null));
             registerMenuAction("Menu.NewWorkOrder", menuNewWorkOrder, () => NewWorkOrder_Click(null, null));
+            // SVG laser job loading is held back from the shared branch until it has had more time on a
+            // real machine - see Features.SvgLaserJob. Collapsing the menu item is not enough on its own:
+            // registering the action would still list it in the keymap editor as something to bind, which
+            // is the same exposure by another route. One switch governs both.
+            menuLoadSvgLaser.Visibility = Features.SvgLaserJob ? Visibility.Visible : Visibility.Collapsed;
+            if (Features.SvgLaserJob)
+                registerMenuAction("Menu.LoadSvgLaser", menuLoadSvgLaser, () => LoadSvgLaser_Click(null, null));
             registerMenuAction("Menu.Camera", menuCamera, () => CameraOpen_Click(null, null));
 
             // Help entries are always available, so the per-item enable gate is a formality - but they are
             // passed anyway so each one can show its bound key in the menu (see trackMenuShortcut).
+            registerMenuAction("Menu.Manual", menuManual, () => userManual_Click(null, null));
             registerMenuAction("Menu.Wiki", menuWiki, () => aboutWikiItem_Click(null, null));
             registerMenuAction("Menu.UsageTips", menuUsageTips, () => tipsWikiItem_Click(null, null));
             registerMenuAction("Menu.BriefTour", menuBriefTour, () => briefTour_Click(null, null));
             registerMenuAction("Menu.VideoTutorials", menuVideoTutorials, () => videoTutorials_Click(null, null));
             registerMenuAction("Menu.ErrorCodes", menuErrorsAndAlarms, () => errorAndAlarms_Click(null, null));
+            registerMenuAction("Menu.RestartIoSender", menuRestartIoSender, () => restartIoSender_Click(null, null));
             registerMenuAction("Menu.CheckForUpdates", menuCheckForUpdates, () => checkForUpdates_Click(null, null));
             registerMenuAction("Menu.RollBack", menuRollbackVersion, () => rollbackVersion_Click(null, null));
             registerMenuAction("Menu.OpenDataFolder", menuOpenConfigFolder, () => openConfigFolderMenuItem_Click(null, null));
             registerMenuAction("Menu.About", menuAbout, () => aboutMenuItem_Click(null, null));
+
+            // Run-strip buttons ("Program" group). Same contract as the menu commands: press the actual
+            // button's own handler rather than reimplementing it, and refuse while that button is disabled
+            // so a key can never do what a click currently cannot.
+            registerButtonAction("Program.Mdi", btnMdiConsole, () => MdiConsole_Click(null, null));
+            registerButtonAction("Program.Status", btnViewStatus, () => ViewStatus_Click(null, null));
+            // Peek lives inside the JobControl rather than on the window, so the control hands its button
+            // out (PeekButton) instead of this reaching in. Same contract as the two above: the button's own
+            // IsEnabled is the whole gate, and the click handler is the single implementation.
+            registerButtonAction("Program.Peek", runControl?.PeekButton, () => runControl?.PeekButton?.RaiseEvent(
+                new System.Windows.RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent)));
+        }
+
+        // The button counterpart of registerMenuAction. These live on the run strip rather than in the menu
+        // bar, so there is no menuMain gate to consult - the button's own IsEnabled is the whole condition,
+        // and it stays live mid-job (unlike the menu, which disables wholesale while a job runs: reaching
+        // the MDI console and the message history is exactly what you want DURING a run).
+        private void registerButtonAction(string id, System.Windows.Controls.Button button, System.Action invoke)
+        {
+            ActionKeyBinder.Register(id, k =>
+            {
+                if (button == null || !button.IsEnabled)
+                    return false;
+                invoke();
+                return true;
+            });
         }
 
         // Refuse the shortcut whenever the menu bar is disabled (menuMain's IsEnabled is bound to
@@ -3076,6 +4267,7 @@ namespace GCode_Sender
             { "Tab.MachineSetup", ViewType.MachineSetup },
             { "Tab.HeightMap",    ViewType.HeightMap },
             { "Tab.LatheWizard",  ViewType.LatheWizards },
+            { "Tab.Calibration",  ViewType.Calibration },
         };
 
         // The three ex-Tools-tab tools. They are plain layout components (no ViewType, no ICNCView), so they
@@ -3088,7 +4280,7 @@ namespace GCode_Sender
             { "Tab.Tools.PID",       LayoutKeys.PID },
         };
 
-        // (Re)parse the saved tab-switch shortcuts. Called at startup (just after registerConsoleShortcut, which
+        // (Re)parse the saved tab-switch shortcuts. Called at startup (just after hookWindowKeyHandlers, which
         // hooks the window preview handler that dispatches them) and again whenever the editor saves changes.
         private void registerTabShortcuts()
         {
@@ -3167,7 +4359,27 @@ namespace GCode_Sender
                 // window, then drill in exactly as the tab path does. ViewHostWindow.Open caches the view
                 // instance, so ViewInstance() is the same control the window is showing.
                 var d = TabRegistry.DescriptorFor(vt);
-                if (d == null || ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this) == null)
+                if (d == null)
+                    return false;
+
+                // A view that drives the shared Run bar becomes a tab instead of a window - the bar is
+                // docked in this window only (see showViewAsTab). The tab it creates then satisfies the
+                // nested drill-in below through the ordinary tab path.
+                if (d.RequiresRunStrip)
+                {
+                    var asTab = showViewAsTab(d);
+                    if (asTab == null)
+                        return false;
+                    if (secondDot > 0)
+                    {
+                        var tabHost = asTab as ITabBindingHost;
+                        if (tabHost == null || !tabHost.SelectSubTab(id))
+                            return false;
+                    }
+                    return true;
+                }
+
+                if (ViewHostWindow.Open(d, UIViewModel, AppConfig.Settings, this) == null)
                     return false;
 
                 if (secondDot > 0)
@@ -3218,41 +4430,77 @@ namespace GCode_Sender
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            // Kept as a fallback for keys that reach this window without going through the class handler.
+            // GlobalKeys normally gets there first and marks the event handled, in which case this instance
+            // handler is not called at all.
+            //
+            // Suspended is honoured here too: it is a FALLBACK for the same dispatch, so leaving it live
+            // while the class handler stands down would defeat the whole point - the bindings editor would
+            // still never see a shortcut.
+            if (!e.Handled && !CNC.Controls.GlobalKeys.Suspended)
+                e.Handled = dispatchGlobalShortcut(e);
+        }
+
+        // Every keyboard shortcut this window owns, in priority order. Registered with
+        // GlobalKeys.ShortcutDispatcher so it runs for EVERY window in the application - these used to be
+        // dispatched only from this window's own PreviewKeyDown, so a shortcut worked on the top-level tabs
+        // and nowhere else: not while Machine Setup or Fixture Definition held the keyboard. Jog keys had
+        // the same disease and are fixed the same way; see CNC.Controls.GlobalKeys.
+        //
+        // Each dispatcher below carries its own "don't steal a text-producing key from a text box" guard, so
+        // a Ctrl+Alt shortcut still fires while the caret is in a field and an unmodified one does not.
+        private bool dispatchGlobalShortcut(KeyEventArgs e)
+        {
             // F1 - context help: open the user manual at the page for whatever view is current.
+            //
+            // Reached only if the macro handler did not take F1 first (GlobalKeys.OnPreviewKeyDown runs
+            // ProcessKeypress before this), and in original ioSender F1-F9 were the first nine macro keys -
+            // so an operator who uses that convention has no F1 help at all. That is why Help > User manual
+            // exists and why its action ships on Shift+F1: a modified key is outside the macro convention,
+            // and unlike this branch it is rebindable.
             if (e.Key == Key.F1 && Keyboard.Modifiers == ModifierKeys.None)
             {
-                ManualHelp.Open(UIViewModel?.CurrentView?.ViewType ?? ViewType.Startup);
-                e.Handled = true;
-                return;
+                OpenContextHelp();
+                return true;
             }
 
-            if (consoleKey != Key.None && e.Key == consoleKey && Keyboard.Modifiers == consoleModifiers)
+            // ESC discards a generated program that a Generate-first tab handed to the Job tab and that
+            // has not been started - gives the previous program back and returns to the tab that built it.
+            //
+            // FIRST, ahead of the close-tab branch below, because it is the more specific claim on the key:
+            // it fires only while there is a handoff outstanding, where "cancel what I just did" can mean
+            // nothing else. It shares that branch's guards for the same reasons (see them), and adds
+            // nothing of its own - CancelHandoff itself refuses while a job is running, since Esc is not a
+            // Stop. Returning false when there is nothing to cancel is what keeps the key falling through
+            // to everyone else who wants it.
+            if (e.Key == Key.Escape && Keyboard.Modifiers == ModifierKeys.None
+                && IsActive
+                && !(Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase)
+                && CNC.Controls.MacroProcessor.CancelHandoff(DataContext as GrblViewModel))
+                return true;
+
+            // ESC closes the current tab, opt-in (Settings > UI) and only when that tab is closable.
+            //
+            // Three guards, and each one is load-bearing. This dispatcher runs for EVERY window in the
+            // application (GlobalKeys), so without the IsActive test an ESC dismissing a dialog would close
+            // a tab behind it at the same time. ESC is also the universal "cancel my edit" key, so a focused
+            // text box keeps it. And unmodified only - Shift+ESC and friends belong to whoever binds them.
+            if (e.Key == Key.Escape && Keyboard.Modifiers == ModifierKeys.None
+                && AppConfig.Settings.Base.EscClosesTab
+                && IsActive
+                && !(Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase))
             {
-                openConsole();   // openConsole() toggles: shows when hidden/new, hides when visible
-                e.Handled = true;
-                return;
+                var cur = tabMode.SelectedItem as TabItem;
+                if (isClosableTab(cur))
+                {
+                    closeTab(cur);
+                    return true;
+                }
+                // Not closable: fall through rather than swallow. ESC has other jobs (the console overlay,
+                // a flyout) and a setting that is ON must not make the key dead everywhere else.
             }
 
-            if (dispatchTabShortcut(e))
-            {
-                e.Handled = true;
-                return;
-            }
-
-            if (ActionKeyBinder.Dispatch(e))
-            {
-                e.Handled = true;
-                return;
-            }
-
-            // Keep keyboard jogging alive on the Job page even when focus has drifted out of the Job view
-            // (a flyout, side panel or the menu). The Job view only sees keys through its own OnPreviewKeyDown,
-            // which requires focus inside its tree; this window-level preview always fires, so forward jog keys
-            // when the Job view is the current view but is not focused. Skip if focus is in any text input
-            // (typing) - the Job view's own handler covers the focused case, including its MDI/DRO gates.
-            if (UIViewModel?.CurrentView is JobView jobView && !jobView.IsKeyboardFocusWithin
-                 && !(Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase))
-                e.Handled = jobView.ProcessKeyPreview(e);
+            return dispatchTabShortcut(e) || ActionKeyBinder.Dispatch(e);
         }
 
         private void MainWindow_PreviewKeyUp(object sender, KeyEventArgs e)

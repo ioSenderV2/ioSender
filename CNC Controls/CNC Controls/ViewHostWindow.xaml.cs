@@ -34,9 +34,18 @@ namespace CNC.Controls
         private ViewType _viewType;
         private ICNCView _view;
 
+        /// <summary>The view this window hosts. Read by context help, which has to answer for the window
+        /// the operator is actually looking at rather than for the tab behind it.</summary>
+        public ViewType HostedViewType { get { return _viewType; } }
+
         public ViewHostWindow()
         {
             InitializeComponent();
+            // Hand focus back to the owner on close. This class is where that behaviour was first
+            // worked out (Owner alone does NOT do it - see WindowFocusReturn's header); it now lives
+            // in one place and applies to every window. Attached explicitly as well as by App's class
+            // handler so a host that never called Install still gets it - Attach is idempotent.
+            WindowFocusReturn.Attach(this);
         }
 
         /// <summary>
@@ -205,6 +214,7 @@ namespace CNC.Controls
             else
                 _open.Remove(_viewType);
             base.OnClosed(e);
+            // Focus return to the owner is WindowFocusReturn's job now (attached in the constructor).
         }
     }
 }

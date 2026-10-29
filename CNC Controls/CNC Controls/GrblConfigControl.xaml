@@ -22,7 +22,7 @@
         <system:String x:Uid="str_settingsInvalid" x:Key="SettingsInvalid">The file does not contain any settings.</system:String>
         <system:String x:Uid="str_settingsRestore" x:Key="SettingsRestore">Restore settings from file</system:String>
         <system:String x:Uid="str_settingsReloadMismatch" x:Key="SettingsReloadMismatch">{0} settings were ignored, not supported by the controller.</system:String>
-        <system:String x:Uid="str_settingsRestoreNoChanges" x:Key="SettingsRestoreNoChanges">Nothing to restore - every setting in this file already matches the controller.</system:String>
+        <system:String x:Uid="str_settingsRestoreNoChanges" x:Key="SettingsRestoreNoChanges">No machine settings to restore - every $ value in that snapshot already matches the controller. Anything else you chose from the same restore point (work offsets, app configuration) is handled separately and is unaffected by this.</system:String>
         <local:LogicalNotConverter x:Key="IsNotConverter" />
         <local:GrblStateToBooleanConverter x:Key="StateToBooleanConverter" />
         <Style x:Key="NumericErrorStyle" TargetType="local:NumericTextBox">

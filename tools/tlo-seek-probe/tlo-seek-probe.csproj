@@ -1,0 +1,78 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    tlo-seek-probe - exercises MacroProcessor.EmitTloSeekDepth (the derived TLO seek depth, and the
+    CLAMP that is its safety property) against the REAL grblHAL simulator on loopback. No UI, no
+    test server, no real hardware.
+
+    Why this harness exists, and why it is net462 rather than a check bolted onto waitidle-probe:
+    EmitTloSeekDepth lives in MacroProcessor, which is in CNC.Controls.WPF (net462, and the file
+    really does use System.Windows), so the net8 waitidle-probe CANNOT reach it - the commit that
+    added the method said so and shipped the arithmetic hand-checked only. The render-harness
+    csproj already proved the route: a net462 host referencing the app's own built assemblies by
+    HintPath. Same trick here, console instead of a window.
+
+    What it asserts is the SAFETY property, not the convenience: the emitted depth must never pass
+    the Z envelope floor, and when ANY input is unknown the method must emit NOTHING so tlo.macro
+    falls back to its own conservative literal. Too shallow is Alarm 5 with the machine in mid-air,
+    which is a refusal; too deep drills whatever the touch plate is bolted to, and there is only
+    about 15mm between the plate surface and the table.
+
+    It drives the LIVE inputs the method reads, rather than faking them: G59.3's Z offset is set on
+    the controller with G10 L2 P9 and re-read through GrblWorkParameters.Get($#), and the Z envelope
+    comes from the controller's own $132 via GrblSettings.Load. That matters because the whole point
+    of the change is that G59.3's offset is read and not assumed - it was both 0.000 and -42.000 on
+    this machine inside one week.
+
+    The simulator binary and its EEPROM/littlefs state are copied to a temp work dir per run
+    (waitidle-probe's pattern), so the $ writes below land in OUR copy and never dirty the user's.
+
+    Build:  pwsh -File build.ps1 -Configuration Debug     (this references its bin\Debug output)
+            then, in this folder:  dotnet build
+    Run:    tools\tlo-seek-probe\bin\Debug\net462\tlo-seek-probe.exe   (exit 0 = all checks passed)
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net462</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>tlo-seek-probe</AssemblyName>
+    <RootNamespace>TloSeekProbe</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="CNC.Core">
+      <HintPath>..\..\CNC Core\CNC Core\bin\Debug\CNC.Core.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="CNC.Controls.WPF">
+      <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\CNC.Controls.WPF.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="CNC.Common">
+      <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\CNC.Common.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <!-- GrblSetting / grblHALSetting - the setting id enums EmitTloSeekDepth indexes $132 with. -->
+    <Reference Include="CNC.Contracts">
+      <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\CNC.Contracts.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="RP.Math">
+      <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\RP.Math.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Transitive deps + the real App.config, synced on every build so this never runs against a
+       stale copy. Source is CNC Controls' own bin\Debug - rebuild ioSender first if this looks off. -->
+  <Target Name="SyncAppBinaries" AfterTargets="Build">
+    <ItemGroup>
+      <SourceDlls Include="..\..\CNC Controls\CNC Controls\bin\Debug\*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SourceDlls)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="..\..\ioSender XL\ioSender XL\bin\Debug\ioSender.exe.config" DestinationFiles="$(OutDir)tlo-seek-probe.exe.config" SkipUnchangedFiles="true" Condition="Exists('..\..\ioSender XL\ioSender XL\bin\Debug\ioSender.exe.config')" />
+  </Target>
+
+</Project>

@@ -4,9 +4,9 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:CNC.Controls"
-             mc:Ignorable="d" 
+             mc:Ignorable="d"
              d:DesignHeight="26" d:DesignWidth="22"
-             MaxHeight="26" MaxWidth="22">
+             MaxHeight="26">
     <UserControl.Resources>
         <Style x:Key="ButtonStyleNoHighlighting" TargetType="Button" BasedOn="{StaticResource {x:Static ToolBar.ButtonStyleKey}}">
             <Setter Property="Template">
@@ -27,9 +27,22 @@
     </UserControl.Resources>
     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
         <Button x:Uid="btnLED" x:Name="btnLED" Focusable="False" HorizontalAlignment="Center" Margin="0,2,0,0" VerticalAlignment="Top" Width="10" Height="10" Style="{StaticResource ButtonStyleNoHighlighting}"/>
-        <Grid Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
-            <Ellipse x:Name="ellSignal" Width="19" Height="19" Fill="Transparent" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-            <TextBlock x:Name="txtSignal" Text="{Binding Label, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12.5" FontFamily="Global User Interface"/>
+        <!-- Width follows BoxWidth so one lamp can be wider than the rest without every lamp changing:
+             the TLO-reference lamp spells "TLO" rather than borrowing a single letter, and three
+             characters do not fit a 19px square at a readable size. Default 19 keeps every existing
+             single-letter lamp exactly as it was. -->
+        <Grid x:Name="boxSignal" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <!-- An OUTLINED rounded rectangle, not a filled disc. The disc put the letter on top of a
+                 solid colour and the glyph became hard to read - reported 2026-10-28. The border plus a
+                 light tint still reads as lit from across the room, and the letter stays legible. -->
+            <Rectangle x:Name="shpSignal" Width="19" Height="19" RadiusX="3" RadiusY="3"
+                       Fill="Transparent" Stroke="Transparent" StrokeThickness="2"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <!-- DownOnly: a longer label shrinks to fit the box, but a single letter keeps its natural
+                 12.5px rather than being blown up to fill the square. -->
+            <Viewbox Stretch="Uniform" StretchDirection="DownOnly" Margin="2,1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock x:Name="txtSignal" Text="{Binding Label, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12.5" FontFamily="Global User Interface"/>
+            </Viewbox>
         </Grid>
     </StackPanel>
 </UserControl>
