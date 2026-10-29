@@ -17,7 +17,10 @@
        unless MainWindow's legacyVersion declares a HIGHER one, which is how a major bump
        (2.41 -> 3.0) is expressed - see the block itself.
     4. Writes release notes (Markdown) listing the new entries, ending with the new
-       "changelog-through:N" marker for the *next* run to read back.
+       "changelog-through:N" marker for the *next* run to read back. If docs\release-notes\<version>.md
+       exists it is spliced in ahead of that list, which is how a release says what it MEANS rather
+       than only what changed - see the block itself. No such file is the normal case and changes
+       nothing about the output.
     5. Stamps the TOC "ver" column in Overview.html for those newly-included entries.
   Does not commit/push - the workflow does that as a separate step so it can also embed
   BuildInfo.cs first.
@@ -197,6 +200,36 @@ $lines += '```'
 $lines += "powershell -NoProfile -ExecutionPolicy Bypass -Command `"& ([scriptblock]::Create((irm https://raw.githubusercontent.com/$Repo/master/install.ps1))) -Tag '$newVersion'`""
 $lines += '```'
 $lines += ""
+
+# --- 4a. A hand-written narrative for this version, if one is tracked -------------------------
+# The generator can say WHAT changed; it cannot say what a release MEANS. That is tolerable for an
+# ordinary minor cut of two or three entries and useless for a big one: 3.0 carries 203 entries
+# (#218-#420), the first major bump in the project's history, and a flat numeric list gives the
+# machine engine becoming a portable .NET 8 library (#218) exactly the same visual weight as a
+# mojibake'd degree sign in a readout (#361). So docs\release-notes\<version>.md, if it exists, is
+# spliced in ahead of the list.
+#
+# ABSENT IS THE NORMAL CASE, and it must cost nothing: with no such file this emits byte-for-byte
+# what it always has, the "All changes" heading included. An ordinary cut neither needs a narrative
+# nor should start sprouting an empty section inviting one.
+#
+# An EMPTY file counts as absent for the same reason - whitespace is not a narrative, and a file
+# someone created to fill in later should not silently retitle the list and then say nothing.
+$narrativePath = Join-Path (Split-Path $PSScriptRoot -Parent) "docs\release-notes\$newVersion.md"
+$narrative = ''
+if (Test-Path $narrativePath) { $narrative = ([System.IO.File]::ReadAllText($narrativePath)).Trim() }
+if ($narrative) {
+    $lines += $narrative
+    $lines += ""
+    # Only with a narrative above it does the generated list need naming - it is no longer the
+    # whole body, and unlabelled it would read as a continuation of the prose.
+    $lines += "### All changes in this release"
+    $lines += ""
+    Write-Host "Narrative: spliced docs\release-notes\$newVersion.md ($($narrative.Length) chars)." -ForegroundColor Cyan
+} else {
+    Write-Host "Narrative: none (no docs\release-notes\$newVersion.md) - the generated list is the whole body." -ForegroundColor DarkGray
+}
+
 if ($newEntries.Count -eq 0) {
     $lines += "No changelog entries in this build."
 } else {
