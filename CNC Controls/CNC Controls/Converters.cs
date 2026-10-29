@@ -709,6 +709,29 @@ namespace CNC.Controls
         }
     }
 
+    // The selected probe INPUT as a single letter: P = the main probe input, T = the tool setter's.
+    // grblHAL routes one at a time (GrblCommand.ProbeSelect, "G65P5Q{0}", Q0 = main, Q1 = toolsetter), so
+    // one lamp whose letter changes says which input a G38 probe will actually listen to - which is the
+    // question the lamp exists to answer. GrblViewModel.Probe carries the id and raises PropertyChanged
+    // when the controller's parser state reports it, so a binding tracks a switch made anywhere.
+    public class ProbeIdToLetterConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            int id;
+            if (value is int)
+                id = (int)value;
+            else if (!int.TryParse(System.Convert.ToString(value, CultureInfo.InvariantCulture), out id))
+                return "P";
+
+            return id == 1 ? "T" : "P";
+        }
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     // Like BoolToVisibleConverter but false -> HIDDEN, so the element keeps the space it occupies.
     // For a control inside a StackPanel whose neighbours must not move when it is turned off - the jog
     // pad's go-to button between Z+ and Z-, which collapsing would let Z- slide up into.

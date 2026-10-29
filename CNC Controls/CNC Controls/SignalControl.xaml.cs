@@ -98,6 +98,25 @@ namespace CNC.Controls
             c.txtSignal.FontWeight = set ? FontWeights.Bold : FontWeights.Normal;
         }
 
+        // Width of the lamp box. 19 (a square) for a single letter; wider for a label that spells
+        // something - the TLO reference lamp. The Viewbox shrinks the text to whatever this allows.
+        public static readonly DependencyProperty BoxWidthProperty = DependencyProperty.Register(
+            nameof(BoxWidth), typeof(double), typeof(SignalControl), new PropertyMetadata(19d, OnBoxWidthChanged));
+
+        public double BoxWidth
+        {
+            get { return (double)GetValue(BoxWidthProperty); }
+            set { SetValue(BoxWidthProperty, value); }
+        }
+
+        private static void OnBoxWidthChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var c = (SignalControl)d;
+            double w = (double)e.NewValue;
+            c.shpSignal.Width = w;
+            c.boxSignal.Width = w + 1;   // the grid carried 1px more than the shape before BoxWidth existed
+        }
+
         public static readonly DependencyProperty LabelProperty = DependencyProperty.Register(nameof(Label), typeof(string), typeof(SignalControl), new PropertyMetadata());
         public string Label
         {

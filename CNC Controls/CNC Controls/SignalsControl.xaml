@@ -19,6 +19,7 @@
                         <Setter Property="Padding" Value="0"/>
                     </Style>
                     <local:IsSignalVisibleConverter x:Key="IsSignalVisibleConverter" />
+                    <local:ProbeIdToLetterConverter x:Key="ProbeLetterConverter" />
                     <Style x:Key="DoorOpenVisibleStyle">
                         <Setter Property="Control.Visibility">
                             <Setter.Value>
@@ -122,8 +123,21 @@
                 <local:SignalControl x:Uid="lbl_signalReset" Label="R" ToolTip="Reset" IsSet="{Binding Path=Signals[(core:Signals)Reset], Mode=OneWay}" Style="{StaticResource ResetVisibleStyle}"/>
                 <local:SignalControl x:Uid="lbl_signalEStop" Label="E" ToolTip="E-Stop" IsSet="{Binding Path=Signals[(core:Signals)EStop], Mode=OneWay}" Style="{StaticResource EStopVisibleStyle}"/>
                 <local:SignalControl x:Uid="lbl_signalSafetyDoor" Label="D" ToolTip="Safety door" IsSet="{Binding Path=Signals[(core:Signals)SafetyDoor], Mode=OneWay}" Style="{StaticResource DoorOpenVisibleStyle}"/>
-                <local:SignalControl x:Uid="lbl_signalProbe" Label="P" ToolTip="Probe" IsSet="{Binding Path=Signals[(core:Signals)Probe], Mode=OneWay}"/>
-                <local:SignalControl x:Uid="lbl_signalTloRef" Label="T" ToolTip="{Binding Path=TloReferenceTooltip, Mode=OneWay}" IsSet="{Binding Path=IsTloReferenceSet, Mode=OneWay}" SetColor="Green"/>
+                <!-- The probe lamp lights on the Probe signal as it always did; what is new is that its
+                     LETTER says which input that signal is coming from - P for the main probe, T for the
+                     tool setter. grblHAL routes one at a time, so "which input will a G38 answer to" is a
+                     real question with a real answer, and it is the question this lamp was meant to be
+                     about. Static tooltip rather than a bound one so it stays localizable - the letter
+                     itself is the live part. -->
+                <local:SignalControl x:Uid="lbl_signalProbe" Label="{Binding Path=Probe, Converter={StaticResource ProbeLetterConverter}, Mode=OneWay}"
+                                     ToolTip="The probe input a G38 probe will respond to: P = the main probe input, T = the tool setter's. Set by the probe you choose for a job; the run strip's P/T pair switches it directly."
+                                     IsSet="{Binding Path=Signals[(core:Signals)Probe], Mode=OneWay}"/>
+                <!-- Spells TLO rather than borrowing "T", which this lamp had taken over from the probe
+                     letter above: same glyph, two unrelated meanings, and the one that looked like the
+                     probe routing was actually the tool length reference. Reported 2026-10-28. -->
+                <!-- Width set locally because the implicit SignalControl style above pins every lamp to 22,
+                     and a style setter would otherwise clip the wider box back to one letter's worth. -->
+                <local:SignalControl x:Uid="lbl_signalTloRef" Label="TLO" BoxWidth="30" Width="34" ToolTip="{Binding Path=TloReferenceTooltip, Mode=OneWay}" IsSet="{Binding Path=IsTloReferenceSet, Mode=OneWay}" SetColor="Green"/>
             </StackPanel>
         </DockPanel>
     </GroupBox>
