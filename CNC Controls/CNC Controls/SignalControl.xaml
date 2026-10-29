@@ -28,7 +28,14 @@
     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
         <Button x:Uid="btnLED" x:Name="btnLED" Focusable="False" HorizontalAlignment="Center" Margin="0,2,0,0" VerticalAlignment="Top" Width="10" Height="10" Style="{StaticResource ButtonStyleNoHighlighting}"/>
         <Grid Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
-            <Ellipse x:Name="ellSignal" Width="19" Height="19" Fill="Transparent" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <!-- An OUTLINED rounded rectangle, not a filled disc. The disc put the letter on top of a
+                 solid colour and the glyph became hard to read - reported 2026-10-28 for the green "T",
+                 where it matters most, since that lamp means "reference set" and the letter is the only
+                 thing saying WHICH lamp you are looking at. The border plus a light tint still reads as
+                 lit from across the room, and the letter stays legible against the page background. -->
+            <Rectangle x:Name="shpSignal" Width="19" Height="19" RadiusX="3" RadiusY="3"
+                       Fill="Transparent" Stroke="Transparent" StrokeThickness="2"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
             <TextBlock x:Name="txtSignal" Text="{Binding Label, RelativeSource={RelativeSource AncestorType=UserControl}}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12.5" FontFamily="Global User Interface"/>
         </Grid>
     </StackPanel>
