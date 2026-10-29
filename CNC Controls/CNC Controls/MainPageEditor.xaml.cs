@@ -82,6 +82,13 @@ namespace CNC.Controls
         private readonly ObservableCollection<AssignableItem> Left = new ObservableCollection<AssignableItem>();
         private readonly ObservableCollection<AssignableItem> Flyouts = new ObservableCollection<AssignableItem>();
         private readonly ObservableCollection<PlacementRow> Placements = new ObservableCollection<PlacementRow>();
+
+        // Components the tree places but the editor does NOT list, because the controller cannot offer them
+        // (they are in the Unavailable list with their reason instead). Their placement is remembered here
+        // and written back unchanged on save: the slots are rebuilt from Placements alone, so without this
+        // merely opening and leaving this page would delete the lathe wizards' placement from the profile
+        // of anyone whose controller happened to be in mill mode at the time.
+        private readonly Dictionary<string, ViewPlacement> preservedPlacements = new Dictionary<string, ViewPlacement>(StringComparer.Ordinal);
         private string[] _origMain, _origLeft, _origFlyouts, _origTabs;   // baselines to detect changes on OK
 
         // True if OK applied any layout/tab change (the host enables its Restart button + status when set).
@@ -285,9 +292,21 @@ namespace CNC.Controls
                     order.Add(t.Name);
                 }
 
+            // A component this controller cannot offer is listed ONCE, in Unavailable, with the reason. It
+            // used to appear here as well, offering a tab-bar/menu/hidden choice that the next load would
+            // prune away regardless - the same kind of lie CanHide below refuses to tell for an essential
+            // view. Its placement is preserved rather than dropped (see preservedPlacements).
+            var unavailable = ComponentAvailability.UnavailableKeys();
+
             var labels = TabRegistry.AllTabs.GroupBy(t => t.Name).ToDictionary(g => g.Key, g => g.First().Label);
             foreach (var key in order)
             {
+                if (unavailable.Contains(key))
+                {
+                    preservedPlacements[key] = placed[key];
+                    continue;
+                }
+
                 string label;
                 if (!labels.TryGetValue(key, out label))
                     label = ComponentRegistry.Get(key)?.Label;
@@ -353,8 +372,12 @@ namespace CNC.Controls
             if (Placements.Count == 0)
                 return;
 
-            cfg.Tabs = Placements.Where(p => p.Placement == ViewPlacement.TabBar).Select(p => p.Name).ToList();
-            cfg.HiddenViews = Placements.Where(p => p.Placement == ViewPlacement.Hidden).Select(p => p.Name).ToList();
+            // Preserved (unavailable) components are appended to whichever list they were already in, so a
+            // placement this editor deliberately did not show is handed back exactly as it was found.
+            cfg.Tabs = Placements.Where(p => p.Placement == ViewPlacement.TabBar).Select(p => p.Name)
+                                 .Concat(PreservedIn(ViewPlacement.TabBar)).ToList();
+            cfg.HiddenViews = Placements.Where(p => p.Placement == ViewPlacement.Hidden).Select(p => p.Name)
+                                 .Concat(PreservedIn(ViewPlacement.Hidden)).ToList();
 
             var root = AppConfig.Settings.Layout;
             if (root == null)
@@ -383,8 +406,16 @@ namespace CNC.Controls
 
             slot.Items = Placements
                 .Where(p => p.Placement == placement)
-                .Select(p => existing.TryGetValue(p.Name, out var n) ? n : new LayoutNode(p.Name))
+                .Select(p => p.Name)
+                .Concat(PreservedIn(placement))
+                .Select(name => existing.TryGetValue(name, out var n) ? n : new LayoutNode(name))
                 .ToList();
+        }
+
+        // Keys the editor withheld from its list (unavailable on this controller) that belong in this slot.
+        private IEnumerable<string> PreservedIn(ViewPlacement placement)
+        {
+            return preservedPlacements.Where(kv => kv.Value == placement).Select(kv => kv.Key);
         }
 
         // Save-on-leave: write the buckets back to config and persist. If anything changed since the tab was

@@ -1919,21 +1919,29 @@ namespace CNC.Controls
             // instead of a tab-inside-a-tab. Swap OddJobs for WorkOrder at the SAME position in both the
             // tree's tabs slot and the legacy flat Base.Tabs list, rather than remove+append, so an operator's
             // existing tab ORDER doesn't jump just because the tab was renamed/promoted underneath them.
+            //
+            // SWAP ONLY. Both halves used to fall back to "...else append Work Order if it is missing", and
+            // ApplyOneTimeFixups is not one-time - it runs on EVERY load, so those appends were generators.
+            // The flat-list one was the live bug: move Work Order to the Tools menu and it leaves the tabs
+            // slot, but it is then absent from Base.Tabs, so the append put it back there; TabOrder.Apply
+            // rebuilds the tabs slot to be exactly that flat list, and DeduplicateTopLevelPlacements keeps
+            // the first placement found - tabs is the first root slot - so the menu entry was dropped and
+            // the tab reappeared. The setting looked like it simply did not work. Reported 2026-10-28.
+            //
+            // Nothing is lost by dropping the appends: a profile that has never heard of Work Order has it
+            // in no slot at all, which is exactly what a brand-new component looks like, and
+            // EnforceMenuPlacement already puts those into their default placement.
             if (tabsSlot != null)
             {
                 int idx = tabsSlot.Items.FindIndex(n => n.Component == LayoutKeys.OddJobs);
                 if (idx >= 0)
                     tabsSlot.Items[idx] = new LayoutNode(LayoutKeys.WorkOrder);
-                else if (!LayoutTree.Contains(layoutSection.Root, LayoutKeys.WorkOrder))
-                    tabsSlot.Items.Add(new LayoutNode(LayoutKeys.WorkOrder));
             }
             if (Base != null && Base.Tabs.Count > 0)
             {
                 int idx = Base.Tabs.IndexOf(LayoutKeys.OddJobs);
                 if (idx >= 0)
                     Base.Tabs[idx] = LayoutKeys.WorkOrder;
-                else if (!Base.Tabs.Contains(LayoutKeys.WorkOrder))
-                    Base.Tabs.Add(LayoutKeys.WorkOrder);
             }
 
             // 2026-07-24 (later still): FeedsAndSpeedsView's "have they seen the Intro tab" flag briefly

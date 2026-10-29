@@ -364,7 +364,14 @@ namespace CNC.Controls
                 string reason = gated.UnavailableReason;
                 if (reason == null)
                     continue;
-                found.Add(new UnavailableComponent { Label = tab.Header?.ToString() ?? string.Empty, Reason = reason });
+                // Tag is the component key (BuildTabs sets it); it is what the Main Page editor matches on to
+                // keep a pruned component out of its placement list. Null for a tab authored in XAML without
+                // one - the entry still lists, it just cannot be matched by key.
+                found.Add(new UnavailableComponent {
+                    Key = tab.Tag as string,
+                    Label = tab.Header?.ToString() ?? string.Empty,
+                    Reason = reason
+                });
                 if (gated.HideWhenUnavailable)
                     Items.Remove(tab);
             }
