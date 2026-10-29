@@ -3,6 +3,11 @@
 > **Shadows: `claude-hub/playbooks/end_of_session_wrapup.md`** — that file holds the shared
 > shape (the ordering, and why the conversation-log step is last). This one replaces it for
 > ioSender because every step below names this project's branches, remotes and release tooling.
+>
+> **What it deliberately does NOT restate: the REASONING for the two-turn capture ordering.** Read
+> the shared copy for that. Keeping a second copy of generic argument here is what let this file
+> drift three times with nothing going red — so when a step below has no ioSender content, it is a
+> bug, not a convenience. `claude-hub\tools\playbook-lint.ps1` now checks the mechanical half.
 
 **When:** work for the session is done and the user is about to `/clear`.
 **Memory context:** `iosender-end-of-session-convolog.md`.
@@ -100,17 +105,20 @@ second one is what 3.6 describes.
 
 ## Ordering that matters (steps 5 → 6): the wrap-up is TWO turns
 
-> ⚠️ **CORRECTED 2026-08-08 — this supersedes the same-message flow described below, which lost the
-> summary TWICE.** Mid-turn prose (text emitted *between* tool calls in one turn) is **not reliably
-> persisted** to the transcript `.jsonl`. Two separate summary attempts written mid-turn — prose, then
-> the capture call in the same turn — both vanished; the transcript kept the surrounding `tool_use`
-> entries but no text block, verified by parsing the raw `.jsonl` both times. Short mid-turn status
-> lines sometimes survive; long prose did not. **Only the TURN-FINAL message is guaranteed captured.**
+> **The REASONING behind every rule in this section is in the shared copy and is not restated here**
+> — `claude-hub/playbooks/end_of_session_wrapup.md`, section "Steps 6 and 7 are two separate turns"
+> plus its Notes: why mid-turn prose is not reliably persisted (it lost the summary twice,
+> 2026-08-08), why nothing may follow the capture (the orphan-fragment bug, user 2026-08-12), why the
+> trigger is armed rather than live, why reporting "captured" from an exit code is banned, and why
+> `-Amend` works at all. **None of it is ioSender-specific.** This file used to carry all 94 lines of
+> it, and that duplicated text is where every one of its three paid-for drifts lived — a bare
+> `powershell` that rewrote `sessions.json`, four dead paths, and a missing hub-push step. The RULES
+> stay below, because a link is not in front of you at the moment you need them; the arguments for
+> them do not.
 
-So:
-
-1. **Turn A** ends with the session summary as its **final message — no tool calls after it.** Before
-   writing that message, arm the trigger — this is the last tool call of the turn:
+1. **Turn A** ends with the session summary as its **final message — no tool calls after it.** Only
+   the turn-final message is reliably persisted. Arm the trigger as the turn's **last tool call**,
+   before writing that message:
 
    ```powershell
    pwsh -File c:\github\claude-hub\tools\turn.ps1 wrapup
@@ -118,10 +126,15 @@ So:
 
    It prints the working title recorded at session start and arms the next prompt to set the title.
    Then say plainly that the capture still has to run, that anything the user sends will trigger it,
-   and **name the session** so the next message can replace it. One line is enough:
+   and **name the session**. One line is enough:
 
    > Filing this as **"Feed hold starves the planner buffer"** — send `Title: <name>` to file it
    > under something else; anything else you send just runs the capture.
+
+   **`Title: <name>` at the trigger needs nothing from you** — `on-prompt.ps1` has already rewritten
+   the working title record. Do not pass `-Title` as well, and do not re-record it. That flag is for
+   the other case: the user renames it in prose ("call it the feed hold one") rather than with the
+   prefix. Give their words as given.
 
    **Then end the message with this line, alone, in capitals, as the very last thing in it:**
 
@@ -129,68 +142,24 @@ So:
    READY TO CAPTURE
    ```
 
-   Nothing after it — no sign-off, no further sentence. It is the one line whose job is to be *seen*,
-   and it only works if it is last: a summary is a wall of text after a long session, the sentence
-   naming the trigger reads like more of the same, and the user's own account of the failure is that
-   he read the wrap-up, did not register that something was still owed, and moved on. That is how the
-   2026-09-29 CNCBuild capture was lost — 227 turns and 15 hours, wrapped up correctly and then
-   `/clear`ed, because the request for the trigger never stood out from the report around it. The
-   recovery in `on-session-start.ps1` now catches this after the fact; this line is the half that
-   stops it happening, and the two are not alternatives. Capitals on their own line, because that is
-   what survives being skim-read.
-
-   **`Title: <name>` at the trigger needs nothing from you** — `on-prompt.ps1` has already rewritten
-   the working title record, and the injected context says so. Do not pass `-Title` as well, and do
-   not re-record it. `-Title "..."` is for the other case: the user renames it in prose ("call it the
-   feed hold one") rather than with the prefix. Give their words as given.
+   🔴 **Nothing after it** — no sign-off, no further sentence. Capitals, on their own line, last,
+   because that is what survives being skim-read: a 227-turn, 15-hour CNCBuild session was lost on
+   2026-09-29 to a wrap-up that asked for the trigger in prose the user read straight past.
 2. **Turn B** (the user says anything) runs the capture as the **LAST ACTION OF THE TURN, and writes
-   nothing after it.**
+   nothing after it** — not a verification report, not a sign-off, not a "captured N turns" note.
+   Say everything beforehand; the user reads the tool result themselves. **Never report "captured" from
+   an exit code** — verify in the *next* session, not after the run.
 
-> 🔴 **Why nothing after it (user, 2026-08-12) — this is the orphan bug's actual cause.** The stray
-> 1-2 turn fragments the capture keeps having to fold backwards are **just the messages written after
-> the capture ran**: a verification report, a sign-off, a "captured N turns" note. They land between
-> the end of one session and the start of the next and belong to neither.
-> *"When you do the capture don't do anything else, don't send any more output to the messages. I will
-> see when it's done and do the `/clear` at that point."*
-> Say everything beforehand — the summary in turn A, any commentary before the tool call. The user
-> reads the tool result themselves.
->
-> **Consequence for the verify step:** "grep the HTML before reporting success" cannot be done as prose
-> afterwards without recreating the bug. Never report "captured" from an exit code alone either — that
-> chained two false claims once, including wrongly "correcting" the user, who had it right. The way out
-> is to **build the check into `convo-sessions.ps1`** (does the final turn's text appear in the HTML?)
-> so the script itself answers it. Until then: verify in the *next* session, not after the run.
->
-> 🔴 **If a capture was INTERRUPTED and you cannot tell whether it ran — do not guess, and do not
-> re-run it blind. Ask:**
->
-> ```powershell
-> pwsh -File c:\github\claude-hub\tools\capture-status.ps1
-> ```
->
-> It writes nothing, and its "unfiled" figure comes from `convo-sessions.ps1 -Probe`, so it cannot
-> disagree with what a real capture would do. It resolves the project from the current directory, so
-> it works unchanged from an ioSender session.
->
-> **Why it exists:** 2026-10-12, a capture was running, the user hit Escape thinking he was in a
-> different window, and the call was cancelled. **An interrupted capture and a failed capture look
-> identical from outside** — no record printed, nothing to say whether the session was filed. It was
-> restarted twice 48 seconds apart, and there was then no way to know whether that produced one
-> record, two, or a session folded onto the wrong one; answering it afterwards took a git-log
-> reconstruction and a hand-read of `sessions.json`. Escape cannot be made to confirm first — Claude
-> Code has no confirm-before-cancel action — so the fix is **observable state after the fact**, not a
-> harder interruption.
->
-> Use **`-Amend`** only when a capture already ran for THIS sitting and turns need folding into it;
-> `-Amend` extends the most recent session, so on a first capture it would wrongly extend the previous
-> one.
+🔴 **If a capture was INTERRUPTED and you cannot tell whether it ran, do not guess and do not re-run
+it blind — ask.** It writes nothing, and it resolves the project from the current directory, so it
+works unchanged from an ioSender session:
 
-The original reasoning still holds and is why `-Amend` works at all: the capture reads the transcript from
-disk, and Claude Code flushes an assistant message's **text** before running a tool call in that same
-message — so text written earlier *in the message* than the capture call is already on disk. What the
-2026-08-08 incident showed is that this holds for the message's **final** text block, not for prose
-sandwiched between tool calls. Never run the capture first and write the summary as trailing text — that
-pushed the summary into the following run, which is the original bug this ordering fixed (2026-07-08).
+```powershell
+pwsh -File c:\github\claude-hub\tools\capture-status.ps1
+```
+
+Use **`-Amend`** only when a capture already ran for THIS sitting and turns need folding into it; it
+extends the most recent session, so on a first capture it would wrongly extend the previous one.
 
 ## Ready command (step 3.5 — integration sessions only)
 
