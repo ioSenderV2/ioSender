@@ -2191,13 +2191,67 @@ namespace CNC.Controls
                 }
 
                 // Fresh install (no existing App.config was migrated): seed the per-user App.config by copying the
-                // shipped read-only template so first-run starts from the curated defaults.
+                // shipped read-only template so first-run starts from the curated defaults, then lay the
+                // shipped default PRESET over it (see SeedDefaultPreset).
                 string userCfg = Path.Combine(userDir, "App.config");
                 string template = Path.Combine(appDir, DefaultTemplateName);
                 if (!File.Exists(userCfg) && File.Exists(template))
-                    try { File.Copy(template, userCfg); } catch { }
+                    try { File.Copy(template, userCfg); SeedDefaultPreset(userCfg); } catch { }
             }
             catch { /* migration is best-effort; a missing file just re-initialises to defaults */ }
+        }
+
+        // The arrangement a BRAND-NEW INSTALL opens on. Not the same question as "what are the factory
+        // defaults": Default-App.config is the source of "Reset to Default" for every settings panel and
+        // DefaultV3.0.ioconfig is GENERATED from it, so making the template itself Classic would collapse
+        // those two documents into one and leave no way back to the V3 look. The shipped Classic preset is
+        // merged onto the just-seeded profile instead.
+        //
+        // Done HERE, not via AppConfig.StageOverlay, because this is the one moment the file on disk is
+        // authoritative and nothing has read it yet - so first launch already looks Classic, with no staged
+        // fragment and no restart. (That is the same reason the overlay merge itself lives in TryLoad.)
+        public const string DefaultPresetName = "ioSenderClassic";
+
+        private static void SeedDefaultPreset(string userCfg)
+        {
+            try
+            {
+                string preset = Path.Combine(CNC.Core.Resources.ShippedPresetsFolder,
+                                             DefaultPresetName + CNC.Core.ConfigOverlay.FileExtension);
+                if (!File.Exists(preset))
+                    return;
+
+                var doc = XDocument.Load(userCfg);
+                var applied = CNC.Core.ConfigOverlay.Apply(doc, XDocument.Load(preset));
+                if (applied.Count == 0)
+                    return;
+
+                // ActivePreset is deliberately NOT one of UiLayoutCoreElements - a preset's own Core merge
+                // must not be able to rewrite which preset is active (see UiPresets.Switch) - so the merge
+                // above does not set it. Without this the selector would read "Custom" over a Classic
+                // arrangement, and the first switch away would save Classic's layout under that name.
+                var core = doc.Root?.Elements("section")
+                                    .FirstOrDefault(s => (string)s.Attribute("key") == "Core")
+                                    ?.Elements().FirstOrDefault();
+                if (core != null)
+                {
+                    var active = core.Element("ActivePreset");
+                    if (active != null)
+                        active.Value = DefaultPresetName;
+                    else
+                        core.Add(new XElement("ActivePreset", DefaultPresetName));
+                }
+
+                doc.Save(userCfg);
+                CNC.Core.DebugLog.Write("config", "fresh install seeded with preset " + DefaultPresetName +
+                                                  " [" + string.Join(", ", applied) + "]");
+            }
+            catch (Exception ex)
+            {
+                // A seed that fails leaves the curated template in place - a worse look, never a broken
+                // profile. Said out loud because it is otherwise invisible: the app just opens on V3.
+                CNC.Core.DebugLog.Write("config", "default preset seed failed - " + ex.Message);
+            }
         }
 
         // Parse command-line args and load the config file (populates Base). Must run BEFORE any
