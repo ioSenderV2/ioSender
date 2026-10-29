@@ -56,6 +56,41 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
+            <!-- UI preset selector. It belongs with the window title - it names which screen arrangement
+                 you are looking at - but the OS title bar cannot host a control without taking over the
+                 whole window frame (WindowStyle=None), which would cost native snap and DPI behaviour for
+                 a combo box. So the name is echoed in the title as TEXT and the control sits in the row
+                 directly beneath it, left of the connection summary this row already carries.
+
+                 Chrome, not main UI: no border or background until hovered, so it reads as part of the
+                 title rather than as a field to fill in. Right-click for the rest (see presetMenu). -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="12,0,0,0">
+                <TextBlock x:Uid="lbl_presetCaption" Text="Layout:" VerticalAlignment="Center" Opacity="0.65" Margin="0,0,5,0"/>
+                <ComboBox x:Uid="cbo_preset" x:Name="cboPreset" MinWidth="130" VerticalAlignment="Center"
+                          DisplayMemberPath="Label" SelectionChanged="Preset_SelectionChanged"
+                          ToolTip="The screen arrangement in use. Switching saves the one you are leaving under its own name first, so nothing you changed is lost. Right-click for save, export and folder.">
+                    <ComboBox.ContextMenu>
+                        <ContextMenu x:Name="presetMenu">
+                            <MenuItem x:Uid="mnu_presetSave" x:Name="menuPresetSave" Header="_Save changes to this layout" Click="presetSave_Click"
+                                      ToolTip="Write the arrangement as it stands now into this preset's own file."/>
+                            <MenuItem x:Uid="mnu_presetSaveAs" Header="Save as _new layout..." Click="presetSaveAs_Click"
+                                      ToolTip="Keep the current arrangement under a new name, and switch to tracking that name. No restart - nothing on screen changes."/>
+                            <Separator/>
+                            <MenuItem x:Uid="mnu_presetExport" Header="_Export to a file..." Click="presetExport_Click"
+                                      ToolTip="Save this layout as a file you can send to someone else. The connection port, network host and machine are never included."/>
+                            <MenuItem x:Uid="mnu_presetImport" Header="_Import from a file..." Click="presetImport_Click"
+                                      ToolTip="Add a layout file someone sent you. A copy is kept in your Presets folder; nothing is applied until you pick it from the list."/>
+                            <MenuItem x:Uid="mnu_presetFolder" Header="Open layouts _folder" Click="presetFolder_Click"
+                                      ToolTip="Open the folder holding your saved layouts."/>
+                            <Separator/>
+                            <MenuItem x:Uid="mnu_presetDelete" x:Name="menuPresetDelete" Header="_Delete this layout..." Click="presetDelete_Click"
+                                      ToolTip="Delete your copy of this layout. A layout that shipped with ioSender comes back when your copy is removed."/>
+                            <MenuItem x:Uid="mnu_presetUndo" x:Name="menuPresetUndo" Header="_Undo last switch" Click="presetUndo_Click"
+                                      ToolTip="Restore the configuration as it was immediately before the last layout switch. ioSender restarts."/>
+                        </ContextMenu>
+                    </ComboBox.ContextMenu>
+                </ComboBox>
+            </StackPanel>
             <TextBlock x:Name="lblMenuBarInfo" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
                        Margin="0,0,10,0" TextWrapping="NoWrap" Foreground="#FF3C6E3C" FontWeight="SemiBold"/>
         <Menu x:Name="menuMain" Grid.Column="0" IsEnabled="{Binding Path=IsJobRunning, Converter={StaticResource BooleanConverter}}">
@@ -111,10 +146,11 @@
                     <MenuItem x:Uid="mnu_checkForUpdates" x:Name="menuCheckForUpdates" Header="_Check for updates..." Click="checkForUpdates_Click" ToolTip="Check if a newer version of ioSender is available on GitHub."/>
                     <MenuItem x:Uid="mnu_rollbackVersion" x:Name="menuRollbackVersion" Header="_Roll back to previous version..." Click="rollbackVersion_Click" ToolTip="Swap back to the ioSender build installed before the last update. Only goes back one version - it does not work if you have not updated at least once."/>
                     <MenuItem x:Uid="mnu_openConfigFolder" x:Name="menuOpenConfigFolder" Header="Open Application _data folder" Click="openConfigFolderMenuItem_Click" ToolTip="Open the per-user folder where ioSender keeps its settings (App.config), key mappings, grbl backups and restore points."/>
-                    <Separator/>
-                    <MenuItem x:Uid="mnu_applyConfigOverlay" x:Name="menuApplyConfigOverlay" Header="Apply configuration _overlay..." Click="applyConfigOverlay_Click" ToolTip="Layer a configuration fragment (.ioconfig) onto this profile - for example to adopt a new screen layout - without disturbing your machine settings, profiles or macros. ioSender restarts to apply it, and it can be undone."/>
-                    <MenuItem x:Uid="mnu_exportConfigOverlay" x:Name="menuExportConfigOverlay" Header="E_xport configuration overlay..." Click="exportConfigOverlay_Click" ToolTip="Save this profile's screen layout as a .ioconfig fragment that someone else can apply to their own installation. Machine identity (port, network host, machine) is never included."/>
-                    <MenuItem x:Uid="mnu_undoConfigOverlay" x:Name="menuUndoConfigOverlay" Header="_Undo configuration overlay" Click="undoConfigOverlay_Click" ToolTip="Restore the configuration as it was immediately before the last overlay was applied. ioSender restarts."/>
+                    <!-- The three configuration-overlay items are gone (2026-10-28). Everything they did is
+                         on the Layout selector in the menu row and its right-click menu - apply became
+                         picking a name, export and undo moved verbatim, and import is new. A file dialog
+                         was the only way in before, so applying the same arrangement twice meant finding
+                         the file again. -->
                     <Separator/>
                     <MenuItem x:Uid="mnu_installFusionAddin" x:Name="menuInstallFusionAddin" Header="_Install ioSenderV2 Fusion Addin..." Click="installFusionAddin_Click" ToolTip="Symlink the ioSenderV2 Fusion 360 add-in into Fusion's AddIns folder. Future ioSenderV2 updates need no reinstall - only shown when Fusion 360 is installed for this user." Visibility="Collapsed"/>
                     <MenuItem x:Uid="mnu_generateResetTestCase" Header="Generate _reset test case..." Click="generateResetTestCase_Click" ToolTip="Write a .nc file that calls an O-word subroutine several times, for reproducing controller-wedge-on-Reset bugs." Visibility="Collapsed"/>

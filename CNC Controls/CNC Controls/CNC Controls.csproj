@@ -401,6 +401,9 @@
     <Compile Include="UiSoundConfigControl.xaml.cs">
       <DependentUpon>UiSoundConfigControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="TextPromptDialog.xaml.cs">
+      <DependentUpon>TextPromptDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="UiPresets.cs" />
     <Compile Include="UiSounds.cs" />
     <Compile Include="UiSoundWatcher.cs" />
@@ -637,6 +640,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="SecretPromptDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="TextPromptDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

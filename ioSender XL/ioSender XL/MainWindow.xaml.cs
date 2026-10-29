@@ -780,14 +780,32 @@ namespace GCode_Sender
 
         public string BaseWindowTitle { get; set; }
 
+        // " (Classic)" / " (Custom, modified)" - the UI preset, echoed in the window title because that is
+        // where it belongs and the OS title bar cannot hold the selector itself (see MainWindow.xaml).
+        // Kept OUT of BaseWindowTitle deliberately: that string is the caption for the About and
+        // Errors-and-alarms windows, which have nothing to do with which layout is loaded.
+        private string presetTitleSuffix = string.Empty;
+
+        // The last file-load title suffix, so re-rendering the title for a preset change does not drop the
+        // loaded file's name. The WindowTitle setter is write-only and callers do not re-send it.
+        private string fileTitleSuffix = string.Empty;
+
         public string WindowTitle
         {
             set
             {
-                ui.Title = BaseWindowTitle + (string.IsNullOrEmpty(value) ? "" : " - " + value);
-                // File open/save/close/transform state now lives on the program view + its right-click menu
-                // (menu overhaul), which self-gate on GCode.File - no menu-bar items to toggle here.
+                fileTitleSuffix = value ?? string.Empty;
+                RenderWindowTitle();
             }
+        }
+
+        private void RenderWindowTitle()
+        {
+            // File open/save/close/transform state now lives on the program view + its right-click menu
+            // (menu overhaul), which self-gate on GCode.File - no menu-bar items to toggle here.
+            ui.Title = BaseWindowTitle
+                     + presetTitleSuffix
+                     + (string.IsNullOrEmpty(fileTitleSuffix) ? "" : " - " + fileTitleSuffix);
         }
 
         public bool JobRunning
@@ -1117,6 +1135,12 @@ namespace GCode_Sender
             }
             else
                 RevealMainWindow();   // no controller / cancelled: show the normal UI disconnected
+
+            // Layout selector: here rather than in Window_Load because it reads AppConfig.Settings.Base
+            // (the active preset name) and compares the live config document against the preset file, and
+            // Base is only populated by the SetupAndOpen() above. It also has to run after the tabs are
+            // built, since the layout tree it fingerprints is what built them.
+            RefreshPresets();
 
             // Safety net: never leave the user staring at the splash if the controller never reports in.
             var revealSafety = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
@@ -1467,79 +1491,13 @@ namespace GCode_Sender
             }
         }
 
-        #region Configuration overlays (Help > Support)
+        #region Restart (Help > Support)
 
-        // See ConfigOverlay.cs for the format and AppConfig's "Config overlays" region for why applying is
-        // staged-then-restart rather than written live. Everything here is presentation: pick a file, say
-        // exactly which sections it will change, hand it to AppConfig, relaunch.
-
-        // Only offer Undo when there is actually a pre-overlay backup to go back to - a disabled item is a
-        // truthful "nothing to undo", where a live one that then reports failure is not.
+        // The three configuration-overlay items this region used to serve are gone - they live on the
+        // Layout selector in the menu row now (see the UI presets region). Restart stayed: it is a
+        // RECOVERY action, not a configuration one.
         private void menuSupport_SubmenuOpened(object sender, RoutedEventArgs e)
         {
-            menuUndoConfigOverlay.IsEnabled = AppConfig.CanUndoOverlay;
-        }
-
-        private void applyConfigOverlay_Click(object sender, RoutedEventArgs e)
-        {
-            var dlg = new Microsoft.Win32.OpenFileDialog
-            {
-                Title = "Apply configuration overlay",
-                Filter = "Configuration overlay|*" + ConfigOverlay.FileExtension + ";*.config|All files|*.*",
-                DefaultExt = ConfigOverlay.FileExtension,
-                CheckFileExists = true
-            };
-            if (dlg.ShowDialog(this) != true)
-                return;
-
-            List<ConfigOverlayEntry> sections;
-            string name;
-            try
-            {
-                var doc = System.Xml.Linq.XDocument.Load(dlg.FileName);
-                sections = ConfigOverlay.Describe(doc);
-                name = ConfigOverlay.NameOf(doc);
-            }
-            catch (Exception ex)
-            {
-                AppDialogs.Show(this, "That file could not be read as a configuration overlay:\n\n" + ex.Message,
-                                "Apply Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                return;
-            }
-
-            if (sections.Count == 0)
-            {
-                AppDialogs.Show(this,
-                    "That file contains no configuration sections, so there is nothing to apply.\n\n"
-                    + "An overlay is a trimmed App.config: an <AppConfig> document holding just the "
-                    + "<section> entries it means to change.",
-                    "Apply Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                return;
-            }
-
-            // Name the sections outright. "Apply this overlay?" tells the operator nothing about what it is
-            // about to change in a config that holds their machine, fixtures, probes and macros.
-            string what = string.Join("\n", sections.Select(s => "    " + (s.Merge ? s.Key + "  (merged into your existing values)" : s.Key)));
-            if (AppDialogs.Show(this,
-                    (string.IsNullOrEmpty(name) ? "This overlay" : "\"" + name + "\"")
-                    + " will change these parts of your configuration:\n\n" + what
-                    + "\n\nEverything else is left exactly as it is. Your current configuration is backed up first, "
-                    + "and \"Undo configuration overlay\" puts it back.\n\nioSender will restart. Apply it?",
-                    "Apply Configuration Overlay", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-                return;
-
-            // Save first: the backup StageOverlay takes is a copy of the file on disk, so anything changed
-            // this session and not yet written would be silently missing from what Undo restores.
-            AppConfig.Settings.Save();
-
-            if (!AppConfig.StageOverlay(dlg.FileName))
-            {
-                AppDialogs.Show(this, "The overlay could not be staged - see the debug log for the reason. Nothing has been changed.",
-                                "Apply Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                return;
-            }
-
-            GrblConfigView.DoRestart();
         }
 
         /// <summary>
@@ -1568,38 +1526,139 @@ namespace GCode_Sender
             GrblConfigView.DoRestart();
         }
 
-        private void undoConfigOverlay_Click(object sender, RoutedEventArgs e)
+        #endregion
+
+        #region UI presets (the Layout selector in the menu row)
+
+        // Everything here is presentation - UiPresets owns the library, the modified check and the staging.
+        // See its header for why a preset is not an overlay, and AppConfig's overlay region for why a
+        // switch is staged-then-restart rather than written live.
+
+        // One row of the selector. The label is built once per refresh rather than bound, because
+        // "(modified)" belongs to the ACTIVE row only and is computed, not stored.
+        private sealed class PresetRow
         {
-            if (!AppConfig.CanUndoOverlay)
+            public string Name { get; set; }
+            public string Label { get; set; }
+        }
+
+        // Guards the SelectionChanged handler while the list is being rebuilt. Without it, assigning
+        // SelectedItem during a refresh would read as the operator picking a preset - and a preset switch
+        // restarts the app, so a reentrant refresh would relaunch ioSender on its own.
+        private bool refreshingPresets;
+
+        private void RefreshPresets()
+        {
+            refreshingPresets = true;
+            try
             {
-                AppDialogs.Show(this, "There is no pre-overlay configuration to go back to.",
-                                "Undo Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Information);
+                string active = UiPresets.ActiveName;
+                bool modified = UiPresets.IsModified();
+
+                var rows = UiPresets.All().Select(p => new PresetRow
+                {
+                    Name = p.Name,
+                    Label = p.Name
+                          + (string.Equals(p.Name, active, StringComparison.OrdinalIgnoreCase) && modified ? "  (modified)" : "")
+                          + (p.Error != null ? "  (unreadable)" : "")
+                }).ToList();
+
+                cboPreset.ItemsSource = rows;
+                cboPreset.SelectedItem = rows.FirstOrDefault(r => string.Equals(r.Name, active, StringComparison.OrdinalIgnoreCase));
+
+                presetTitleSuffix = " (" + active + (modified ? ", modified" : "") + ")";
+                RenderWindowTitle();
+
+                menuPresetSave.Header = "_Save changes to \"" + active + "\"";
+                menuPresetDelete.Header = "_Delete \"" + active + "\"...";
+                menuPresetUndo.IsEnabled = AppConfig.CanUndoOverlay;
+            }
+            finally
+            {
+                refreshingPresets = false;
+            }
+        }
+
+        private void Preset_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (refreshingPresets)
+                return;
+
+            var row = cboPreset.SelectedItem as PresetRow;
+            if (row == null || string.Equals(row.Name, UiPresets.ActiveName, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            string leaving = UiPresets.ActiveName;
+
+            if (AppDialogs.Show(this,
+                    "Switch the screen layout to \"" + row.Name + "\"?\n\n"
+                    + "\"" + leaving + "\" is saved first, with any changes you have made to it, so you can "
+                    + "switch back and find it as you left it.\n\nioSender will restart.",
+                    "Switch Layout", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            {
+                RefreshPresets();           // put the selection back on the active preset
                 return;
             }
 
-            if (AppDialogs.Show(this,
-                    "Restore your configuration as it was immediately before the last overlay was applied?\n\n"
-                    + "Any settings changed since then are lost. ioSender will restart.",
-                    "Undo Configuration Overlay", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
-                return;
-
-            if (!AppConfig.StageOverlayUndo())
+            string error;
+            if (!UiPresets.Switch(row.Name, out error))
             {
-                AppDialogs.Show(this, "The backup could not be staged for restore - see the debug log. Nothing has been changed.",
-                                "Undo Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(this, "That layout could not be applied:\n\n" + error + "\n\nNothing has been changed.",
+                                "Switch Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                RefreshPresets();
                 return;
             }
 
             GrblConfigView.DoRestart();
         }
 
-        private void exportConfigOverlay_Click(object sender, RoutedEventArgs e)
+        private void presetSave_Click(object sender, RoutedEventArgs e)
+        {
+            string error;
+            if (!UiPresets.Save(UiPresets.ActiveName, out error))
+            {
+                AppDialogs.Show(this, "That layout could not be saved:\n\n" + error,
+                                "Save Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            RefreshPresets();
+        }
+
+        private void presetSaveAs_Click(object sender, RoutedEventArgs e)
+        {
+            string name;
+            if (!TextPromptDialog.Show(this, "Name for this screen layout:", UiPresets.ActiveName, out name))
+                return;
+
+            string clean = UiPresets.Sanitize(name);
+            if (UiPresets.Find(clean) != null &&
+                AppDialogs.Show(this, "A layout called \"" + clean + "\" already exists.\n\nReplace it?",
+                                "Save Layout", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            string error;
+            if (!UiPresets.Save(clean, out error))
+            {
+                AppDialogs.Show(this, "That layout could not be saved:\n\n" + error,
+                                "Save Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            // No restart and no staging: the arrangement on screen is already this one, so all that
+            // changes is which name the profile is tracking.
+            AppConfig.Settings.Base.ActivePreset = clean;
+            AppConfig.Settings.Save();
+            RefreshPresets();
+        }
+
+        private void presetExport_Click(object sender, RoutedEventArgs e)
         {
             var dlg = new Microsoft.Win32.SaveFileDialog
             {
-                Title = "Export configuration overlay",
-                FileName = "layout" + ConfigOverlay.FileExtension,
-                Filter = "Configuration overlay|*" + ConfigOverlay.FileExtension,
+                Title = "Export screen layout",
+                FileName = UiPresets.Sanitize(UiPresets.ActiveName) + ConfigOverlay.FileExtension,
+                Filter = "ioSender layout|*" + ConfigOverlay.FileExtension,
                 DefaultExt = ConfigOverlay.FileExtension,
                 AddExtension = true
             };
@@ -1608,36 +1667,182 @@ namespace GCode_Sender
 
             try
             {
-                // Export reads the file, not the in-memory Config, so it produces exactly the section XML the
-                // overlay merge works on - one representation, no second serializer to disagree with it. Save
-                // first so the file actually reflects this session.
-                AppConfig.Settings.Save();
-
-                var source = System.Xml.Linq.XDocument.Load(CNC.Core.Resources.IniFile);
-                var overlay = ConfigOverlay.ExtractUiLayout(source, System.IO.Path.GetFileNameWithoutExtension(dlg.FileName));
-                var applied = ConfigOverlay.Describe(overlay);
+                // Built from the live config (ConfigStore.WriteDocument), so what is exported is the
+                // arrangement on screen right now - not the last thing written to App.config, which with
+                // auto-save off can be hours stale.
+                var doc = ConfigOverlay.ExtractUiLayout(CNC.Core.ConfigStore.WriteDocument(),
+                                                        System.IO.Path.GetFileNameWithoutExtension(dlg.FileName));
+                var applied = ConfigOverlay.Describe(doc);
 
                 if (applied.Count == 0)
                 {
                     AppDialogs.Show(this, "This configuration has no screen-layout sections to export.",
-                                    "Export Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                                    "Export Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                     return;
                 }
 
-                overlay.Save(dlg.FileName);
+                doc.Save(dlg.FileName);
 
                 AppDialogs.Show(this,
-                    "Saved a configuration overlay containing:\n\n"
+                    "Saved a layout file containing:\n\n"
                     + string.Join("\n", applied.Select(s => "    " + (s.Merge ? s.Key + "  (merge)" : s.Key)))
-                    + "\n\nApplying it elsewhere adopts this screen layout and changes nothing else. "
+                    + "\n\nImporting it elsewhere adopts this screen layout and changes nothing else. "
                     + "The connection port, network host and machine are deliberately not included.",
-                    "Export Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Information);
+                    "Export Layout", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                AppDialogs.Show(this, "The overlay could not be written:\n\n" + ex.Message,
-                                "Export Configuration Overlay", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                AppDialogs.Show(this, "The layout could not be written:\n\n" + ex.Message,
+                                "Export Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
             }
+        }
+
+        private void presetImport_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Import screen layout",
+                Filter = "ioSender layout|*" + ConfigOverlay.FileExtension + ";*.config|All files|*.*",
+                DefaultExt = ConfigOverlay.FileExtension,
+                CheckFileExists = true
+            };
+            if (dlg.ShowDialog(this) != true)
+                return;
+
+            // Validate BEFORE copying, so a file that is not a layout can never sit in the library looking
+            // like one and fail only when it is picked.
+            List<ConfigOverlayEntry> sections;
+            string name;
+            try
+            {
+                var doc = System.Xml.Linq.XDocument.Load(dlg.FileName);
+                sections = ConfigOverlay.Describe(doc);
+                name = ConfigOverlay.NameOf(doc);
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show(this, "That file could not be read as a screen layout:\n\n" + ex.Message,
+                                "Import Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            if (sections.Count == 0)
+            {
+                AppDialogs.Show(this,
+                    "That file contains no configuration sections, so there is nothing to import.",
+                    "Import Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(name))
+                name = System.IO.Path.GetFileNameWithoutExtension(dlg.FileName);
+
+            string clean = UiPresets.Sanitize(name);
+            string target = UiPresets.PathFor(clean);
+
+            try
+            {
+                System.IO.Directory.CreateDirectory(CNC.Core.Resources.PresetsFolder);
+
+                if (System.IO.File.Exists(target) &&
+                    AppDialogs.Show(this, "You already have a layout called \"" + clean + "\".\n\nReplace it?",
+                                    "Import Layout", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                    return;
+
+                System.IO.File.Copy(dlg.FileName, target, true);
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show(this, "That layout could not be copied into your Presets folder:\n\n" + ex.Message,
+                                "Import Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            RefreshPresets();
+
+            // Deliberately not applied: importing is instant and reversible, switching restarts the app.
+            AppDialogs.Show(this,
+                "\"" + clean + "\" is now in your layout list.\n\n"
+                + "Pick it from the Layout selector to switch to it - that is when ioSender restarts.",
+                "Import Layout", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void presetFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.IO.Directory.CreateDirectory(CNC.Core.Resources.PresetsFolder);
+                System.Diagnostics.Process.Start("explorer.exe",
+                    "\"" + CNC.Core.Resources.PresetsFolder.TrimEnd('\\') + "\"");
+            }
+            catch (Exception ex)
+            {
+                AppDialogs.Show(this, "That folder could not be opened:\n\n" + ex.Message,
+                                "Layouts Folder", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+            }
+        }
+
+        private void presetDelete_Click(object sender, RoutedEventArgs e)
+        {
+            string active = UiPresets.ActiveName;
+            var preset = UiPresets.Find(active);
+
+            if (preset == null || (preset.Shipped && !System.IO.File.Exists(UiPresets.PathFor(active))))
+            {
+                AppDialogs.Show(this, "\"" + active + "\" shipped with ioSender, so there is no copy of your own to delete.",
+                                "Delete Layout", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (AppDialogs.Show(this,
+                    "Delete your saved copy of \"" + active + "\"?\n\n"
+                    + "The screen stays exactly as it is - this removes the saved file, not the arrangement "
+                    + "you are looking at. The layout is simply no longer in the list to switch back to.",
+                    "Delete Layout", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+
+            string error;
+            if (!UiPresets.Delete(active, out error))
+            {
+                AppDialogs.Show(this, "That layout could not be deleted:\n\n" + error,
+                                "Delete Layout", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            // The profile is no longer tracking a name it can reach, so it is back to being the operator's
+            // own arrangement - which is exactly what "Custom" means.
+            if (UiPresets.Find(active) == null)
+            {
+                AppConfig.Settings.Base.ActivePreset = string.Empty;
+                AppConfig.Settings.Save();
+            }
+
+            RefreshPresets();
+        }
+
+        private void presetUndo_Click(object sender, RoutedEventArgs e)
+        {
+            if (!AppConfig.CanUndoOverlay)
+            {
+                AppDialogs.Show(this, "There is no earlier configuration to go back to.",
+                                "Undo Layout Switch", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (AppDialogs.Show(this,
+                    "Restore your configuration as it was immediately before the last layout switch?\n\n"
+                    + "Any settings changed since then are lost. ioSender will restart.",
+                    "Undo Layout Switch", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+
+            if (!AppConfig.StageOverlayUndo())
+            {
+                AppDialogs.Show(this, "The backup could not be staged for restore - see the debug log. Nothing has been changed.",
+                                "Undo Layout Switch", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            GrblConfigView.DoRestart();
         }
 
         #endregion

@@ -288,13 +288,25 @@ namespace CNC.Controls
                 return false;
             }
 
-            // Outgoing first, and unconditionally. This is the losslessness: the operator's edits to the
-            // arrangement they are leaving go back into ITS file, not into whatever they switch to.
-            string saveError;
-            if (!Save(ActiveName, out saveError))
+            // Outgoing first. This is the losslessness: the operator's edits to the arrangement they are
+            // leaving go back into ITS file, not into whatever they switch to.
+            //
+            // The condition is "unless we can prove it is already saved", NOT "if modified" - those differ
+            // exactly where it matters. A never-saved Custom has no file to compare against, so IsModified
+            // answers false (unknown is not modified, deliberately), and keying the save off that would
+            // discard the arrangement it exists to protect. So: save unless a file exists AND matches.
+            // That also stops an untouched SHIPPED preset being shadowed by an identical user copy merely
+            // because it was switched away from.
+            var outgoing = Find(ActiveName);
+            string savedState = FileState(outgoing?.Path);
+            if (savedState == null || savedState != LiveState())
             {
-                error = "the current arrangement could not be saved as \"" + ActiveName + "\" - " + saveError;
-                return false;
+                string saveError;
+                if (!Save(ActiveName, out saveError))
+                {
+                    error = "the current arrangement could not be saved as \"" + ActiveName + "\" - " + saveError;
+                    return false;
+                }
             }
 
             // Recorded BEFORE the save: the restart reads this back to know which preset it is on, and
