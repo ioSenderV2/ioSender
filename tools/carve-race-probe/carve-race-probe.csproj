@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Reproduces issue #24 - "Collection was modified; enumeration operation may not execute" thrown
+    from GCodeEmulator.run, reached from CarveView.BuildToolpath - WITHOUT any WPF, because the race
+    is not a UI bug. GCodeJob.Tokens hands out the parser's live list by reference, the emulator
+    enumerates it lazily for the whole duration of a build, and the parser clears and refills that
+    same list on the next load. Both halves are in CNC Core, so both halves are testable here.
+
+    Same shape and the same net8 core project as tools/ngc-roundtrip and tools/waitidle-probe.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <AssemblyName>carve-race-probe</AssemblyName>
+    <RootNamespace>CarveRaceProbe</RootNamespace>
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\CNC Core\CNC Core\CNC.Core.net8.csproj" />
+  </ItemGroup>
+</Project>
