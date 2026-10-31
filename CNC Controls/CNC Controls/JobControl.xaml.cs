@@ -171,6 +171,19 @@ namespace CNC.Controls
 
                 case nameof(JobRunner.CanFeedHold):
                     IsFeedHoldEnabled = runner.CanFeedHold;
+                    // Record every transition of the one control that stops a moving machine. A press
+                    // that never reaches btnHold_Click leaves NO trace - a disabled button and a click
+                    // lost to a busy UI thread look identical from the log - and on 2026-10-30 that was
+                    // exactly the gap: the operator reported Feed Hold "locked out" during a job and the
+                    // only evidence available was the single press that DID get through. Both inputs to
+                    // the gate are named because they fail for different reasons: FeedHoldArmed is the
+                    // engine's "a hold would mean something here", and the M53 gate is the controller's.
+                    if (PollDiag.Enabled)
+                        DebugLog.Write("poll", string.Format("feed hold gate -> {0}  (armed={1}, controller-disabled={2}, state={3})",
+                            runner.CanFeedHold ? "ENABLED" : "disabled",
+                            runner.FeedHoldArmed,
+                            (DataContext as GrblViewModel)?.FeedHoldDisabled,
+                            runner.MachineState));
                     break;
 
                 case nameof(JobRunner.CanStop):

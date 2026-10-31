@@ -256,7 +256,12 @@ namespace CNC.Core
                 if (milliseconds >= UiLateWarnMs && warningsThisWindow < MaxWarningsPerWindow)
                 {
                     warningsThisWindow++;
-                    warning = string.Format("UI input lateness {0:F0}ms - a Feed Hold pressed now would have waited that long", milliseconds);
+                    // Wording matters here beyond readability: this line must NOT contain the phrase used
+                    // to find a REAL press ("FEED HOLD pressed"). The first version said "a Feed Hold
+                    // pressed now would have waited that long", and searching the log for the handler's
+                    // own line then returned 430 of these as false positives - which hid the single real
+                    // press in a session where the operator reported the button not working.
+                    warning = string.Format("UI input lateness {0:F0}ms - operator input would have waited that long", milliseconds);
                 }
                 else if (milliseconds >= UiLateWarnMs)
                     warningsSuppressed++;
