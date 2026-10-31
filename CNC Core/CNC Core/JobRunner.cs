@@ -701,8 +701,18 @@ namespace CNC.Core
         /// change on "no M6" was proposed in August 2026 and was the wrong answer for exactly that reason:
         /// the offset was already correct, just discarded later. So the test is the OBSERVABLE - is an
         /// offset applied right now - not the program's text and not a record of which tool set the origin.
-        /// $341 &gt; 0 is what makes "work Z0 lives in the reference frame" true; a machine with no toolsetter
-        /// mode zeroes Z directly and is never in this state.
+        ///
+        /// WORK Z0 LIVES IN A TOOL-LENGTH REFERENCE FRAME is read from <see cref="GrblInfo.HasToolSetter"/>
+        /// (probe id 1 present), NOT from $341. This was written as "$341 &gt; 0" and measured dead on the
+        /// development machine 2026-10-31: the settings dump goes $308 straight to $347, because grblHAL does
+        /// not publish the manual tool-change-mode setting when a plugin owns tool changes - and this machine
+        /// reports ATC=1 in [NEWOPT]. So on the one machine the feature exists for, every $341-keyed check is
+        /// silently false. <see cref="ToolReferenceSetupWarranted"/> carries the same correction.
+        ///
+        /// What this still does not cover: a machine with NO toolsetter hardware using a touch plate at
+        /// G59.3 - the operator's choice, recorded app-side as TloProbeName, which Core cannot see. Hence the
+        /// IsTloReferenceSet arm: if a reference has ever been set this session the machine demonstrably
+        /// works in that frame, whatever the hardware reports.
         ///
         /// READS A FRESH $G AND $# before deciding. The cached parser state can be minutes old (the status
         /// poller goes quiet during a macro), and a guard on motion that reads a stale value is not a guard.
@@ -716,14 +726,13 @@ namespace CNC.Core
             // "no prompt appeared" does not say which. -debuglog=run.
             bool physical = model.IsPhysicalFileLoaded;
             int toolChanges = Source.ToolChanges;
-            bool hasMode = GrblSettings.HasSetting(grblHALSetting.ToolChangeMode);
-            int mode = hasMode ? GrblSettings.GetInteger(grblHALSetting.ToolChangeMode) : int.MinValue;
+            bool referenceFrame = ToolReferenceSetupWarranted();
 
-            if (!physical || toolChanges > 0 || !hasMode || mode <= 0)
+            if (!physical || toolChanges > 0 || !referenceFrame)
             {
                 DebugLog.Write("run", string.Format(
-                    "ToolOffsetMissingForProgram: NO - physical={0} toolChanges={1} hasMode($341)={2} mode={3}",
-                    physical, toolChanges, hasMode, mode == int.MinValue ? "(absent)" : mode.ToString()));
+                    "ToolOffsetMissingForProgram: NO - physical={0} toolChanges={1} referenceFrame={2} (toolSetter={3} tloRefSet={4})",
+                    physical, toolChanges, referenceFrame, GrblInfo.HasToolSetter, model.IsTloReferenceSet));
                 return false;
             }
 
@@ -752,6 +761,23 @@ namespace CNC.Core
             return missing;
         }
 
+        /// <summary>
+        /// Does this machine measure tool length against a reference, so that a work Z0 is stored in that
+        /// frame rather than being a direct machine-Z zero?
+        ///
+        /// 🔴 NOT $341. Both checks here used to read GrblSettings.HasSetting(ToolChangeMode) and were
+        /// measured DEAD on the development machine 2026-10-31 - its settings dump goes $308 straight to
+        /// $347, with no $341 at all, because grblHAL does not publish the manual tool-change-mode setting
+        /// when a plugin owns tool changes ([NEWOPT] reports ATC=1 there). An ATC machine is precisely the
+        /// machine this question matters on, so keying it on $341 made it false exactly where it had to be
+        /// true. The toolsetter's presence is reported in [NEWOPT]'s PROBES mask and is the real signal.
+        /// </summary>
+        public static bool ToolReferenceSetupWarranted()
+        {
+            return GrblInfo.HasToolSetter
+                   || (Grbl.GrblViewModel != null && Grbl.GrblViewModel.IsTloReferenceSet);
+        }
+
         /// <summary>A different program was loaded (or the loaded one cleared): reset the line accounting.</summary>
         public void OnFileNameChanged()
         {
@@ -766,8 +792,11 @@ namespace CNC.Core
                 job.PgmEndLine = Source.Blocks - 1;
                 if (model.IsPhysicalFileLoaded)
                 {
-                    if (Source.ToolChanges > 0 && GrblSettings.HasSetting(grblHALSetting.ToolChangeMode)
-                        && GrblSettings.GetInteger(grblHALSetting.ToolChangeMode) > 0 && !model.IsTloReferenceSet)
+                    // Was keyed on $341 and so could never fire on an ATC machine - see
+                    // ToolReferenceSetupWarranted. HasToolSetter alone here, not the IsTloReferenceSet arm:
+                    // this warning's whole subject is a reference that has NOT been set, so reading "a
+                    // reference was set" as evidence the machine needs one would make it self-cancelling.
+                    if (Source.ToolChanges > 0 && GrblInfo.HasToolSetter && !model.IsTloReferenceSet)
                         LoadedJobWarning?.Invoke(JobLoadWarning.ToolReferenceNotSet);
                     if (Source.HasGoPredefinedPosition && model.IsGrblHAL && model.HomedState != HomedState.Homed)
                         LoadedJobWarning?.Invoke(JobLoadWarning.NotHomedForPredefinedPosition);
