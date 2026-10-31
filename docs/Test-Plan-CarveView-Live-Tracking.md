@@ -108,6 +108,11 @@ whether motion stuttered.
   signal entirely.
 - **At least 3 minutes per arm**, so there are three report windows; the numbers are per-minute
   aggregates.
+- 🔴 **DISCARD THE FIRST REPORT WINDOW, and start the job only after it has passed.** Measured
+  2026-10-30 on the very first launch carrying the probe: within six seconds of startup it logged UI
+  lateness of 476 ms and 189 ms and marshal stalls of 253 ms and 347 ms - all of it connect handshake,
+  settings load and view construction, none of it a job. Those four lines would otherwise land in
+  arm A's first window and set a baseline that no arm could fail against.
 - **The 3D view must be on screen** for arm C — `UpdateTool` returns early on `!IsVisible` before the
   carve, so an off-screen view silently measures arm B.
 
