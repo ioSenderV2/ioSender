@@ -685,6 +685,51 @@ namespace CNC.Core
             NotHomedForPredefinedPosition
         }
 
+        /// <summary>
+        /// A program that NEVER changes tools, about to run on a machine whose work Z0 is stored in the
+        /// tool-length reference frame, with no offset applied. Every Z in that program is then out by the
+        /// reference tool's length. Checked at RUN, not at load: at load time the answer is not actionable -
+        /// the operator may be about to run Setup, which sets it.
+        ///
+        /// The load-time warning beside this one cannot see the case at all: its first condition is
+        /// <c>Source.ToolChanges &gt; 0</c>, so a program with no M6 - the only kind where nothing downstream
+        /// will establish an offset for itself - is the one program it skips.
+        ///
+        /// WHY THIS IS THE CONDITION AND NOT "THE PROGRAM HAS NO M6". A single-tool job whose work Z0 was
+        /// probed with the cutter that will cut it needs no offset at all - the terms cancel - and refusing
+        /// there would fire on most single-tool jobs and teach the operator to click through. Forcing a tool
+        /// change on "no M6" was proposed in August 2026 and was the wrong answer for exactly that reason:
+        /// the offset was already correct, just discarded later. So the test is the OBSERVABLE - is an
+        /// offset applied right now - not the program's text and not a record of which tool set the origin.
+        /// $341 &gt; 0 is what makes "work Z0 lives in the reference frame" true; a machine with no toolsetter
+        /// mode zeroes Z directly and is never in this state.
+        ///
+        /// READS A FRESH $G AND $# before deciding. The cached parser state can be minutes old (the status
+        /// poller goes quiet during a macro), and a guard on motion that reads a stale value is not a guard.
+        /// Returns false if either query fails: UNKNOWN here means "do not claim a fault", and the operator
+        /// still has the load-time warning and the run-strip TLO indicator. The prompt this drives is an
+        /// offer, not an interlock - it does not stand in for one.
+        /// </summary>
+        public bool ToolOffsetMissingForProgram()
+        {
+            if (!model.IsPhysicalFileLoaded || Source.ToolChanges > 0)
+                return false;
+            if (!GrblSettings.HasSetting(grblHALSetting.ToolChangeMode)
+                || GrblSettings.GetInteger(grblHALSetting.ToolChangeMode) <= 0)
+                return false;
+
+            if (!GrblParserState.Get(model) || !GrblWorkParameters.Get())
+                return false;
+
+            // Both halves, because either alone has a blind spot. IsToolOffsetActive reads $G's G49 on
+            // grblHAL - authoritative about whether an offset is in force at all - while a G43.1 holding
+            // exactly zero is "active" and still means no compensation. $G showing G49 right before a job
+            // is the tell the August write-up names.
+            return !model.IsToolOffsetActive
+                   || double.IsNaN(model.ToolOffset.Z)
+                   || model.ToolOffset.Z == 0d;
+        }
+
         /// <summary>A different program was loaded (or the loaded one cleared): reset the line accounting.</summary>
         public void OnFileNameChanged()
         {

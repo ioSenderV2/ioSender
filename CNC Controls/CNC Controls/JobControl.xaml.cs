@@ -1153,7 +1153,86 @@ namespace CNC.Controls
         // already have a Source primed (the in-place run, StartLoadedJob) pass false so they don't re-enter it.
         public void Run(int fromBlock, bool honorActiveProgram = true)
         {
+            // Core states the condition (JobRunner.ToolOffsetMissingForProgram), this words it. One-shot per
+            // Run: if the operator takes the offer, the remedy's own completion calls back in here and by
+            // then an offset IS applied, so the gate is false and the run proceeds - no need for a flag.
+            if (!referencingForRun && runner.ToolOffsetMissingForProgram())
+            {
+                if (!OfferToolReferenceBeforeRun(fromBlock, honorActiveProgram))
+                    return;
+            }
+
             runner.Run(fromBlock, honorActiveProgram);
+        }
+
+        // Set only while the pre-run reference program is itself being streamed, so its own Run does not
+        // re-enter the gate.
+        private bool referencingForRun;
+
+        /// <summary>
+        /// The loaded program never changes tools and no tool length offset is applied, so its Z numbers are
+        /// out by the reference tool's length. Offer to measure the tool that is actually in the spindle
+        /// before streaming. Returns true to run now, false if the run was deferred or cancelled.
+        /// </summary>
+        private bool OfferToolReferenceBeforeRun(int fromBlock, bool honorActiveProgram)
+        {
+            var answer = AppDialogs.Show(Window.GetWindow(this),
+                                         (string)FindResource("JobNoToolChangeNoOffset"), "ioSender",
+                                         MessageBoxButton.YesNoCancel, MessageBoxImage.Warning, MessageBoxResult.Yes);
+
+            if (answer == MessageBoxResult.Cancel)
+                return false;
+            if (answer == MessageBoxResult.No)
+                return true;        // run it as written - the operator's call
+
+            // What is in the spindle is a CUTTING TOOL: a job is about to run. tlo.macro reads the tool id
+            // only to pick which probe input to watch, and 8 means the 3D probe stylus - which probes the
+            // MAIN input because it must not bear down on the puck. Sending 8 for a rigid cutter would watch
+            // an input the cutter never closes, and the probe would drive into the toolsetter rather than
+            // stop at it. So never 8 here, whatever the controller currently reports as the tool number.
+            int toolId;
+            if (!int.TryParse(model.Tool, System.Globalization.NumberStyles.Integer,
+                              System.Globalization.CultureInfo.InvariantCulture, out toolId)
+                || toolId == 8 || toolId <= 0)
+                toolId = 1;
+
+            var b = new System.Text.StringBuilder();
+            b.AppendLine("(Reference the tool in the spindle - the loaded program never changes tools)");
+            b.AppendLine("G21 G90 G94 G17");
+            MacroProcessor.EmitTloReference(l => b.AppendLine(l), toolId,
+                string.IsNullOrEmpty(model.WorkCoordinateSystem) ? "G54" : model.WorkCoordinateSystem);
+
+            // ---- HAND THE PROGRAM OFF OVER THE WORK, NOT FROM THE PARK -------------------------------
+            // EmitTloReference's documented post-condition is "LEAVES THE MACHINE PARKED AT G30", which is
+            // beside the toolsetter and nowhere near the stock. Streaming a program from there is the
+            // lift-before-traverse hazard one level up: a post whose first motion is a bare XY rapid would
+            // cross the whole table at G30's height, and one that opens with a work-coordinate G0 to its
+            // clearance plane would DESCEND to that height while still over G30 and then cross low.
+            //
+            // So finish over the work origin at machine top. G0 X0 Y0 names no Z, so it traverses at the
+            // height the G53 above put it at - machine top, the only height guaranteed clear for any tool.
+            // The program's own first Z move then descends over the stock, and its first XY runs inside the
+            // footprint it is about to cut.
+            //
+            // The work ORIGIN rather than the program's first XY on purpose: the origin is a real stored
+            // number in the active WCS, where the first XY would have to come from the parsed program - and
+            // parsing is for the 3D view, never for deciding a move. The one thing this does not clear is a
+            // clamp sitting exactly on the origin corner.
+            b.AppendLine("G53 G0 Z0");
+            b.AppendLine("G0 X0 Y0");
+
+            referencingForRun = true;
+            bool started = MacroProcessor.Run(model, "Reference tool before job", b.ToString(), false, false,
+                ok => {
+                    referencingForRun = false;
+                    if (ok)
+                        Run(fromBlock, honorActiveProgram);
+                });
+
+            if (!started)
+                referencingForRun = false;
+
+            return false;       // either the remedy is running and will start the job, or it never started
         }
 
         // Step 7 (unified streaming engine): start the just-pushed/loaded macro program through the

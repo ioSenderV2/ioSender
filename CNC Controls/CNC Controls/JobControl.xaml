@@ -10,6 +10,7 @@
     <UserControl.Resources>
         <system:String x:Uid="str_toolchangeTLO" x:Key="JobToolReference">Job has {0} tool change(s), tool length reference should be established before start.</system:String>
         <system:String x:Uid="str_g28g30" x:Key="JobG28G30">Job has G28/G30 moves and machine is not homed.</system:String>
+        <system:String x:Uid="str_notoolchangenooffset" x:Key="JobNoToolChangeNoOffset">This program never changes tools and no tool length offset is applied, so its Z depths are measured from the reference tool, not the one in the spindle.&#13;&#10;&#13;&#10;Yes - measure the tool in the spindle at the tool setter first, then start over the work.&#13;&#10;No - run the program as written.&#13;&#10;Cancel - do not run.</system:String>
         <system:String x:Uid="str_stop" x:Key="JobStop">Stop</system:String>
         <system:String x:Uid="str_pause" x:Key="JobPause">Pause</system:String>
         <!-- Peek's two labels. Same split as JobStop/JobPause: Core decides the STATE (JobRunner.IsPeeking),
