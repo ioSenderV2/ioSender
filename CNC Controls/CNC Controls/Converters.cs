@@ -479,7 +479,34 @@ namespace CNC.Controls
             Converters.grblState.Value.TryGetValue(((GrblState)value).State, out result);
             int substate = ((GrblState)value).State == GrblStates.Alarm && ((GrblState)value).LastAlarm > 0 ? ((GrblState)value).LastAlarm : ((GrblState)value).Substate;
 
-            if (value is GrblState && ((GrblState)value).State != GrblStates.Unknown) 
+            // A HOLD'S TWO SUBSTATES MEAN OPPOSITE THINGS TO THE OPERATOR, and as "HOLD:1"/"HOLD:0" the
+            // difference is a code nobody reads. Hold:1 is "your press was taken, I am decelerating";
+            // Hold:0 is "stopped, press cycle start to resume". On 2026-10-30 an operator pressed Pause
+            // during a job, watched HOLD:1 for six seconds while the machine wound down through a full
+            // planner buffer, concluded the button had not worked, and reset the machine instead.
+            //
+            // Measured the same day against the simulator, directly over its socket: the controller
+            // reports Hold:1 within 10 ms of the hold byte and keeps it until motion stops - the feed
+            // visibly winding down 500 -> 404 -> 302 -> 194 -> 68 -> 0 - then reports Hold:0. So this
+            // renders a substate the controller ACTUALLY SENDS, immediately. Nothing is invented, and no
+            // timeout or fall-back is needed: if the hold were never taken there would be no Hold state
+            // to name, and the readout would still say RUN.
+            //
+            // The number is dropped because the names carry it: a hold has only these two substates.
+            // Falls back to plain HOLD if the resource is missing - an empty State field would be worse
+            // than an unhelpful one.
+            if (value is GrblState && ((GrblState)value).State == GrblStates.Hold)
+            {
+                if (((GrblState)value).Substate == 1)
+                {
+                    string holding = LibStrings.FindResource("StateHolding");
+                    if (!string.IsNullOrEmpty(holding))
+                        return holding;
+                }
+                return result == string.Empty ? GrblStates.Hold.ToString().ToUpper() : result;
+            }
+
+            if (value is GrblState && ((GrblState)value).State != GrblStates.Unknown)
                 result = (result == string.Empty ? ((GrblState)value).State.ToString().ToUpper() : result) + (substate == -1 ? "" : (":" + substate.ToString()));
 
             return result;
@@ -506,6 +533,14 @@ namespace CNC.Controls
             string help;
             if (!Converters.grblStateHelp.Value.TryGetValue(gs.State, out help))
                 help = gs.State.ToString();
+
+            // The sibling of the State rename above: the one dictionary entry is keyed by state alone, so
+            // it cannot distinguish a hold that is still stopping from one that has stopped - and those
+            // need opposite things said about them. "Press Cycle Start to resume" is wrong and confusing
+            // while the machine is still moving, which is exactly the moment the operator is reading it.
+            if (gs.State == GrblStates.Hold && gs.Substate == 1)
+                help = "Stopping - the feed hold was received and the machine is decelerating. It will "
+                     + "hold as soon as it can stop; with a full planner buffer that can take several seconds.";
 
             if (gs.State == GrblStates.Alarm)
             {

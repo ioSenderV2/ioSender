@@ -35,6 +35,10 @@
     <system:String x:Uid="str_grblStateRun" x:Key="StateRun">RUN</system:String>
     <system:String x:Uid="str_grblStateTool" x:Key="StateTool">TOOL</system:String>
     <system:String x:Uid="str_grblStateHold" x:Key="StateHold">HOLD</system:String>
+    <!-- Hold:1 - the hold is taken and the machine is still decelerating. HOLD (above) is Hold:0,
+         stopped and resumable. See GrblStateToStringConverter for why these are named rather than
+         numbered, and for the measurement behind it. -->
+    <system:String x:Uid="str_grblStateHolding" x:Key="StateHolding">HOLDING</system:String>
     <system:String x:Uid="str_grblStateHome" x:Key="StateHome">HOME</system:String>
     <system:String x:Uid="str_grblStateCheck" x:Key="StateCheck">CHECK</system:String>
     <system:String x:Uid="str_grblStateJog" x:Key="StateJog">JOG</system:String>
