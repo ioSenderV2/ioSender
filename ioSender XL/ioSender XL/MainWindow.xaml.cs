@@ -808,9 +808,33 @@ namespace GCode_Sender
                      + (string.IsNullOrEmpty(fileTitleSuffix) ? "" : " - " + fileTitleSuffix);
         }
 
+        /// <summary>
+        /// Is a job or macro in flight. Reads the MODEL, which is the thing that knows.
+        ///
+        /// It used to read back <c>menuMain.IsEnabled != true</c> - the enabled state of a WPF Menu -
+        /// which is a rendering of the answer, not the answer. menuMain binds to IsJobRunning through
+        /// LogicalNotConverter, so the value round-tripped out through a binding and back in through a
+        /// control property, and every consumer that matters was downstream of that: the exit guard in
+        /// Window_Closing, Pipe_ShutdownRequested's ShutdownBlocked, and the menus themselves.
+        ///
+        /// Two things were wrong with that, and the second is the one that bites:
+        ///
+        ///  - SET AND GET WERE NOT THE SAME PROPERTY. The setter below only disables tab items; it has
+        ///    never touched menuMain. So "ui.JobRunning = true" followed by reading ui.JobRunning gave
+        ///    back whatever the binding said, not what was just assigned - and JobView does exactly that
+        ///    assignment when a hold arrives outside a job.
+        ///  - A CONTROL PROPERTY IS ONLY AS TRUE AS ITS LAST LAYOUT PASS. Anything that leaves the menu
+        ///    disabled - a stale binding, a re-parent, a DataContext swap - makes the whole app believe a
+        ///    job is running: menus dead, shortcuts dead, exit refused, and the tooling's graceful-close
+        ///    request timing out against a machine sitting at Idle. Observed 2026-10-30.
+        ///
+        /// The model's flag can still latch true wrongly - that is a separate defect, and this change
+        /// does not fix it. What it fixes is that the answer now comes from one place, so when the flag
+        /// IS wrong there is one thing to look at instead of a binding, a converter and a Menu.
+        /// </summary>
         public bool JobRunning
         {
-            get { return menuMain.IsEnabled != true; }
+            get { return CNC.Core.Grbl.GrblViewModel?.IsJobRunning == true; }
             set {
                 foreach (TabItem tabitem in UIUtils.FindLogicalChildren<TabItem>(ui.tabMode))
                 {
@@ -1386,10 +1410,13 @@ namespace GCode_Sender
             // to plug that. Step 7 closed the hole BY CONSTRUCTION: a macro is one continuous stream and a
             // hold is a mid-stream barrier, so IsJobRunning stays true (menu disabled) for the whole run.
             // Same predicate as Pipe_ShutdownRequested's ShutdownBlocked.
-            if (!CNC.Core.Grbl.GrblViewModel.IsSDCardJob && !menuMain.IsEnabled)
+            if (!CNC.Core.Grbl.GrblViewModel.IsSDCardJob && JobRunning)
             {
-                // JobRunning (menuMain disabled) blocks exit while a job is running/paused (e.g. HOLD) -
-                // used to just silently refuse the close with no explanation.
+                // JobRunning blocks exit while a job is running/paused (e.g. HOLD) - used to just
+                // silently refuse the close with no explanation. Tests the PROPERTY rather than
+                // menuMain.IsEnabled directly (as it did until 2026-10-31): one definition, so this
+                // guard and ShutdownBlocked cannot come to disagree about what "running" means, and
+                // neither depends on a Menu having been laid out.
                 e.Cancel = true;
                 AppDialogs.Show("Cannot exit while a job or macro is running or paused (e.g. in Hold, or waiting at a macro prompt).\n\nStop or finish it first, then close ioSender.",
                     "Exit blocked", MessageBoxButton.OK, MessageBoxImage.Warning);
