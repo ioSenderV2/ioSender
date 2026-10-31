@@ -1,4 +1,4 @@
-﻿/*
+/*
  * FixtureEditDialog.xaml.cs - part of CNC Controls library
  *
  * Edits a single Fixture. The Kind dropdown drives which schematic is shown. The caller passes a clone and
@@ -863,7 +863,7 @@ namespace CNC.Controls
                 b.AppendLine(string.Format("G53G0Z{0}", savedZ.ToInvariantString("0.0##")));
 
                 var started = new RunStarted();
-                var handler = WatchAsyncCompletion(PromptRetryCloserToSpoilboard, started);
+                var handler = WatchAsyncCompletion(() => PromptRetryCloserToSpoilboard(savedZ), started);
                 bool ran = MacroProcessor.Run(model, "Test position recovery", b.ToString(), false);
                 if (ran)
                     started.Value = true;
@@ -887,16 +887,33 @@ namespace CNC.Controls
         // (2026-08-02) caught the whole loop: fail, retract, dismiss, jog 7mm closer, press Test, drive
         // straight back up, fail identically. Both halves are gone; the operator jogs freely once this is
         // dismissed and ResolveTestPosition above offers to adopt the new position on the next Test.
-        private void PromptRetryCloserToSpoilboard()
+        /// <param name="savedZ">
+        /// The fixture's saved Z, so the message can say what it actually searched rather than
+        /// describing the rule in the abstract. The caller has it; recomputing it here would be a second
+        /// place for it to be wrong.
+        /// </param>
+        private void PromptRetryCloserToSpoilboard(double savedZ)
         {
             SetBusy(false);
 
+            // SAY THE NUMBERS, AND NAME THE CAUSE THAT IS NOT THE PROBE. The message used to explain the
+            // 12 mm rule in the abstract and then talk only about the probe and the staged object - so an
+            // operator whose BED had moved read a probe fault and went looking at wiring. 2026-10-31: the
+            // T-slot bed came off, the first fence tested afterwards searched from its old saved Z and
+            // touched nothing, and the saved Z was the whole story. A fixture position is a machine
+            // coordinate captured against the bed as it was that day; it does not survive the bed moving,
+            // and nothing about the alarm says so.
             AppDialogs.Show(
-                "Test position failed - the probe search never made contact within 12mm below the saved Z. " +
-                "The alarm has been cleared and the machine returned to the saved Z.\n\n" +
-                "Check the probe (or, for Touch Plate, that a conductive object is actually staged at this " +
-                "position), then jog to within ~10mm above the surface and press Test position again - it " +
-                "will offer to use the new position.",
+                string.Format(CultureInfo.CurrentCulture,
+                "Test position failed - the probe searched from the saved Z of {0:0.0##} down to {1:0.0##} " +
+                "and never made contact. The alarm has been cleared and the machine returned to the saved Z.\n\n" +
+                "Either the probe did not trigger - check it, or for a Touch Plate that a conductive object " +
+                "is actually staged here - or this fixture's saved position is from before the surface moved. " +
+                "A new or resurfaced spoilboard, or a bed change, leaves every fixture taught against the old " +
+                "one.\n\n" +
+                "If the surface has moved: jog to the reference and use Set position to re-teach it. " +
+                "Otherwise jog to within ~10mm above the surface and press Test position again - it will " +
+                "offer to use the new position.", savedZ, savedZ - 12d),
                 "Test position", MessageBoxButton.OK, MessageBoxImage.Warning);
 
             model.Message = "Test position failed - jog closer to the surface, then press Test position again.";

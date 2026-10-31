@@ -2448,12 +2448,46 @@ namespace CNC.Controls
                 AppConfig.Settings.Base.TloRefBaseline = model.ProbePosition.Z;
                 AppConfig.Settings.Save();
 
+                // RE-TEACHING THE REFERENCE INVALIDATES EVERY FIXTURE. A fixture's position is a machine
+                // coordinate captured against the bed as it was that day; re-probing the tool-length
+                // reference is what happens when that bed has changed - a new spoilboard, a resurfaced
+                // one, the table itself moved. The fixtures cannot have survived it, and nothing else
+                // tells them so.
+                //
+                // Measured 2026-10-31: the T-slot bed came off the Mega V and the spoilboard went
+                // straight onto the plywood top. Setup was redone, and the first fence tested afterwards
+                // probed from its old Z of -99.001 down to -111.001, touched nothing and raised Alarm:5.
+                // The page had gone on showing that fence as validated the whole time.
+                //
+                // THIS IS NOT COSMETIC: PositionValidated is what Start Job filters its fixture list on,
+                // and what the offset flyout, AutoSquare and the stepper calibration wizards require. So
+                // a stale fence stops being offered for a job until it has been re-taught and re-tested,
+                // which is the point - it is a number from a bed that no longer exists.
+                //
+                // Cleared rather than deleted: the coordinates stay, so Test position still has somewhere
+                // to start from and re-teaching is a correction rather than a re-entry from nothing.
+                int invalidated = 0;
+                foreach (var fx in Fixtures.Items)
+                    if (fx.PositionValidated)
+                    {
+                        fx.PositionValidated = false;
+                        invalidated++;
+                    }
+                if (invalidated > 0)
+                {
+                    Fixtures.Save();
+                    DebugLog.Write("run", string.Format("tool-length reference re-taught - {0} fixture position(s) marked unvalidated", invalidated));
+                }
+
                 UpdateTloRefValueDisplay();
                 UpdateReferencePositions();
                 RefreshStoredPositionsAfterWrite();
                 RefreshStepColors();
                 model.Message = string.Format(
-                    "Target surface, tool-length baseline and G59.3 all set from one probe: machine Z {0:0.0##} mm.",
+                    "Target surface, tool-length baseline and G59.3 all set from one probe: machine Z {0:0.0##} mm."
+                    + (invalidated > 0
+                        ? string.Format("  {0} fixture position(s) now need re-teaching - they were taught against the previous surface.", invalidated)
+                        : string.Empty),
                     model.ProbePosition.Z);
             };
             model.PropertyChanged += doneHandler;
