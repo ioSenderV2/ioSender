@@ -59,6 +59,11 @@ namespace CNC.Core
         private const int MarshalWarnMs = 250;
         private const int RxGapWarnMs = 1000;
 
+        // Deliberately tighter than MarshalWarnMs. A late status report costs a stale DRO; an operator's
+        // Feed Hold waiting this long costs whatever the cutter does in the meantime, and 150 ms is
+        // already past what a hand registers as "the button did nothing".
+        private const int UiLateWarnMs = 150;
+
         // ...but a genuinely broken link would then write a line per reply forever. Cap the immediate lines
         // per reporting window and carry the suppressed count into the periodic line, so the information
         // survives without the flood.
@@ -97,6 +102,7 @@ namespace CNC.Core
         private static readonly Stat marshalMs = new Stat();   // ms a reply waited for the UI thread
         private static readonly Stat processMs = new Stat();   // ms spent inside DataReceived
         private static readonly Stat rxGap = new Stat();       // ms between consecutive replies off the wire
+        private static readonly Stat uiLate = new Stat();      // ms an Input-priority callback ran late
 
         private static double lastSendAt = -1d;
         private static double lastRxAt = -1d;
@@ -220,6 +226,56 @@ namespace CNC.Core
                 processMs.Add(milliseconds);
         }
 
+        /// <summary>
+        /// How late an Input-priority dispatcher callback ran - i.e. how long an OPERATOR'S CLICK would
+        /// have waited for the UI thread.
+        ///
+        /// This is the one thing the four original numbers cannot see. They all measure the machine
+        /// talking to us; none measures us failing to answer the operator. Feed Hold's handler is an
+        /// ordinary UI-thread click handler, and Feed Hold has been starved for a whole job before, so
+        /// "the UI thread is busy" and "the operator cannot stop the machine" are the same sentence.
+        ///
+        /// Measured by sampling rather than by timing a real press, because a click handler cannot see
+        /// when the click physically happened - and because an instrument that only reads when the
+        /// operator remembers to press something is not running when it matters. Input is the priority a
+        /// click is dispatched at, so lateness at Input IS the latency a press would see.
+        ///
+        /// Fed from the WPF side (UiLatencyProbe): this class ships in the net8 portable core and must
+        /// stay free of any WPF reference.
+        /// </summary>
+        public static void UiLate(double milliseconds)
+        {
+            if (!Enabled)
+                return;
+
+            string warning = null;
+            lock (sync)
+            {
+                uiLate.Add(milliseconds);
+                lastUiLate = milliseconds;
+                if (milliseconds >= UiLateWarnMs && warningsThisWindow < MaxWarningsPerWindow)
+                {
+                    warningsThisWindow++;
+                    warning = string.Format("UI input lateness {0:F0}ms - a Feed Hold pressed now would have waited that long", milliseconds);
+                }
+                else if (milliseconds >= UiLateWarnMs)
+                    warningsSuppressed++;
+            }
+            Emit(warning);
+        }
+
+        /// <summary>
+        /// Current UI input lateness as last sampled, for a caller that wants to stamp a specific event
+        /// with it - see JobControl's Feed Hold handler. Reading, not measuring: no lock contention on a
+        /// path the operator is waiting on.
+        /// </summary>
+        /// Not volatile and not interlocked, deliberately: the probe's timer tick WRITES this on the UI
+        /// thread and the Feed Hold handler READS it on the UI thread, so there is no cross-thread access
+        /// to protect and no double to tear - which matters, because this process runs x86 and a torn
+        /// 64-bit read there is a real thing rather than a theoretical one.
+        public static double LastUiLate { get { return lastUiLate; } }
+        private static double lastUiLate;
+
         // Caller holds the lock. Returns the line to write (the CALLER writes it, outside the lock - see
         // Emit), or null when the reporting interval has not elapsed yet.
         private static string BuildReport(double now)
@@ -236,13 +292,15 @@ namespace CNC.Core
             string line = string.Format(
                 "uptime={0:F1}h  send: n={1} mean={2:F0}ms max={3:F0}ms  write: mean={4:F1}ms max={5:F0}ms  " +
                 "rx: n={6} mean={7:F0}ms max={8:F0}ms  marshal: n={9} mean={10:F1}ms max={11:F0}ms  " +
-                "process: mean={12:F1}ms max={13:F0}ms  subs: {14}{15}",
+                "process: mean={12:F1}ms max={13:F0}ms  uilate: n={14} mean={15:F1}ms max={16:F0}ms  " +
+                "subs: {17}{18}",
                 (DateTime.UtcNow - startedUtc).TotalHours,
                 sendGap.Count, sendGap.Mean, sendGap.Max,
                 writeMs.Mean, writeMs.Max,
                 rxGap.Count, rxGap.Mean, rxGap.Max,
                 marshalMs.Count, marshalMs.Mean, marshalMs.Max,
                 processMs.Mean, processMs.Max,
+                uiLate.Count, uiLate.Mean, uiLate.Max,
                 subs,
                 warningsSuppressed > 0 ? string.Format("  [{0} further warnings suppressed]", warningsSuppressed) : "");
 
@@ -251,6 +309,7 @@ namespace CNC.Core
             marshalMs.Reset();
             processMs.Reset();
             rxGap.Reset();
+            uiLate.Reset();
             warningsThisWindow = warningsSuppressed = 0;
 
             return line;

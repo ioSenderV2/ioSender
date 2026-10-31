@@ -1268,7 +1268,12 @@ namespace CNC.Controls.Viewer
             // NOT fixed by changing IsJobRunning itself, though it is arguably wrong there too: that flag
             // is read by the filesystem-listing guard, the Home button and the Peek gate among others, and
             // narrowing a shared safety flag is not a change to make from a symptom in a viewer.
-            if (model != null && model.IsJobRunning && model.GrblState.State != GrblStates.Jog)
+            //
+            // -carvelive=cone|full lifts this for the measurement arms in
+            // docs\Test-Plan-CarveView-Live-Tracking.md. Default Off = everything above stands.
+            bool jobStreaming = model != null && model.IsJobRunning && model.GrblState.State != GrblStates.Jog;
+
+            if (jobStreaming && Features.CarveLive == CarveLiveMode.Off)
             {
                 haveLast = false;        // resume cleanly later - no false cut from a stale last position
                 return;
@@ -1286,6 +1291,15 @@ namespace CNC.Controls.Viewer
             // Live material removal (CarveTo mutates the stock mesh, PushMesh re-publishes it) is the expensive
             // part - only do it when the view is actually on screen.
             if (!IsVisible)
+            {
+                haveLast = false;
+                return;
+            }
+
+            // Arm B stops here: the cone tracked (the line above), the expensive half below does not run.
+            // This is the split the two comments in this method already describe - "cheap" versus "the
+            // expensive part" - and the whole reason the measurement has three arms rather than two.
+            if (jobStreaming && Features.CarveLive == CarveLiveMode.Cone)
             {
                 haveLast = false;
                 return;

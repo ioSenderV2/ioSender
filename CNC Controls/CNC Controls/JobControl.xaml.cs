@@ -439,6 +439,11 @@ namespace CNC.Controls
             {
                 AppConfig.Settings.Base.PropertyChanged += Base_PropertyChanged;
 
+                // Started from here because this control owns the Feed Hold button, which is the input
+                // whose latency the probe exists to stand for. Inert unless PollDiag is on, and it does
+                // not even create its timer then - see UiLatencyProbe.
+                UiLatencyProbe.Start();
+
                 // Hand the shutter remote the REAL buttons, not copies of what they do - so a remote press
                 // inherits their enabled state and their meaning, including Start's "resume a held job".
                 // Same reasoning as PeekButton's, and the same reason this is a registration rather than a
@@ -763,7 +768,18 @@ namespace CNC.Controls
 
         void btnHold_Click(object sender, RoutedEventArgs e)
         {
+            // Read the lateness first but SEND THE HOLD BEFORE LOGGING IT. DebugLog.Write is a disk write,
+            // and putting any of it ahead of the realtime byte would mean an instrument measuring operator
+            // latency had added to it - on the one command whose whole purpose is to be immediate.
+            double uiLate = PollDiag.Enabled ? PollDiag.LastUiLate : 0d;
+
             Comms.com.WriteByte(GrblLegacy.ConvertRTCommand(GrblConstants.CMD_FEED_HOLD));
+
+            // A real press on the record, stamped with how backed up the UI thread was when the handler
+            // ran - the sampled figure, since a click handler cannot see when its own click happened. The
+            // minute report says what the thread was like in general; this says what the operator got.
+            if (PollDiag.Enabled)
+                DebugLog.Write("poll", string.Format("FEED HOLD pressed - UI input lateness was {0:F0}ms when this handler ran", uiLate));
         }
 
         void btnStop_Click(object sender, RoutedEventArgs e)
