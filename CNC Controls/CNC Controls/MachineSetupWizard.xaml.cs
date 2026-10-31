@@ -1,4 +1,4 @@
-﻿/*
+/*
  * MachineSetupWizard.xaml.cs - part of CNC Controls library
  *
  * Machine Setup Wizard: a single-page configuration of the machine-description grbl settings
@@ -130,9 +130,28 @@ namespace CNC.Controls
         private FirmwareUpdateManager.ReleaseInfo _pendingFwRelease = null;
         private string _lastFirmwareKey = null;   // GrblInfo.Version+"|"+DriverSha as last shown - see Model_PropertyChanged
 
+        /// <summary>
+        /// How far to one side of G59.3 the "place it beside G59.3" buttons put G30, in mm.
+        ///
+        /// ONE DEFINITION. This was 100 and it was restated in six places - the const, a label, two button
+        /// captions and two tooltips - so changing it to 120 on 2026-10-31 meant finding all six, and
+        /// missing one would have left a button promising a distance it did not move. The UI no longer
+        /// says the number at all in XAML: the captions are composed from here at construction (below) and
+        /// the label and tooltips were reworded to not quote it.
+        ///
+        /// The captions therefore leave the LocBaml CSVs, which is the deliberate trade: "120 mm −X" is a
+        /// numeral and an axis letter, and a translation of it would only be a chance to disagree with the
+        /// constant. The wording that DOES need translating stayed in XAML with its x:Uid.
+        /// </summary>
+        public const double G30ParkOffset = 120d;
+
         public MachineSetupWizard()
         {
             InitializeComponent();
+
+            // Say the real distance, from the one place that knows it.
+            btnG30Left.Content = string.Format(CultureInfo.InvariantCulture, "{0:0} mm −X", G30ParkOffset);
+            btnG30Right.Content = string.Format(CultureInfo.InvariantCulture, "{0:0} mm +X", G30ParkOffset);
 
             // The step tabs used to be made bindable to a key here (TabKeyBinder.AttachTabBinding adds a
             // shortcut badge and a right-click bind menu to the tab header). The step tab strip no longer
@@ -1799,7 +1818,7 @@ namespace CNC.Controls
         /// is to go to it first. Said plainly in the confirmation, because every other button here is a
         /// read.
         ///
-        /// 100 mm to one side keeps the tool change near the measuring point - the gap between G30 and
+        /// That offset to one side keeps the tool change near the measuring point - the gap between G30 and
         /// G59.3 is travelled twice per tool change - without the spindle parking over the toolsetter or
         /// plate while both your hands are on a collet.
         /// </summary>
@@ -1809,7 +1828,13 @@ namespace CNC.Controls
                 return;
 
             int sign = (sender as FrameworkElement)?.Tag as string == "-1" ? -1 : 1;
-            const double offset = 100d, safeZ = -5d;
+            // The distance comes from G30ParkOffset - the ONE place it is written - and so do the button
+            // captions and the refusal message below. Nothing restates it.
+            //
+            // safeZ is the height the placement move travels at, NOT G59.3's Z - G59.3 stays at the top of
+            // travel, which is the only height every tool clears on the way in (see ProbeTloTarget_Click).
+            const double safeZ = -5d;
+            const double offset = G30ParkOffset;
 
             GrblWorkParameters.Get(model);
             var cs = GrblWorkParameters.GetCoordinateSystem("G59.3");
@@ -1828,7 +1853,7 @@ namespace CNC.Controls
             {
                 AppDialogs.Show(Window.GetWindow(this),
                     string.Format(CultureInfo.CurrentCulture,
-                        "100 mm that way from G59.3 is X {0:0.0}, which is outside this machine's travel. Try the other side, or jog to a park position and use \"Set from here\".", x),
+                        "{1:0} mm that way from G59.3 is X {0:0.0}, which is outside this machine's travel. Try the other side, or jog to a park position and use \"Set from here\".", x, offset),
                     "Set G30", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }

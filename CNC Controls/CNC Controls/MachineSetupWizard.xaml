@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="CNC.Controls.MachineSetupWizard"
+<UserControl x:Class="CNC.Controls.MachineSetupWizard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -38,6 +38,18 @@
             <Setter Property="Foreground" Value="#FF1F3A5F"/>
             <Setter Property="Margin" Value="0,0,0,4"/>
         </Style>
+        <!-- ⚠ THE EXPLANATORY TEXT ON THIS PAGE IS FontSize 12, HARDCODED IN FOURTEEN PLACES. It was 11:
+             the smallest text on a page whose ladder runs 18 / 15 / 13 / 12, while carrying the content
+             that explains what each control does. On a dense laptop panel at a low Windows scaling
+             percentage that is unreadable, and the only answer was Ctrl+Alt+Plus - zooming the whole
+             application to read one paragraph. Raised 2026-10-31 to match the body text; the hierarchy is
+             carried by colour and position, which is enough, rather than by making the explanation
+             smaller than the thing it explains.
+             Contrast was never the problem: #5A5A5A on white is about 7:1 and passes AA.
+             A shared style would be better than fourteen copies and was deliberately NOT done here - the
+             fourteen differ in attribute order, grey (#5A5A5A and #586069) and whether they carry an
+             x:Name, so applying one blind risked layout nobody could see to check. Worth doing as its own
+             change, with eyes on the result. -->
     </UserControl.Resources>
 
     <Grid Margin="10" d:DataContext="{d:DesignInstance Type=local:MachineSetupWizard}">
@@ -236,7 +248,7 @@
                                 <CheckBox x:Uid="chk_wsDefined" x:Name="chkWorkSurfaceDefined" Content="The spoilboard is smaller than the machine's travel" Click="WorkSurface_Changed"
                                           ToolTip="Tick when the machine can reach past the board - typically to a toolsetter mounted off the front. Left unticked, the whole travel envelope is treated as board, which is what surfacing and height mapping assumed before this existed."/>
                                 <StackPanel x:Name="pnlWorkSurface" Margin="18,6,0,0" IsEnabled="{Binding IsChecked, ElementName=chkWorkSurfaceDefined}">
-                                    <TextBlock x:Uid="txt_wsHelp" TextWrapping="Wrap" FontSize="11" Foreground="#586069" Margin="0,0,0,6"
+                                    <TextBlock x:Uid="txt_wsHelp" TextWrapping="Wrap" FontSize="12" Foreground="#586069" Margin="0,0,0,6"
                                                Text="The board's edges in MACHINE coordinates - the same numbers the DRO shows when the spindle is over each corner. Jog to a corner and read them off."/>
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock x:Uid="lbl_wsMinX" Text="X from:" Width="60" VerticalAlignment="Center"/>
@@ -254,7 +266,7 @@
                                             HorizontalAlignment="Left" Click="WorkSurfaceHere_Click"
                                             ToolTip="Jog the spindle over the corner of the board nearest the machine origin, then click this to fill X from / Y from with the current machine position."/>
                                 </StackPanel>
-                                <TextBlock x:Name="txtWorkSurfaceSummary" TextWrapping="Wrap" FontSize="11" Foreground="#586069" Margin="0,8,0,0"/>
+                                <TextBlock x:Name="txtWorkSurfaceSummary" TextWrapping="Wrap" FontSize="12" Foreground="#586069" Margin="0,8,0,0"/>
                             </StackPanel>
                         </GroupBox>
                     </StackPanel>
@@ -360,7 +372,7 @@
                         <TextBlock x:Uid="txt_probeIntroHdr" Text="1 · What probes does this machine have?" FontWeight="SemiBold" Margin="0,0,0,3"/>
                         <TextBlock x:Uid="txt_probeIntro" TextWrapping="Wrap" Margin="0,0,0,4"
                                    Text="Start with the list below. A new install begins with one generic touch plate - edit it to match the plate you actually own, and add a row for anything else: a toolsetter, a 3D probe, an edge finder. Nothing here is guessed from the controller; these are facts about your bench."/>
-                        <TextBlock x:Uid="txt_probeIntro2" TextWrapping="Wrap" Margin="0,0,0,8" FontSize="11" Foreground="#FF5A5A5A"
+                        <TextBlock x:Uid="txt_probeIntro2" TextWrapping="Wrap" Margin="0,0,0,8" FontSize="12" Foreground="#FF5A5A5A"
                                    Text="A touch plate is the one thing nearly every machine has. If yours has two lips meeting at a right angle it can find a corner as well as set Z; a plain slab sets Z only. Say which in the plate's own editor - Setup relies on the answer."/>
                         <TextBlock x:Uid="txt_probesDesc" TextWrapping="Wrap" Margin="0,4,0,0"
                                    Text="The probes fitted to this machine - tip diameter, feeds, clearances and offsets. Used by Setup and the probing tabs."/>
@@ -388,7 +400,7 @@
                         </StackPanel>
                         <Border x:Name="brdTloFixedWarn" BorderBrush="#FFE0A800" BorderThickness="1" Background="#FFFFF8E1"
                                 Padding="8,5" Margin="10,6,8,0" Visibility="Collapsed">
-                            <TextBlock x:Uid="txt_tloFixedWarn" x:Name="txtTloFixedWarn" TextWrapping="Wrap" FontSize="11"/>
+                            <TextBlock x:Uid="txt_tloFixedWarn" x:Name="txtTloFixedWarn" TextWrapping="Wrap" FontSize="12"/>
                         </Border>
 
                         <!-- $65 bit 3 follows from the answer above rather than being an independent
@@ -396,7 +408,7 @@
                              change. It does not write it silently: this is a controller setting the
                              operator may have chosen deliberately. -->
                         <StackPanel Orientation="Horizontal" Margin="10,6,0,0">
-                            <TextBlock x:Uid="txt_probingFlags" x:Name="txtProbingFlags" TextWrapping="Wrap" FontSize="11"
+                            <TextBlock x:Uid="txt_probingFlags" x:Name="txtProbingFlags" TextWrapping="Wrap" FontSize="12"
                                        Foreground="#FF5A5A5A" MaxWidth="640" VerticalAlignment="Center"/>
                             <Button x:Uid="btn_fixProbingFlags" x:Name="btnFixProbingFlags" Content="Turn it off" Margin="10,0,0,0"
                                     Padding="8,1" MinHeight="22" Visibility="Collapsed" Click="FixToolsetterAutoSelect_Click"
@@ -436,37 +448,37 @@
                                  rather than asked and ignored. Rows are hidden as a group, see
                                  UpdateReferencePositions. -->
                             <TextBlock x:Uid="lbl_tloSurface" x:Name="lblTloSurface" Grid.Row="0" Grid.Column="0" Text="1. Target surface:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <TextBlock x:Uid="txt_tloSurfaceDesc" x:Name="txtTloSurfaceDesc" Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="11" Foreground="#FF5A5A5A"
+                            <TextBlock x:Uid="txt_tloSurfaceDesc" x:Name="txtTloSurfaceDesc" Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="12" Foreground="#FF5A5A5A"
                                        Text="The TOP of the toolsetter or plate - the surface every tool-length probe will actually touch. Jog roughly over it, with a tool or probe in the spindle, and press Probe it: one probe records this height, the tool-length baseline and G59.3 together. No jogging down onto anything by hand."/>
-                            <TextBlock x:Name="txtTloSurfaceValue" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Margin="10,0,8,0" FontFamily="Consolas" FontSize="11"/>
+                            <TextBlock x:Name="txtTloSurfaceValue" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Margin="10,0,8,0" FontFamily="Consolas" FontSize="12"/>
                             <Button x:Uid="btn_setTloSurface" x:Name="btnSetTloSurface" Grid.Row="0" Grid.Column="3" Content="Probe it" Padding="8,1" MinHeight="24" Click="ProbeTloTarget_Click"
                                     ToolTip="Probe straight down from where the machine is standing to find the top of the toolsetter or plate. Records the target surface, the tool-length baseline and G59.3 in one go. The machine WILL move."/>
 
                             <TextBlock x:Uid="lbl_g30" x:Name="lblG30" Grid.Row="1" Grid.Column="0" Text="3. G30 - tool swap:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,6,8,0"/>
-                            <TextBlock x:Uid="txt_g30Desc" Grid.Row="1" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="11" Foreground="#FF5A5A5A" Margin="0,6,0,0"
+                            <TextBlock x:Uid="txt_g30Desc" Grid.Row="1" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="12" Foreground="#FF5A5A5A" Margin="0,6,0,0"
                                        Text="Where the machine parks for you to change the tool, and where it returns afterwards. Near the top of Z, clear of the work, somewhere you can reach the collet."/>
-                            <TextBlock x:Name="txtG30Value" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="10,6,8,0" FontFamily="Consolas" FontSize="11"/>
+                            <TextBlock x:Name="txtG30Value" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="10,6,8,0" FontFamily="Consolas" FontSize="12"/>
                             <Button x:Uid="btn_setG30" x:Name="btnSetG30" Grid.Row="1" Grid.Column="3" Content="Set from here" Padding="8,1" MinHeight="24" Margin="0,6,0,0" Click="SetG30_Click"
                                     ToolTip="Store the machine's CURRENT position as G30. Jog to the park position first."/>
 
-                            <!-- Placing G30 relative to G59.3, which is why G59.3 is set first. 100 mm to one
+                            <!-- Placing G30 relative to G59.3, which is why G59.3 is set first. That offset to one
                                  side keeps the tool change close to the measuring point without the spindle
                                  sitting over it while you have both hands on a collet. -->
                             <StackPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,4,0,0">
-                                <TextBlock x:Uid="txt_g30Offer" Text="or place it 100 mm from G59.3:" VerticalAlignment="Center" FontSize="11" Foreground="#FF5A5A5A" Margin="0,0,8,0"/>
-                                <Button x:Uid="btn_g30Left" x:Name="btnG30Left" Content="100 mm −X" Padding="8,1" MinHeight="22" Margin="0,0,6,0" Click="PlaceG30_Click" Tag="-1"
-                                        ToolTip="Move to 100 mm in −X from G59.3 at safe Z, and store that as G30. The machine WILL move."/>
-                                <Button x:Uid="btn_g30Right" x:Name="btnG30Right" Content="100 mm +X" Padding="8,1" MinHeight="22" Click="PlaceG30_Click" Tag="1"
-                                        ToolTip="Move to 100 mm in +X from G59.3 at safe Z, and store that as G30. The machine WILL move."/>
+                                <TextBlock x:Uid="txt_g30Offer" Text="or place it beside G59.3:" VerticalAlignment="Center" FontSize="12" Foreground="#FF5A5A5A" Margin="0,0,8,0"/>
+                                <Button x:Uid="btn_g30Left" x:Name="btnG30Left" Content="−X" Padding="8,1" MinHeight="22" Margin="0,0,6,0" Click="PlaceG30_Click" Tag="-1"
+                                        ToolTip="Move that far in −X from G59.3 at safe Z, and store that as G30. The machine WILL move."/>
+                                <Button x:Uid="btn_g30Right" x:Name="btnG30Right" Content="+X" Padding="8,1" MinHeight="22" Click="PlaceG30_Click" Tag="1"
+                                        ToolTip="Move that far in +X from G59.3 at safe Z, and store that as G30. The machine WILL move."/>
                             </StackPanel>
                         </Grid>
-                        <TextBlock x:Name="txtTloSearchValue" x:Uid="txt_tloSearchValue" TextWrapping="Wrap" Margin="10,4,0,0" FontSize="11" Foreground="#FF1F3A5F" FontStyle="Italic"/>
+                        <TextBlock x:Name="txtTloSearchValue" x:Uid="txt_tloSearchValue" TextWrapping="Wrap" Margin="10,4,0,0" FontSize="12" Foreground="#FF1F3A5F" FontStyle="Italic"/>
                         <!-- What the probe will actually do, and where its one limit comes from. The limit
                              lives on the PROBE, not on this page, so an operator looking at this row has no
                              way to know what bounds the descent unless it is said here. Filled in by
                              UpdateReferencePositions with the selected probe's own number. -->
-                        <TextBlock x:Name="txtTloProbePlan" x:Uid="txt_tloProbePlan" TextWrapping="Wrap" Margin="10,6,0,0" FontSize="11" Foreground="#FF5A5A5A"/>
-                        <TextBlock x:Uid="txt_refPosAdjacent" TextWrapping="Wrap" Margin="10,4,0,8" FontSize="11" Foreground="#FF5A5A5A"
+                        <TextBlock x:Name="txtTloProbePlan" x:Uid="txt_tloProbePlan" TextWrapping="Wrap" Margin="10,6,0,0" FontSize="12" Foreground="#FF5A5A5A"/>
+                        <TextBlock x:Uid="txt_refPosAdjacent" TextWrapping="Wrap" Margin="10,4,0,8" FontSize="12" Foreground="#FF5A5A5A"
                                    Text="Put them next to each other. Every tool change travels G30 → G59.3 and back, so the gap between them is paid twice per tool, every job."/>
 
                     </StackPanel>
@@ -621,7 +633,7 @@
                  machine both read as faults. DockPanel's LAST child fills, so this sits left of the
                  buttons and wraps into whatever room they leave. -->
             <TextBlock x:Uid="txt_applyScope" DockPanel.Dock="Left" TextWrapping="Wrap" MaxWidth="520"
-                       VerticalAlignment="Center" Margin="0,0,16,0" FontSize="11" Foreground="#FF5A5A5A"
+                       VerticalAlignment="Center" Margin="0,0,16,0" FontSize="12" Foreground="#FF5A5A5A"
                        Text="Apply writes the controller settings and the values typed on these pages. Probes, fixtures, and anything measured or taught - a probe result, G30, G59.3 - are saved the moment you do them."/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <TextBlock x:Name="txtStatus" VerticalAlignment="Center" Margin="0,0,16,0" Foreground="Gray"/>
