@@ -746,19 +746,44 @@ namespace CNC.Core
                 return false;
             }
 
-            // Both halves, because either alone has a blind spot. IsToolOffsetActive reads $G's G49 on
-            // grblHAL - authoritative about whether an offset is in force at all - while a G43.1 holding
-            // exactly zero is "active" and still means no compensation. $G showing G49 right before a job
-            // is the tell the August write-up names.
+            // IsToolOffsetActive reads $G's G49 on grblHAL - authoritative about whether an offset is in
+            // force. $G showing G49 right before a job is the tell the August write-up names.
+            //
+            // The VALUE is logged but deliberately not tested. This also fired on "TLO.Z == 0", on the
+            // reasoning that a G43.1 holding zero means no compensation - true, and still the wrong test: a
+            // tool that IS the reference tool gets a correct G43.1 Z0, and prompting there would be a false
+            // alarm on exactly the case the operator already objected to in August. An active G43.1 is the
+            // controller saying the frame is right, whatever the number in it.
             bool offsetActive = model.IsToolOffsetActive;
             double tloZ = model.ToolOffset.Z;
-            bool missing = !offsetActive || double.IsNaN(tloZ) || tloZ == 0d;
+            bool missing = !offsetActive;
 
             DebugLog.Write("run", string.Format(
                 "ToolOffsetMissingForProgram: {0} - offsetActive={1} TLO.Z={2} tloRefSet={3} tool={4}",
                 missing ? "YES" : "no", offsetActive, tloZ, model.IsTloReferenceSet, model.Tool));
 
             return missing;
+        }
+
+        /// <summary>
+        /// Fresh $G: is a tool length offset in force right now? <c>null</c> means the controller could not
+        /// be asked, which is NOT "no" - a caller about to move metal on the strength of this must treat
+        /// anything but <c>true</c> as a refusal.
+        /// </summary>
+        /// <remarks>
+        /// Exists because MacroProcessor.Run's onDone hands back the controller's own "Pgm End" flag, and a
+        /// short program that reaches Idle before that message arrives reports FALSE having run perfectly.
+        /// Measured 2026-10-31: the pre-run reference applied a 6.665 mm offset and its callback still said
+        /// the run had not finished, so the work that depended on it was skipped. Every other generated
+        /// program here ends in M2, which would set the flag - but M2 also resets the coordinate system to
+        /// G54, and a loaded job that selects no WCS of its own would then silently run against a different
+        /// origin. So the answer comes from the machine rather than from a flag about program structure.
+        /// </remarks>
+        public bool? ToolOffsetApplied()
+        {
+            if (!GrblParserState.Get(model))
+                return null;
+            return model.IsToolOffsetActive;
         }
 
         /// <summary>

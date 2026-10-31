@@ -1263,13 +1263,24 @@ namespace CNC.Controls
             bool started = MacroProcessor.Run(model, "Reference tool before job", b.ToString(), false, false,
                 ok => {
                     referencingForRun = false;
-                    if (ok)
-                    {
-                        // AFTER the reference, not before: if the probe fails the operator's program is
-                        // still exactly as they wrote it.
-                        StripToolOffsetCancel(cancelling);
-                        Run(fromBlock, honorActiveProgram);
-                    }
+
+                    // NOT gated on ok. That flag is the controller's own "Pgm End", and this program has no
+                    // program end, so it comes back false on a run that worked - measured 2026-10-31, the
+                    // offset was applied and this callback still said no, which silently skipped both the
+                    // strip and the start. Ask whether the offset is actually in force instead, with a fresh
+                    // $G. Anything but true is a refusal: null means the controller could not be asked, and
+                    // stripping a G49 without an offset to protect would make the depths worse, not better.
+                    bool? applied = runner.ToolOffsetApplied();
+                    DebugLog.Write("run", string.Format(
+                        "Reference-before-run finished: onDone={0}, offset applied now={1}",
+                        ok, applied.HasValue ? applied.Value.ToString() : "unknown"));
+                    if (applied != true)
+                        return;
+
+                    // AFTER the reference, not before: if the probe fails the operator's program is still
+                    // exactly as they wrote it.
+                    StripToolOffsetCancel(cancelling);
+                    Run(fromBlock, honorActiveProgram);
                 });
 
             if (!started)
