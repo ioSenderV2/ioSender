@@ -1176,8 +1176,15 @@ namespace CNC.Controls
         /// </summary>
         private bool OfferToolReferenceBeforeRun(int fromBlock, bool honorActiveProgram)
         {
+            // A program that cancels the offset throws away anything the reference step applies - its first
+            // line is G49 and that is the end of the matter - so for those the offer has to cover BOTH steps
+            // or it is worthless. ONE prompt, not two: the operator was explicit about not being walked
+            // through a dialog per step.
+            var cancelling = Source.Data.Where(blk => blk.HasToolOffsetCancel).ToList();
             var answer = AppDialogs.Show(Window.GetWindow(this),
-                                         (string)FindResource("JobNoToolChangeNoOffset"), "ioSender",
+                                         (string)FindResource(cancelling.Count > 0
+                                                              ? "JobNoOffsetAndG49" : "JobNoToolChangeNoOffset"),
+                                         "ioSender",
                                          MessageBoxButton.YesNoCancel, MessageBoxImage.Warning, MessageBoxResult.Yes);
 
             if (answer == MessageBoxResult.Cancel)
@@ -1257,13 +1264,67 @@ namespace CNC.Controls
                 ok => {
                     referencingForRun = false;
                     if (ok)
+                    {
+                        // AFTER the reference, not before: if the probe fails the operator's program is
+                        // still exactly as they wrote it.
+                        StripToolOffsetCancel(cancelling);
                         Run(fromBlock, honorActiveProgram);
+                    }
                 });
 
             if (!started)
                 referencingForRun = false;
 
             return false;       // either the remedy is running and will start the job, or it never started
+        }
+
+        private static readonly System.Text.RegularExpressions.Regex _g49Word =
+            new System.Text.RegularExpressions.Regex(@"(?<![0-9.])[Gg]0*49(?![0-9.])");
+
+        /// <summary>
+        /// Remove the G49 word from the blocks that carry it, so the tool length offset measured a moment ago
+        /// survives into the program. Consented to on the pre-run prompt, never silent.
+        /// </summary>
+        /// <remarks>
+        /// 🔴 THIS EDITS WHAT THE CONTROLLER WILL SEE, which is otherwise forbidden here - a parser gap that
+        /// rewrote a program silently dropped whole blocks and crashed the machine. Three things keep this on
+        /// the right side of that rule and all three are load-bearing:
+        ///
+        /// 1. The operator agreed to it on a prompt that said so, and it is written to the job log. Nothing
+        ///    happens quietly.
+        /// 2. A WORD is removed, not a block. Block count, line numbering and every index the streamer and
+        ///    the program list hold stay exactly as they were - the crash was caused by blocks disappearing.
+        /// 3. The blocks were identified from the PARSER's own Commands.G49 token, so a "G49" inside a
+        ///    comment is not touched, and the regex then removes only a standalone G49 word.
+        ///
+        /// Not written back to the file, and lost on reload - this is a decision about one run.
+        ///
+        /// WHY NOT SUBSTITUTE G54, as first suggested: G49 and G54 are different modal groups, and that
+        /// program selects no WCS anywhere in 67,554 blocks - it inherits whatever is active. Writing G54 in
+        /// would force work coordinate system 1 and silently relocate the origin the day the job is run in
+        /// G55. Removing the word leaves every other modal state the program set exactly as it was.
+        /// </remarks>
+        private void StripToolOffsetCancel(System.Collections.Generic.List<GCodeBlock> blocks)
+        {
+            if (blocks == null || blocks.Count == 0)
+                return;
+
+            foreach (var blk in blocks)
+            {
+                string before = blk.Data;
+                string after = _g49Word.Replace(before, string.Empty).TrimEnd();
+                if (after == before)
+                    continue;
+
+                blk.Data = after;
+                // The operator's own log, not just the debug channel: a run that behaved differently from
+                // the file on disk has to be answerable afterwards.
+                model.LogDetail(string.Format(
+                    "Tool length offset kept: removed G49 from line {0} - '{1}' is now '{2}'",
+                    blk.LineNum, before.Trim(), after.Trim()), false);
+                DebugLog.Write("run", string.Format("StripToolOffsetCancel: line {0} '{1}' -> '{2}'",
+                    blk.LineNum, before.Trim(), after.Trim()));
+            }
         }
 
         // Step 7 (unified streaming engine): start the just-pushed/loaded macro program through the

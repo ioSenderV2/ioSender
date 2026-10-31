@@ -152,6 +152,27 @@ namespace CNC.Core
         // reset) before this fix.
         public bool HasToolChange { get; set; }
 
+        /// <summary>
+        /// This line contains G49 - it CANCELS tool length compensation.
+        /// </summary>
+        /// <remarks>
+        /// A program that cancels the offset expresses its depths in the no-offset frame, which is
+        /// incompatible with a work Z0 established by Setup: that Z0 is stored in the tool-length REFERENCE
+        /// frame and only reads as the stock top while a G43 is active. With the offset cancelled it sits a
+        /// reference-tool-length INSIDE the stock, and every depth in the program goes that much deeper.
+        ///
+        /// Found on hardware 2026-10-31: a SketchUcam post opens "G90 G21 G49 G17" and that one word, in the
+        /// first line of 67,554 blocks, put the safe height below the stock surface - the tool cut a trench
+        /// on its way to the start of the cut. The program is otherwise correct; it positions before it
+        /// descends. Nothing else in that file selects a WCS or re-enables the offset.
+        ///
+        /// Consulted by JobControl's pre-run offer, which can strip the word with the operator's consent.
+        /// Removing a WORD and leaving the block in place is deliberate: block count and line numbering are
+        /// untouched, which is what separates this from the parser gap that silently dropped whole blocks
+        /// and crashed the machine.
+        /// </remarks>
+        public bool HasToolOffsetCancel { get; set; }
+
         // DRAFT/UNVERIFIED 2026-08-08 - not yet built or hardware-tested, see
         // docs/Architecture-Unified-Streaming-Engine.md Step 2. Set at load time (GCodeJob.ParseFileLines/
         // AddBlock, same call sites as HasSpindleOrCoolantOn/HasToolChange above) from a plain text check
@@ -243,6 +264,18 @@ namespace CNC.Core
         {
             for (int i = tokenStart; i < Parser.Tokens.Count; i++)
                 if (Parser.Tokens[i].Command == Commands.M6)
+                    return true;
+            return false;
+        }
+
+        // True iff this line's tokens include G49 (cancel tool length compensation) - see
+        // GCodeBlock.HasToolOffsetCancel. From the TOKENS, not a text match on "G49": a text scan also hits
+        // the word inside a comment, and "(Plunge Depth first) G49" style lines are exactly what a post
+        // writes. The parser emits Commands.G49 only for a real modal-group-8 cancel.
+        private bool CurrentLineCancelsToolOffset(int tokenStart)
+        {
+            for (int i = tokenStart; i < Parser.Tokens.Count; i++)
+                if (Parser.Tokens[i].Command == Commands.G49)
                     return true;
             return false;
         }
@@ -686,7 +719,7 @@ namespace CNC.Core
 
                         // parsed guards the token-derived flags, same as AddBlock: a failed parse leaves
                         // Parser.Tokens stale from the last successful line - never trust it here.
-                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = parsed && CurrentLineHasToolChange(tokenStart), Directive = directiveKeyword, Tokens = parsed ? Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) : new List<GCodeToken>() });
+                        AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = parsed && CurrentLineHasToolChange(tokenStart), HasToolOffsetCancel = parsed && CurrentLineCancelsToolOffset(tokenStart), Directive = directiveKeyword, Tokens = parsed ? Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) : new List<GCodeToken>() });
                         while (commands.Count > 0)
                         {
                             block = commands.Dequeue();
@@ -844,7 +877,7 @@ namespace CNC.Core
                     // parsed guards Tokens here too: a failed parse (O-word/#-expression passthrough, see
                     // `passThrough` above) leaves Parser.Tokens stale from whatever line last parsed
                     // successfully - only trust it right after ParseBlock itself returned true.
-                    AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = parsed && CurrentLineHasToolChange(tokenStart), Directive = directiveKeyword, Tokens = parsed ? Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) : new List<GCodeToken>() });
+                    AddStamped(new GCodeBlock(LineNumber, block, block.Length + 1, isComment, parsed && Parser.ProgramEnd) { HasSpindleOrCoolantOn = parsed && CurrentLineHasSpindleOrCoolantOn(tokenStart), HasToolChange = parsed && CurrentLineHasToolChange(tokenStart), HasToolOffsetCancel = parsed && CurrentLineCancelsToolOffset(tokenStart), Directive = directiveKeyword, Tokens = parsed ? Parser.Tokens.GetRange(tokenStart, Parser.Tokens.Count - tokenStart) : new List<GCodeToken>() });
                     while (commands.Count > 0)
                     {
                         block = commands.Dequeue();
