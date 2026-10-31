@@ -3199,7 +3199,10 @@ namespace GCode_Sender
                 L(string.Format("#<_bottom> = [#5163 - {0}]", N(DynamicSearchDepthMm)));
                 L(string.Format("#<_ls_topx> = {0}", N(topClearance)));
                 L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
-                EmitCall(id1, "#5161", "#5162", "0", "[#5163+2]");
+                // appz = 0: corner 1 is ALWAYS reached from the G30 probe-install park, which is an unrelated
+                // point with nothing verified clear between it and G28's own stored XY - so the crossing has
+                // to happen at machine top. See the same override on corner 1's REUSE call below.
+                EmitCall(id1, "#5161", "#5162", "0", "[#5163+2]", "0");
             }
             else
             {
@@ -3238,7 +3241,15 @@ namespace GCode_Sender
                 string c1maxz = setTloRef
                                  ? GrblInfo.ClampToZTop(string.Format("[#<_probe_z> + {0}]", N(cornerTravelMarginMm)))
                                  : "0";
-                EmitCall(id1, refX, refY, "0", c1maxz);
+                // appz = 0 - the APPROACH crossing only. The "G53 G0 Z0" emitted above (see its comment: the
+                // puck and corner 1's Coords are unrelated locations, nothing verified clear between them)
+                // was being undone by the very next move: pcorner's first act is a height change to #<maxz>,
+                // and only THEN does it traverse to the inset XY. Starting from Z0 that height change is a
+                // DESCENT, so the whole crossing happened at puck+25 with a clamp or a vise anywhere in the
+                // way. Reported on hardware 2026-10-31. maxz still governs the rest of this call's own probe
+                // sequence, which stays within the footprint it was measured over - same structure as the
+                // mid-run TLO detour's override on corner 2 below.
+                EmitCall(id1, refX, refY, "0", c1maxz, "0");
             }
             L(string.Format("#<_ls_topx> = {0}", N(topClearance)));   // restore for corners 2-4's default (non-exact) path below
             L(string.Format("#<_ls_topy> = {0}", N(topClearance)));
@@ -3608,15 +3619,20 @@ namespace GCode_Sender
                 // so a sacrificial backer is respected the same as before.
                 L(string.Format("#<_bottom> = [#5163 - {0}]", N(DynamicSearchDepthMm)));
                 string dynMaxZ = GrblInfo.ClampToZTop("[#5163+2]");
+                // appz = 0 - the approach crossing only. The machine is sitting at the G30 probe-install park
+                // (EmitGotoG30 above), which is an unrelated point to G28: nothing is verified clear between
+                // them, and dynMaxZ is G28's own Z + 2, so without this pcorner would descend to a height
+                // scoped to the stock and cross the table at it. maxz still governs the probe sequence once
+                // it is over the work. Same override as corner 1 in BuildProgram.
                 if (isEdge)
                 {
                     L(string.Format("(--- {0} edge midpoint ---)", EdgeNames[dynamicIndex]));
-                    EmitPcornerCall(L, EdgeCornerId[dynamicIndex], "#5161", "#5162", "0", dynMaxZ, "9999", inside, EdgeFaces[dynamicIndex]);
+                    EmitPcornerCall(L, EdgeCornerId[dynamicIndex], "#5161", "#5162", "0", dynMaxZ, "0", inside, EdgeFaces[dynamicIndex]);
                 }
                 else
                 {
                     L(string.Format("(--- {0} corner ---)", CornerNames[dynamicIndex]));
-                    EmitPcornerCall(L, dynamicIndex + 1, "#5161", "#5162", "0", dynMaxZ, "9999", inside, 0);
+                    EmitPcornerCall(L, dynamicIndex + 1, "#5161", "#5162", "0", dynMaxZ, "0", inside, 0);
                 }
                 L("#<c1x> = #<_corner_x>");
                 L("#<c1y> = #<_corner_y>");
