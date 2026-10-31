@@ -2263,6 +2263,31 @@ namespace CNC.Controls
                 return;
             }
 
+            // PULL A FRESH STATUS FIRST. model.MachinePosition is only as current as the last status
+            // report, and this program bakes that position into G10 L2 P9 - so a stale one writes G59.3
+            // to somewhere the machine is not.
+            //
+            // Measured 2026-10-31: the machine sat parked at X668.394, the operator pressed Guided setup
+            // and jogged to the toolsetter at X788.391, and the console shows NO status reports at all
+            // across those 31 seconds. The probe ran correctly at 788.391 and then wrote
+            // "G10 L2 P9 X668.394" - the pre-jog position - putting G59.3 on the park and making G30 look
+            // 240 mm away instead of 120. The park was right; G59.3 was written from a frozen copy.
+            //
+            // Polling is suspended by ~13 short query helpers sharing one bool, and an inner Resume
+            // clears an outer Suspend (see PollGrbl's own header), so "it is normally polling" is not
+            // something this can assume. Asking for one report and waiting for it costs ~ms and does not
+            // care why the poller was quiet. Same WaitFor.SingleEvent on OnRealtimeStatusProcessed that
+            // AppConfig uses to pull an authoritative report.
+            EventUtils.RunPumped(() =>
+            {
+                WaitFor.SingleEvent<string>(
+                    new System.Threading.CancellationToken(),
+                    null,
+                    a => model.OnRealtimeStatusProcessed += a,
+                    a => model.OnRealtimeStatusProcessed -= a,
+                    500, () => Comms.com.WriteByte(GrblConstants.CMD_STATUS_REPORT_ALL));
+            });
+
             var here = model.MachinePosition;
 
             // How far down the machine can actually GO from here, as opposed to how far the probe is
