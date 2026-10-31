@@ -25,6 +25,19 @@
                   ToolTip="The G30 park and toolsetter signs on the bed, and the dot at machine zero."
                   IsChecked="{Binding Path=ShowStoredPositions, Mode=TwoWay}"/>
 
+        <TextBlock x:Uid="vo_during" Text="DURING A CARVE" Foreground="Gray" FontSize="10" Margin="0,14,0,2" Background="Transparent"
+                   ToolTip="What the view does while a job is actually running. Both are off by default: the view shares a thread with the running job's screen updates, so work done here competes with them."/>
+
+        <CheckBox x:Uid="vo_trackTool" x:Name="chkTrackTool" Content="Update tool position in 3D view during a carve" Margin="0,4,0,0"
+                  ToolTip="Follow the cutter with the tool cone while the job runs. Off by default; the view is otherwise frozen until the job ends."
+                  IsChecked="{Binding Path=TrackToolDuringCarve, Mode=TwoWay}"/>
+        <!-- Gated on the parent: carving the stock without moving the tool is meaningless, and the
+             expensive half should not be reachable without the cheap one being wanted first. -->
+        <CheckBox x:Uid="vo_trackRemoval" x:Name="chkTrackRemoval" Content="Update material removal in 3D view during a carve" Margin="18,4,0,0"
+                  ToolTip="Also cut the stock away as the machine moves. This is the expensive half - it rebuilds the stock mesh on every status report."
+                  IsEnabled="{Binding Path=TrackToolDuringCarve}"
+                  IsChecked="{Binding Path=TrackRemovalDuringCarve, Mode=TwoWay}"/>
+
         <!-- Background="Transparent" is load-bearing on these labels: a TextBlock with a null background is
              not hit-testable, so the tooltip would never appear however long you hovered. -->
         <TextBlock x:Uid="vo_colours" Text="COLOURS" Foreground="Gray" FontSize="10" Margin="0,14,0,2" Background="Transparent"

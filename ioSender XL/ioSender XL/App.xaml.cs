@@ -179,20 +179,6 @@ namespace GCode_Sender
                         {
                             CNC.Controls.Features.SvgLaserJob = true;
                         }
-                        // -carvelive=cone|full  let the carve view track while a job streams, instead of
-                        // freezing. The three arms of docs\Test-Plan-CarveView-Live-Tracking.md, behind one
-                        // flag so the baseline and the test arms run on the SAME binary - rebuilding between
-                        // arms would make them incomparable. Anything unrecognised (including bare
-                        // -carvelive) leaves it Off rather than guessing, because the quiet failure mode here
-                        // is measuring the shipped behaviour and labelling it as an arm.
-                        else if (arg.StartsWith("-carvelive=", StringComparison.OrdinalIgnoreCase))
-                        {
-                            string mode = arg.Substring("-carvelive=".Length).Trim();
-                            if (string.Equals(mode, "cone", StringComparison.OrdinalIgnoreCase))
-                                CNC.Controls.Features.CarveLive = CNC.Controls.CarveLiveMode.Cone;
-                            else if (string.Equals(mode, "full", StringComparison.OrdinalIgnoreCase))
-                                CNC.Controls.Features.CarveLive = CNC.Controls.CarveLiveMode.Full;
-                        }
                         // -message=text  show an informational popup once the main window is up (see StartupMessage)
                         else if (arg.StartsWith("-message=", StringComparison.OrdinalIgnoreCase))
                         {

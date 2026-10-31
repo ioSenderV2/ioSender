@@ -43,32 +43,10 @@ namespace CNC.Controls
         /// </summary>
         public static bool SvgLaserJob { get; set; }
 
-        /// <summary>
-        /// How much of the carve view is allowed to track while a job streams - the three arms of
-        /// docs\Test-Plan-CarveView-Live-Tracking.md.
-        ///
-        /// NOT a held-back feature like the one above: a MEASUREMENT switch, so the same binary can run
-        /// the baseline and the test arms back to back. That matters more than it sounds - rebuilding
-        /// between arms means the arms were measured on different binaries and the comparison is worth
-        /// nothing.
-        ///
-        /// <c>Off</c> is the shipped behaviour and the default: <c>CarveView.UpdateTool</c> bails out
-        /// entirely while a job runs. <c>Cone</c> lets the tool cone follow (which that code labels
-        /// "cheap") but still skips the carve. <c>Full</c> removes the guard.
-        ///
-        /// Off unless <c>-carvelive=cone</c> or <c>-carvelive=full</c> was passed.
-        /// </summary>
-        public static CarveLiveMode CarveLive { get; set; } = CarveLiveMode.Off;
-    }
-
-    /// <summary>Arms of the carve-view live-tracking measurement. See <see cref="Features.CarveLive"/>.</summary>
-    public enum CarveLiveMode
-    {
-        /// <summary>Arm A - frozen while a job streams. The shipped behaviour.</summary>
-        Off,
-        /// <summary>Arm B - the tool cone tracks; no material removal.</summary>
-        Cone,
-        /// <summary>Arm C - cone and carve both track.</summary>
-        Full
+        // The carve-view live-tracking switch lived here as CarveLive/CarveLiveMode behind -carvelive,
+        // while it was a measurement knob. It is now two persisted operator settings -
+        // CarveViewConfig.TrackToolDuringCarve and TrackRemovalDuringCarve, on the view's own View
+        // options - because a thing the operator chooses per machine does not belong in a flag they have
+        // to remember on every launch. This file is for OUR switches, not theirs (see the header).
     }
 }

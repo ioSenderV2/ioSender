@@ -201,6 +201,16 @@ namespace CNC.Controls
     {
         private bool _showRapids = true, _showStock = true, _showGrid = true, _showStoredPositions = true;
 
+        // Both OFF by default, and that is a measurement rather than caution. The view froze entirely
+        // during a job from 2026-06-29 until these existed, because moving the cone forced a viewport
+        // re-render on the thread the job's display marshals share. Measured 2026-10-30 over a 2.3 h
+        // simulator run with the view FROZEN: UI input lateness still ran 150-300 ms with a 1778 ms peak,
+        // so the freeze was not buying the responsiveness it cost the view for - but "the baseline is
+        // already poor" is not evidence that adding work is free, and two baseline runs of the same
+        // program differed by ~50%, which is more than any effect measured so far. Default off until a
+        // paired comparison says otherwise. See docs\Test-Plan-CarveView-Live-Tracking.md.
+        private bool _trackToolDuringCarve = false, _trackRemovalDuringCarve = false;
+
         // Only these three are adjustable. The rest of the palette is a LEGEND - blue park sign, orange
         // toolsetter sign, green machine zero, orange-red tool - and a legend that each install can
         // rearrange is one the manual, the screenshots and any two people talking about the view can no
@@ -213,6 +223,25 @@ namespace CNC.Controls
         public bool ShowStock { get { return _showStock; } set { _showStock = value; OnPropertyChanged(); } }
         public bool ShowGrid { get { return _showGrid; } set { _showGrid = value; OnPropertyChanged(); } }
         public bool ShowStoredPositions { get { return _showStoredPositions; } set { _showStoredPositions = value; OnPropertyChanged(); } }
+
+        /// <summary>
+        /// Let the tool cone follow the machine while a job streams. The cheap half: one Origin
+        /// assignment per status report, which CarveView's own comment calls "cheap".
+        /// </summary>
+        public bool TrackToolDuringCarve { get { return _trackToolDuringCarve; } set { _trackToolDuringCarve = value; OnPropertyChanged(); } }
+
+        /// <summary>
+        /// Also carve the stock as the machine moves - CarveTo mutates the mesh and PushMesh republishes
+        /// it, which the same comment calls "the expensive part". Meaningless on its own, so it is gated
+        /// on <see cref="TrackToolDuringCarve"/> in the UI AND here: a stored true with tracking off would
+        /// otherwise come back to life the moment tracking was switched on, which is not what the operator
+        /// who unticked the parent asked for.
+        /// </summary>
+        public bool TrackRemovalDuringCarve
+        {
+            get { return _trackRemovalDuringCarve && _trackToolDuringCarve; }
+            set { _trackRemovalDuringCarve = value; OnPropertyChanged(); }
+        }
 
         public Color StockColor { get { return _stock; } set { _stock = value; OnPropertyChanged(); } }
         public Color RapidColor { get { return _rapid; } set { _rapid = value; OnPropertyChanged(); } }

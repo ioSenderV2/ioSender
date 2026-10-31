@@ -57,12 +57,24 @@ expensive part". So a binary frozen/unfrozen test would miss the interesting ans
 
 **Run A, then C. If C passes, B is unnecessary** — B only earns a run if C fails.
 
-## Implementation needed before the run
+## Implementation (done)
 
-1. **A launch flag: `-carvelive=off|cone|full`, default `off`.** Follows the existing
-   `-debuglog=poll` / `-enableSVGLaserJob` idiom. It must be a flag, not an edit, for two reasons:
-   rebuilding between arms means the arms are not comparable, and default-off means nothing ships
-   changed until this is decided.
+1. ~~A launch flag `-carvelive=off|cone|full`~~ — **superseded 2026-10-30 by two persisted settings**
+   on the carve view's own **View options**, which is where an operator's own choice belongs rather
+   than in a flag they must remember every launch:
+
+   | setting | arm | cost |
+   |---|---|---|
+   | *Update tool position in 3D view during a carve* | B | one Origin assignment per status report - "cheap" |
+   | *Update material removal in 3D view during a carve* | C | `CarveTo` + `PushMesh` - "the expensive part" |
+
+   Both default **off**, so the shipped behaviour is unchanged. The second is gated on the first in
+   the dialog **and** in its getter - a stored true with tracking off would otherwise spring back to
+   life the moment tracking was re-enabled, which is not what unticking the parent asked for.
+
+   The arms are now selected by ticking boxes rather than by relaunching, which also removes the
+   original worry: arms no longer need separate launches at all, so a paired A/C/A/C comparison is
+   just four short runs with two clicks between them.
 2. **Feed Hold latency instrumentation.** PollDiag measures replies *arriving*; it cannot see
    operator input being *serviced*. A log line on entry to the Feed Hold handler, read against the
    wire log's timestamp for the hold byte going out, gives the interval. This is the strongest

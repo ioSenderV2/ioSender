@@ -1269,11 +1269,11 @@ namespace CNC.Controls.Viewer
             // is read by the filesystem-listing guard, the Home button and the Peek gate among others, and
             // narrowing a shared safety flag is not a change to make from a symptom in a viewer.
             //
-            // -carvelive=cone|full lifts this for the measurement arms in
-            // docs\Test-Plan-CarveView-Live-Tracking.md. Default Off = everything above stands.
+            // View options > "Update tool position in 3D view during a carve" lifts this. Off by default,
+            // so everything above stands unless the operator asked for it.
             bool jobStreaming = model != null && model.IsJobRunning && model.GrblState.State != GrblStates.Jog;
 
-            if (jobStreaming && Features.CarveLive == CarveLiveMode.Off)
+            if (jobStreaming && !AppConfig.Settings.CarveView.TrackToolDuringCarve)
             {
                 haveLast = false;        // resume cleanly later - no false cut from a stale last position
                 return;
@@ -1296,10 +1296,11 @@ namespace CNC.Controls.Viewer
                 return;
             }
 
-            // Arm B stops here: the cone tracked (the line above), the expensive half below does not run.
-            // This is the split the two comments in this method already describe - "cheap" versus "the
-            // expensive part" - and the whole reason the measurement has three arms rather than two.
-            if (jobStreaming && Features.CarveLive == CarveLiveMode.Cone)
+            // The tool cone tracked (the line above); the expensive half below is a second, separate
+            // option because the two cost wildly different amounts - this method's own comments call them
+            // "cheap" and "the expensive part". An operator who wants to see where the cutter is should
+            // not have to pay for mesh rebuilds to get it.
+            if (jobStreaming && !AppConfig.Settings.CarveView.TrackRemovalDuringCarve)
             {
                 haveLast = false;
                 return;
