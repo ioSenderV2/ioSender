@@ -160,7 +160,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>424 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>425 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -298,6 +298,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>A "Layout:" selector in the menu row switches between named screen arrangements, saving the one you are leaving first; ioSenderClassic and DefaultV3.0 ship with the build.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr416">416</a></td></tr>
 <tr><td>A layout fixup put Work Order back on the tab bar on every launch, Lathe Wizards appeared as both placeable and unavailable, and the jog pad's Goto button ignored the checkbox that hides the other four.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr418">418</a></td></tr>
 <tr><td>A brand-new installation now starts on the ioSenderClassic layout preset rather than the generated V3.0 one; an upgrade keeps whatever arrangement it already has.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr419">419</a></td></tr>
+<tr><td>One Guided setup button on Machine Setup's probing step teaches the tool-length target, the reference and the park position - plus three probing fixes it uncovered.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr425">425</a></td></tr>
 </table>
 
 <h3>Commissioning &amp; workflow tools</h3>
@@ -1085,7 +1086,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">422</td><td><a href="#pr422">Cross at the top of Z, not at safe Z</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+43</span> <span class="del">-7</span></td></tr>
 <tr><td class="n">423</td><td><a href="#pr423">No tool change: offer to measure the tool first</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+478</span> <span class="del">-45</span></td></tr>
 <tr><td class="n">424</td><td><a href="#pr424">Recent Files menu</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+227</span> <span class="del">-0</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (424 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">3384</span> <span class="del">32</span> <span class="add">+315</span><br><span class="k">Lines:</span> <span class="add">+140237</span> <span class="del">-30150</span></td></tr>
+<tr><td class="n">425</td><td><a href="#pr425">Guided setup on the probing step</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">9</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+581</span> <span class="del">-133</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (425 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">3393</span> <span class="del">32</span> <span class="add">+315</span><br><span class="k">Lines:</span> <span class="add">+140818</span> <span class="del">-30283</span></td></tr>
 </table>
 </div>
 
@@ -7486,6 +7488,17 @@ G92.1</pre><ul><li><strong>It is a rapid, not <code>G92 X#&lt;x_org&gt; Y#&lt;y_
 <tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">49</td><td class="num">0</td></tr>
 </table>
 <div class="desc"><p><strong>File &rarr; Recent Files</strong> lists the last ten programs loaded, most recent first, each file once. Picking one loads it.</p><ul><li><strong>Right-click an entry</strong> for &quot;Remove from this list&quot; or &quot;Clear the list&quot;. Clear is on the submenu as well, since an empty list has no entry to right-click.</li><li>Entries read as the file name with its containing folder, because the bare name does not distinguish two revisions of the same part in different places. The full path is on the tooltip.</li><li>An entry whose file has since been moved or deleted offers to remove itself rather than failing to load.</li></ul><p>The list is kept across restarts and is shared by every machine profile. It fills from any route that loads a program - the File menu, a drag and drop, or the list itself - and generated programs such as probe cycles and Setup never appear in it.</p><p class="foot">Built and running; the menu itself has not been driven through every case yet.</p></div>
+</div>
+<!-- ===== #425 ===== -->
+<div class="pr">
+<h2 id="pr425"><span class="badge">#425</span>Guided setup: one button sets up tool changing</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">488</td><td class="num del">105</td></tr>
+<tr><td class="mono">CNC Controls/MachineSetupWizard.xaml</td><td class="num add">65</td><td class="num del">28</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">28</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>Setting up automatic tool changing used to mean working through two sections of questions on Machine Setup's probing step, knowing in advance which answers mattered and in what order. The step now has a single <strong>Guided setup</strong> button that runs the whole sequence from one press:</p><ul><li>pick the probe that measures tool length, asked only when you own more than one that could;</li><li>jog over the tool-length target and press OK - one probe down records the surface, the tool-length reference and G59.3 together;</li><li>choose which side of that target the machine should park on to swap tools, and it moves there and stores it as G30.</li></ul><p>The prompt to jog is deliberately <strong>not</strong> modal, because the jog buttons have to keep working while it is up. The button turns green when the three values are stored, and pressing it again offers to re-teach rather than doing nothing - which is what a bench change needs. Nothing is replaced until a step actually runs, so stopping part way leaves what you already had.</p><p>Three bugs were found getting this working on real hardware, and each of them bites outside guided setup too:</p><ul><li><strong>Alarm 2 with no movement at all.</strong> The probe clamped its descent to <em>exactly</em> the soft limit, which the controller rejects, so it alarmed without moving. It now stops a millimetre short.</li><li><strong>Every valid park position rejected</strong> on a machine whose X axis homes away from zero. The travel check assumed X always ran from zero to a negative limit; it now reads the homing direction setting.</li><li><strong>G59.3 stored where the machine was parked</strong> rather than where it had been jogged to, when the status poller had gone quiet during the preceding macro. The position is now read fresh at the moment it is captured, not taken from a cached report.</li></ul><p>The probing step's help text is also readable now - it used to render too small to read on a high-DPI laptop - and the park offset is one named constant instead of a number repeated in three places.</p><p class="foot">Guided setup ran end to end on the machine, re-doing a complete setup after a bed rebuild; all three fixes were confirmed there.</p></div>
 </div>
 </section>
 
