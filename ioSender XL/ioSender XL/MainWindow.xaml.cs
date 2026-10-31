@@ -730,6 +730,16 @@ namespace GCode_Sender
                 return;
             }
             CNC.Controls.ObsBridge.StartRecording();   // program loaded: begin the demo recording (no-op unless armed)
+
+            // Recent files. Here because this is the one hook every load route reaches - the File menu, a
+            // drag-drop, the recent list itself, a Work Order handoff - so none of them has to remember.
+            // File.Exists is the filter that matters: a generated or borrowed program sets FileName to a
+            // NAME, not a path ("Reference tool before job"), and those must never reach the list.
+            if (System.IO.File.Exists(fileName))
+            {
+                CNC.Controls.AppConfig.Settings.Base.AddRecentFile(fileName);
+                CNC.Controls.AppConfig.Settings.Save();
+            }
             if (jobProgramView == null)
             {
                 jobProgramView = new CNC.Controls.ProgramView { AutoShow = false, IsLoadedJob = true };
@@ -2506,6 +2516,114 @@ namespace GCode_Sender
         {
             GCode.File.Open();
         }
+
+        #region Recent files
+
+        /// <summary>
+        /// Rebuild the Recent Files submenu each time it opens, so it cannot show a stale list.
+        /// </summary>
+        private void RecentFiles_SubmenuOpened(object sender, RoutedEventArgs e)
+        {
+            menuRecentFiles.Items.Clear();
+
+            var recent = CNC.Controls.AppConfig.Settings.Base.RecentFiles;
+            if (recent.Count == 0)
+            {
+                menuRecentFiles.Items.Add(new MenuItem {
+                    Header = (string)FindResource("RecentFilesNone"), IsEnabled = false });
+                return;
+            }
+
+            // ToList: the Click/Remove handlers mutate the stored list, and this menu is rebuilt from it.
+            foreach (string path in recent.ToList())
+            {
+                var item = new MenuItem {
+                    Header = RecentFileHeader(path),
+                    Tag = path,
+                    ToolTip = path,
+                    ContextMenu = BuildRecentFileContextMenu(path)
+                };
+                item.Click += RecentFile_Click;
+                menuRecentFiles.Items.Add(item);
+            }
+
+            // Clear is on the submenu as well as on each entry's context menu - "right-click to clear" is
+            // not discoverable on its own, and an empty list has no entry to right-click.
+            menuRecentFiles.Items.Add(new Separator());
+            var clear = new MenuItem { Header = (string)FindResource("RecentFilesClear") };
+            clear.Click += (s, args) => { ClearRecentFiles(); };
+            menuRecentFiles.Items.Add(clear);
+        }
+
+        /// <summary>
+        /// "filename  (containing folder)" - the bare name is ambiguous between two revisions of a part in
+        /// different folders, and the full path is too wide for a menu. The full path is on the tooltip.
+        /// </summary>
+        /// <remarks>
+        /// Underscores are DOUBLED. WPF reads a single underscore in a menu header as an access-key marker
+        /// and swallows it, so "cut_outer.nc" would render as "cutouter.nc" with the o underlined - and
+        /// g-code filenames are full of underscores.
+        /// </remarks>
+        private static string RecentFileHeader(string path)
+        {
+            string name = System.IO.Path.GetFileName(path);
+            string dir = System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(path) ?? string.Empty);
+            string text = string.IsNullOrEmpty(dir) ? name : string.Format("{0}      ({1})", name, dir);
+            return text.Replace("_", "__");
+        }
+
+        private ContextMenu BuildRecentFileContextMenu(string path)
+        {
+            var menu = new ContextMenu();
+
+            var remove = new MenuItem { Header = (string)FindResource("RecentFilesRemove") };
+            remove.Click += (s, args) => {
+                CNC.Controls.AppConfig.Settings.Base.RecentFiles.RemoveAll(
+                    p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+                CNC.Controls.AppConfig.Settings.Save();
+                menuFile.IsSubmenuOpen = false;
+            };
+            menu.Items.Add(remove);
+
+            var clear = new MenuItem { Header = (string)FindResource("RecentFilesClear") };
+            clear.Click += (s, args) => { ClearRecentFiles(); };
+            menu.Items.Add(clear);
+
+            return menu;
+        }
+
+        private void ClearRecentFiles()
+        {
+            CNC.Controls.AppConfig.Settings.Base.RecentFiles.Clear();
+            CNC.Controls.AppConfig.Settings.Save();
+            menuFile.IsSubmenuOpen = false;
+        }
+
+        private void RecentFile_Click(object sender, RoutedEventArgs e)
+        {
+            string path = (sender as MenuItem)?.Tag as string;
+            if (string.IsNullOrEmpty(path))
+                return;
+
+            // The file can have been moved or deleted since it was listed. Offer to drop it rather than
+            // letting the loader fail on it and leaving the dead entry in place.
+            if (!System.IO.File.Exists(path))
+            {
+                if (CNC.Controls.AppDialogs.Show(this,
+                        string.Format((string)FindResource("RecentFilesMissing"), path), "ioSender",
+                        MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                {
+                    CNC.Controls.AppConfig.Settings.Base.RecentFiles.RemoveAll(
+                        p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+                    CNC.Controls.AppConfig.Settings.Save();
+                }
+                return;
+            }
+
+            GCode.File.Load(path);
+        }
+
+        #endregion
 
         // Main-menu entry points for the Work Order tab (2026-07-31), same idea as Load File above: jump
         // straight to the tab and run its New/Load action, rather than making the operator find the tab

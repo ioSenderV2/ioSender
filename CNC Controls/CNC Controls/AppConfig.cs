@@ -801,11 +801,17 @@ namespace CNC.Controls
         // default menu so they can't go missing. Without this list, hiding a menu-defaulted view was
         // impossible - it came straight back on the next load.
         private List<string> _hiddenViews = new List<string>();
+        // RecentFiles: full paths of recently loaded programs, MOST RECENT FIRST, capped at RecentFilesMax.
+        // Asked for 2026-10-31. Global, not per machine profile - a g-code file is a file, and the operator
+        // who keeps one machine would only find a per-profile list surprising.
+        private List<string> _recentFiles = new List<string>();
 
         [XmlIgnore]
         public List<string> MainPanels { get { return _mainPanels; } set { _mainPanels = value ?? new List<string>(); } }
         [XmlIgnore]
         public List<string> HiddenViews { get { return _hiddenViews; } set { _hiddenViews = value ?? new List<string>(); } }
+        [XmlIgnore]
+        public List<string> RecentFiles { get { return _recentFiles; } set { _recentFiles = value ?? new List<string>(); } }
         [XmlIgnore]
         public List<string> Tabs { get { return _tabs; } set { _tabs = value ?? new List<string>(); } }
         [XmlIgnore]
@@ -815,6 +821,47 @@ namespace CNC.Controls
 
         // A persisted, comma-joined list of component keys - see the NOTE above for why this is a string
         // property rather than List<string>.
+        /// <summary>How many entries the Recent Files menu keeps.</summary>
+        public const int RecentFilesMax = 10;
+
+        /// <summary>
+        /// Recent files, persisted. Same joined-string shape as the panel lists above and for the same
+        /// reason - XmlSerializer APPENDS to a pre-initialized List&lt;T&gt;, so a List property would grow
+        /// on every load.
+        /// </summary>
+        /// <remarks>
+        /// Separated by '|', NOT the comma the panel-key lists use: these are file paths, and a comma is
+        /// perfectly legal in a Windows path while '|' is not. A comma separator would split one path into
+        /// two bogus entries the first time somebody loaded "parts, final.nc".
+        /// </remarks>
+        public string RecentFilesList
+        {
+            get { return string.Join("|", _recentFiles); }
+            set
+            {
+                _recentFiles = string.IsNullOrEmpty(value)
+                    ? new List<string>()
+                    : new List<string>(value.Split('|')).Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
+            }
+        }
+
+        /// <summary>
+        /// Put <paramref name="path"/> at the top of the recent list, removing any earlier appearance of it
+        /// so the list holds each file once, and trimming to <see cref="RecentFilesMax"/>.
+        /// </summary>
+        public void AddRecentFile(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return;
+
+            // Case-insensitive, because Windows paths are - without this, loading the same file from a
+            // differently-cased path (a drag-drop versus a typed path) would list it twice.
+            _recentFiles.RemoveAll(p => string.Equals(p, path, System.StringComparison.OrdinalIgnoreCase));
+            _recentFiles.Insert(0, path);
+            while (_recentFiles.Count > RecentFilesMax)
+                _recentFiles.RemoveAt(_recentFiles.Count - 1);
+        }
+
         public string MainPanelsKeys
         {
             get { return string.Join(",", _mainPanels); }

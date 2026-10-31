@@ -280,3 +280,10 @@ ioSender.g.en-US.resources:mainwindow.baml,mnu_presetDelete:System.Windows.Frame
 ioSender.g.en-US.resources:mainwindow.baml,mnu_presetUndo:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Undo last switch
 ioSender.g.en-US.resources:mainwindow.baml,mnu_presetUndo:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Restore the configuration as it was immediately before the last layout switch. ioSender restarts.
 ioSender.g.en-US.resources:mainwindow.baml,lbl_classicStatusMessage:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,The most recent status message. Click to see the whole history since launch.
+ioSender.g.en-US.resources:mainwindow.baml,mnu_recentFiles:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,_Recent Files
+ioSender.g.en-US.resources:mainwindow.baml,mnu_recentFiles:System.Windows.FrameworkElement.ToolTip,ToolTip,True,True,,Programs loaded recently. Right-click an entry to remove it or to clear the list.
+ioSender.g.en-US.resources:mainwindow.baml,mnu_recentPlaceholder:System.Windows.Controls.HeaderedItemsControl.Header,Menu,True,True,,(none)
+ioSender.g.en-US.resources:mainwindow.baml,str_recentNone:System.String.$Content,None,True,True,,(no recent programs)
+ioSender.g.en-US.resources:mainwindow.baml,str_recentClear:System.String.$Content,None,True,True,,Clear the list
+ioSender.g.en-US.resources:mainwindow.baml,str_recentRemove:System.String.$Content,None,True,True,,Remove from this list
+ioSender.g.en-US.resources:mainwindow.baml,str_recentMissing:System.String.$Content,None,True,True,,This program is no longer there:&#13;&#10;&#13;&#10;{0}&#13;&#10;&#13;&#10;Remove it from the recent list?

@@ -19,6 +19,10 @@
         Closing="Window_Closing"
         Closed="Window_Closed" Icon="App.ico">
     <Window.Resources>
+        <system:String x:Uid="str_recentNone" x:Key="RecentFilesNone">(no recent programs)</system:String>
+        <system:String x:Uid="str_recentClear" x:Key="RecentFilesClear">Clear the list</system:String>
+        <system:String x:Uid="str_recentRemove" x:Key="RecentFilesRemove">Remove from this list</system:String>
+        <system:String x:Uid="str_recentMissing" x:Key="RecentFilesMissing">This program is no longer there:&#13;&#10;&#13;&#10;{0}&#13;&#10;&#13;&#10;Remove it from the recent list?</system:String>
         <system:String x:Uid="str_mnuRotate" x:Key="MenuRotate">Rotate</system:String>
         <system:String x:Uid="str_mnuArcsToLines" x:Key="MenuArcsToLines">Arcs to lines</system:String>
         <system:String x:Uid="str_mnuCompress" x:Key="MenuCompress">Compress (experimental)</system:String>
@@ -107,6 +111,15 @@
                           ToolTip="Start composing a new work order."/>
                 <MenuItem x:Uid="mnu_loadSvgLaser" x:Name="menuLoadSvgLaser" Header="Load SVG Laser _Job..." Click="LoadSvgLaser_Click"
                           ToolTip="Burn an SVG with the laser: pick the artwork, then set width, power, feed and shading. Settings are remembered between jobs."/>
+                <Separator/>
+                <!-- Items are rebuilt on every SubmenuOpened (RecentFiles_SubmenuOpened), so the list is
+                     never stale. The placeholder child is REQUIRED: a MenuItem with no children shows no
+                     submenu arrow and never raises SubmenuOpened, so there would be nothing to rebuild on. -->
+                <MenuItem x:Uid="mnu_recentFiles" x:Name="menuRecentFiles" Header="_Recent Files"
+                          SubmenuOpened="RecentFiles_SubmenuOpened"
+                          ToolTip="Programs loaded recently. Right-click an entry to remove it or to clear the list.">
+                    <MenuItem x:Uid="mnu_recentPlaceholder" Header="(none)" IsEnabled="False"/>
+                </MenuItem>
                 <Separator x:Name="menuFileViewSeparator"/>
                 <!-- Machine + Settings appended here -->
             </MenuItem>
