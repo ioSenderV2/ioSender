@@ -1974,7 +1974,7 @@ namespace CNC.Controls
                     () =>
                     {
                         GuidedStepPerformed("g593");
-                        ProbeTloTarget(true, ok => { if (ok) GuidedNext(); });
+                        ProbeTloTarget(true, GuidedContinue);
                     });
                 return;
             }
@@ -1991,7 +1991,7 @@ namespace CNC.Controls
                     return;
 
                 GuidedStepPerformed("g30");
-                PlaceG30(which == MessageBoxResult.Yes ? -1 : 1, confirmed: true, onDone: ok => { if (ok) GuidedNext(); });
+                PlaceG30(which == MessageBoxResult.Yes ? -1 : 1, confirmed: true, onDone: GuidedContinue);
                 return;
             }
 
@@ -2002,6 +2002,26 @@ namespace CNC.Controls
             UpdateGuidedSetup();
         }
 
+        /// <summary>
+        /// Continue the chain after an asynchronous step, having RE-READ the stored positions first.
+        ///
+        /// PositionTaught asks GrblWorkParameters for the cached coordinate systems, and the only refresh
+        /// in PlaceG30 happens BEFORE its macro - so after the park was stored the cache still said G30
+        /// was untaught. The spindle moved, the dialog closed, and the button sat red saying "placing the
+        /// park position" for ever: the step had succeeded and the page was reading a stale copy.
+        ///
+        /// A failed step stops the chain rather than re-offering itself, so a step that cannot succeed
+        /// cannot become a loop of identical prompts. The status line then shows where it actually got to.
+        /// </summary>
+        private void GuidedContinue(bool ok)
+        {
+            GrblWorkParameters.Get(model);
+
+            if (ok)
+                GuidedNext();
+            else
+                UpdateGuidedSetup();
+        }
         private Window _jogPrompt;
 
         /// <summary>
