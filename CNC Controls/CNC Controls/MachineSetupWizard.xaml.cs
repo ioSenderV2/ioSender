@@ -1849,12 +1849,62 @@ namespace CNC.Controls
         /// Nothing here moves the machine except the probe descent and the G30 placement move, and both of
         /// those are the existing actions, with the existing confirmations and refusals.
         /// </summary>
+        /// <summary>
+        /// A re-run is in progress: the stored values are ignored and each step must be done again.
+        ///
+        /// Without this the button is a one-shot. Every predicate reads stored state, so once G59.3 and
+        /// G30 are taught they are true for ever and the next press does nothing - and the manual controls
+        /// that used to re-teach them are gone, so a toolsetter that moves would leave no way back.
+        /// </summary>
+        private bool _guidedRerun;
+
+        /// <summary>
+        /// Steps PERFORMED since the re-run began. Performed, not succeeded: the probe step finishes
+        /// asynchronously, so there is nothing to wait on here - and a step the operator watched fail is
+        /// one they can see failed, where a sequence that silently re-offered it would just look stuck.
+        /// </summary>
+        private readonly System.Collections.Generic.HashSet<string> _guidedRerunDone = new System.Collections.Generic.HashSet<string>();
+
+        /// <summary>Is this step done - by stored state normally, by this re-run's progress during one.</summary>
+        private bool GuidedStepDone(string step)
+        {
+            if (_guidedRerun)
+                return _guidedRerunDone.Contains(step);
+
+            if (step == "probe")
+                return !string.IsNullOrEmpty(AppConfig.Settings?.Base?.TloProbeName);
+            if (step == "g593")
+                return PositionTaught("G59.3");
+            return PositionTaught("G30");
+        }
+
+        private void GuidedStepPerformed(string step)
+        {
+            if (_guidedRerun)
+                _guidedRerunDone.Add(step);
+            RefreshStepColors();   // repaints the button, the next-step line and the summary
+        }
+
         private void GuidedSetup_Click(object sender, RoutedEventArgs e)
         {
             if (model == null)
                 return;
 
             var owner = Window.GetWindow(this);
+
+            // Already set up, and not already walking it again: offer to re-teach rather than no-op. This
+            // is the whole reason _guidedRerun exists - see its summary.
+            if (!_guidedRerun && ProbeStepStatus() == StepState.Complete)
+            {
+                if (AppDialogs.Show(owner,
+                        "Tool changing is already set up.\r\n\r\nRun through it again? Nothing is cleared until you answer each step, and you can stop at any point - what is already stored stays until it is replaced.",
+                        "Guided setup", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
+                    return;
+
+                _guidedRerun = true;
+                _guidedRerunDone.Clear();
+                UpdateGuidedSetup();
+            }
 
             // Step 0 - there has to be something to measure with. The page seeds a generic touch plate, so
             // this is about a DELIBERATE answer existing, not about the list being non-empty.
@@ -1867,7 +1917,7 @@ namespace CNC.Controls
 
             // Step 1 - which probe measures tool length. Only asked when there is a real choice; with one
             // candidate, asking would be theatre.
-            if (string.IsNullOrEmpty(AppConfig.Settings?.Base?.TloProbeName))
+            if (!GuidedStepDone("probe"))
             {
                 var candidates = ProbeDefinitions.Items
                                     .Where(x => x.ProbeType == ProbeType.ToolSetter || x.ProbeType == ProbeType.TouchPlate)
@@ -1894,15 +1944,14 @@ namespace CNC.Controls
                 }
 
                 AppConfig.Settings.Base.TloProbeName = chosen.Name;
-                RefreshStepColors();
-                UpdateGuidedSetup();
+                GuidedStepPerformed("probe");
                 AppDialogs.Show(owner, string.Format("{0} will measure tool length.\r\n\r\nPress Guided setup again for the next step.", chosen.Name),
                     "Guided setup", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             // Step 2 - the target surface, the tool-length baseline and G59.3, all from one probe.
-            if (!PositionTaught("G59.3"))
+            if (!GuidedStepDone("g593"))
             {
                 var p = SelectedTloProbe();
                 double search = p?.ProbeDistance ?? 0d;   // "max probing move" - the real field, see ProbeDefinition
@@ -1918,13 +1967,14 @@ namespace CNC.Controls
                         "Guided setup - probe the target", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK)
                     return;
 
+                GuidedStepPerformed("g593");        // PERFORMED, not succeeded - the probe finishes async
                 ProbeTloTarget_Click(null, null);   // completes asynchronously; the next press carries on
                 return;
             }
 
             // Step 3 - the park. Placed relative to G59.3 so the tool change does not travel further than
             // it must; the operator picks the side, because which one is clear is a fact about the bench.
-            if (!PositionTaught("G30"))
+            if (!GuidedStepDone("g30"))
             {
                 var which = AppDialogs.Show(owner,
                         string.Format("Where should the machine park to swap tools?\r\n\r\n" +
@@ -1936,8 +1986,15 @@ namespace CNC.Controls
                     return;
 
                 PlaceG30(which == MessageBoxResult.Yes ? -1 : 1);
+                GuidedStepPerformed("g30");
                 return;
             }
+
+            // A re-run that reached the end stops being a re-run, so the button goes back to reading
+            // stored state and the next press offers to walk it again rather than silently repeating.
+            _guidedRerun = false;
+            _guidedRerunDone.Clear();
+            UpdateGuidedSetup();
 
             AppDialogs.Show(owner, "Tool changing is set up: the tool-length probe is chosen, G59.3 and the reference are taught, and G30 is placed.",
                 "Guided setup", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1966,13 +2023,17 @@ namespace CNC.Controls
             var st = ProbeStepStatus();
             btnGuidedSetup.Foreground = st == StepState.Complete ? StepGreen : StepRed;
 
+            // Reads the same GuidedStepDone the sequence does, so during a re-run it says what the NEXT
+            // press will actually do rather than describing the stored state the re-run is ignoring. Two
+            // predicates would be two chances to disagree, and the line would be wrong exactly when the
+            // operator was relying on it.
             if (txtGuidedStatus != null)
                 txtGuidedStatus.Text =
-                    st == StepState.Complete ? "Done - press again only to re-teach something."
-                    : string.IsNullOrEmpty(AppConfig.Settings?.Base?.TloProbeName) ? "Not run. Next: choose which probe measures tool length."
-                    : !PositionTaught("G59.3") ? "Next: jog over the tool-length probe, then press Guided setup."
-                    : !PositionTaught("G30") ? "Next: choose which side of G59.3 the machine parks on."
-                    : "Not run.";
+                    !GuidedStepDone("probe") ? (_guidedRerun ? "Re-running. Next: choose which probe measures tool length."
+                                                             : "Not run. Next: choose which probe measures tool length.")
+                    : !GuidedStepDone("g593") ? "Next: jog over the tool-length probe, then press Guided setup."
+                    : !GuidedStepDone("g30") ? "Next: choose which side of G59.3 the machine parks on."
+                    : "Done - press again to run through it once more.";
 
             if (txtGuidedSummary != null)
             {
