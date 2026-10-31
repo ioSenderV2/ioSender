@@ -1892,12 +1892,11 @@ namespace CNC.Controls
 
             var owner = Window.GetWindow(this);
 
-            // Already set up, and not already walking it again: offer to re-teach rather than no-op. This
-            // is the whole reason _guidedRerun exists - see its summary.
+            // Already set up: offer to re-teach rather than no-op.
             if (!_guidedRerun && ProbeStepStatus() == StepState.Complete)
             {
                 if (AppDialogs.Show(owner,
-                        "Tool changing is already set up.\r\n\r\nRun through it again? Nothing is cleared until you answer each step, and you can stop at any point - what is already stored stays until it is replaced.",
+                        "Tool changing is already set up.\r\n\r\nRun through it again? Nothing is replaced until each step actually runs, so stopping part way leaves what you have.",
                         "Guided setup", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
                     return;
 
@@ -1906,8 +1905,27 @@ namespace CNC.Controls
                 UpdateGuidedSetup();
             }
 
-            // Step 0 - there has to be something to measure with. The page seeds a generic touch plate, so
-            // this is about a DELIBERATE answer existing, not about the list being non-empty.
+            GuidedNext();
+        }
+
+        /// <summary>
+        /// Carry the sequence forward from wherever it is. ONE PRESS RUNS THE WHOLE THING: each step hands
+        /// off to the next, the asynchronous ones by calling back here when their program finishes.
+        ///
+        /// It used to be a press per step, which was the implementation showing through the UI - the probe
+        /// completes asynchronously, so making the operator press again was the sequencer's problem turned
+        /// into the operator's job. MacroProcessor.Run has taken an onDone callback all along (the same one
+        /// AutoSquareWizard and FixtureEditDialog use); the flow just had to be written to use it.
+        ///
+        /// Still driven by what is actually stored, so a step done elsewhere is seen as done and an abort
+        /// costs nothing - but that is now an internal property, not something the operator has to know.
+        /// </summary>
+        private void GuidedNext()
+        {
+            var owner = Window.GetWindow(this);
+
+            // There has to be something to measure with. The page seeds a generic touch plate, so this is
+            // about a DELIBERATE answer existing, not about the list being non-empty.
             if ((ProbeDefinitions.Items?.Count ?? 0) == 0)
             {
                 AppDialogs.Show(owner, "Add the probe you actually own in the list above first - a toolsetter, or the touch plate.",
@@ -1915,8 +1933,7 @@ namespace CNC.Controls
                 return;
             }
 
-            // Step 1 - which probe measures tool length. Only asked when there is a real choice; with one
-            // candidate, asking would be theatre.
+            // 1 - which probe measures tool length. Only asked when there is a real choice.
             if (!GuidedStepDone("probe"))
             {
                 var candidates = ProbeDefinitions.Items
@@ -1929,76 +1946,107 @@ namespace CNC.Controls
                     return;
                 }
 
-                ProbeDefinition chosen = candidates[0];
-                if (candidates.Count > 1)
-                {
-                    // A toolsetter is the right answer whenever there is one, so it leads - but the operator
-                    // decides, because "I use the plate upside down" is a real setup.
-                    var preferred = candidates.FirstOrDefault(x => x.ProbeType == ProbeType.ToolSetter) ?? candidates[0];
-                    if (AppDialogs.Show(owner,
-                            string.Format("Which probe sits at the tool-measuring position?\r\n\r\nYes - {0}\r\nNo - pick a different one in the list above, then press Guided setup again.",
-                                          preferred.Name),
-                            "Guided setup", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-                        return;
-                    chosen = preferred;
-                }
+                var chosen = candidates.FirstOrDefault(x => x.ProbeType == ProbeType.ToolSetter) ?? candidates[0];
+                if (candidates.Count > 1 &&
+                    AppDialogs.Show(owner,
+                        string.Format("Which probe sits at the tool-measuring position?\r\n\r\nYes - {0}\r\nNo - pick a different one in the list above, then press Guided setup again.",
+                                      chosen.Name),
+                        "Guided setup", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                    return;
 
                 AppConfig.Settings.Base.TloProbeName = chosen.Name;
                 GuidedStepPerformed("probe");
-                // No "that's chosen, press again" dialog. The status line beside the button already says
-                // what the next press does, and an acknowledgement nobody asked for is a click wasted.
-                return;
-
+                // Falls straight through to the next step - no "press again".
             }
 
-            // Step 2 - the target surface, the tool-length baseline and G59.3, all from one probe.
-            // Step 2 - the target surface, the tool-length baseline and G59.3, all from one probe.
+            // 2 - the target surface, the tool-length baseline and G59.3, from one probe.
             //
-            // DELIBERATELY NO DIALOG. This used to put up a modal saying "jog over the toolsetter, then
-            // press OK" - which is a contradiction: the operator cannot jog while it is up. The run
-            // strip's jog buttons stay visible and reachable and simply do nothing, because the modal
-            // swallows the input, while KEYBOARD jogging still works (shortcuts reach dialogs since the
-            // keyboard rework) - so it looked like the jog pad was broken rather than blocked. Reported
-            // 2026-10-31.
-            //
-            // The instruction belongs on the page, where the status line beside the button already says
-            // it and nothing is blocked; the press itself is the "I am over it" signal.
-            // ProbeTloTarget is told the operator has already committed, so it does not ask again.
+            // The prompt is NON-MODAL on purpose. "Jog over the toolsetter, then press OK" inside a modal
+            // is a contradiction: the run strip's jog buttons stay visible and reachable and do nothing,
+            // because the modal swallows their input, while keyboard jogging still works - so it reads as
+            // a broken jog pad rather than a blocked one (reported 2026-10-31). Owned and
+            // ShowInTaskbar=false, with ActivateOwnerOnClose, matching the firmware-info window below.
             if (!GuidedStepDone("g593"))
             {
-                GuidedStepPerformed("g593");        // PERFORMED, not succeeded - the probe finishes async
-                ProbeTloTarget(true);
+                var p = SelectedTloProbe();
+                ShowJogPrompt(string.Format("Jog the spindle over the middle of {0}, with a tool or probe fitted.\r\n\r\nPress OK when you are there and it will probe straight down.",
+                                            p?.Name ?? "the tool-length probe"),
+                    () =>
+                    {
+                        GuidedStepPerformed("g593");
+                        ProbeTloTarget(true, ok => { if (ok) GuidedNext(); });
+                    });
                 return;
             }
-            // Step 3 - the park. Placed relative to G59.3 so the tool change does not travel further than
-            // it must; the operator picks the side, because which one is clear is a fact about the bench.
+
+            // 3 - the park, placed relative to G59.3. The operator picks the side, because which one is
+            // clear is a fact about the bench.
             if (!GuidedStepDone("g30"))
             {
                 var which = AppDialogs.Show(owner,
-                        string.Format("Where should the machine park to swap tools?\r\n\r\n" +
-                                      "Yes - {0:0} mm to −X of G59.3\r\nNo - {0:0} mm to +X\r\n\r\n" +
-                                      "THE MACHINE WILL MOVE to that position and store it as G30.",
+                        string.Format("Which way from G59.3 should the machine park to swap tools?\r\n\r\nYes - {0:0} mm to \u2212X\r\nNo - {0:0} mm to +X\r\n\r\nIt will move there and store it as G30.",
                                       G30ParkOffset),
-                        "Guided setup - park position", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+                        "Guided setup - park position", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
                 if (which == MessageBoxResult.Cancel)
                     return;
 
-                PlaceG30(which == MessageBoxResult.Yes ? -1 : 1, confirmed: true);
                 GuidedStepPerformed("g30");
+                PlaceG30(which == MessageBoxResult.Yes ? -1 : 1, confirmed: true, onDone: ok => { if (ok) GuidedNext(); });
                 return;
             }
 
-            // A re-run that reached the end stops being a re-run, so the button goes back to reading
-            // stored state and the next press offers to walk it again rather than silently repeating.
+            // Done. The button turns green and the summary shows the three values - saying so in a dialog
+            // would be a click to dismiss something already on screen.
             _guidedRerun = false;
             _guidedRerunDone.Clear();
             UpdateGuidedSetup();
-
-            // No "all done" popup either - the button turns green and the summary below it shows the
-            // three values. Saying so in a dialog is a click to dismiss a thing already on screen.
-
         }
 
+        private Window _jogPrompt;
+
+        /// <summary>
+        /// A non-modal "do this, then press OK" prompt. Non-modal is the whole point: the operator has to
+        /// be able to use the jog buttons while it is up.
+        /// </summary>
+        private void ShowJogPrompt(string message, System.Action onOk)
+        {
+            _jogPrompt?.Close();
+
+            var ok = new Button { Content = "OK", MinWidth = 86, MinHeight = 26, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
+            var cancel = new Button { Content = "Cancel", MinWidth = 86, MinHeight = 26, IsCancel = true };
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
+            buttons.Children.Add(ok);
+            buttons.Children.Add(cancel);
+
+            var panel = new StackPanel { Margin = new Thickness(16) };
+            panel.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MaxWidth = 420 });
+            panel.Children.Add(buttons);
+
+            var win = new Window
+            {
+                Title = "Guided setup",
+                Content = panel,
+                SizeToContent = SizeToContent.WidthAndHeight,
+                ResizeMode = ResizeMode.NoResize,
+                Owner = Window.GetWindow(this),
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ShowInTaskbar = false
+            };
+
+            bool accepted = false;
+            ok.Click += (s, e) => { accepted = true; win.Close(); };
+            cancel.Click += (s, e) => win.Close();
+            win.Closed += (s, e) =>
+            {
+                _jogPrompt = null;
+                if (accepted)
+                    onOk?.Invoke();
+            };
+            UIUtils.ActivateOwnerOnClose(win);
+
+            _jogPrompt = win;
+            win.Show();   // NON-modal - the jog buttons must keep working
+        }
         /// <summary>
         /// Paint the guided-setup button and its summary from the same facts the step dot uses. Red until
         /// the step is complete, so the page says at a glance whether this machine has been through it.
@@ -2028,11 +2076,11 @@ namespace CNC.Controls
             // operator was relying on it.
             if (txtGuidedStatus != null)
                 txtGuidedStatus.Text =
-                    !GuidedStepDone("probe") ? (_guidedRerun ? "Re-running. Next: choose which probe measures tool length."
-                                                             : "Not run. Next: choose which probe measures tool length.")
-                    : !GuidedStepDone("g593") ? "Next: jog over the tool-length probe, then press Guided setup."
-                    : !GuidedStepDone("g30") ? "Next: choose which side of G59.3 the machine parks on."
-                    : "Done - press again to run through it once more.";
+                    !GuidedStepDone("probe") ? (_guidedRerun ? "Re-running - it will take you through each step."
+                                                             : "Not run - one press takes you through the whole thing.")
+                    : !GuidedStepDone("g593") ? "In progress - probing the tool-length target."
+                    : !GuidedStepDone("g30") ? "In progress - placing the park position."
+                    : "Done. Press to run through it again.";
 
             if (txtGuidedSummary != null)
             {
@@ -2050,7 +2098,7 @@ namespace CNC.Controls
         /// the click handler so the guided sequence can call it without fabricating a sender whose Tag says
         /// which way to go - the direction is the argument it always was.
         /// </summary>
-        private void PlaceG30(int sign, bool confirmed = false)
+        private void PlaceG30(int sign, bool confirmed = false, System.Action<bool> onDone = null)
         {
             if (model == null)
                 return;
@@ -2112,7 +2160,7 @@ namespace CNC.Controls
             // confirm: !confirmed - MacroProcessor.Run asks its own "run this?" question, which is the
             // THIRD prompt for one decision when the guided step has already asked. The flag has to reach
             // here, not just the dialog above it, or the sequence still stutters.
-            if (MacroProcessor.Run(model, "Set G30", b.ToString(), !confirmed))
+            if (MacroProcessor.Run(model, "Set G30", b.ToString(), !confirmed, onDone: onDone))
                 RefreshStoredPositionsAfterWrite();
         }
 
@@ -2155,7 +2203,7 @@ namespace CNC.Controls
         /// the same thing is the "ten dialogs to do three things" the operator objected to - the question
         /// was answered, so asking again is not safety, it is noise.
         /// </param>
-        private void ProbeTloTarget(bool confirmed)
+        private void ProbeTloTarget(bool confirmed, System.Action<bool> onDone = null)
         {
             if (model == null)
                 return;
@@ -2366,7 +2414,7 @@ namespace CNC.Controls
             model.PropertyChanged += doneHandler;
 
             // confirm: !confirmed - see PlaceG30. The guided step has already committed the operator.
-            if (!MacroProcessor.Run(model, "Probe the target", b.ToString(), !confirmed))
+            if (!MacroProcessor.Run(model, "Probe the target", b.ToString(), !confirmed, onDone: onDone))
             {
                 model.PropertyChanged -= doneHandler;
                 model.PropertyChanged -= zHandler;
