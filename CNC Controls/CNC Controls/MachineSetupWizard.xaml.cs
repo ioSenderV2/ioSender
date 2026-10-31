@@ -2109,7 +2109,10 @@ namespace CNC.Controls
             b.AppendLine(string.Format("G53 G0 X{0} Y{1}", x.ToInvariantString("0.0##"), y.ToInvariantString("0.0##")));
             b.AppendLine("G30.1");
 
-            if (MacroProcessor.Run(model, "Set G30", b.ToString(), true))
+            // confirm: !confirmed - MacroProcessor.Run asks its own "run this?" question, which is the
+            // THIRD prompt for one decision when the guided step has already asked. The flag has to reach
+            // here, not just the dialog above it, or the sequence still stutters.
+            if (MacroProcessor.Run(model, "Set G30", b.ToString(), !confirmed))
                 RefreshStoredPositionsAfterWrite();
         }
 
@@ -2362,7 +2365,8 @@ namespace CNC.Controls
             };
             model.PropertyChanged += doneHandler;
 
-            if (!MacroProcessor.Run(model, "Probe the target", b.ToString(), true))
+            // confirm: !confirmed - see PlaceG30. The guided step has already committed the operator.
+            if (!MacroProcessor.Run(model, "Probe the target", b.ToString(), !confirmed))
             {
                 model.PropertyChanged -= doneHandler;
                 model.PropertyChanged -= zHandler;
