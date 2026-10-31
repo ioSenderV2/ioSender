@@ -712,22 +712,44 @@ namespace CNC.Core
         /// </summary>
         public bool ToolOffsetMissingForProgram()
         {
-            if (!model.IsPhysicalFileLoaded || Source.ToolChanges > 0)
-                return false;
-            if (!GrblSettings.HasSetting(grblHALSetting.ToolChangeMode)
-                || GrblSettings.GetInteger(grblHALSetting.ToolChangeMode) <= 0)
-                return false;
+            // Every term logged, with its raw value, because four of them can independently return false and
+            // "no prompt appeared" does not say which. -debuglog=run.
+            bool physical = model.IsPhysicalFileLoaded;
+            int toolChanges = Source.ToolChanges;
+            bool hasMode = GrblSettings.HasSetting(grblHALSetting.ToolChangeMode);
+            int mode = hasMode ? GrblSettings.GetInteger(grblHALSetting.ToolChangeMode) : int.MinValue;
 
-            if (!GrblParserState.Get(model) || !GrblWorkParameters.Get())
+            if (!physical || toolChanges > 0 || !hasMode || mode <= 0)
+            {
+                DebugLog.Write("run", string.Format(
+                    "ToolOffsetMissingForProgram: NO - physical={0} toolChanges={1} hasMode($341)={2} mode={3}",
+                    physical, toolChanges, hasMode, mode == int.MinValue ? "(absent)" : mode.ToString()));
                 return false;
+            }
+
+            bool gotState = GrblParserState.Get(model);
+            bool gotParams = GrblWorkParameters.Get();
+            if (!gotState || !gotParams)
+            {
+                DebugLog.Write("run", string.Format(
+                    "ToolOffsetMissingForProgram: NO - query failed, $G={0} $#={1} (unknown is not a fault)",
+                    gotState, gotParams));
+                return false;
+            }
 
             // Both halves, because either alone has a blind spot. IsToolOffsetActive reads $G's G49 on
             // grblHAL - authoritative about whether an offset is in force at all - while a G43.1 holding
             // exactly zero is "active" and still means no compensation. $G showing G49 right before a job
             // is the tell the August write-up names.
-            return !model.IsToolOffsetActive
-                   || double.IsNaN(model.ToolOffset.Z)
-                   || model.ToolOffset.Z == 0d;
+            bool offsetActive = model.IsToolOffsetActive;
+            double tloZ = model.ToolOffset.Z;
+            bool missing = !offsetActive || double.IsNaN(tloZ) || tloZ == 0d;
+
+            DebugLog.Write("run", string.Format(
+                "ToolOffsetMissingForProgram: {0} - offsetActive={1} TLO.Z={2} tloRefSet={3} tool={4}",
+                missing ? "YES" : "no", offsetActive, tloZ, model.IsTloReferenceSet, model.Tool));
+
+            return missing;
         }
 
         /// <summary>A different program was loaded (or the loaded one cleared): reset the line accounting.</summary>
