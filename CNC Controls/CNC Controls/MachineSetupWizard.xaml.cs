@@ -462,6 +462,10 @@ namespace CNC.Controls
             SetStepColor(hdrMacros, StepStatusOf(7));
             SetStepColor(hdrSimulator, StepState.Complete);
 
+            // Keep the guided button, its next-step line and the collapse in step with the same facts the
+            // dots were just painted from - this is the one place that already runs after every change.
+            UpdateGuidedSetup();
+
             StepStatusChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -1824,10 +1828,173 @@ namespace CNC.Controls
         /// </summary>
         private void PlaceG30_Click(object sender, RoutedEventArgs e)
         {
+            PlaceG30((sender as FrameworkElement)?.Tag as string == "-1" ? -1 : 1);
+        }
+
+        /// <summary>
+        /// Guided setup: do the NEXT thing that has not been done, then stop.
+        ///
+        /// RESUMABLE BY STATE RATHER THAN BY A COUNTER, and that is the whole design. Each press asks what
+        /// is actually stored - the chosen tool-length probe, G59.3, G30 - and acts on the first gap. So an
+        /// abort half way through costs nothing but another press, a step redone by hand outside this
+        /// button is simply seen as done, and there is no progress variable that can disagree with the
+        /// machine. It reads the same facts <see cref="ProbeStepStatus"/> does, so the button and the step
+        /// dot can never tell different stories.
+        ///
+        /// It also sidesteps the thing that would otherwise force a rewrite: the probe step finishes
+        /// ASYNCHRONOUSLY (ProbeTloTarget_Click streams a program and completes on a message), so a
+        /// straight-line sequencer would need that handler to grow a completion callback - a change to
+        /// probing code. One step per press needs no such thing.
+        ///
+        /// Nothing here moves the machine except the probe descent and the G30 placement move, and both of
+        /// those are the existing actions, with the existing confirmations and refusals.
+        /// </summary>
+        private void GuidedSetup_Click(object sender, RoutedEventArgs e)
+        {
             if (model == null)
                 return;
 
-            int sign = (sender as FrameworkElement)?.Tag as string == "-1" ? -1 : 1;
+            var owner = Window.GetWindow(this);
+
+            // Step 0 - there has to be something to measure with. The page seeds a generic touch plate, so
+            // this is about a DELIBERATE answer existing, not about the list being non-empty.
+            if ((ProbeDefinitions.Items?.Count ?? 0) == 0)
+            {
+                AppDialogs.Show(owner, "Add the probe you actually own in the list above first - a toolsetter, or the touch plate.",
+                    "Guided setup", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // Step 1 - which probe measures tool length. Only asked when there is a real choice; with one
+            // candidate, asking would be theatre.
+            if (string.IsNullOrEmpty(AppConfig.Settings?.Base?.TloProbeName))
+            {
+                var candidates = ProbeDefinitions.Items
+                                    .Where(x => x.ProbeType == ProbeType.ToolSetter || x.ProbeType == ProbeType.TouchPlate)
+                                    .ToList();
+                if (candidates.Count == 0)
+                {
+                    AppDialogs.Show(owner, "None of the probes defined above can measure tool length. Add a toolsetter, or a touch plate.",
+                        "Guided setup", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                ProbeDefinition chosen = candidates[0];
+                if (candidates.Count > 1)
+                {
+                    // A toolsetter is the right answer whenever there is one, so it leads - but the operator
+                    // decides, because "I use the plate upside down" is a real setup.
+                    var preferred = candidates.FirstOrDefault(x => x.ProbeType == ProbeType.ToolSetter) ?? candidates[0];
+                    if (AppDialogs.Show(owner,
+                            string.Format("Which probe sits at the tool-measuring position?\r\n\r\nYes - {0}\r\nNo - pick a different one in the list above, then press Guided setup again.",
+                                          preferred.Name),
+                            "Guided setup", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                        return;
+                    chosen = preferred;
+                }
+
+                AppConfig.Settings.Base.TloProbeName = chosen.Name;
+                RefreshStepColors();
+                UpdateGuidedSetup();
+                AppDialogs.Show(owner, string.Format("{0} will measure tool length.\r\n\r\nPress Guided setup again for the next step.", chosen.Name),
+                    "Guided setup", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // Step 2 - the target surface, the tool-length baseline and G59.3, all from one probe.
+            if (!PositionTaught("G59.3"))
+            {
+                var p = SelectedTloProbe();
+                double search = p?.ProbeDistance ?? 0d;   // "max probing move" - the real field, see ProbeDefinition
+                string within = search > 0d
+                    ? string.Format(CultureInfo.InvariantCulture, "within {0:0} mm above it", search)
+                    : "just above it";
+
+                if (AppDialogs.Show(owner,
+                        string.Format("Jog the spindle over the middle of {0}, {1}, with a tool or probe fitted.\r\n\r\n" +
+                                      "Then press OK and it will probe straight down - recording the target surface, the tool-length reference and G59.3 together.\r\n\r\n" +
+                                      "THE MACHINE WILL MOVE DOWN when you press OK.",
+                                      p?.Name ?? "the tool-length probe", within),
+                        "Guided setup - probe the target", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK)
+                    return;
+
+                ProbeTloTarget_Click(null, null);   // completes asynchronously; the next press carries on
+                return;
+            }
+
+            // Step 3 - the park. Placed relative to G59.3 so the tool change does not travel further than
+            // it must; the operator picks the side, because which one is clear is a fact about the bench.
+            if (!PositionTaught("G30"))
+            {
+                var which = AppDialogs.Show(owner,
+                        string.Format("Where should the machine park to swap tools?\r\n\r\n" +
+                                      "Yes - {0:0} mm to −X of G59.3\r\nNo - {0:0} mm to +X\r\n\r\n" +
+                                      "THE MACHINE WILL MOVE to that position and store it as G30.",
+                                      G30ParkOffset),
+                        "Guided setup - park position", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+                if (which == MessageBoxResult.Cancel)
+                    return;
+
+                PlaceG30(which == MessageBoxResult.Yes ? -1 : 1);
+                return;
+            }
+
+            AppDialogs.Show(owner, "Tool changing is set up: the tool-length probe is chosen, G59.3 and the reference are taught, and G30 is placed.",
+                "Guided setup", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        /// <summary>
+        /// Paint the guided-setup button and its summary from the same facts the step dot uses. Red until
+        /// the step is complete, so the page says at a glance whether this machine has been through it.
+        /// </summary>
+        private void UpdateGuidedSetup()
+        {
+            if (btnGuidedSetup == null)
+                return;
+
+            // Hide what the guided flow replaces. Done HERE, not with a static Visibility in the markup,
+            // because UpdateTloRefControls and UpdateReferencePositions set these back to Visible as part
+            // of their own logic - a static value would simply be overwritten the first time either ran.
+            // The controls have to keep existing: ProbeTloTarget_Click reads chkTloRef3dProbe, and the
+            // whole agreement was to sequence the existing actions rather than reimplement a probe path.
+            foreach (var el in new UIElement[] { secTloHdr, secTloDesc, secTloPickRow, brdTloFixedWarn,
+                                                 sec65Row, secRefHdr, secRefDesc, secRefGrid,
+                                                 txtTloSearchValue, txtTloProbePlan, secRefAdjacent })
+                if (el != null)
+                    el.Visibility = Visibility.Collapsed;
+
+            var st = ProbeStepStatus();
+            btnGuidedSetup.Foreground = st == StepState.Complete ? StepGreen : StepRed;
+
+            if (txtGuidedStatus != null)
+                txtGuidedStatus.Text =
+                    st == StepState.Complete ? "Done - press again only to re-teach something."
+                    : string.IsNullOrEmpty(AppConfig.Settings?.Base?.TloProbeName) ? "Not run. Next: choose which probe measures tool length."
+                    : !PositionTaught("G59.3") ? "Next: jog over the tool-length probe, then press Guided setup."
+                    : !PositionTaught("G30") ? "Next: choose which side of G59.3 the machine parks on."
+                    : "Not run.";
+
+            if (txtGuidedSummary != null)
+            {
+                string tlo = AppConfig.Settings?.Base?.TloProbeName;
+                txtGuidedSummary.Text = string.Format(CultureInfo.InvariantCulture,
+                    "tool-length probe : {0}\r\nG59.3             : {1}\r\nG30               : {2}",
+                    string.IsNullOrEmpty(tlo) ? "not chosen" : tlo,
+                    PositionTaught("G59.3") ? DescribeStoredPosition("G59.3") : "not taught",
+                    PositionTaught("G30") ? DescribeStoredPosition("G30") : "not taught");
+            }
+        }
+
+        /// <summary>
+        /// Place G30 one <see cref="G30ParkOffset"/> to the given side of G59.3 and store it. Split out of
+        /// the click handler so the guided sequence can call it without fabricating a sender whose Tag says
+        /// which way to go - the direction is the argument it always was.
+        /// </summary>
+        private void PlaceG30(int sign)
+        {
+            if (model == null)
+                return;
+
             // The distance comes from G30ParkOffset - the ONE place it is written - and so do the button
             // captions and the refusal message below. Nothing restates it.
             //

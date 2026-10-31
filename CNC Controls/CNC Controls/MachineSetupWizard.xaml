@@ -381,15 +381,40 @@
                     <!-- Questions 2 and 3, BELOW the table (grid row 2) - see the row comment above. -->
                     <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,10,0,0">
 
+                        <!-- ===== Guided setup =====
+                             Sections 2 and 3 asked the operator three questions across eleven controls,
+                             with four paragraphs of explanation that were the smallest text on the page.
+                             All of it is one job - make a tool change work - and the order never varied,
+                             so it is now one button that does the next unfinished piece.
+
+                             RESUMABLE BY STATE, NOT BY A COUNTER. Each press looks at what is actually
+                             stored - the chosen tool-length probe, G59.3, G30 - and does the first thing
+                             missing, so an abort costs nothing but another press and there is no progress
+                             variable to fall out of step with the machine. Same facts the step dot uses.
+
+                             The old controls still EXIST and are collapsed by UpdateGuidedSetup: the probe
+                             program reads chkTloRef3dProbe and the TLO reference controls, so the markup
+                             has to be here for the logic the guided flow reuses. Collapsed from code
+                             rather than statically because UpdateTloRefControls re-shows several of them.
+                        -->
+                        <TextBlock x:Uid="txt_guidedHdr" x:Name="txtGuidedHdr" Text="2 &#183; Set up tool changing" FontWeight="SemiBold" FontSize="15" Margin="0,14,0,2"/>
+                        <TextBlock x:Uid="txt_guidedDesc" x:Name="txtGuidedDesc" TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Text="One pass teaches everything a tool change needs: which probe measures tool length, where it sits (G59.3), the tool-length reference, and where the machine parks to swap tools (G30). You jog; nothing moves on its own except the probe going down."/>
+                        <StackPanel x:Name="pnlGuidedRow" Orientation="Horizontal" Margin="10,0,0,0">
+                            <Button x:Uid="btn_guidedSetup" x:Name="btnGuidedSetup" Content="Guided setup" Padding="16,5" MinHeight="32" FontWeight="SemiBold" Click="GuidedSetup_Click"
+                                    ToolTip="Runs the next step that has not been done yet. Safe to press again after an abort."/>
+                            <TextBlock x:Name="txtGuidedStatus" VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap" MaxWidth="620"/>
+                        </StackPanel>
+                        <TextBlock x:Name="txtGuidedSummary" Margin="10,10,0,0" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" Foreground="#FF5A5A5A"/>
                         <!-- ===== Which probe measures tool length =====
                              Asked second, because it is a choice AMONG the definitions above. All eligible
                              answers probe the same way - straight down at G59.3 - so what this really
                              settles is whose feeds get used, and what advice to give: a puck is bolted
                              down, a plate is a loose object that has to be made to land in the same spot. -->
-                        <TextBlock x:Uid="txt_tloProbeHdr" Text="2 · Which one measures tool length?" FontWeight="SemiBold" Margin="0,4,0,3"/>
-                        <TextBlock x:Uid="txt_tloProbeDesc" TextWrapping="Wrap" Margin="0,0,0,4"
+                        <TextBlock x:Uid="txt_tloProbeHdr" x:Name="secTloHdr" Text="2 · Which one measures tool length?" FontWeight="SemiBold" Margin="0,4,0,3"/>
+                        <TextBlock x:Uid="txt_tloProbeDesc" x:Name="secTloDesc" TextWrapping="Wrap" Margin="0,0,0,4"
                                    Text="Tool length is measured at the G59.3 position below. A dedicated toolsetter is the usual answer; with no toolsetter, a touch plate does the same job - including your corner plate turned upside down, probed in the middle clear of its lips."/>
-                        <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
+                        <StackPanel x:Name="secTloPickRow" Orientation="Horizontal" Margin="10,0,0,0">
                             <!-- No fixed Width. It was 130 and clipped its own English text to "Tool-length p", and this
                                  label is localized through its x:Uid - every translation is a different
                                  length, so a hard-coded box can only ever be wrong somewhere. -->
@@ -407,7 +432,7 @@
                              preference, so the page states what it is, what it should be, and offers the
                              change. It does not write it silently: this is a controller setting the
                              operator may have chosen deliberately. -->
-                        <StackPanel Orientation="Horizontal" Margin="10,6,0,0">
+                        <StackPanel x:Name="sec65Row" Orientation="Horizontal" Margin="10,6,0,0">
                             <TextBlock x:Uid="txt_probingFlags" x:Name="txtProbingFlags" TextWrapping="Wrap" FontSize="12"
                                        Foreground="#FF5A5A5A" MaxWidth="640" VerticalAlignment="Center"/>
                             <Button x:Uid="btn_fixProbingFlags" x:Name="btnFixProbingFlags" Content="Turn it off" Margin="10,0,0,0"
@@ -421,15 +446,15 @@
                              FOR - and a machine with them unset or badly placed does not fail loudly, it
                              just makes every tool change long, or drives the spindle into the puck. The
                              contract below is tc.macro's own "Required state" section, not a paraphrase. -->
-                        <TextBlock x:Uid="txt_refPosHdr" Text="3 · Where do the reference positions go?" FontWeight="SemiBold" Margin="0,10,0,3"/>
-                        <TextBlock x:Uid="txt_refPosDesc" TextWrapping="Wrap" Margin="0,0,0,5"
+                        <TextBlock x:Uid="txt_refPosHdr" x:Name="secRefHdr" Text="3 · Where do the reference positions go?" FontWeight="SemiBold" Margin="0,10,0,3"/>
+                        <TextBlock x:Uid="txt_refPosDesc" x:Name="secRefDesc" TextWrapping="Wrap" Margin="0,0,0,5"
                                    Text="A tool change runs G30 → G59.3 → G30: park so you can reach the spindle, go and measure the new tool, come back. Work down these in order - each one is easier once the one above it is known."/>
                         <!-- Two items now, not three. The tool-length target and G59.3 are set by ONE
                              probe (ProbeTloTarget_Click), so they are one row - there is no separate way to
                              set G59.3 from this page any more. Two buttons writing the same stored position
                              is exactly how one of them came to use G10 L20 and fold the tool length in. The
                              Offsets tab can still edit G59.3 by hand. -->
-                        <Grid Margin="10,0,0,4">
+                        <Grid x:Name="secRefGrid" Margin="10,0,0,4">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
@@ -478,7 +503,7 @@
                              way to know what bounds the descent unless it is said here. Filled in by
                              UpdateReferencePositions with the selected probe's own number. -->
                         <TextBlock x:Name="txtTloProbePlan" x:Uid="txt_tloProbePlan" TextWrapping="Wrap" Margin="10,6,0,0" FontSize="12" Foreground="#FF5A5A5A"/>
-                        <TextBlock x:Uid="txt_refPosAdjacent" TextWrapping="Wrap" Margin="10,4,0,8" FontSize="12" Foreground="#FF5A5A5A"
+                        <TextBlock x:Uid="txt_refPosAdjacent" x:Name="secRefAdjacent" TextWrapping="Wrap" Margin="10,4,0,8" FontSize="12" Foreground="#FF5A5A5A"
                                    Text="Put them next to each other. Every tool change travels G30 → G59.3 and back, so the gap between them is paid twice per tool, every job."/>
 
                     </StackPanel>
