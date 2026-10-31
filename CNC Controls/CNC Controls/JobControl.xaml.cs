@@ -1214,10 +1214,13 @@ namespace CNC.Controls
             // The program's own first Z move then descends over the stock, and its first XY runs inside the
             // footprint it is about to cut.
             //
-            // The work ORIGIN rather than the program's first XY on purpose: the origin is a real stored
-            // number in the active WCS, where the first XY would have to come from the parsed program - and
-            // parsing is for the 3D view, never for deciding a move. The one thing this does not clear is a
-            // clamp sitting exactly on the origin corner.
+            // The work ORIGIN rather than the program's first XY, and it is the BETTER destination, not just
+            // the cheaper one. The origin is PROVEN CLEAR BY CONSTRUCTION: Setup cannot have established this
+            // origin unless the probe could descend onto that corner and run two face probes there, so a
+            // clamp over it would have stopped Setup long before any program ran. Nothing proves the same of
+            // a first XY read out of the program - and that number would have to come from the parse, which
+            // is for the 3D view and never for deciding a move. Settled 2026-10-31; do not re-propose
+            // parsing the first move for this.
             b.AppendLine("G53 G0 Z0");
             b.AppendLine("G0 X0 Y0");
 
