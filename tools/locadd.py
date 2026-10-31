@@ -127,6 +127,11 @@ TARGETS = [
     # CNC.Controls.Viewer (the 3D/carve viewer)
     ('CNC GCodeViewer/CNC GCodeViewer/CarveView.xaml', 'CNC.Controls.Viewer'),
     ('CNC GCodeViewer/CNC GCodeViewer/ViewOptionsDialog.xaml', 'CNC.Controls.Viewer'),
+    # The options themselves, extracted out of ViewOptionsDialog 2026-10-30 so the dialog and
+    # Settings > User Interface > 3D View can host one definition. Both hosts need listing: a file
+    # missing from here produces NO locale rows and says so only by adding 0 of them.
+    ('CNC GCodeViewer/CNC GCodeViewer/CarveViewOptionsControl.xaml', 'CNC.Controls.Viewer'),
+    ('CNC GCodeViewer/CNC GCodeViewer/CarveViewConfigControl.xaml', 'CNC.Controls.Viewer'),
 
     # CNC.Controls.Camera (the camera view + its App-settings panel)
     ('CNC Controls Camera/CNC Controls Camera/ConfigControl.xaml', 'CNC.Controls.Camera'),

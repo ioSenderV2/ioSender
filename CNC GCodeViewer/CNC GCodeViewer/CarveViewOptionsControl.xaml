@@ -1,0 +1,92 @@
+﻿<UserControl x:Class="CNC.Controls.Viewer.CarveViewOptionsControl"
+             x:Uid="ctl_carveViewOptions"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:CNC.Controls.Viewer"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d" d:DesignWidth="320">
+    <!-- THE 3D VIEW'S OPTIONS, DEFINED ONCE AND HOSTED TWICE: by ViewOptionsDialog (the View options
+         button on the view itself) and by CarveViewConfigControl (Settings > User Interface > 3D View).
+         Extracted 2026-10-30 when the settings page was added, deliberately rather than duplicating the
+         markup - a page and a dialog editing the same settings from two copies of the same controls is
+         the shape that drifts, and this project already has one "second authority over the same thing"
+         problem it did not need a second of.
+
+         DataContext is the live CarveViewConfig in both hosts, and every option applies as it is
+         toggled: the result of each is visible behind the dialog the moment it changes, so there is no
+         OK/Cancel. Each host owns SAVING - the dialog on close, the settings page through the settings
+         host's own Save. -->
+    <StackPanel>
+        <TextBlock x:Uid="vo_intro" TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,8"
+                   Text="What the 3D view draws. Changes apply straight away."/>
+
+        <CheckBox x:Uid="vo_rapids" x:Name="chkRapids" Content="Rapid moves" Margin="0,4,0,0"
+                  ToolTip="The grey lines between cuts. Hiding them leaves only the cutting path."
+                  IsChecked="{Binding Path=ShowRapids, Mode=TwoWay}"/>
+        <CheckBox x:Uid="vo_stock" x:Name="chkStock" Content="Stock block" Margin="0,4,0,0"
+                  ToolTip="The material the program cuts into. Hide it to see the whole toolpath, including the parts inside the material."
+                  IsChecked="{Binding Path=ShowStock, Mode=TwoWay}"/>
+        <CheckBox x:Uid="vo_grid" x:Name="chkGrid" Content="Bed grid" Margin="0,4,0,0"
+                  ToolTip="The table grid: 50 mm squares, heavier line every 100 mm."
+                  IsChecked="{Binding Path=ShowGrid, Mode=TwoWay}"/>
+        <CheckBox x:Uid="vo_stored" x:Name="chkStored" Content="Stored positions" Margin="0,4,0,0"
+                  ToolTip="The G30 park and toolsetter signs on the bed, and the dot at machine zero."
+                  IsChecked="{Binding Path=ShowStoredPositions, Mode=TwoWay}"/>
+
+        <TextBlock x:Uid="vo_during" Text="DURING A CARVE" Foreground="Gray" FontSize="10" Margin="0,14,0,2" Background="Transparent"
+                   ToolTip="What the view does while a job is actually running. Both are off by default: the view shares a thread with the running job's screen updates, so work done here competes with them."/>
+
+        <CheckBox x:Uid="vo_trackTool" x:Name="chkTrackTool" Content="Update tool position in 3D view during a carve" Margin="0,4,0,0"
+                  ToolTip="Follow the cutter with the tool cone while the job runs. Off by default; the view is otherwise frozen until the job ends."
+                  IsChecked="{Binding Path=TrackToolDuringCarve, Mode=TwoWay}"/>
+        <!-- Gated on the parent: carving the stock without moving the tool is meaningless, and the
+             expensive half should not be reachable without the cheap one being wanted first. The
+             getter enforces the same thing, so a stored true cannot spring back when the parent is
+             re-enabled. -->
+        <CheckBox x:Uid="vo_trackRemoval" x:Name="chkTrackRemoval" Content="Update material removal in 3D view during a carve" Margin="18,4,0,0"
+                  ToolTip="Also cut the stock away as the machine moves. This is the expensive half - it rebuilds the stock mesh on every status report. Measured 2026-10-30: it roughly doubled UI input lateness and the cost grew as the carve accumulated."
+                  IsEnabled="{Binding Path=TrackToolDuringCarve}"
+                  IsChecked="{Binding Path=TrackRemovalDuringCarve, Mode=TwoWay}"/>
+
+        <!-- Background="Transparent" is load-bearing on these labels: a TextBlock with a null background is
+             not hit-testable, so the tooltip would never appear however long you hovered. -->
+        <TextBlock x:Uid="vo_colours" Text="COLOURS" Foreground="Gray" FontSize="10" Margin="0,14,0,2" Background="Transparent"
+                   ToolTip="Lighting and viewing angle change how a colour looks in the view - a surface renders darker than its swatch, and darker still on faces turned away from the light."/>
+
+        <Grid Margin="0,2,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock x:Uid="vo_lblCut" Grid.Row="0" Grid.Column="0" Text="Cut moves" VerticalAlignment="Center" Margin="0,3" Background="Transparent"
+                       ToolTip="Drawn as lines, which are not lit - this colour appears in the view exactly as picked."/>
+            <local:ColorPicker x:Uid="vo_clrCut" x:Name="clrCut" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Margin="12,3,0,3"
+                               ToolTip="Drawn as lines, which are not lit - this colour appears in the view exactly as picked."
+                               SelectedColor="{Binding Path=CutColor, Mode=TwoWay}"/>
+
+            <TextBlock x:Uid="vo_lblRapid" Grid.Row="1" Grid.Column="0" Text="Rapid moves" VerticalAlignment="Center" Margin="0,3" Background="Transparent"
+                       ToolTip="Drawn as lines, which are not lit - this colour appears in the view exactly as picked."/>
+            <local:ColorPicker x:Uid="vo_clrRapid" x:Name="clrRapid" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="12,3,0,3"
+                               ToolTip="Drawn as lines, which are not lit - this colour appears in the view exactly as picked."
+                               SelectedColor="{Binding Path=RapidColor, Mode=TwoWay}"/>
+
+            <TextBlock x:Uid="vo_lblStock" Grid.Row="2" Grid.Column="0" Text="Stock" VerticalAlignment="Center" Margin="0,3" Background="Transparent"
+                       ToolTip="The stock is a lit surface, so it renders darker than the swatch and its sides darker again. Cut and rapid are lines, which take the colour exactly."/>
+            <local:ColorPicker x:Uid="vo_clrStock" x:Name="clrStock" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" Margin="12,3,0,3"
+                               ToolTip="The stock is a lit surface, so it renders darker than the swatch and its sides darker again. Cut and rapid are lines, which take the colour exactly."
+                               SelectedColor="{Binding Path=StockColor, Mode=TwoWay}"/>
+        </Grid>
+
+        <Button x:Uid="vo_defaults" x:Name="btnDefaults" Content="Default colours" HorizontalAlignment="Left"
+                MinWidth="80" MinHeight="24" Margin="0,10,0,0"
+                ToolTip="Put the three colours back to the shipped palette." Click="btnDefaults_Click"/>
+    </StackPanel>
+</UserControl>

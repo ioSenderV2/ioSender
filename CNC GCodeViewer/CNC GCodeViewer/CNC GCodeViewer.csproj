@@ -81,6 +81,20 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Compile Include="CarveViewOptionsControl.xaml.cs">
+      <DependentUpon>CarveViewOptionsControl.xaml</DependentUpon>
+    </Compile>
+    <Page Include="CarveViewOptionsControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Compile Include="CarveViewConfigControl.xaml.cs">
+      <DependentUpon>CarveViewConfigControl.xaml</DependentUpon>
+    </Compile>
+    <Page Include="CarveViewConfigControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="CarveView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
