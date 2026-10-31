@@ -2173,8 +2173,15 @@ namespace CNC.Controls
             b.AppendLine("(Machine Setup - place G30 beside G59.3)");
             b.AppendLine("(PREREQ, connected, homed, noalarm)");
             b.AppendLine("G21 G90 G94 G17");
-            b.AppendLine(string.Format(CultureInfo.InvariantCulture, "G53 G0 Z{0}", safeZ.ToInvariantString("0.0##")));
+            // TOP OF TRAVEL FIRST, TRAVERSE, THEN DOWN ONTO THE PARK. This emitted the safe Z, then the
+            // traverse, then G30.1 - so it dropped to -5 over wherever it happened to be standing and
+            // crossed the table there. Five millimetres is a small exposure, but the ORDER is the thing:
+            // the one height guaranteed clear for every tool is machine zero, and the descent belongs
+            // after the crossing, over the destination. Same shape as Reference TLO above and #399's fix
+            // for Test position.
+            b.AppendLine("G53 G0 Z0");
             b.AppendLine(string.Format("G53 G0 X{0} Y{1}", x.ToInvariantString("0.0##"), y.ToInvariantString("0.0##")));
+            b.AppendLine(string.Format(CultureInfo.InvariantCulture, "G53 G0 Z{0}", safeZ.ToInvariantString("0.0##")));
             b.AppendLine("G30.1");
 
             // confirm: !confirmed - MacroProcessor.Run asks its own "run this?" question, which is the
@@ -3168,7 +3175,19 @@ namespace CNC.Controls
             b.AppendLine("(PREREQ, connected, homed, noalarm, ATC=1, G30, G59.3)");
             b.AppendLine("G21 G90 G94 G17");
             b.AppendLine("G49");
-            b.AppendLine("G53 G0 Z-5");
+            // LIFT TO THE TOP OF Z BEFORE CROSSING, AND DESCEND ONLY ONCE OVER THE TARGET.
+            //
+            // This was "G53 G0 Z-5" before the traverse and "G53 G0 Z<g593.Z>" after it. Coming up from a
+            // probe that retracts correctly - but arriving from G30, which PlaceG30 parks at Z-5, the
+            // machine is already there and crosses the whole table 5 mm below the top, lifting only after
+            // it has arrived. The lift after the crossing achieves nothing: anything standing proud - a
+            // clamp, a vise, tall stock - is in the path on the way over. Reported on the Mega V,
+            // 2026-10-31.
+            //
+            // Machine zero is the TOP of Z travel, so G53 G0 Z0 is the one height clear for every tool,
+            // which is the same reasoning that keeps G59.3's own Z there. Same correction #399 made for
+            // Test position: lift to the top of Z, travel in X and Y, descend last.
+            b.AppendLine("G53 G0 Z0");
             // MACHINE COORDINATES, not "G59.3 then G0 X0 Y0".
             //
             // This used to SELECT G59.3 to get to it, and never put the operator's own coordinate system
@@ -3219,7 +3238,8 @@ namespace CNC.Controls
             // Flat parentheses, no nesting: a NESTED paren silently kills a grblHAL PRINT comment, which is
             // how tlo.macro's touch-plate TLO03 print stayed dead in exactly the branch that was failing.
             b.AppendLine("(PRINT, TLOREF_DONE)");
-            b.AppendLine("G53 G0 Z-5");
+            // Top of travel before the traverse home, then down onto G30 - see the approach above.
+            b.AppendLine("G53 G0 Z0");
             b.AppendLine("G53 G0 X#5181 Y#5182");
             b.AppendLine("G53 G0 Z#5183");
 
