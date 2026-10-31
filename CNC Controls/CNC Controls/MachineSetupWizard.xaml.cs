@@ -1945,33 +1945,31 @@ namespace CNC.Controls
 
                 AppConfig.Settings.Base.TloProbeName = chosen.Name;
                 GuidedStepPerformed("probe");
-                AppDialogs.Show(owner, string.Format("{0} will measure tool length.\r\n\r\nPress Guided setup again for the next step.", chosen.Name),
-                    "Guided setup", MessageBoxButton.OK, MessageBoxImage.Information);
+                // No "that's chosen, press again" dialog. The status line beside the button already says
+                // what the next press does, and an acknowledgement nobody asked for is a click wasted.
                 return;
+
             }
 
             // Step 2 - the target surface, the tool-length baseline and G59.3, all from one probe.
+            // Step 2 - the target surface, the tool-length baseline and G59.3, all from one probe.
+            //
+            // DELIBERATELY NO DIALOG. This used to put up a modal saying "jog over the toolsetter, then
+            // press OK" - which is a contradiction: the operator cannot jog while it is up. The run
+            // strip's jog buttons stay visible and reachable and simply do nothing, because the modal
+            // swallows the input, while KEYBOARD jogging still works (shortcuts reach dialogs since the
+            // keyboard rework) - so it looked like the jog pad was broken rather than blocked. Reported
+            // 2026-10-31.
+            //
+            // The instruction belongs on the page, where the status line beside the button already says
+            // it and nothing is blocked; the press itself is the "I am over it" signal.
+            // ProbeTloTarget is told the operator has already committed, so it does not ask again.
             if (!GuidedStepDone("g593"))
             {
-                var p = SelectedTloProbe();
-                double search = p?.ProbeDistance ?? 0d;   // "max probing move" - the real field, see ProbeDefinition
-                string within = search > 0d
-                    ? string.Format(CultureInfo.InvariantCulture, "within {0:0} mm above it", search)
-                    : "just above it";
-
-                if (AppDialogs.Show(owner,
-                        string.Format("Jog the spindle over the middle of {0}, {1}, with a tool or probe fitted.\r\n\r\n" +
-                                      "Then press OK and it will probe straight down - recording the target surface, the tool-length reference and G59.3 together.\r\n\r\n" +
-                                      "THE MACHINE WILL MOVE DOWN when you press OK.",
-                                      p?.Name ?? "the tool-length probe", within),
-                        "Guided setup - probe the target", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK)
-                    return;
-
                 GuidedStepPerformed("g593");        // PERFORMED, not succeeded - the probe finishes async
-                ProbeTloTarget_Click(null, null);   // completes asynchronously; the next press carries on
+                ProbeTloTarget(true);
                 return;
             }
-
             // Step 3 - the park. Placed relative to G59.3 so the tool change does not travel further than
             // it must; the operator picks the side, because which one is clear is a fact about the bench.
             if (!GuidedStepDone("g30"))
@@ -1985,7 +1983,7 @@ namespace CNC.Controls
                 if (which == MessageBoxResult.Cancel)
                     return;
 
-                PlaceG30(which == MessageBoxResult.Yes ? -1 : 1);
+                PlaceG30(which == MessageBoxResult.Yes ? -1 : 1, confirmed: true);
                 GuidedStepPerformed("g30");
                 return;
             }
@@ -1996,8 +1994,9 @@ namespace CNC.Controls
             _guidedRerunDone.Clear();
             UpdateGuidedSetup();
 
-            AppDialogs.Show(owner, "Tool changing is set up: the tool-length probe is chosen, G59.3 and the reference are taught, and G30 is placed.",
-                "Guided setup", MessageBoxButton.OK, MessageBoxImage.Information);
+            // No "all done" popup either - the button turns green and the summary below it shows the
+            // three values. Saying so in a dialog is a click to dismiss a thing already on screen.
+
         }
 
         /// <summary>
@@ -2051,7 +2050,7 @@ namespace CNC.Controls
         /// the click handler so the guided sequence can call it without fabricating a sender whose Tag says
         /// which way to go - the direction is the argument it always was.
         /// </summary>
-        private void PlaceG30(int sign)
+        private void PlaceG30(int sign, bool confirmed = false)
         {
             if (model == null)
                 return;
@@ -2076,8 +2075,16 @@ namespace CNC.Controls
             double x = cs.Values[0] + sign * offset, y = cs.Values[1];
 
             // Refuse a target outside the machine rather than let the controller alarm partway there.
-            double travelX = GrblSettings.GetDouble(GrblSetting.MaxTravelBase);
-            if (!double.IsNaN(travelX) && travelX > 0d && (x > 0d || x < -travelX))
+            //
+            // ASK ReachableLimit, do not assume a sign. This used to test "x > 0 || x < -travelX", which
+            // hardcodes the usual convention of X running 0 .. -travel. On a machine whose X homes the
+            // other way ($23 bit 0, as here) the envelope is 0 .. +travel and EVERY legal X is positive,
+            // so that test refused all of them: G59.3 at X128.747 less 120 is X8.747, comfortably inside,
+            // and it was rejected as outside travel. ReachableLimit already works out which end is which
+            // from $23 and force-set-origin, and min/max of its two ends is true either way round.
+            double endA = GrblInfo.ReachableLimit(0, true), endB = GrblInfo.ReachableLimit(0, false);
+            double xMin = Math.Min(endA, endB), xMax = Math.Max(endA, endB);
+            if (!double.IsNaN(endA) && !double.IsNaN(endB) && (x < xMin || x > xMax))
             {
                 AppDialogs.Show(Window.GetWindow(this),
                     string.Format(CultureInfo.CurrentCulture,
@@ -2086,7 +2093,7 @@ namespace CNC.Controls
                 return;
             }
 
-            if (AppDialogs.Show(Window.GetWindow(this),
+            if (!confirmed && AppDialogs.Show(Window.GetWindow(this),
                     string.Format(CultureInfo.CurrentCulture,
                         "THE MACHINE WILL MOVE.\r\n\r\nIt will lift Z to {0:0.0}, travel to X {1:0.0} Y {2:0.0}, and store that as G30.\r\n\r\n" +
                         "Make sure that path is clear. Unlike the other buttons here, this one does not just read the current position.",
@@ -2136,6 +2143,16 @@ namespace CNC.Controls
         /// it afterwards anyway.
         /// </summary>
         private void ProbeTloTarget_Click(object sender, RoutedEventArgs e)
+        {
+            ProbeTloTarget(false);
+        }
+
+        /// <param name="confirmed">
+        /// The caller has already asked. Guided setup confirms its own step, and a second dialog saying
+        /// the same thing is the "ten dialogs to do three things" the operator objected to - the question
+        /// was answered, so asking again is not safety, it is noise.
+        /// </param>
+        private void ProbeTloTarget(bool confirmed)
         {
             if (model == null)
                 return;
@@ -2222,7 +2239,7 @@ namespace CNC.Controls
             bool limitedByTravel = room < want;
             double search = limitedByTravel ? room : want;
 
-            if (AppDialogs.Show(Window.GetWindow(this), string.Format(CultureInfo.CurrentCulture,
+            if (!confirmed && AppDialogs.Show(Window.GetWindow(this), string.Format(CultureInfo.CurrentCulture,
                     "Probe straight down from here to find the top of the {0}?" + Environment.NewLine + Environment.NewLine +
                     "It will search up to {1:0.#} mm down at the probe's own feeds{5}. Position it roughly over the target first - X and Y are not changed." +
                     Environment.NewLine + Environment.NewLine +
