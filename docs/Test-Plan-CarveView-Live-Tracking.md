@@ -113,26 +113,67 @@ whether motion stuttered.
 
 ## Acceptance criteria — decided before the run, not after
 
-An arm **passes** if all of:
+🔴 **Judge the SIMULATOR phase on the A-to-C DELTA, and the HARDWARE phase on the absolute
+thresholds.** See "What the simulator changes" below for why: the sim inflates the absolute numbers,
+but it inflates them identically in both arms, so the delta survives and the absolutes do not.
 
-- no marshal outlier warnings (none over 250 ms)
-- marshal mean within a small margin of arm A's, and max not materially above it
-- send gap mean still within ~10% of `PollInterval`
+**Phase 1 (simulator) — an arm passes if:**
+
+- marshal mean and max no worse than arm A's by more than a small margin
+- send gap mean no worse than arm A's
 - subscriber counts flat across the arm's windows
+- no NEW marshal outlier warnings that arm A did not also produce
+
+**Phase 2 (hardware) — an arm passes if, additionally:**
+
+- no marshal outlier warnings at all (none over 250 ms)
+- send gap mean within ~10% of `PollInterval`
 - Feed Hold interval not materially worse than arm A's
 - no stutter the operator can see or hear
 
-Anything else is a fail, and the guard stays.
+A phase-2 fail means the guard stays. A phase-1 fail does **not** on its own — see below.
 
 ## Phases
 
-**Phase 1 — simulator.** Arms A and C against the option-matched grblHAL simulator. Marshal latency
-is a **sender-side** number and is fully valid there: no cutter, no scrap, no risk. This answers the
-saturation question outright, and a failure here ends the investigation with no machine time spent.
+**Phase 1 — simulator.** Arms A and C against the option-matched grblHAL simulator. No cutter, no
+scrap, no risk.
+
+🔴 **A pass here is strong evidence; a FAIL here is not conclusive and must not end the
+investigation.** Everything the simulator changes biases the measurement toward looking *worse* than
+hardware (see below), so a sim failure may be the simulator's own cost rather than the carve view's.
+A phase-1 fail means "confirm on hardware before the guard stays on this account", not "done".
 
 **Phase 2 — hardware, in scrap.** Only if phase 1 is clean. This is the only thing that can answer
 "does motion actually stutter" and give a real Feed Hold interval, neither of which the simulator
 can produce. Scrap material, because arm C is the arm that could spoil a part.
+
+## What the simulator changes
+
+Checked rather than assumed, because the plan's validity rests on it.
+
+**The architecture does NOT change.** `SimulatorManager` starts the sim as a local process and
+connects a `TcpClient` to `127.0.0.1`, so the live link is `TelnetStream` — and `TelnetStream` raises
+`ReplyClassified` with the same "bypassing the UI dispatcher" comment as `SerialStream`. All four
+stream classes carry the tap. Same `Comms.PostTo` marshal to the UI thread, same read-thread tap,
+same `StreamPump` pacer, same poller timer. What is being measured has the same shape.
+
+**Three things do change, and all three bias the same way — toward looking WORSE than hardware:**
+
+| | Effect | Direction |
+|---|---|---|
+| **CPU contention** | the sim is a process on the same box, competing for CPU with the very UI thread under measurement; a real controller is a separate MCU doing none of that | inflates marshal latency |
+| **Reply density** | status reports are sender-driven at `PollInterval` so that rate is identical, but `ok` replies come back as fast as the sim can parse — faster than a real board at 115200 — and every reply still gets a `PostTo` to the UI thread | more UI marshals per second |
+| **Write cost** | a localhost socket write is far cheaper than real serial | PollDiag's `write` figure is optimistic — do **not** compare it across phases |
+
+**Why the run survives this:** both arms carry the identical simulator overhead, so the **A-to-C
+delta is valid** even though the absolute numbers are inflated. Hence the split acceptance criteria
+above — delta for phase 1, absolutes for phase 2.
+
+**One unknown, not answerable from the code:** whether the sim honours feed rates in real time or
+runs as fast as it can. If it runs faster, position changes faster per wall-clock second and the
+carve does more work than hardware would — conservative again, but it means the carve load is not
+representative. Check it during the run by comparing the program's wall-clock duration against what
+its feeds predict.
 
 ## What would invalidate the run
 
