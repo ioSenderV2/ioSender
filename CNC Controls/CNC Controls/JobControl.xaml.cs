@@ -1185,6 +1185,26 @@ namespace CNC.Controls
             if (answer == MessageBoxResult.No)
                 return true;        // run it as written - the operator's call
 
+            // ---- NO STORED BASELINE MEANS THIS REMEDY CANNOT DELIVER --------------------------------
+            // tlo.macro MEASURES a tool against #<_tlo_ref>; with #<_tlo_ref> at 0 it instead makes the tool
+            // in the spindle the new reference and applies no offset at all. That is the right behaviour for
+            // a first-ever reference and completely wrong here: the work Z0 already on the machine was stored
+            // against the OLD reference, so silently re-baselining onto the cutter redefines the frame that
+            // Z0 lives in and every depth in the program moves with it. Observed 2026-10-31 - the remedy ran,
+            // $TLR went true, and the offset was still zero, which is also why the prompt came back.
+            //
+            // Named parameters do not survive a controller reset, so #<_tlo_ref> being 0 says nothing about
+            // whether a reference exists - the machine-wide one is held app-side in TloRefBaseline. Zero
+            // THERE means no reference has ever been taught, and then there is genuinely nothing to measure
+            // against. Say so rather than doing the destructive thing quietly.
+            double baseline = AppConfig.Settings.Base.TloRefBaseline;
+            if (baseline == 0d)
+            {
+                AppDialogs.Show(Window.GetWindow(this), (string)FindResource("JobNoTloBaseline"), "ioSender",
+                                MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
             // What is in the spindle is a CUTTING TOOL: a job is about to run. tlo.macro reads the tool id
             // only to pick which probe input to watch, and 8 means the 3D probe stylus - which probes the
             // MAIN input because it must not bear down on the puck. Sending 8 for a rigid cutter would watch
@@ -1199,6 +1219,14 @@ namespace CNC.Controls
             var b = new System.Text.StringBuilder();
             b.AppendLine("(Reference the tool in the spindle - the loaded program never changes tools)");
             b.AppendLine("G21 G90 G94 G17");
+
+            // LOAD THE BASELINE FIRST, exactly as Setup does (StartJobView.BuildProgram) - this is an INPUT
+            // to tlo.macro, not a reset. It is what turns the call from "make this tool the reference" into
+            // "measure this tool against the reference the machine was taught", which is the only version
+            // that leaves the stored work Z0 meaning what it meant. Decided here in C# from the controller's
+            // own $TLR report rather than with an O-word IF in the streamed program: a bare ELSE/ENDIF is
+            // dropped by the line pipeline and wedges the controller's o-word engine.
+            MacroProcessor.EmitTloBaseline(l => b.AppendLine(l), model.IsTloReferenceSet, baseline);
             MacroProcessor.EmitTloReference(l => b.AppendLine(l), toolId,
                 string.IsNullOrEmpty(model.WorkCoordinateSystem) ? "G54" : model.WorkCoordinateSystem);
 
