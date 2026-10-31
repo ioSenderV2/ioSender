@@ -189,6 +189,59 @@ its feeds predict.
 - arm C run with the 3D view off screen
 - reading the means without reading the outlier warnings
 
+## Results so far — arm A only, 2026-10-30
+
+Two arm A runs on the simulator, Phil's 67,555-line program (250 depth passes at 0.1 mm on 25 mm
+stock), G54 at X282 Y-570 Z-20.
+
+| | 2.3 h run, 141 windows | 10 min run, 12 windows |
+|---|---|---|
+| send mean (median) | 211 ms | 210 ms |
+| marshal mean (median) | 23.4 ms | **35.0 ms** |
+| marshal max (median) | 248 ms | 274 ms |
+| process mean (median) | 0.0 ms | 1.1 ms |
+| uilate mean (median) | 20.9 ms | **26.8 ms** |
+| uilate max (median) | 226 ms | 236 ms |
+| uilate breaches / min | 3.1 | **4.3** |
+| marshal stalls / min | 1.1 | **3.0** |
+| Feed Hold | **locked out once** | **worked every time** |
+
+**The simulator honours real feed rates** - 10 minutes covered under 5% of the program. That answers
+the open question above.
+
+**No uptime drift.** Over 2.4 h, marshal mean went 25.0 -> 24.0 and uilate mean 21.9 -> 21.1. The
+degradation PollDiag was originally written for is not reproducing in these sessions.
+
+🔴 **THE BASELINE IS NOT REPEATABLE ENOUGH FOR THE PLANNED COMPARISON.** Two arm A runs of the same
+program differ by ~50% on marshal mean (23.4 vs 35.0) and ~28% on uilate mean. Any arm C effect has
+to be bigger than that gap to be visible, and there is no reason to assume it will be. **Before
+running arm C, decide how to handle this** - repeated alternating short runs (A, C, A, C) rather than
+one of each, so the comparison is paired rather than between two single samples.
+
+## Discovered on the way: Feed Hold disables itself while a hold is in flight
+
+Not the carve view's doing, and worth its own fix. The gate log shows:
+
+```
+21:40:06.793  FEED HOLD pressed - UI input lateness was 1ms when this handler ran
+21:40:06.861  feed hold gate -> disabled (armed=False, controller-disabled=False, state=Run)
+21:40:12.758  feed hold gate -> ENABLED  (armed=True,  controller-disabled=False, state=Hold)
+```
+
+The press is serviced in 1 ms, then the button greys out for **six seconds** while the machine
+decelerates from Run to Hold through a full planner buffer. A second press in that window does
+nothing, which from the operator's chair is indistinguishable from the button not working - and on
+2026-10-30 the operator read it exactly that way and reset the machine instead.
+
+**UI-thread lateness did NOT cause it**, and the measurements say so plainly: the 10-minute run had
+*worse* lateness on every measure and Feed Hold worked every time, while the long run's extreme
+spikes (1112 ms, 1294 ms) landed at 19:25 and the lockout was at ~21:33. A theory that the dispatcher
+was to blame survived two turns on nothing but plausibility; the gate log killed it in one run.
+
+**The fix is a label, not a latency**: while a hold is in flight the control should say so
+("Holding...", or similar) rather than simply disabling, so a press that WAS taken does not look like
+one that was missed.
+
 ## Afterwards
 
 Whatever the outcome, the stale comment in `CarveView` gets corrected — a comment that justifies a
