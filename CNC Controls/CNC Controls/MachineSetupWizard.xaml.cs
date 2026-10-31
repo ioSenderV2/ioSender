@@ -2190,7 +2190,23 @@ namespace CNC.Controls
                 return;
             }
 
-            double room = here.Z - zBottom;      // both negative; the descent left before the soft limit
+            // A TARGET EXACTLY ON THE SOFT LIMIT IS REFUSED, so the descent has to stop short of it.
+            // Measured 2026-10-31 on the simulator: standing at Z -102.907 with the far end at -146.000
+            // (travel 152 less the 6 mm pull-off, force-set-origin folding it into this end), the probe
+            // asked for G38.2 Z-43.093 - landing on -146.000 to three decimals - and grblHAL answered
+            // Alarm:2 without moving a step. MPos was identical before and after, which is what made it
+            // look like the probe had not run at all.
+            //
+            // This is the OPPOSITE failure to the one the clamp was added for: that was asking for 100 mm
+            // from Z -61.254 and overshooting the floor by 15.254. Clamping to exactly the floor fixed the
+            // overshoot and created this. The boundary itself is not a legal target, so leave margin.
+            //
+            // 1 mm, which is what the two probe wizards that got this right already use: both
+            // AutoSquareProbeWizard.SeekFloorZ and StepperCalibrationProbeWizard.SeekFloorZ return
+            // "floor + 1.0". This was the one seek that clamped to the floor itself. Matching them beats
+            // inventing a third number, and the "no room" test below already refuses under 1 mm anyway.
+            const double softLimitMargin = 1.0d;
+            double room = here.Z - zBottom - softLimitMargin;   // both negative; descent left, less margin
             if (room <= 1d)
             {
                 AppDialogs.Show(Window.GetWindow(this), string.Format(CultureInfo.CurrentCulture,
