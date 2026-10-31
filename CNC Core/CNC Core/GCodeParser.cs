@@ -354,6 +354,48 @@ namespace CNC.GCode
         public bool HasGoPredefinedPosition { get; private set; }
         public List<GCodeToken> Tokens { get; private set; } = new List<GCodeToken>();
 
+        /// <summary>
+        /// Work X and Y of the program's FIRST positioning move, or <c>null</c> when it has none.
+        /// </summary>
+        /// <remarks>
+        /// Asked for 2026-10-31 so the sender can park where the program is about to start rather than at the
+        /// work origin. The extents already come out of this same token walk, and SketchUcam-style posts put
+        /// the first move on a line of its own ("X73.288Y73.288"), so there was nothing to add but a latch.
+        ///
+        /// FAILS CLOSED, deliberately - this feeds a decision about where to move a spindle:
+        /// - only a real motion command counts (G0/G1/G2/G3), so a tool change or an offset write does not
+        ///   claim to be the first move;
+        /// - the move must name X or Y. A program whose first motion is Z-only leaves this null rather than
+        ///   reporting the origin, because "no XY yet" and "XY is 0,0" are different facts;
+        /// - set once per program and never updated, so a later move cannot overwrite it.
+        ///
+        /// It is a WORK coordinate in the program's own frame, the same frame the bounding box and the 3D
+        /// view use - see the note that the emulator yields exactly one frame.
+        /// </remarks>
+        public double[] FirstMotionXY { get; private set; }
+
+        // Latch for FirstMotionXY. Called as each motion token is emitted; the first one carrying X or Y wins.
+        private void NoteFirstMotion(GCodeToken token)
+        {
+            if (FirstMotionXY != null)
+                return;
+            if (token.Command != Commands.G0 && token.Command != Commands.G1
+                && token.Command != Commands.G2 && token.Command != Commands.G3)
+                return;
+
+            var a3 = token as GCAxisCommand3;
+            if (a3 != null)
+            {
+                if (a3.AxisFlags.HasFlag(AxisFlags.X) || a3.AxisFlags.HasFlag(AxisFlags.Y))
+                    FirstMotionXY = new double[] { a3.X, a3.Y };
+                return;
+            }
+
+            var a9 = token as GCAxisCommand9;
+            if (a9 != null && (a9.AxisFlags.HasFlag(AxisFlags.X) || a9.AxisFlags.HasFlag(AxisFlags.Y)))
+                FirstMotionXY = new double[] { a9.X, a9.Y };
+        }
+
         public new void Reset()
         {
             base.Reset();
@@ -362,6 +404,7 @@ namespace CNC.GCode
             gcValues.Clear();
             Tokens.Clear();
             ProgramEnd = HasGoPredefinedPosition = false;
+            FirstMotionXY = null;
             motionMode = MotionMode.G0;
             coordSystem = 0;
             demarcCount = 0;
@@ -1660,6 +1703,7 @@ namespace CNC.GCode
                     case MotionMode.G0:
                         RetractOldZ = true;
                         Tokens.Add(new GCLinearMotion(Commands.G0, gcValues.N, gcValues.XYZ, axisWords, blockDelete));
+                        NoteFirstMotion(Tokens[Tokens.Count - 1]);
                         break;
 
                     case MotionMode.G1:
@@ -1667,6 +1711,7 @@ namespace CNC.GCode
                             throw new GCodeException(LibStrings.FindResource("ParserG1NoFeed"));
                         RetractOldZ = true;
                         Tokens.Add(new GCLinearMotion(Commands.G1, gcValues.N, gcValues.XYZ, axisWords, blockDelete));
+                        NoteFirstMotion(Tokens[Tokens.Count - 1]);
                         break;
 
                     case MotionMode.G2:
@@ -1703,6 +1748,7 @@ namespace CNC.GCode
                         }
                         bool invert = IsScaled && scaleFactors[Plane.Axis0] * scaleFactors[Plane.Axis1] < 0.0d;
                         Tokens.Add(new GCArc(motionMode == MotionMode.G2 ? Commands.G2 : Commands.G3, gcValues.N, gcValues.XYZ, axisWords, gcValues.IJK, ijkWords, gcValues.R, wordFlags.HasFlag(WordFlags.P) ? (int)gcValues.P : 0, IJKMode, invert ? motionMode == MotionMode.G3 : motionMode == MotionMode.G2, blockDelete));
+                        NoteFirstMotion(Tokens[Tokens.Count - 1]);
                         break;
 
                     case MotionMode.G5:

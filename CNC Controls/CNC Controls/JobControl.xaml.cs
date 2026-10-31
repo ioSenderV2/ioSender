@@ -1249,15 +1249,27 @@ namespace CNC.Controls
             // The program's own first Z move then descends over the stock, and its first XY runs inside the
             // footprint it is about to cut.
             //
-            // The work ORIGIN rather than the program's first XY, and it is the BETTER destination, not just
-            // the cheaper one. The origin is PROVEN CLEAR BY CONSTRUCTION: Setup cannot have established this
-            // origin unless the probe could descend onto that corner and run two face probes there, so a
-            // clamp over it would have stopped Setup long before any program ran. Nothing proves the same of
-            // a first XY read out of the program - and that number would have to come from the parse, which
-            // is for the 3D view and never for deciding a move. Settled 2026-10-31; do not re-propose
-            // parsing the first move for this.
+            // THE PROGRAM'S OWN FIRST XY when the parse can give one, the work origin otherwise.
+            //
+            // The origin was the only destination at first, on the grounds that Setup proves it clear - which
+            // is true, and still the wrong place to stand: a program that descends before it finishes
+            // positioning cuts from wherever it starts to wherever it is going, and the origin only makes
+            // that trench shorter. The one position that removes it is the point the program is about to work
+            // at, so there is nothing left to traverse at depth. Asked for 2026-10-31 after exactly that
+            // trench, by an operator pointing out the extents already come out of the same token walk.
+            //
+            // Null when the first motion names no X or Y - then fall back to the origin rather than inventing
+            // a number, and the origin is still the proven-clear point it always was.
+            double[] firstXY = Source.Parser?.FirstMotionXY;
             b.AppendLine("G53 G0 Z0");
-            b.AppendLine("G0 X0 Y0");
+            if (firstXY != null)
+                b.AppendLine(string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                                           "G0 X{0:0.###} Y{1:0.###}", firstXY[0], firstXY[1]));
+            else
+                b.AppendLine("G0 X0 Y0");
+            DebugLog.Write("run", firstXY != null
+                ? string.Format("Pre-run park: program's first XY {0:0.###},{1:0.###}", firstXY[0], firstXY[1])
+                : "Pre-run park: no first XY from the parse - using the work origin");
 
             referencingForRun = true;
             bool started = MacroProcessor.Run(model, "Reference tool before job", b.ToString(), false, false,
@@ -1289,8 +1301,14 @@ namespace CNC.Controls
             return false;       // either the remedy is running and will start the job, or it never started
         }
 
+        // No lookbehind. It used to begin (?<![0-9.]) to keep the match off the inside of a number, and that
+        // was the bug: blocks are stored with their spaces stripped, so the line arrives as "G90G21G49G17F4000"
+        // where the character before the G is the "1" of G21 - the guard refused every real case. The
+        // lookbehind was never needed anyway: a G cannot be part of a number, and "G149" does not match
+        // because 0* takes nothing and "49" then has to line up against "14". The LOOKAHEAD stays, so a
+        // hypothetical G49.x or G490 is left alone.
         private static readonly System.Text.RegularExpressions.Regex _g49Word =
-            new System.Text.RegularExpressions.Regex(@"(?<![0-9.])[Gg]0*49(?![0-9.])");
+            new System.Text.RegularExpressions.Regex(@"[Gg]0*49(?![0-9.])");
 
         /// <summary>
         /// Remove the G49 word from the blocks that carry it, so the tool length offset measured a moment ago
@@ -1317,6 +1335,10 @@ namespace CNC.Controls
         /// </remarks>
         private void StripToolOffsetCancel(System.Collections.Generic.List<GCodeBlock> blocks)
         {
+            // Logged even when there is nothing to do. "No line appeared" said only that this method had
+            // returned early, which could have meant the detector found nothing OR the regex matched nothing -
+            // two different bugs, and one round trip on real hardware was spent not knowing which.
+            DebugLog.Write("run", string.Format("StripToolOffsetCancel: {0} block(s) flagged", blocks?.Count ?? 0));
             if (blocks == null || blocks.Count == 0)
                 return;
 
@@ -1325,7 +1347,12 @@ namespace CNC.Controls
                 string before = blk.Data;
                 string after = _g49Word.Replace(before, string.Empty).TrimEnd();
                 if (after == before)
+                {
+                    DebugLog.Write("run", string.Format(
+                        "StripToolOffsetCancel: line {0} flagged but NO G49 word matched in '{1}'",
+                        blk.LineNum, before));
                     continue;
+                }
 
                 blk.Data = after;
                 // The operator's own log, not just the debug channel: a run that behaved differently from
