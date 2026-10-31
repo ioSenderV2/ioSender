@@ -160,7 +160,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 
 <section id="features-and-fixes">
 <h1>Features &amp; Fixes</h1>
-<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>420 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
+<div class="sub">Fork <code>stevenrwood/ioSender</code> &nbsp;·&nbsp; base branch <code>master</code> &nbsp;·&nbsp; <strong>424 improvements in the <code>integration</code> build.</strong> The fork ships as one all-in-one build &mdash; every change below is already in the <code>integration</code> branch and consumed wholesale. &nbsp;·&nbsp; all LF-normalized (<code>.gitattributes</code> <code>* text=auto eol=lf</code>).</div>
 
 <div class="feat">
 <div class="foot" style="margin:0 0 8px"><strong>Features at a glance</strong> &mdash; grouped by area. <span class="t-new">NEW</span> new capability, <span class="t-chg">CHG</span> changes existing behaviour, <span class="t-fix">FIX</span> bug fix. Numbers link to the detail below.</div>
@@ -435,6 +435,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Every Setup program now states its own units, plane and work offset up front, and refuses to start on an alarm or an active G92 instead of inheriting it.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr404">404</a></td></tr>
 <tr><td>When a probe cycle aborts with the tool resting on the plate, Z lifts to machine zero automatically and reports what the probe pin says afterwards.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr405">405</a></td></tr>
 <tr><td>The &quot;Measured stock&quot; readout reported corner skew and the diagonal difference as one line reading like a number and its restatement; they are different measurements and now get a line each, with the four edge lengths beside the delta.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr420">420</a></td></tr>
+<tr><td>Moves that cross the table now lift to machine Z0 first and descend last, instead of dropping to a safe height and travelling at it.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr422">422</a></td></tr>
 </table>
 
 <h3>Files, SD card &amp; ATC</h3>
@@ -453,6 +454,8 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>A command answered with an error stops the wait immediately instead of running to timeout.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr244">244</a></td></tr>
 <tr><td>Short query helpers nested inside a file transfer and cleared its poll suspension</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr346">346</a></td></tr>
 <tr><td>A per-file hash manifest replaces the single whole-set checksum; a one-line edit now uploads one macro</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr352">352</a></td></tr>
+<tr><td>A program that never changes tools is offered a tool-length reference, started over its own first move, and has any G49 removed so the measurement survives.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr423">423</a></td></tr>
+<tr><td>File > Recent Files lists the last ten programs loaded; right-click an entry to remove it or to clear the list.</td><td class="tag"><span class="t-new">NEW</span></td><td class="prs"><a href="#pr424">424</a></td></tr>
 </table>
 
 <h3>Program view &amp; G-code</h3>
@@ -503,6 +506,7 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td>Two token types were missing from the g-code writer&rsquo;s switch and were rewritten to their command name.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr387">387</a></td></tr>
 <tr><td>&ldquo;T1 - 1/4&Prime; 2 flute end mill&rdquo; rather than the name of the first of its five operations.</td><td class="tag"><span class="t-chg">CHG</span></td><td class="prs"><a href="#pr388">388</a></td></tr>
 <tr><td>The g-code emulator yields ONE frame &mdash; work coordinates &mdash; so the 3D view and the stock finally agree.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr390">390</a></td></tr>
+<tr><td>The 3D view can track the tool, and carve the stock, while a program streams - two settings, both off by default.</td><td class="tag"><span class="t-fix">FIX</span></td><td class="prs"><a href="#pr421">421</a></td></tr>
 </table>
 
 <h3>Macros, console &amp; keys</h3>
@@ -1077,7 +1081,11 @@ at runtime; the <a href="#features-and-fixes">full changelog</a> follows below.
 <tr><td class="n">418</td><td><a href="#pr418">Three placement and gating fixes</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">6</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+104</span> <span class="del">-17</span></td></tr>
 <tr><td class="n">419</td><td><a href="#pr419">Fresh install opens on ioSenderClassic</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+56</span> <span class="del">-2</span></td></tr>
 <tr><td class="n">420</td><td><a href="#pr420">Measure size: skew and diagonal delta split apart</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">1</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+29</span> <span class="del">-4</span></td></tr>
-<tr class="tot"><td class="n"></td><td>Totals (420 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">3346</span> <span class="del">32</span> <span class="add">+311</span><br><span class="k">Lines:</span> <span class="add">+138941</span> <span class="del">-29977</span></td></tr>
+<tr><td class="n">421</td><td><a href="#pr421">3D view follows the cut during a job</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">14</span> <span class="del">0</span> <span class="add">+4</span><br><span class="k">Lines:</span> <span class="add">+548</span> <span class="del">-121</span></td></tr>
+<tr><td class="n">422</td><td><a href="#pr422">Cross at the top of Z, not at safe Z</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">2</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+43</span> <span class="del">-7</span></td></tr>
+<tr><td class="n">423</td><td><a href="#pr423">No tool change: offer to measure the tool first</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">12</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+478</span> <span class="del">-45</span></td></tr>
+<tr><td class="n">424</td><td><a href="#pr424">Recent Files menu</a></td><td class="sz"><span class="k">Files:</span> <span class="chg">10</span> <span class="del">0</span> <span class="add">+0</span><br><span class="k">Lines:</span> <span class="add">+227</span> <span class="del">-0</span></td></tr>
+<tr class="tot"><td class="n"></td><td>Totals (424 changes)</td><td class="sz"><span class="k">Files:</span> <span class="chg">3384</span> <span class="del">32</span> <span class="add">+315</span><br><span class="k">Lines:</span> <span class="add">+140237</span> <span class="del">-30150</span></td></tr>
 </table>
 </div>
 
@@ -7425,6 +7433,59 @@ G92.1</pre><ul><li><strong>It is a rapid, not <code>G92 X#&lt;x_org&gt; Y#&lt;y_
 <tr><td class="mono">ioSender XL/ioSender XL/StartJobView.xaml.cs</td><td class="num add">29</td><td class="num del">4</td></tr>
 </table>
 <div class="desc"><p>Reported on stock measured 319.743 &times; 199.518&nbsp;mm, where the readout said <em>Squareness: skew &minus;0.009&deg; (diagonal &Delta; 0.361)</em> &mdash; and 0.361 was also bit-identical to the <em>Flatness (Z range)</em> on the line above. It read exactly like the parenthetical was printing the flatness variable by mistake, and the geometry agreed that the two numbers could not both be right: &minus;0.009&deg; of skew predicts a diagonal difference of 0.056&nbsp;mm, not 0.361. A 6.8&times; gap.</p><ul><li><strong>It was not a wrong variable.</strong> Recomputed from that run's own stored corners &mdash; the <code>v1|</code> measurement string persisted in <code>App.config</code> &mdash; every reported figure reproduces exactly: flatness 0.3610, skew &minus;0.00948&deg;, diagonal delta 0.3612, mean X 319.7430, mean Y 199.5180. <code>Flatness()</code> and <code>DiagonalDelta()</code> share no variable; the match is a coincidence at three decimals between unrelated arithmetic.</li><li><strong>They disagree because they measure different things</strong>, and one line gave the operator no way to tell which to believe. Skew is the angle at the front-left corner, from corners 1/2/3 &mdash; the quantity <em>Verify skew</em> writes as the WCS rotation. The diagonal delta needs all four corners and catches the whole quad's departure from a rectangle, which on that board was its back edge running 0.346&nbsp;mm longer than its front. The stock was not square; the machine very nearly was.</li><li><strong>Two labelled lines, and the edge lengths go out with the delta</strong> &mdash; front/back and left/right. They are free, already measured, and they are what makes a non-zero delta actionable instead of alarming.</li><li>Each line is now gated on its own corners, too: the angle needs three, the delta needs four. Previously a three-corner measure reported neither.</li></ul><p class="foot">Diagnosed from the operator's own stored measurement rather than from a re-probe. Builds clean (Debug); the new readout text is unverified on a live 4-corner run.</p></div>
+</div>
+<!-- ===== #421 ===== -->
+<div class="pr">
+<h2 id="pr421"><span class="badge">#421</span>3D view can follow the cut while a job runs</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC GCodeViewer/CarveView.xaml.cs</td><td class="num add">34</td><td class="num del">7</td></tr>
+<tr><td class="mono">CNC GCodeViewer/CarveViewOptionsControl.xaml(.cs) (new)</td><td class="num add">123</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC GCodeViewer/CarveViewConfigControl.xaml(.cs) (new)</td><td class="num add">73</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC GCodeViewer/ViewOptionsDialog.xaml(.cs)</td><td class="num add">25</td><td class="num del">73</td></tr>
+<tr><td class="mono">CNC GCodeViewer/CNC GCodeViewer.csproj</td><td class="num add">14</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/AppConfig.cs</td><td class="num add">29</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/Features.cs</td><td class="num add">5</td><td class="num del">27</td></tr>
+<tr><td class="mono">ioSender XL/App.xaml.cs</td><td class="num add">0</td><td class="num del">14</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">245</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>The 3D view used to stop following the machine the moment a program started, so the one time you most want to see where the tool is - mid-job - was the one time the view sat still. It can now track during a run, controlled by two new settings.</p><ul><li><strong>Update tool position in 3D view during a carve</strong> - the tool cone follows the machine as the program streams. This is the cheap half: one position assignment per status report.</li><li><strong>Update material removal in 3D view during a carve</strong> - also carves the stock away as the tool moves. This is the expensive half, and it only becomes available when tool tracking is on, because it means nothing without it.</li></ul><p>Both are <strong>off by default</strong>, which is the behaviour every previous version had. They live in Settings under User Interface &rarr; 3D View, and the same controls are still reachable from the 3D view's own View options button - one control with two entrances, so the two can never disagree.</p><p>Also fixed a crash in the same area: the 3D view built its scene from a block list that a worker thread was still appending to, which could throw while a large program was loading. The view now waits for the load to finish.</p><p class="foot">The two settings were exercised on the machine. Whether tracking is cheap enough to leave on for a long job is still being measured - the timing comparison in docs/Test-Plan-CarveView-Live-Tracking.md is not finished, which is why both default to off.</p></div>
+</div>
+<!-- ===== #422 ===== -->
+<div class="pr">
+<h2 id="pr422"><span class="badge">#422</span>Safety: cross the table at the top of Z, not at safe Z</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/StartJobView.xaml.cs</td><td class="num add">20</td><td class="num del">4</td></tr>
+<tr><td class="mono">CNC Controls/MachineSetupWizard.xaml.cs</td><td class="num add">23</td><td class="num del">3</td></tr>
+</table>
+<div class="desc"><p>Several moves that cross the table used to descend to a &quot;safe&quot; Z and then travel at it. Safe over the place you are leaving is not safe over the path, and anything standing on the table - a clamp, a vise, a fence - is in the way at that height. The correct order is to lift to machine Z0, which is the top of Z travel and the only height guaranteed clear for any tool, traverse in X and Y, and descend only once the tool is over where it is going.</p><ul><li><strong>Starting a job</strong> - the move from the park position to the work now runs at the top of Z and drops down over the stock.</li><li><strong>Setup's first corner</strong> - the program already lifted to the top of Z before crossing to the fixture, and that lift was being undone one move later: the corner-probing macro's first act is to change height, and arriving from the top that change is a descent, so the whole crossing happened at the stock's own safe height. It now holds the top of Z for the crossing and uses the trusted height only once it is over the fixture it was measured on.</li><li><strong>Referencing tool length and storing the park position</strong> in Machine Setup - both took the same shortcut.</li></ul><p>This is the fourth and fifth time this shape of mistake has been fixed in different places. It reads as correct in the code every time, because the same line is a <em>retract</em> whenever the machine happens to be below it - it only becomes a descent when the machine arrives from above.</p><p class="foot">Both verified on the machine: the job-start move was watched running at Z0 over the stock before descending, and Setup's crossing after the corner fix.</p></div>
+</div>
+<!-- ===== #423 ===== -->
+<div class="pr">
+<h2 id="pr423"><span class="badge">#423</span>A program with no tool change gets its tool measured before it runs</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">CNC Controls/JobControl.xaml.cs</td><td class="num add">230</td><td class="num del">21</td></tr>
+<tr><td class="mono">CNC Controls/JobControl.xaml</td><td class="num add">3</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/JobRunner.cs</td><td class="num add">143</td><td class="num del">22</td></tr>
+<tr><td class="mono">CNC Core/GCodeParser.cs</td><td class="num add">46</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Core/GCodeJob.cs</td><td class="num add">35</td><td class="num del">2</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">21</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p>On a machine with a tool setter, the work Z0 that Setup stores is measured against a reference tool, and it only means &quot;the top of the stock&quot; while a tool length offset is applied. A program containing an M6 gets one applied as a matter of course. A program with <em>no</em> tool change never does - so every Z in it is out by the difference between the reference tool and whatever is actually in the spindle, and the first move can be below the stock surface rather than above it.</p><p>Pressing Start on such a program now raises one prompt, offering to put it right before anything cuts:</p><ul><li><strong>Measure the tool in the spindle</strong> at the tool setter, against the reference the machine was taught in Machine Setup. If no reference has ever been taught there is nothing to measure against, and it says so and stops rather than quietly making the current tool the new reference - which would move every depth in the program.</li><li><strong>Start over the program's own first move</strong> rather than at the work origin. A program that descends before it has finished positioning cuts a groove from wherever it starts to wherever it is going; starting at the point it is about to work at leaves nothing to travel across. The first X and Y now come out of the same pass that already measures the program's extents.</li><li><strong>Remove a G49</strong>, with permission. Some posts cancel tool length compensation in their opening lines, which throws away the measurement that was just taken. The one word is removed from that line, the file on disk is untouched, and the edit is written to the job log - nothing happens silently, and a line is never dropped, only shortened.</li></ul><p>The prompt also offers to run the program exactly as written, or not at all. It appears only when no offset is actually in force - a job whose Z0 was set with the same tool that will cut it needs none, and is left alone.</p><p>Also fixed: the existing load-time warning about a missing tool-length reference could never appear on a machine with automatic tool changing, because it was keyed on a setting that such firmware does not publish.</p><p class="foot">Verified on the machine end to end, on a program whose first line cancelled compensation: the tool was measured, the G49 removed, and the job started above the stock instead of in it.</p></div>
+</div>
+<!-- ===== #424 ===== -->
+<div class="pr">
+<h2 id="pr424"><span class="badge">#424</span>Recent Files on the File menu</h2>
+<table class="files">
+<tr><th>File</th><th style="text-align:right">+</th><th style="text-align:right">&minus;</th></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml.cs</td><td class="num add">118</td><td class="num">0</td></tr>
+<tr><td class="mono">ioSender XL/MainWindow.xaml</td><td class="num add">13</td><td class="num">0</td></tr>
+<tr><td class="mono">CNC Controls/AppConfig.cs</td><td class="num add">47</td><td class="num">0</td></tr>
+<tr><td class="mono">Locale/*/csv (7 locales)</td><td class="num add">49</td><td class="num">0</td></tr>
+</table>
+<div class="desc"><p><strong>File &rarr; Recent Files</strong> lists the last ten programs loaded, most recent first, each file once. Picking one loads it.</p><ul><li><strong>Right-click an entry</strong> for &quot;Remove from this list&quot; or &quot;Clear the list&quot;. Clear is on the submenu as well, since an empty list has no entry to right-click.</li><li>Entries read as the file name with its containing folder, because the bare name does not distinguish two revisions of the same part in different places. The full path is on the tooltip.</li><li>An entry whose file has since been moved or deleted offers to remove itself rather than failing to load.</li></ul><p>The list is kept across restarts and is shared by every machine profile. It fills from any route that loads a program - the File menu, a drag and drop, or the list itself - and generated programs such as probe cycles and Setup never appear in it.</p><p class="foot">Built and running; the menu itself has not been driven through every case yet.</p></div>
 </div>
 </section>
 
