@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    version-gate-probe - exercises GrblInfo's [VER:] parsing and the BuildAtLeast gate against the
+    app's OWN built CNC.Core.dll. No simulator, no hardware, no UI.
+
+    Why it exists: firmware 2.0.0 deleted GRBL_VERSION/GRBL_BUILD and derives its version from a
+    git tag, so [VER:] lost its trailing ".YYYYMMDD" build date and GrblInfo.Build parses to 0.
+    Every date-gated feature test in the app then flips - and TWO of them do not disable a feature,
+    they ENABLE a workaround for a controller bug the new firmware does not have (the spindle
+    id/num swap). A compile proves none of that. This feeds the real $I lines of all three version
+    schemes through the real parser and asserts what each gate answers.
+
+    The parser entry point (GrblInfo.Process) is private, so it is reached by reflection - the
+    alternative is a live link, and the thing under test is pure string handling that does not need
+    one. The PROPERTIES read back are public, so the assertions are against the real API.
+
+    Build:  pwsh -File build.ps1 -Configuration Debug     (this references its bin\Debug output)
+            then, in this folder:  dotnet build
+    Run:    tools\version-gate-probe\bin\Debug\net462\version-gate-probe.exe   (exit 0 = all passed)
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net462</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>version-gate-probe</AssemblyName>
+    <RootNamespace>VersionGateProbe</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="CNC.Core">
+      <HintPath>..\..\CNC Core\CNC Core\bin\Debug\CNC.Core.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="CNC.Contracts">
+      <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\CNC.Contracts.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="RP.Math">
+      <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\RP.Math.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="SyncAppBinaries" AfterTargets="Build">
+    <ItemGroup>
+      <SourceDlls Include="..\..\CNC Controls\CNC Controls\bin\Debug\*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SourceDlls)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="..\..\ioSender XL\ioSender XL\bin\Debug\ioSender.exe.config" DestinationFiles="$(OutDir)version-gate-probe.exe.config" SkipUnchangedFiles="true" Condition="Exists('..\..\ioSender XL\ioSender XL\bin\Debug\ioSender.exe.config')" />
+  </Target>
+
+</Project>

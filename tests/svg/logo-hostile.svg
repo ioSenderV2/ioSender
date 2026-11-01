@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  logo-hostile.svg - the BACKLOG, made concrete (see docs/Architecture-SVG-Import.md).
+
+  Everything a narrow first cut is NOT expected to handle, in one file, so "what is still missing"
+  is a test result rather than a memory. A v1 importer should FAIL THIS FILE HONESTLY - naming what
+  it cannot do - rather than silently emitting a toolpath that is missing half the artwork. Silent
+  partial import is the dangerous outcome here: the operator sees a plausible preview and cuts it.
+
+  Each element below is labelled with the capability it demands. Delete a comment and move it to
+  the acceptance file as each one starts working.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     version="1.1" viewBox="0 0 400 200" width="80mm" height="40mm">
+  <defs>
+    <style>
+      .a { fill: #222; }
+      .b { fill: #c80; }
+    </style>
+    <!-- CAPABILITY: <defs> + <use> instancing. The star is defined once and placed twice. -->
+    <polygon id="star" class="a" points="0,-18 5,-6 18,-6 8,2 12,14 0,7 -12,14 -8,2 -18,-6 -5,-6" />
+  </defs>
+
+  <!-- CAPABILITY: root width/height in mm vs a viewBox in user units. 400 units -> 80 mm, so the
+       scale is 0.2 mm/unit and is NOT 1:1. An importer that ignores this gets the size wrong by 5x. -->
+
+  <!-- CAPABILITY: primitive shapes. None of these are <path>; each needs its own conversion. -->
+  <rect class="a" x="10" y="10" width="60" height="40" rx="8" ry="8" />
+  <circle class="b" cx="110" cy="30" r="20" />
+  <ellipse class="a" cx="170" cy="30" rx="26" ry="16" />
+  <polygon class="b" points="210,10 250,10 240,50 220,50" />
+
+  <!-- CAPABILITY: an OPEN path. Meaningful to engrave (follow the line); meaningless to v-carve,
+       which needs closed regions. The two operations diverge here in a way text never does. -->
+  <path class="a" fill="none" stroke="#222" stroke-width="3"
+        d="M 280 10 L 300 50 L 320 10 L 340 50" />
+
+  <!-- CAPABILITY: elliptical arcs (A/a) - endpoint-to-centre parameterisation, the nastiest part
+       of the path grammar. The real vendor logo happened to contain none; most will. -->
+  <path class="b" d="M 20 120 a 30 20 0 1 0 60 0 a 30 20 0 1 0 -60 0 Z" />
+  <path class="a" d="M 100 100 A 40 25 30 0 1 170 140 L 135 160 Z" />
+
+  <!-- CAPABILITY: nested group transforms. The inner translate composes with the outer rotate;
+       flattening only one level puts this in the wrong place. -->
+  <g transform="rotate(-12 260 130)">
+    <g transform="translate(200 100) scale(1.4)">
+      <path class="a" d="M 0 0 h 40 v 24 h -40 Z M 8 6 v 12 h 24 V 6 Z" />
+    </g>
+  </g>
+
+  <!-- CAPABILITY: <use> with its own transform, referencing the <defs> star above. -->
+  <use xlink:href="#star" transform="translate(320 120)" />
+  <use xlink:href="#star" transform="translate(360 160) scale(0.6)" />
+
+  <!-- CAPABILITY: fill-rule="evenodd" - a DIFFERENT hole rule from the document default (nonzero).
+       These two rings are wound the SAME way; under evenodd the inner one is a hole, under nonzero
+       it would not be. Getting the rule wrong inverts the result. -->
+  <path class="b" fill-rule="evenodd"
+        d="M 60 150 L 130 150 L 130 190 L 60 190 Z
+           M 75 160 L 115 160 L 115 180 L 75 180 Z" />
+
+  <!-- CAPABILITY: inline style= rather than a class, and a transform on the element itself. -->
+  <path style="fill:#c80" transform="translate(150 150)"
+        d="M 0 0 h 30 v 30 h -30 Z" />
+</svg>

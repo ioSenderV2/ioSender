@@ -208,8 +208,18 @@ namespace CNC.Controls
             //data.ReadXml(CNC.Core.Resources.Path + "PIDLog.xml");
 
             Comms.com.DataReceived += Process;
-            Comms.com.AwaitAck(((char)GrblConstants.CMD_PID_REPORT).ToString(CultureInfo.InvariantCulture));
+            bool acked = Comms.com.AwaitAck(((char)GrblConstants.CMD_PID_REPORT).ToString(CultureInfo.InvariantCulture));
             Comms.com.DataReceived -= Process;
+
+            // No report came back. RawData is whatever Process collected in the meantime - possibly a
+            // partial line, possibly nothing - so parsing it below would either throw on the Split or
+            // plot garbage. Bail with an empty plot instead. (This wait used to be unbounded, and on a
+            // Telnet/Websocket link it spun without pumping: a hard-frozen UI, not a slow one.)
+            if (!acked)
+            {
+                RawData = "";
+                return;
+            }
 
             if (RawData != "")
             {

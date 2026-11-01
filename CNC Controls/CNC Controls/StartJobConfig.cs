@@ -1,4 +1,4 @@
-/*
+﻿/*
  * StartJobConfig.cs - part of CNC Controls library
  *
  * Persisted Load Stock inputs, folded into App.config as the "StartJob" section (was the standalone
@@ -31,6 +31,21 @@ namespace CNC.Controls
         // assumes near-zero skew; corners 3/4 use the skew measured from corners 1-2) instead of the padded
         // reference. See BuildProgram - only changes the REFERENCE fed to pcorner.macro, not the macro itself.
         public bool ExactSize = false;
+        // The LAST MEASURE RESULT, so a measure survives a restart (and, in practice, a rebuild - re-running a
+        // four-corner probe just to get back to Verify skew costs minutes of machine time per code change).
+        // One opaque string rather than twenty fields: it serialises through the existing App.config section
+        // with no schema work, and a format that fails to parse restores NOTHING instead of half a frame.
+        //
+        //   v1|<utc iso8601>|<wcs 1-6>|<measuredX>|<measuredY>|<spoilZ>|c1x,c1y,c1z|c2..|c3..|c4..
+        //
+        // Empty means "never measured". Values are mm and MACHINE coordinates, the frame the corners are
+        // probed and stored in - never the display unit, which the operator can toggle at any time.
+        // The timestamp is not decoration: restored corners describe stock that may since have been moved,
+        // and the readout says so with this date - see RestoreMeasured.
+        public string MeasuredResult = string.Empty;
+        // Fly-over only: the V-bit (CustomTool.Id) Verify skew changes to before visiting the corners.
+        // -1 = none, use whatever is in the spindle. See StartJobView's picker for why V-bits only.
+        public int VerifyFlyoverToolId = int.MinValue;   // int.MinValue = never chosen (pick the sharpest V-bit); -1 = explicitly none
         public string Corner = "FrontLeft";
         public int Wcs = 1;            // 1 = G54
         public bool Measure = true;

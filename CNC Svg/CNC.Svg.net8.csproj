@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    PORTABILITY PROBE for CNC.Svg - not part of ioSender XL.sln, same two-project pattern as
+    CNC Common / CNC Core / CNC Contracts and for the same reason: the VS MSBuild that builds the
+    solution (17.6) cannot resolve SDK-style net8.0 projects, so those stay out of the .sln and
+    build with dotnet.
+
+    For this assembly the probe is not a nicety - it is the ACCEPTANCE TEST. CNC.Svg exists so the
+    SVG-to-laser converter can run on the EngravingBox appliance, and the way that promise breaks is
+    someone adding a WPF or System.Drawing reference to solve a small problem in the Windows build,
+    where it compiles perfectly. This project fails immediately if that happens.
+
+    Build it alone with:  dotnet build "CNC Svg/CNC.Svg.net8.csproj"
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>CNC.Svg</AssemblyName>
+    <RootNamespace>CNC.Svg</RootNamespace>
+    <LangVersion>7.3</LangVersion>              <!-- match what the net462 compiler accepts -->
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <BaseOutputPath>bin\net8probe\</BaseOutputPath>
+    <!-- BaseIntermediateOutputPath + MSBuildProjectExtensionsPath come from Directory.Build.props in
+         this folder - set here they are too late for NuGet and its assets file lands in the shared
+         obj\, breaking the legacy CNC.Svg.csproj build. See that file's comment. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="*.cs" Exclude="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CNC Common\CNC.Common.net8.csproj" />
+  </ItemGroup>
+
+</Project>

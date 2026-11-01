@@ -13,9 +13,14 @@
        marker embedded (as an HTML comment) in its body.
     2. Parses Overview.html's at-a-glance tables for every #N entry (description, tag),
        and picks out the ones numbered higher than the previous release's marker.
-    3. Computes the next version (2.1, 2.2, ... - seeds at 2.1 if there's no prior release).
+    3. Computes the next version (2.1, 2.2, ... - seeds at 2.1 if there's no prior release),
+       unless MainWindow's legacyVersion declares a HIGHER one, which is how a major bump
+       (2.41 -> 3.0) is expressed - see the block itself.
     4. Writes release notes (Markdown) listing the new entries, ending with the new
-       "changelog-through:N" marker for the *next* run to read back.
+       "changelog-through:N" marker for the *next* run to read back. If docs\release-notes\<version>.md
+       exists it is spliced in ahead of that list, which is how a release says what it MEANS rather
+       than only what changed - see the block itself. No such file is the normal case and changes
+       nothing about the output.
     5. Stamps the TOC "ver" column in Overview.html for those newly-included entries.
   Does not commit/push - the workflow does that as a separate step so it can also embed
   BuildInfo.cs first.
@@ -93,11 +98,51 @@ if (-not $DryRun) {
 }
 
 # --- 2. Next version ---------------------------------------------------------
+# The default is minor+1 off the last published release, which is the rolling model: every push to
+# master is a release and nobody has to remember to bump anything.
+#
+# That alone CANNOT express a major bump. On 2026-10-28 the operator's call was that what leaves V2
+# is 3.0, not 2.42 - and with v2.41 published, this block could only ever compute 2.42, so a push
+# carrying a 3.0 binary would have been cut and tagged "2.41 + 1".
+#
+# So MainWindow's legacyVersion gets a vote: if it is HIGHER than the rolling number, it wins. That
+# is the same constant beta-release.yml reads to stamp a beta, so the beta a change was tested under
+# and the release it ships as cannot drift apart. It is deliberately one-directional - legacyVersion
+# can only push the version UP, never hold it back - so it self-heals: once 3.0 is published, the
+# rolling number becomes 3.1, which outranks a legacyVersion still reading "3.0", and the normal
+# behaviour resumes with nothing to clean up.
 if ($prevVersion) {
     $parts = $prevVersion.Split('.')
     $newVersion = "$($parts[0]).$([int]$parts[1] + 1)"
 } else {
     $newVersion = '2.1'   # seed - first versioned release
+}
+
+$mwPath = Join-Path (Split-Path $PSScriptRoot -Parent) 'ioSender XL\ioSender XL\MainWindow.xaml.cs'
+if (Test-Path $mwPath) {
+    $m = [regex]::Match([System.IO.File]::ReadAllText($mwPath), 'legacyVersion\s*=\s*"([^"]+)"')
+    if ($m.Success) {
+        $declared = $m.Groups[1].Value
+        # Same per-component integer compare the app's own CompareVersions uses, so "3.0" vs "2.42"
+        # is [3,0] vs [2,42] and the major wins - never a string compare, which would read "3.0"
+        # as lower than "2.42" on the second character.
+        function Compare-Ver($a, $b) {
+            $pa = @($a.Split('.') | ForEach-Object { $n = 0; [void][int]::TryParse($_, [ref]$n); $n })
+            $pb = @($b.Split('.') | ForEach-Object { $n = 0; [void][int]::TryParse($_, [ref]$n); $n })
+            for ($i = 0; $i -lt [Math]::Max($pa.Count, $pb.Count); $i++) {
+                $va = if ($i -lt $pa.Count) { $pa[$i] } else { 0 }
+                $vb = if ($i -lt $pb.Count) { $pb[$i] } else { 0 }
+                if ($va -ne $vb) { return $va - $vb }
+            }
+            return 0
+        }
+        if ((Compare-Ver $declared $newVersion) -gt 0) {
+            Write-Host "legacyVersion ($declared) outranks the rolling next version ($newVersion) - cutting $declared." -ForegroundColor Cyan
+            $newVersion = $declared
+        }
+    } else {
+        Write-Host "WARN: legacyVersion not found in MainWindow.xaml.cs - a major bump declared there would be missed." -ForegroundColor Yellow
+    }
 }
 
 # --- 3. Parse Overview.html: TOC rows are the authoritative "which entries exist" list -----
@@ -140,13 +185,53 @@ $newEntries = @($entries.Values | Where-Object { $_.N -gt $previousThrough } | S
 # uses internally for Check for Updates/Roll back).
 $lines = @("## ioSender $newVersion", "")
 $lines += "### Install / update"
-$lines += "Run from CMD or PowerShell:"
+# The one-liner is PowerShell syntax and CANNOT be pasted into cmd.exe - "&" is CMD's own command
+# separator, so it dies with "& was unexpected at this time" before anything else is parsed. This
+# said "Run from CMD or PowerShell" for every release until a user hit exactly that (2026-08-10).
+# The CMD form wraps it in powershell -Command and uses SINGLE quotes for the tag: nesting double
+# quotes inside the double-quoted -Command argument is what breaks it. Both forms tested in a real
+# cmd.exe before being written here.
+$lines += "**PowerShell:**"
 $lines += '```'
 $lines += "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/$Repo/master/install.ps1))) -Tag `"$newVersion`""
 $lines += '```'
+$lines += "**Command Prompt (cmd.exe):**"
+$lines += '```'
+$lines += "powershell -NoProfile -ExecutionPolicy Bypass -Command `"& ([scriptblock]::Create((irm https://raw.githubusercontent.com/$Repo/master/install.ps1))) -Tag '$newVersion'`""
+$lines += '```'
 $lines += ""
+
+# --- 4a. A hand-written narrative for this version, if one is tracked -------------------------
+# The generator can say WHAT changed; it cannot say what a release MEANS. That is tolerable for an
+# ordinary minor cut of two or three entries and useless for a big one: 3.0 carries 203 entries
+# (#218-#420), the first major bump in the project's history, and a flat numeric list gives the
+# machine engine becoming a portable .NET 8 library (#218) exactly the same visual weight as a
+# mojibake'd degree sign in a readout (#361). So docs\release-notes\<version>.md, if it exists, is
+# spliced in ahead of the list.
+#
+# ABSENT IS THE NORMAL CASE, and it must cost nothing: with no such file this emits byte-for-byte
+# what it always has, the "All changes" heading included. An ordinary cut neither needs a narrative
+# nor should start sprouting an empty section inviting one.
+#
+# An EMPTY file counts as absent for the same reason - whitespace is not a narrative, and a file
+# someone created to fill in later should not silently retitle the list and then say nothing.
+$narrativePath = Join-Path (Split-Path $PSScriptRoot -Parent) "docs\release-notes\$newVersion.md"
+$narrative = ''
+if (Test-Path $narrativePath) { $narrative = ([System.IO.File]::ReadAllText($narrativePath)).Trim() }
+if ($narrative) {
+    $lines += $narrative
+    $lines += ""
+    # Only with a narrative above it does the generated list need naming - it is no longer the
+    # whole body, and unlabelled it would read as a continuation of the prose.
+    $lines += "### All changes in this release"
+    $lines += ""
+    Write-Host "Narrative: spliced docs\release-notes\$newVersion.md ($($narrative.Length) chars)." -ForegroundColor Cyan
+} else {
+    Write-Host "Narrative: none (no docs\release-notes\$newVersion.md) - the generated list is the whole body." -ForegroundColor DarkGray
+}
+
 if ($newEntries.Count -eq 0) {
-    $lines += "No changelog entries in this build (see [Overview.html](https://github.com/$Repo/blob/master/Overview.html#features-and-fixes) for the full history)."
+    $lines += "No changelog entries in this build."
 } else {
     foreach ($e in $newEntries) {
         # Strip inner HTML tags for a plain-text release note line.
@@ -154,6 +239,28 @@ if ($newEntries.Count -eq 0) {
         $lines += "- **[$($e.Tag)] #$($e.N)** $plain"
     }
 }
+$lines += ""
+
+# Link to the GitHub Pages copy, NOT the repo blob view. github.com/<repo>/blob/master/Overview.html
+# serves 880KB of HTML *source* in a code viewer - readable only as markup, and the
+# #features-and-fixes anchor is meaningless there. Pages serves it as text/html, so it renders as
+# the actual document and the anchor lands on the changelog. raw.githubusercontent.com is no good
+# either (text/plain), and attaching the file as a release asset downloads it instead of opening it.
+#
+# The Pages host is the owner lowercased - github.io hostnames are case-folded - while the path
+# segment keeps the repo's own casing, and the FILE is lowercase overview.html (see the publish
+# step in .github/workflows/release.yml, which is what keeps this URL from going stale).
+#
+# This used to live inside the "$newEntries.Count -eq 0" branch, which meant the link appeared only
+# on the rare release that shipped NO changelog entries - i.e. it was missing from essentially every
+# real release. It is unconditional now.
+#
+# Note for anyone tempted: the link cannot be made to open in a new tab. GitHub sanitizes release
+# body markdown and strips target attributes, so raw <a target="_blank"> gets scrubbed. Ctrl+click
+# or middle-click is the reader's only route, and that's fine.
+$owner, $repoName = $Repo -split '/', 2
+$overviewUrl = "https://$($owner.ToLowerInvariant()).github.io/$repoName/overview.html#features-and-fixes"
+$lines += "Full changelog and feature documentation: [**Overview**]($overviewUrl) (opens in your browser; Ctrl+click for a new tab)"
 $lines += ""
 $lines += "<!-- changelog-through:$currentMax -->"
 $notes = ($lines -join "`n")
@@ -167,6 +274,18 @@ if (-not $DryRun -and $newEntries.Count -gt 0) {
     $firstN = ($newEntries | Sort-Object N | Select-Object -First 1).N
     $marker = "<tr><td class=""n"">$firstN</td>"
     if ($content.Contains($marker)) {
+        # Drop the "pending" placeholder header before inserting the real one. Entries that are
+        # merged but unreleased sit under a `ver-hdr pending` row (added by add-changelog-entry.ps1)
+        # so the TOC never implies they shipped in the version above them - which is exactly what
+        # went wrong before this existed: #218-#268 sat under "Version 2.41", a release that
+        # actually stopped at #217, so 51 unreleased entries read as shipped.
+        #
+        # Removing it here is not optional: the pending row sits immediately above $firstN, the same
+        # place the real header goes, so skipping this leaves BOTH stacked on the released version.
+        # add-changelog-entry.ps1 recreates a fresh pending row for the next entry added after this
+        # release, which is what stops the mislabelling from creeping back in a version or two.
+        $pendingRe = '<tr class="ver-hdr pending" id="pending"><td colspan="3">[^<]*</td></tr>\r?\n?'
+        $content = [regex]::Replace($content, $pendingRe, '')
         $hdr = "<tr class=""ver-hdr""><td colspan=""3"">Version $newVersion</td></tr>`n"
         $content = $content.Replace($marker, $hdr + $marker)
         [System.IO.File]::WriteAllText($Html, $content)

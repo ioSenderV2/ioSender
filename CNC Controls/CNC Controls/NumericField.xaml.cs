@@ -66,6 +66,42 @@ namespace CNC.Controls
             data.DataContext = this;
         }
 
+        /// <summary>
+        /// Flush a half-typed edit in this field into <see cref="Value"/>.
+        /// </summary>
+        public void CommitEdit()
+        {
+            data?.CommitEdit();
+        }
+
+        /// <summary>
+        /// Flush every <see cref="NumericField"/> under <paramref name="root"/>, so a handler about to READ
+        /// their values sees what the operator actually typed.
+        /// </summary>
+        /// <remarks>
+        /// Call this first in any click handler that acts on field values. A length-unit field commits only
+        /// on LostFocus/Enter, and this app's action buttons are Focusable="False" so they cannot steal the
+        /// jog keys - which means clicking one raises no LostFocus and the edit is still sitting in the
+        /// TextBox, unread. See NumericTextBox.CommitEdit for the hardware incident that found this: a typed
+        /// 0.37 was displayed while 0.450 was written to the controller.
+        ///
+        /// Walks the LOGICAL tree, not the visual one: it has to work whether or not the containing panel
+        /// has been rendered, and collapsed or virtualized branches still hold fields whose values a handler
+        /// may legitimately read.
+        /// </remarks>
+        public static void CommitPendingEdits(DependencyObject root)
+        {
+            if (root == null)
+                return;
+
+            if (root is NumericField field)
+                field.CommitEdit();
+
+            foreach (object child in LogicalTreeHelper.GetChildren(root))
+                if (child is DependencyObject dobj)
+                    CommitPendingEdits(dobj);
+        }
+
         // Without a custom peer, UI Automation (and so the WPF test server) sees only the base
         // UserControl - no Value pattern - even though Value is a perfectly normal DependencyProperty.
         // This is what makes every Settings NumericField scriptable via /set/{uid}?value=.

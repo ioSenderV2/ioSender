@@ -87,9 +87,6 @@ namespace CNC.Controls.Probing
                 return;
             }
 
-            if (!probing.VerifyProbe())
-                return;
-
             if (!probing.Program.Init(AppConfig.Settings.Probing.CheckProbeStatus || !probing.ProbeFixture))
                 return;
 

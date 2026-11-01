@@ -12,6 +12,7 @@
 using System;
 using System.Xml.Linq;
 using System.Xml.Serialization;
+using CNC.Core;   // IConfigSection / ConfigStore
 
 namespace CNC.Controls
 {

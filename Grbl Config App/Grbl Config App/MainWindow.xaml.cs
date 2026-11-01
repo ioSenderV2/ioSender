@@ -58,6 +58,10 @@ namespace Grbl_Config_App
         public MainWindow()
         {
             CNC.Core.Resources.Path = AppDomain.CurrentDomain.BaseDirectory;
+            // Before InitializeComponent: MainWindow.xaml instantiates a GrblViewModel, and CNC.Core
+            // marshals to the UI thread and pumps messages through this instead of
+            // Application.Current.Dispatcher. Installs both, at Normal dispatcher priority.
+            CNC.Controls.UiPump.Register();
 
             InitializeComponent();
             Title = string.Format(Title, version);
@@ -82,8 +86,8 @@ namespace Grbl_Config_App
                 GrblSettings.Load();
             }
 
-            halsettings.IsEnabled = grblsettings.IsEnabled = GrblInfo.IsGrblHAL && GrblInfo.Build >= 20210819;
-            grblalarms.IsEnabled = grblerrors.IsEnabled = GrblInfo.IsGrblHAL && GrblInfo.Build >= 20210823;
+            halsettings.IsEnabled = grblsettings.IsEnabled = GrblInfo.IsGrblHAL && GrblInfo.BuildAtLeast(20210819);
+            grblalarms.IsEnabled = grblerrors.IsEnabled = GrblInfo.IsGrblHAL && GrblInfo.BuildAtLeast(20210823);
 
             configView.Activate(true, ViewType.Startup);
         }
@@ -114,7 +118,7 @@ namespace Grbl_Config_App
 
         private void getHalSettingsItem_Click(object sender, RoutedEventArgs e)
         {
-            bool getExtended = GrblInfo.ExtendedProtocol && GrblInfo.Build >= 20200716;
+            bool getExtended = GrblInfo.ExtendedProtocol && GrblInfo.BuildAtLeast(20200716);
 
             var g = new Settings();
 
@@ -136,7 +140,7 @@ namespace Grbl_Config_App
 
         private void getGrblSettingsItem_Click(object sender, RoutedEventArgs e)
         {
-            bool getExtended = GrblInfo.ExtendedProtocol && GrblInfo.Build >= 20200716;
+            bool getExtended = GrblInfo.ExtendedProtocol && GrblInfo.BuildAtLeast(20200716);
 
             var g = new Settings();
 
@@ -158,7 +162,7 @@ namespace Grbl_Config_App
 
         private void getGrblAlarmsItem_Click(object sender, RoutedEventArgs e)
         {
-            bool getExtended = GrblInfo.ExtendedProtocol && GrblInfo.Build >= 20200716;
+            bool getExtended = GrblInfo.ExtendedProtocol && GrblInfo.BuildAtLeast(20200716);
 
             var g = new Settings();
 
@@ -180,7 +184,7 @@ namespace Grbl_Config_App
 
         private void getGrblErrorsItem_Click(object sender, RoutedEventArgs e)
         {
-            bool getExtended = GrblInfo.ExtendedProtocol && GrblInfo.Build >= 20200716;
+            bool getExtended = GrblInfo.ExtendedProtocol && GrblInfo.BuildAtLeast(20200716);
 
             var g = new Settings();
 
@@ -214,7 +218,7 @@ namespace Grbl_Config_App
 
             model.Silent = true;
 
-                new Thread(() =>
+                EventUtils.RunPumped(() =>
                 {
                     res = WaitFor.AckResponse<string>(
                         cancellationToken,
@@ -222,10 +226,7 @@ namespace Grbl_Config_App
                         a => model.OnResponseReceived += a,
                         a => model.OnResponseReceived -= a,
                         400, () => Comms.com.WriteCommand(cmd));
-                }).Start();
-
-                while (res == null)
-                    EventUtils.DoEvents();
+                });
 
             return settings.Count > 0;
         }

@@ -164,10 +164,24 @@ namespace CNC.Controls.Probing
 
 //            GCodeParser.Save(@"C:\Users\terjeio\Desktop\Probing\file.nc", gc);
 
-            GCode.File.AddBlock(string.Format("Heightmap applied: {0}", grbl.FileName), Core.Action.New);
+            // One Reset for the whole rebuilt program, not one per block.
+            //
+            // This loop hands every line through AddBlock, which parses it and appends it to the live,
+            // DataGrid-bound block collection. Measured on real hardware 2026-09-18: a 43,000-block program
+            // took THIRTY SECONDS to reappear, and showed an empty list for all of it - so a height map that
+            // had applied correctly was indistinguishable from one that had silently failed. The same shape
+            // froze the app outright on a 220k-line file in 2026-08-01, which is why the bulk collection
+            // exists at all; this path simply never used it.
+            //
+            // The Action.End block stays OUTSIDE the scope: it is what raises FileChanged, and the listeners
+            // that redraw want the collection already settled when they run.
+            using (GCode.File.DeferBlockNotifications())
+            {
+                GCode.File.AddBlock(string.Format("Heightmap applied: {0}", grbl.FileName), Core.Action.New);
 
-            foreach (string block in gc)
-                GCode.File.AddBlock(block, Core.Action.Add);
+                foreach (string block in gc)
+                    GCode.File.AddBlock(block, Core.Action.Add);
+            }
 
             GCode.File.AddBlock("", Core.Action.End);
         }

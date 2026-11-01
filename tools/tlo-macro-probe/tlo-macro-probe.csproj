@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    tlo-macro-probe - does tlo.macro's o130 branch CONSUME the seek depth the sender emits?
+
+    tlo-seek-probe covers the C# half (EmitTloSeekDepth's arithmetic and its clamp). This covers the
+    JOIN: the sender emitting the parameter proves nothing about whether the controller's o130 EXISTS
+    branch reads it or quietly uses its own 90 literal, and from the sender's side those two are
+    indistinguishable. The macro's TLO02b print is the only thing that tells them apart.
+
+    net462 for the same reason tlo-seek-probe is: EmitTloSeekDepth lives in MacroProcessor, which is
+    in CNC.Controls.WPF, so the net8 harnesses cannot load it. References the app's own built
+    assemblies by HintPath, console instead of a window.
+
+    This one additionally needs tlo.macro to be ON the controller. It was not, on any simulator this
+    project built between 2026-09-14 and 2026-10-26 - gen-sim-macros.py's MACROS list and driver.c's
+    sim_seed_atc_macros table both omitted it - and the only symptom of its absence is "error:81
+    Unknown flow statement", which names neither a file nor a path. So the harness asserts the
+    simulator's own boot seeding report before it asserts anything else, and stops if the macro is
+    not there: a check that silently tests the absence of a file is worse than no check.
+
+    Build:  pwsh -File build.ps1 -Configuration Debug     (this references its bin\Debug output)
+            then, in this folder:  dotnet build
+    Run:    tools\tlo-macro-probe\bin\Debug\net462\tlo-macro-probe.exe   (exit 0 = all checks passed)
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net462</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>tlo-macro-probe</AssemblyName>
+    <RootNamespace>TloMacroProbe</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="CNC.Core">
+      <HintPath>..\..\CNC Core\CNC Core\bin\Debug\CNC.Core.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="CNC.Controls.WPF">
+      <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\CNC.Controls.WPF.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="CNC.Common">
+      <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\CNC.Common.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <!-- GrblSetting / grblHALSetting - the setting id enums EmitTloSeekDepth indexes $132 with. -->
+    <Reference Include="CNC.Contracts">
+      <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\CNC.Contracts.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="RP.Math">
+      <HintPath>..\..\CNC Controls\CNC Controls\bin\Debug\RP.Math.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Transitive deps + the real App.config, synced on every build so this never runs against a
+       stale copy. Source is CNC Controls' own bin\Debug - rebuild ioSender first if this looks off. -->
+  <Target Name="SyncAppBinaries" AfterTargets="Build">
+    <ItemGroup>
+      <SourceDlls Include="..\..\CNC Controls\CNC Controls\bin\Debug\*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SourceDlls)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="..\..\ioSender XL\ioSender XL\bin\Debug\ioSender.exe.config" DestinationFiles="$(OutDir)tlo-macro-probe.exe.config" SkipUnchangedFiles="true" Condition="Exists('..\..\ioSender XL\ioSender XL\bin\Debug\ioSender.exe.config')" />
+  </Target>
+
+</Project>

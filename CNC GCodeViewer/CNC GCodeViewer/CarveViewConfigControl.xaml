@@ -1,0 +1,21 @@
+﻿<UserControl x:Class="CNC.Controls.Viewer.CarveViewConfigControl"
+             x:Uid="ctl_carveViewConfig"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:CNC.Controls.Viewer"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d" d:DesignWidth="420">
+    <!-- Settings > User Interface > 3D View. Hosts the SAME control as the view's own View options
+         button, so there is exactly one definition of these settings - see CarveViewOptionsControl.
+
+         Why this page exists again: there used to be a GCode Viewer settings page, and it was deleted
+         rather than hidden (see Viewer.xaml.cs) because it drove the old renderer that nothing in the UI
+         can reach any more - every option on it was inert, and a settings page that silently does
+         nothing is worse than no page. That reasoning expired when the carve view became the registered
+         renderer with live options of its own, and two of those - the during-a-carve pair - are things
+         worth finding BEFORE a job rather than during one. -->
+    <GroupBox x:Uid="grp_carveView" Header="3D View" Margin="5">
+        <local:CarveViewOptionsControl x:Uid="cv_options" x:Name="options" Margin="5"/>
+    </GroupBox>
+</UserControl>

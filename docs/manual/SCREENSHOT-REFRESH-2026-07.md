@@ -1,5 +1,8 @@
 # Manual screenshot/text refresh — 2026-07 session notes
 
+> **SUPERSEDED — historical.** Session notes for the 2026-07 refresh. The live item list is
+> **`MANUAL-AUDIT-2026-09-17.md`**; its §6 covers every current figure.
+
 This documents work done against `SCREENSHOT-AUDIT.md` (text fixes + stale
 screenshot reshoots for `docs/manual/index.html`) and what's left for a
 follow-up session.

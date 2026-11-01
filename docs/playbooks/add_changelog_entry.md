@@ -91,3 +91,18 @@ Cross-ref another entry as `<a href="#prN">#N</a>` (visible `#N`, href/anchor st
 - Sanity check: `grep -c '<div class="pr">'`, `grep -c 'id="pr'`, and the `<td class="n">` TOC-row count
   should all equal N; header count + "Totals (N changes)" match.
 - `git add Overview.html Overview.pdf` (named files, **not** `-A` — untracked sim binaries/macros live in the tree).
+
+## If a release narrative is pending, its counts just went stale
+
+A tracked `docs\release-notes\<version>.md` is spliced into the release body ahead of the generated
+list (see `tools\cut-release.ps1`), and it opens by stating how many changes the release carries.
+Adding an entry invalidates that sentence, on the one page a reader has no way to check — and nothing
+brings the prose and the generated list together until cut time, on a CI runner, after the push.
+
+```powershell
+pwsh -File tools\check-release-notes-counts.ps1
+```
+
+It recomputes the delta the way the cutter does, against the published release's `changelog-through`
+marker, and prints the corrected sentence if they disagree. Exits 0 with nothing to say when no
+narrative is pending, so it is safe to run every time.

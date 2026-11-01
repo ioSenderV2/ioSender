@@ -267,7 +267,7 @@ namespace CNC.Controls
             bool? res = null;
             CancellationToken cancellationToken = new CancellationToken();
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -275,10 +275,7 @@ namespace CNC.Controls
                     a => parameters.OnResponseReceived += a,
                     a => parameters.OnResponseReceived -= a,
                     1500, () => Comms.com.WriteCommand(cmd));
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             return res == true;
         }
@@ -383,7 +380,7 @@ namespace CNC.Controls
 
             parameters.OnRealtimeStatusProcessed += DataReceived;
 
-            new Thread(() =>
+            EventUtils.RunPumped(() =>
             {
                 res = WaitFor.AckResponse<string>(
                     cancellationToken,
@@ -391,10 +388,7 @@ namespace CNC.Controls
                     a => GotPosition += a,
                     a => GotPosition -= a,
                     1000, () => RequestStatus());
-            }).Start();
-
-            while (res == null)
-                EventUtils.DoEvents();
+            });
 
             parameters.OnRealtimeStatusProcessed -= DataReceived;
             getPosTargetRow = null;

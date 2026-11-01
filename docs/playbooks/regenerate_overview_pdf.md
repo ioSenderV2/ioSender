@@ -12,11 +12,16 @@ already-running instance and the print **silently no-ops** (size/timestamp uncha
 tools\regen-overview-pdf.ps1
 ```
 
-The script bakes in the fresh-`--user-data-dir` GUID (the no-op trap), the ~4 s wait, and a
-LastWriteTime verify that fails loudly if Edge silently no-op'd. It spawns a browser process, so
+The script bakes in the fresh-`--user-data-dir` GUID (the no-op trap), **polls up to ~20 s** for the
+timestamp to advance, and fails loudly if Edge silently no-op'd. It spawns a browser process, so
 run with the sandbox disabled.
 
-## The raw command it runs (for reference)
+**Use the script, not the raw command below.** Edge returns before it has finished flushing the PDF,
+so the raw invocation followed by a fixed `Start-Sleep` races — it reported success against a
+completely unchanged file on 2026-08-13, and only an explicit before/after size comparison caught it.
+The polling loop is the whole reason the script exists; the raw command is reference material.
+
+## The raw command it runs (for reference — prefer the script)
 
 ```powershell
 & "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --headless=new --disable-gpu --no-pdf-header-footer `

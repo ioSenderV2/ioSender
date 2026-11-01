@@ -65,7 +65,20 @@ own configuration:
 
 - **Keyboard** — arrows/letters run the **continuous-jog path** in `KeypressHandler.ProcessKeypress`,
   using the keyboard's own Slow/Fast/Step distance & feed sets, **independent of the on-screen
-  selection**. Gated only by the master switch **`KeyboardEnable`** (`IsJoggingEnabled`, default on).
+  selection**. Gated by the master switch **`KeyboardEnable`** (`IsJoggingEnabled`, default on) and by
+  **one rule: a jog key jogs unless you are typing.**
+
+  Dispatch is a class handler on `Window` (`CNC.Controls.GlobalKeys`), so it fires for **every window
+  in the application** — every tab, and every dialog including Machine Setup and Fixture Definition,
+  which is where lining something up by eye actually happens. Suppressed only when keyboard focus is in
+  an input field: a text box, password box, combo, list/selector, slider or open menu — controls where
+  an arrow key already means something.
+
+  *This paragraph used to read "gated only by the master switch", which was never true.* Jog keys were
+  reachable only from four views' own `PreviewKeyDown`, plus a `MainWindow` forwarder that ran only when
+  `CurrentView is JobView` — so jogging was silently dead on every other tab and behind every dialog.
+  **Key-UP is forwarded unconditionally**, whatever has focus: a continuous jog stops on release, so a
+  suppressed release event would leave an axis running.
 - **On-screen UI** — buttons/2×4 grid call **`JogCommand`** with the on-screen selected distance/feed.
 - **Controller** — D-pad mirrors the on-screen selection (`ControllerMapper.JogStep`); analog stick is
   its own proportional path.

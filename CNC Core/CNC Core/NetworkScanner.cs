@@ -49,7 +49,8 @@ namespace CNC.Core
                 string v = Version;
                 if (!string.IsNullOrEmpty(v))
                 {
-                    // [VER:1.1f.20250901:] -> "1.1f.20250901"
+                    // [VER:1.1f.20250901:] -> "1.1f.20250901"; [VER:2.0.0:] -> "2.0.0" on firmware
+                    // that derives its version from a git tag (no build-date field). Display only.
                     v = v.StartsWith("VER:") ? v.Substring(4) : v;
                     v = v.TrimEnd(':');
                 }

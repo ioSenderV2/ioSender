@@ -59,6 +59,11 @@ using System.Windows.Media.Media3D;
 using HelixToolkit.Wpf;
 using CNC.Core;
 using CNC.GCode;
+using CNC.Controls;   // GeometryInterop.ToMedia3D
+// This file is renderer code: bare "Point3D" means the WPF one throughout (Point3DCollection,
+// HelixToolkit, Vector3D arithmetic). CNC.Core now has its own double-precision Point3D for machine
+// geometry, so the alias keeps this file's meaning explicit; Core points convert via ToMedia3D().
+using Point3D = System.Windows.Media.Media3D.Point3D;
 
 namespace CNC.Controls.Viewer
 {
@@ -1013,24 +1018,32 @@ namespace CNC.Controls.Viewer
                 if(job != null)
                 {
                     job.Dispose();
-                    emu.SetStartPosition(Machine.StartPosition);
+                    emu.SetStartPosition(Machine.StartPosition.ToCore());
                     job = emu.Execute(tokens).GetEnumerator();
                     job.MoveNext();
                 }
             }
             else if (job != null && block > 0)
             {
+                // Instrumented (UiDiag): this runs on the UI thread on every executing-line change, and each
+                // AddCutMove appends to the Point3DCollection that a LinesVisual3D is bound to - which
+                // rebuilds its whole screen-space mesh per change. Only live when the "render executed"
+                // setting is on, which is why it is reported separately from drain's total.
+                long diagStamp = UiDiag.Start();
+                long advanced = 0;
+
                 // Stop at end-of-program: if `block` is past the last token (an unreachable line number)
                 // MoveNext() returns false but Current stays put, so testing only LineNumber < block spins
                 // forever. Bounding the advance on MoveNext() makes an out-of-range block a no-op, not a hang.
                 while (job.Current.Token.LineNumber < block && job.MoveNext())
                 {
-                    point0 = job.Current.Start;
+                    advanced++;
+                    point0 = job.Current.Start.ToMedia3D();
 
                     switch (job.Current.Token.Command)
                     {
                         case Commands.G1:
-                            AddCutMove(job.Current.End);
+                            AddCutMove(job.Current.End.ToMedia3D());
                             break;
 
                         case Commands.G2:
@@ -1047,6 +1060,8 @@ namespace CNC.Controls.Viewer
                             break;
                     }
                 }
+
+                UiDiag.Stop("execpath", diagStamp, advanced);
             }
         }
 
@@ -1302,23 +1317,23 @@ namespace CNC.Controls.Viewer
 
             showAdorners(bbox);
 
-            emu.SetStartPosition(Machine.StartPosition);
+            emu.SetStartPosition(Machine.StartPosition.ToCore());
 
             foreach (var cmd in emu.Execute(tokens))
             {
-                point0 = cmd.Start;
+                point0 = cmd.Start.ToMedia3D();
 
                 switch (cmd.Token.Command)
                 {
                     case Commands.G0:
                         if(cmd.IsRetract)
-                            AddRetractMove(cmd.End);
+                            AddRetractMove(cmd.End.ToMedia3D());
                         else
-                            AddRapidMove(cmd.End);
+                            AddRapidMove(cmd.End.ToMedia3D());
                         break;
 
                     case Commands.G1:
-                        AddCutMove(cmd.End);
+                        AddCutMove(cmd.End.ToMedia3D());
                         break;
 
                     case Commands.G2:
@@ -1360,7 +1375,7 @@ namespace CNC.Controls.Viewer
                 Machine.CutLines = new Point3DCollection(cutPoints);
                 cutPoints.Clear();
                 Machine.ExecutedLines = cutPoints;
-                emu.SetStartPosition(Machine.StartPosition);
+                emu.SetStartPosition(Machine.StartPosition.ToCore());
                 job = emu.Execute(tokens).GetEnumerator();
                 job.MoveNext();
             } else
@@ -1577,26 +1592,26 @@ namespace CNC.Controls.Viewer
 
         private void DrawArc(GCArc arc, double[] start, GCPlane plane, bool isRelative = false)
         {
-            List<Point3D> points = arc.GeneratePoints(plane, start, ArcResolution, isRelative); // Dynamic resolution
+            var points = arc.GeneratePoints(plane, start, ArcResolution, isRelative); // Dynamic resolution
 
-            foreach (Point3D point in points)
-                AddCutMove(point);
+            foreach (var point in points)
+                AddCutMove(point.ToMedia3D());
         }
 
         private void DrawCubicSpline(GCCubicSpline spline, double[] start, bool isRelative = false)
         {
-            List<Point3D> points = spline.GeneratePoints(start, ArcResolution, isRelative); // Dynamic resolution
+            var points = spline.GeneratePoints(start, ArcResolution, isRelative); // Dynamic resolution
 
-            foreach (Point3D point in points)
-                AddCutMove(point);
+            foreach (var point in points)
+                AddCutMove(point.ToMedia3D());
         }
 
         private void DrawQuadraticSpline(GCQuadraticSpline spline, double[] start, bool isRelative = false)
         {
-            List<Point3D> points = spline.GeneratePoints(start, ArcResolution, isRelative); // Dynamic resolution
+            var points = spline.GeneratePoints(start, ArcResolution, isRelative); // Dynamic resolution
 
-            foreach (Point3D point in points)
-                AddCutMove(point);
+            foreach (var point in points)
+                AddCutMove(point.ToMedia3D());
         }
     }
 }

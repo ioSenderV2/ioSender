@@ -1,0 +1,129 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<AppConfig version="2" name="ioSenderClassic">
+  <section key="Layout">
+    <LayoutNode>
+      <Component>MainWindow</Component>
+      <Slots>
+        <LayoutSlot>
+          <Name>tabs</Name>
+          <Items>
+            <LayoutNode>
+              <Component>GRBL</Component>
+              <Slots>
+                <LayoutSlot>
+                  <Name>center</Name>
+                  <Items>
+                    <LayoutNode>
+                      <Component>Program</Component>
+                      <Slots />
+                    </LayoutNode>
+                    <LayoutNode>
+                      <Component>Toolpath3D</Component>
+                      <Slots />
+                    </LayoutNode>
+                    <LayoutNode>
+                      <Component>Console</Component>
+                      <Slots />
+                    </LayoutNode>
+                  </Items>
+                </LayoutSlot>
+              </Slots>
+            </LayoutNode>
+            <LayoutNode>
+              <Component>Probing</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>Offsets</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>GRBLConfig</Component>
+              <Slots />
+            </LayoutNode>
+          </Items>
+        </LayoutSlot>
+        <LayoutSlot>
+          <Name>menuFile</Name>
+          <Items>
+            <LayoutNode>
+              <Component>MachineSetup</Component>
+              <Slots />
+            </LayoutNode>
+          </Items>
+        </LayoutSlot>
+        <LayoutSlot>
+          <Name>menuTools</Name>
+          <Items>
+            <LayoutNode>
+              <Component>LatheWizards</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>StartJob</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>FeedsAndSpeeds</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>SDCard</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>HeightMap</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>Calibration</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>WorkOrder</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>ToolTable</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>Trinamic</Component>
+              <Slots />
+            </LayoutNode>
+            <LayoutNode>
+              <Component>PID</Component>
+              <Slots />
+            </LayoutNode>
+          </Items>
+        </LayoutSlot>
+      </Slots>
+    </LayoutNode>
+  </section>
+  <section key="TabOrder">
+    <TabOrder />
+  </section>
+  <section key="Core" mode="merge">
+    <Config>
+      <TabsKeys>GRBL,Probing,Offsets,GRBLConfig</TabsKeys>
+      <HiddenViewsKeys />
+      <MainPanelsKeys>UIJogging,KeyboardJogging,Goto,Feed,Spindle,Coolant,Macros</MainPanelsKeys>
+      <FlyoutItemsKeys>G28,G30,G59.3,G54,WorkParameters</FlyoutItemsKeys>
+      <LeftPanelsKeys>DRO,Signals,MachinePosition,ProgramLimits</LeftPanelsKeys>
+      <ClassicRunStrip>true</ClassicRunStrip>
+      <ShowJobSplitView>false</ShowJobSplitView>
+      <ShowJobJogPad>true</ShowJobJogPad>
+      <ShowJogTargetButtons>false</ShowJogTargetButtons>
+      <UseFriendlyRunLabels>false</UseFriendlyRunLabels>
+      <KeepMdiFocus>true</KeepMdiFocus>
+      <KeepWindowSize>true</KeepWindowSize>
+      <EscClosesTab>true</EscClosesTab>
+      <StatusWindowAutoCloseSeconds>10</StatusWindowAutoCloseSeconds>
+      <AutoSaveSettings>true</AutoSaveSettings>
+      <PromptOnSave>false</PromptOnSave>
+      <SoundOnLimit>Exclaim</SoundOnLimit>
+      <SoundOnProbe>Chime</SoundOnProbe>
+      <SoundOnAlarm>Critical</SoundOnAlarm>
+    </Config>
+  </section>
+</AppConfig>

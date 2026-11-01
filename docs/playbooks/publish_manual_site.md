@@ -13,7 +13,7 @@ published (NOT `screenshot-uploader.html`).
 ## Ready command
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File docs\manual\publish-pages.ps1
+pwsh -ExecutionPolicy Bypass -File docs\manual\publish-pages.ps1
 ```
 
 ## Notes

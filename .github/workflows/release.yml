@@ -90,3 +90,48 @@ jobs:
           git add Overview.html
           git commit -m "chore: stamp v${{ steps.relinfo.outputs.version }} changelog entries [skip release]"
           git push origin HEAD:master
+
+      # Republish Overview.html to the gh-pages branch, which GitHub Pages serves as a real
+      # rendered page at https://<owner>.github.io/<repo>/overview.html - that URL is what the
+      # release notes link to (cut-release.ps1). Runs AFTER the stamp commit above so the
+      # published copy carries this release's TOC version stamps, not the pre-stamp text.
+      #
+      # Why this step exists: gh-pages was published by hand once (2026-08-04) and nothing
+      # refreshed it, so the served copy drifted ~154KB behind the repo's Overview.html - a
+      # reader following the release link would silently get a changelog that didn't contain
+      # the entries the release notes had just listed. A link to a stale doc is worse than no
+      # link, so this automation is what makes the link honest.
+      #
+      # DESTINATION FILENAME IS LOWERCASE (overview.html) while the repo file is capitalized.
+      # GitHub Pages URLs are case-sensitive even though the Windows runner's filesystem is not
+      # - renaming it to Overview.html here would 404 the existing published URL and every link
+      # already pointing at it. Do not "fix" the case to match the repo.
+      #
+      # Overview.html is fully self-contained (inline CSS/JS/SVG, zero <img> or src= refs), so
+      # copying the single file is the whole publish - no assets to carry alongside it.
+      - name: Publish Overview to GitHub Pages
+        if: ${{ steps.relinfo.outputs.hasChanges == 'true' }}
+        shell: pwsh
+        run: |
+          $ghp = Join-Path $env:RUNNER_TEMP 'gh-pages'
+          git fetch origin gh-pages --depth=1
+          # Detached worktree off origin/gh-pages, kept OUTSIDE the workspace so it can't be
+          # swept into a later `git add` in the main checkout.
+          git worktree add $ghp origin/gh-pages
+          Copy-Item Overview.html -Destination (Join-Path $ghp 'overview.html') -Force
+          git -C $ghp add overview.html
+          # A release can ship code/version changes without touching Overview.html's body; an
+          # unguarded commit would exit 1 on "nothing to commit" and fail an otherwise good
+          # release. Only commit when the copy actually changed something.
+          git -C $ghp diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "gh-pages overview.html already current - nothing to publish."
+          } else {
+            git -C $ghp -c user.name="github-actions[bot]" `
+                        -c user.email="github-actions[bot]@users.noreply.github.com" `
+                        commit -m "docs: publish Overview for v${{ steps.relinfo.outputs.version }}"
+            if ($LASTEXITCODE -ne 0) { throw "gh-pages commit failed" }
+            git -C $ghp push origin HEAD:gh-pages
+            if ($LASTEXITCODE -ne 0) { throw "gh-pages push failed" }
+            Write-Host "Published Overview to gh-pages for v${{ steps.relinfo.outputs.version }}."
+          }

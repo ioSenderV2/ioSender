@@ -76,6 +76,16 @@ namespace CNC.Controls
             new AssignableItem("KeyboardJogging", "Kbd Jogging", PanelKind.Panel, () => new KbdJogGridControl(), canBeFlyout: false),
             new AssignableItem("DRO", "DRO (work)", PanelKind.Panel, () => new DROControl()),
             new AssignableItem("ProgramLimits", "Program limits", PanelKind.Panel, () => new LimitsControl()),
+            // The original ioSender's "Signals" group box - a limit lamp per axis the machine actually has,
+            // then motor warning/fault, block delete, optional stop, feed hold, cycle start, reset, E-stop,
+            // safety door and probe. It sat FIXED below the DRO in the Job tab's left column until Phase 2c
+            // moved signals to the run strip, and it was never added here, so there was no way to put it
+            // back anywhere. Assignable now, which is what the fixed placement should have become.
+            //
+            // The run strip's own SIGNALS column is not this control (RunStripPanel builds its own grouped
+            // rows - see its header for why), so placing this is additive, not a second copy of one widget.
+            // At 216px wide it fits the left column, which is where it was.
+            new AssignableItem("Signals", "Signals", PanelKind.Panel, () => new SignalsControl()),
             new AssignableItem("MachinePosition", "Machine Position", PanelKind.Panel, () => new MachinePositionControl()),
             new AssignableItem("RtspCameras", "OBS Control", PanelKind.Panel, () => new RtspCamerasControl())
         };

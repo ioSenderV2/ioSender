@@ -153,10 +153,10 @@ Needs `-testserver`, so it needs the user's explicit turn-by-turn go-ahead.
       recoverable; only reshoot if a Tools figure is ever wanted again.
 
 ### Known app bug found while auditing (NOT a manual bug)
-- [ ] Machine Setup's in-app **Overview** step list (`MachineSetupWizard.xaml`, `ov_s1`–`ov_s6`) stops at six
-      entries and is wrong from 6 onward — it says "6 · Controller macros" when step 6 is Fixture definitions
-      and 7 is Controller macros. Missing Fixture definitions, Calibration and Build simulator entirely.
-      Fixing it means 3 new `x:Uid` rows through `tools/locadd.py` across all 7 locales.
+- [x] **FIXED 2026-09-17** (`c42c7065`). Machine Setup's in-app **Overview** list stopped at six entries
+      and was mislabelled from 6 on. It is now `ov_s1`–`ov_s8`, matching `GetPages()` and the manual's
+      eight steps. (Carried here as open until 2026-09-18 on the strength of a memory note rather than
+      a look at the file — the note was a week out of date. Read the source.)
 
 ---
 
@@ -216,3 +216,536 @@ box's saved layout; the script files the capture when you quit the app.
 - [ ] `settings-grbl.png` and `machine-setup-overview.png` were reshot 2026-08-03 and are current for
       the nav tree, but both now open as **windows** rather than tabs — worth a glance to check the
       window chrome in the shot doesn't misrepresent where they live.
+
+---
+
+## Debt from the toolpath outline (#376, shipped 2026-09-17) — RECORDED AS IT SHIPPED
+
+The program list now groups into collapsible **toolpath sections on any file with tool changes**, not
+just on ioSenderV2 Fusion add-in output. That also makes two commands reachable that most users will
+never have seen, because on an ordinary file they were not offered.
+
+- [x] **`#job` — a sub-section on the outline.** Where sections come from (an M6, or the add-in's own
+      markers), the **Program start** and **Program end** groups, and the naming convention worth
+      telling people about: *a comment immediately above the tool change becomes the toolpath's name*.
+      That is opt-in behaviour a reader can use in their own posts and hand-written files.
+- [x] **`#job` — the two run commands**, right-click on a group: **Start from this toolpath** (runs
+      Program start, then from there to the end) and **Run just this toolpath** (Program start, that
+      toolpath, Program end). Both now run the program's own preamble rather than a synthetic one.
+- [ ] **Screenshot**: this wants a figure of the grouped list with one section expanded. Fold into the
+      `job-runscreen.png` reshoot already owed as priority 1 of the audit's §6 — a job loaded with
+      three toolpaths would cover the run strip, Peek, and the outline in one shot.
+- [x] **Worth a mention in `#work-order`** too: a generated work order now outlines by tool change like
+      any other program.
+
+---
+
+## Debt from Peek (shipped 2026-09-17) — RECORDED AS IT SHIPPED
+
+Logged the same day, which is the whole point of this file and is what did not happen for the six
+weeks the audit below had to reconstruct.
+
+**Peek** is a new run-strip button: pause a running job at the next block boundary, park at `G30`
+with the spindle off, look at the work, then Resume (or Cycle Start) to go back and carry on.
+Hardware-verified 2026-09-17 — see `docs/Architecture-Peek.md`.
+
+- [x] **`#job` — the run strip.** The control list and the run-control table both need Peek adding.
+      It sits to the right of Stop and is **collapsed when it would do nothing**, like Feed Hold and
+      Stop (#355), so "I don't see it" is expected rather than a fault.
+- [x] **`#job` — a short sub-section on what Peek actually does**, because two things surprise:
+      it takes effect at the **end of the current block**, not instantly (Feed Hold remains the
+      immediate stop), and it parks at **G30**, not at machine home.
+- [x] **`#settings` — the Keyboard table.** The **Program** group gains a third row,
+      *Peek / Resume*, beside MDI and Status. Unbound by default.
+- [x] **Refusals worth documenting**: Peek is not offered for an **SD card job** (the controller
+      streams those itself, so the sender cannot starve it) or on a controller without expression
+      support (the park reads the stored `G30` parameters).
+- [ ] **Screenshot**: `job-runscreen.png` is already owed a reshoot as priority 1 of the audit's §6.
+      Whoever takes it should have a job running so the strip shows Feed Hold, Stop **and** Peek
+      together — one shot pays off both items.
+
+---
+
+## Debt from #216–#371 (shipped 2026-08-04 to 2026-09-17) — AUDIT WRITTEN 2026-09-17
+
+👉 **The item list is `docs/manual/MANUAL-AUDIT-2026-09-17.md`.** All 156 entries were read and
+sorted there into **21 MISSING / 16 OBSOLETE / 13 NEEDS-UPDATING / 19 stale figures**, with the
+evidence and the source that settles each one. Work from that file; this section is now just the
+status board over it.
+
+**156 changelog entries** shipped since the v2.40 payoff zeroed this file: 47 NEW, 30 CHG, 79 FIX.
+Nothing was recorded here as it shipped, which is the actual failure. Unlike July's *restyling* wave,
+most of this one is **new capability** — SVG carving, the diode-laser path, text and V-carving, four
+new Work Order operations, a rebuilt Height Map, a Calibration view, configuration overlays,
+parametric programs.
+
+### Text — the five WRONG statements: DONE 2026-09-17
+These were not gaps, they described the app incorrectly. Each replacement was verified against source
+before it was written, not against the changelog entry that caused the drift.
+
+- [x] **The four-tab default.** `#getting-started` said "Four tabs, left to right" and that everything else
+      "lives in the File and Tools menus". #248 restored the **full nine-tab bar** as the shipped default
+      (`DefaultLayout.Build()` **and** `Default-App.config`'s `TabsKeys`/Layout section, which agree:
+      Settings, Feeds and Speeds, Setup, Job, Offsets, SD Card, Work Order, Machine Setup, Lathe Tools).
+      Tab table and menu table both rewritten; the File/Tools menu contents were wrong with them, since
+      SD Card, Feeds and Speeds and Lathe Tools are tabs again.
+- [x] **"opens in its own window".** #332: a view whose descriptor sets `RequiresRunStrip` opens as a
+      **session tab** instead — Setup, Work Order, Machine Setup and Calibration. Stated as a note, with
+      the reason (the run strip's Generate/Run and jog pad exist only on the main window) and the
+      closable-tab rule from #333.
+- [x] **"Machine Setup → 8 · Calibration"**, four distinct sites. Calibration left Machine Setup in #332
+      and is `Tools → Calibration` with **four** pages: Stepper (probe), Stepper (scratch), Squareness
+      (pins), Squareness (probe). All four references repointed; the step-8 table row replaced by a note
+      saying where it went and why.
+- [x] **"All nine steps".** Machine Setup is **eight** steps now (1 Machine, 2 Home position, 3 Axis
+      information, 4 Homing & limits, 5 Probe definitions, 6 Fixture definitions, 7 Controller macros,
+      8 Build simulator — read off `GetPages()` and the `hdr*` headers). Caption, the "(1–9)" list item
+      and the "why the order matters" paragraph all corrected.
+- [x] **"The current target is shown in the status bar".** #220 retired the bottom status bar. The target
+      reads at the **right-hand end of the menu bar** (`UpdateMenuBarInfo`: "Connected: TARGET" green /
+      "Not connected" red, hidden on a narrow window). Corrected in `#connect`.
+
+**Nearly shipped an invented fact and caught it:** the first draft said a compressed three-tab arrangement
+"ships as a configuration overlay", which is what `DefaultLayout`'s own comment claims. There is **no
+`.ioconfig` in the repo** — only the apply/export mechanism. Sentence rewritten to the verifiable claim.
+
+### Screenshots — OWED
+Two figures now carry an italic line in their caption saying what they predate, rather than being left to
+assert something false. That is a stopgap, not a fix:
+- [ ] `main-window-tools-menu.png` — shows the old four-tab bar and a Tools menu with no Calibration.
+- [ ] `machine-setup-overview.png` — shows nine steps with Calibration expanded.
+- [ ] Every other figure predates #216. **Now individually assessed** — see §6 of
+      `MANUAL-AUDIT-2026-09-17.md`, which ranks all 19 by how badly the shot misleads.
+      `job-runscreen.png` is priority 1, ahead of both of the above: the run strip replaced the run
+      bar and the bottom status bar (#220), on the most-visited topic in the manual. Of the four
+      orphaned images, **`heightmap.png` must not be deleted** — the new Height Map topic needs a
+      figure; the other three depict retired arrangements and can go.
+
+### STILL OWED — deferred to follow-on sessions (user's call, 2026-09-17)
+- [x] **(2) Rebuild the audit** — DONE 2026-09-17, `MANUAL-AUDIT-2026-09-17.md`. It supersedes
+      `MANUAL-AUDIT-2026-07-24.md`, `SCREENSHOT-AUDIT.md` and `SCREENSHOT-REFRESH-2026-07.md`, whose
+      waves were paid off in v2.38 and v2.40 — open one of those only for history.
+- [x] **(3a) The correction pass — DONE 2026-09-17** (`234cb927`). All 16 OBSOLETE sites from §3 of
+      the audit, including the three wrong facts (the rotation sign, the SVG-laser menu entry, and
+      the two Machine Setup callouts that contradicted each other). **Plus two sites the audit had
+      not catalogued**, found by sweeping for the claim rather than the wording: a second wording of
+      the Machine-Setup-is-a-window claim in the first-five-minutes list, and the
+      **`R0`-before-`G53` habit** advised in two places — which is now worse than useless, since an
+      `R0` is itself a rotation write and that is exactly what corrupts the parser position
+      (#358/#359). Replaced with a warning under `#offsets` saying what actually needs care.
+      "Run bar" was also unified to "run strip" throughout, the app's own name for it since #220.
+- [ ] **(3b) The missing topics** — §2 of the audit, **21** of them, not the ~15 this file used to
+      estimate. Four are **named-only** rather than absent (M11 scratch calibration, M14 overlays,
+      M20 machine mirror, M21 Restart) — a word count scores them as covered and they are not.
+  - [x] **M1 + M2 — DONE 2026-09-17** (`7ed98713`). One new topic, **`#carving` "Engraving &
+        carving"**, covering Text / single-stroke vs V-carve / Shape text, SVG artwork, Negative and
+        the two panel kinds, the depth model and **Max carve depth**, plus the parts of **M5** that
+        belong with a carve (Clear floor, Mark, Mark dashed). Written from the app's tooltips, every
+        claim checked in source.
+  - [x] **M3 — DONE 2026-09-17** (`cca9e5f4`). New topic **`#laser` "Burning an SVG on a diode
+        laser"**, after `#carving` (intermediate:7). The gate is stated in a warning box before
+        anything else: no `-enableSVGLaserJob`, no menu entry **and** no row in Settings → Keyboard,
+        so the feature is absent rather than hidden. Written from the dialog's tooltips and the
+        emitter, not the changelog. Four things the audit had not catalogued and that a reader needs:
+        placement is **refused rather than trimmed** (and why that is not advisory on a machine with
+        `$20=0`/`$21=0`); the power ramp's **CLAMPED** warning; shading depth is set by the
+        **interval** as much as the power, which is why the readout leads with an areal figure; and an
+        **aborted job leaves the `G92` applied**, because `G92.1` is on the last line.
+        **Still owed: a figure** — the dialog's three tabs, already listed in §6.
+  - [x] **M5 remainder — Mark only. DONE 2026-09-17** (`14e8adc1`). In `#work-order`, under
+        Running a Work Order, because it is a property of the *run*. Says the four things only the
+        compiler knows — one dimple per **toolpath** (a Drill and a Bore on one toolpath is one
+        hole), a Bore counts, no hole means an empty program refused up front, and the dimple's own
+        tool/feeds through the ordinary dialog with the **dimple's** diameter rather than the bit's
+        — plus the hazard as a warning: **the setting persists with the work order**, and what tells
+        you is the summary line and the program's two MARK ONLY header lines.
+        ✅ **The comment claiming a "Generate (mark only)" button was corrected** (`2e26663b`).
+        It was a wrong COMMENT, not a bug: `JobControl.UpdateRunButtonLabel` takes the button's text
+        from the `GenerateLabel` resource and nothing in the run strip reads the flag — so nothing
+        misbehaved, but the claim was the stated justification for persisting `MarkOnly` and was one
+        edit from reaching the manual. The comment now names the two things that really do say so: the
+        summary line under the checkbox and the program's `*** MARK ONLY` header.
+  - [x] **M4 (Height Map) — DONE 2026-09-17** (`0ddc3062`). Topic **`#heightmap`**, anchored on that
+        name deliberately: `ManualHelp.cs` maps `ViewType.HeightMap` to it, so F1 from the view lands
+        there. Covers the two modes as different jobs, the extent coming from Machine Setup step 3's
+        **Work surface** rather than the travel, why the panel has no depth/feed field (they live in
+        the probe definition), the drop allowance in terms of what it buys, **Retry refused on an
+        alarm that lost position**, the legend's numbers, and the Entire-spoilboard + *Use the work
+        origin already set* pairing. Four cross-links restored now the topic exists again.
+        🔴 **`img/heightmap.png` is NOT current** — the audit's §6 said to check before
+        deleting, and the answer is no: it shows the pre-#332 tab bar, the old run bar with Rewind,
+        the bottom status bar, a *Full table* radio, Probe depth/feed fields that have since moved
+        into the probe definition, and a single *Surface* pane instead of Steps/Program/Surface Map.
+        A fresh shot is owed; nothing references the old one.
+  - [x] **M6–M21 — DONE 2026-09-17.** §2 of the audit is now fully paid.
+        - `1b0c1541` — **M6** corner reliefs, **M7** Indirect + groups, **M8** Save Drawing, all in
+          `#work-order`.
+        - `c14983d6` — **M10** squareness by probe and the reversal test, **M11** scratch stepper
+          calibration, as a **new `#calibration` topic** (machinist:3) covering all four wizards.
+          **M9** (Scribe square) turned out to be already covered by the O4 rewrite in `234cb927`;
+          extended with its two prerequisites.
+        - `f6318339` — **M12** `(PROMPT)` programs, **M13** split screen, **M15** the status line /
+          Status window / status log, **M18** console search, all in `#job`.
+        - `585a521c` — **M14** configuration overlays, **M16** restore points, **M19** on-page search
+          marking, **M20** Machine mirror, **M21** Restart ioSender, all in `#settings`.
+        - `85fef283` — **M17** Work surface, in `#machine-setup` step 3.
+        ⚠️ **The audit had M15 slightly wrong**: it lists an "errors-only setting". There is no such
+        setting — errors-only is the behaviour and the setting is the pop-up's dwell time. Written
+        from source, which is why it was caught.
+
+### ✅ §4 IS PAID — all thirteen NEEDS-UPDATING topics, 2026-09-20
+
+U1–U13 of `MANUAL-AUDIT-2026-09-17.md` §4, written from source rather than from the changelog
+entries the audit cites. Landed with the `#376` outline and Peek sections in the same pass.
+
+- **U1 / U2** `#job` — the run strip (State's colour and its right-click recovery menu, the elapsed
+  job time, the Signals lamps and the P/T probe-input double-click, the overrides' fill bars,
+  double-click to reset feed/spindle and a SINGLE click for rapids, which is 100/50/25 only); loading
+  ("Loaded <name> — N lines in T s", the Data column, the oversized-program question, the verbatim
+  pass-through). Plus a warning the manual did not carry at all: `!` `~` `?` act wherever they appear
+  in a line, so an exclamation mark inside a COMMENT is a feed hold mid-cut.
+- **U3** `#connect` — what the handshake reports, and the three ways a connect goes wrong.
+- **U4** `#setup` — Generate → loaded job → Job tab; Esc discards a handoff; the measurement
+  persists and names its date.
+- **U5** `#work-order` — the Generate report and its estimate's limits, the reason on a disabled
+  Generate, the recorded blank, and the two upgrade notes (V-carve step, Bore feed) as a warning.
+- **U6** `#machine-setup` — a "Controller macros (step 7)" section; `tlo.macro` and `error:81`.
+- **U7** `#settings` — three settings were missing from the UI→General row; four given their own
+  section.
+- **U8** `#offsets` — the reachability guard, with the real refusal text.
+- **U9** `#gcode-viewer` — the stock block, and `G53` drawn in the right frame.
+- **U10** `#accuracy-calibration` — clear the offset first, and do the reversal test.
+- **U11** `#errors-alarms` — the two pre-run `ALARM:2` catches, and where a message that has gone
+  can be found.
+- **U12** `#sdcard` — per-file hash-compared macro upload, the poll-rate fix, and unknown ≠ empty.
+- **U13** `#tools` — a note placing Height Map and Probing.
+
+🔴 **Three OBSOLETE sites the audit did not catch**, all found by checking a claim in source
+before writing near it:
+1. **"Pick the point in the 3D viewer"** to start a job partway through — in BOTH `#job` and
+   `#gcode-viewer`. `StartFromBlock` has exactly one caller, the program list. Corrected in both.
+2. **The "status line"** — the manual described a permanent status line showing the latest message.
+   The run strip lost its message line on 2026-08-10 and only a FLAGGED message is displayed at all
+   (`GrblViewModel.SetErrorMessage`'s own comment says so). Six sites reworded; `#job`'s M15 section,
+   written on 2026-09-17, was one of them.
+3. **#292 as the audit summarised it** — "settings that have not arrived no longer display as 0".
+   What the code does is leave the field AS IT WAS and reschedule a re-read. Written from the source.
+
+**Still owed from this wave: the screenshots only** — §6 of the audit, `job-runscreen.png` first.
+
+### ✅ The F1 anchors are FIXED (`2e26663b`, 2026-09-18)
+`ManualHelp.cs`'s map had drifted from the manual and the failure is silent — a dead anchor still
+opens the manual, the browser just does not scroll, so F1 looks like it worked. `StartJob` pointed at
+`start-job` (renamed `#setup` 2026-07-31) and `Probing` at `probing` (deleted 2026-08-01); `Probing`
+now points at `#setup`, where what that tab did actually lives. **FeedsAndSpeeds**, **WorkOrder** and
+**Calibration** were absent from the map and opened the front page; all three are in it now. Every
+anchor was checked mechanically against the section ids here, including the two literal
+`ManualHelp.Open` call sites, and `ManualHelp.AllTopics` is exposed so that check can be automated.
+**The rule this leaves:** rename or delete a topic and grep `ManualHelp.cs` in the same edit.
+
+### Process note — why this got to 156
+The rule at the top of this file ("when shipping a UI change, add the impact here") did not run once in
+six weeks. The 18 unticked boxes above it are July items superseded by later payoff sections that never
+ticked them, so **the checkbox state is not a live signal either** — read the dated section headers, not
+the boxes.
+
+---
+
+## Debt from the setup + 3D-view wave (shipped 2026-09-20/21) — RECORDED AS IT SHIPPED
+
+38 commits over two days. Machine Setup's tool-length step became an interview, probe definitions
+gained a plate *kind* and lost two settings, the DRO title became an offset picker, the jog pad
+gained a Go-to button, and the 3D view changed substantially — including **the deletion of a
+Settings page**. Recorded as it shipped, which is the rule the process note below says stopped
+running for six weeks.
+
+### 🔴 A Settings page NO LONGER EXISTS
+- [x] **`#settings` line 2584** — the **G Code** row promises "**GCode Viewer** (how the 3D view
+      draws it)". That page is **deleted** (`360a8976`). It drove the OLD renderer, which the UI has
+      no way to reach, so every option on it was inert: nothing on it ever affected the 3D view in
+      the Job tab. Rewrite the row to mention GCode command stripping only, and point viewer options
+      at the view's own **View options** button.
+- [x] Sweep for any other mention of viewer settings living under Settings.
+
+### `#gcode-viewer` — the 3D view changed in five ways
+- [x] **Line 2889 and line 2900** both describe a **Reset view** button. There is no such button:
+      it is now **View options**, and Reset view is a button *inside* that dialog. Line 2900 also
+      claims a <kbd>Ctrl</kbd>+<kbd>V</kbd> shortcut — **checked in source 2026-09-21: that is the
+      OLD renderer's** (`RenderControl.xaml` lines 77-78, with <kbd>Ctrl</kbd>+<kbd>R</kbd> for a
+      "Restore view" that the carve view has no equivalent of). The carve view has no keybinding at
+      all. Line 2900 is describing a screen the user cannot reach — rewrite the whole entry, do not
+      patch the shortcut.
+      ✅ Related CODE debt — **DONE 2026-09-21** (`acef2416`). It was **five** entries, not the two
+      named here: `ResetView`, `RestoreView`, `ToggleGrid`, `ToggleJobEnvelope`, `ToggleWorkEnvelope`,
+      plus the `Categorize` line and the group description that made a **"3D view"** group for them.
+      None could ever appear — the editor builds its rows from the handlers actually registered with
+      `KeypressHandler`, and the only place those five register is `RenderControl_Loaded`, which never
+      runs because `JobWorkspace` registers **CarveView** for `LayoutKeys.Toolpath3D`. `CarveView`
+      registers no key handlers at all, so the group was empty on both counts. The old `RenderControl`
+      itself stays — that is the larger old-renderer removal.
+- [x] **New: the View options dialog.** Four toggles (rapid moves, stock block, bed grid, stored
+      positions), three colour pickers (cut, rapid, stock), Default colours, Reset view. Document
+      that colours persist, and the reason a lit surface does not match its swatch while the cut and
+      rapid *lines* match exactly.
+- [x] **New: stored-position signs.** G30 and the toolsetter (G59.3) are drawn as **100 mm signs
+      painted on the bed** — a parking P for the park, TS for the toolsetter — when taught. Say that
+      an all-zero position is treated as never taught and is not drawn.
+- [x] **New: a green dot at machine zero**, drawn only when homing is enabled. Worth explaining
+      *why*: it is at the top of Z travel, so the gap between it and the stock is the headroom.
+- [x] **Gone: the machine-envelope wireframe box.** If any text mentions a box around the work
+      envelope, remove it — the bed grid carries the footprint now.
+- [x] The tool cone now **follows the live machine position** while jogging (`43201cf6`, `a1389639`).
+      If the manual says the view only moves during a program, that is now wrong.
+- [x] **Two more the audit had not caught, found while rewriting (2026-09-21).** Both were the same
+      old-renderer mistake: **Save view** and <kbd>Ctrl</kbd>-click **to jog to a point in the view**
+      were documented and neither exists — `ClickToJog` is read only in `Renderer.xaml.cs`, which only
+      `RenderControl` and the unused `Viewer` host. And the topic said you could "watch progress as it
+      runs": **the view deliberately holds still for the whole of a streaming job** (`CarveView`
+      position handler, the `IsJobRunning` guard) because redrawing the carve starves the line feed.
+      Jogging tracks live; a streaming program does not. The rewrite says so, and points at Play, the
+      program list and the DRO instead.
+
+### `#machine-setup` — step 5 is a different screen — ✅ TEXT DONE 2026-09-21
+
+Written as a new **"Probes and the reference positions (step 5)"** section in `#machine-setup`, with the
+three questions as `h4` sub-headings in the order the page asks them, plus the step-5 row in the eight-step
+table rewritten (and `$65` added to its grbl-settings column). The `$65` bit-3 trap has its own warn callout;
+the computed search distance has a note saying it is a LIMIT, not a prediction; the plate-with-a-seat advice
+and the adjacent-`G30` advice are both in. The tool-length baseline is its own sub-section, stating that
+Reference TLO runs in machine coordinates and leaves the active offset alone.
+
+**Checked, not assumed:** nothing in the manual ever told the reader to select `G59.3` first, so that item
+needed no correction.
+- [x] **Line 2302** describes step 5 as "Declare the probes fitted to this machine (touch plate /
+      3D probe / toolsetter)". It is now a **three-part interview** and needs a real section:
+      1. what probes you have, editing the seeded touch plate or defining new ones;
+      2. which probe measures tool length — **asked after the probes exist**, not before;
+      3. the positions: target surface Z (only when a plate, not a toolsetter, does tool length),
+         then G59.3, then G30, with an offer to place G30 100 mm to either side of G59.3.
+- [x] **`$65` bit 3 is now an OUTPUT of step 5** (`5161b4eb`, `220a1045`). Explain the trap it
+      closes: touch plates wired OR'd onto the probe input must NOT auto-select the toolsetter
+      input, and the button says "Turn it on"/"Turn it off" according to the probe chosen, greyed
+      when the controller already agrees.
+- [x] **The tool-length search distance is computed**, not typed — from the probe's height and the
+      G59.3 Z, as a **floor** (`5c9588da`). Do not describe it as a prediction of the target top.
+- [x] **Reference TLO runs in machine coordinates** and no longer leaves G59.3 as the active WCS
+      (`2916313d`). If any text says to select G59.3 first, delete it.
+- [x] Mention the advice the interview gives: put G30 and G59.3 **adjacent**, and give a plate used
+      as a toolsetter a **repeatable seat** (a shallow cutout) so it lands the same way every time.
+
+### Probe definitions — `#setup` and `#machine-setup` — ✅ TEXT DONE 2026-09-21
+
+All four live in the new step-5 section: the two plate kinds with the upside-down trick as a tip callout, the
+Lip width field being corner-only, no seeded 3D probe, a note that **Travel speed** and **Target height** are
+gone rather than hidden, and Edge standoff / Drop to side being hidden for a flat plate. `#setup`'s Probe
+bullet now says why a flat plate is not offered for a corner.
+- [x] **Two touch-plate kinds**: corner (two 90° lips) and Z-only (flat). A corner plate can be
+      **turned upside down** to act as a Z-only plate, and it says so when chosen for tool length
+      (`96d31252`).
+- [x] **The 3D probe is no longer seeded** — most users do not have one. Any "you will find a 3D
+      probe already defined" wording is wrong.
+- [x] **Travel speed is GONE** from every probe definition (`43ef1da1`) — nothing read it. Also
+      **Target height** (`cdc6f3af`). Check the probe-settings tables for both.
+- [x] **Motion parameters hide Edge standoff and Drop to side for a flat plate** (`fdaae67d`) —
+      they only mean something when probing sideways.
+
+### `#job` — two new controls — ✅ TEXT DONE 2026-09-21 (three, and mostly in `#jogging`)
+
+The DRO and the jog pad are documented in **`#jogging`**, so that is where the detail went, with pointers from
+`#job`'s at-a-glance list:
+
+- **`#jogging`** gained *"The DRO's own title is the offset picker"* — the chevron, the hover showing X/Y/Z
+  and rotation (and why rotation is shown even at zero), why `G28`/`G30`/`G92` are NOT in that list, and that
+  it works on the run strip's copy too because they are one control.
+- **`#jogging`**'s jog-pad list gained **Go to**, described by where it actually is — the target-and-pin
+  button in the **Z column between Z+ and Z−**, not the "3 o'clock square" this note called it — with a warn
+  callout for the Z rule: only `G30` and `G59.3` lower Z, everything else is XY at the current Z, `G28` is
+  excluded from drive-Z because nothing writes it, and the driven Z happens last as its own move.
+- **Corrected while there:** the *Show go-to buttons on the jog pad* tick covers the centre and corner
+  buttons only — the arrows, the Z buttons and **Go to** are unaffected. The manual now says so.
+- **`#job`**'s Work Parameters bullet explains the removed `G28`/`G30`/`G92` entries and why it mattered:
+  the combo sends the code verbatim, so picking one rapided the machine from a dropdown next to the tool
+  selector.
+- [x] **The DRO title is an offset picker** (`3740a198`). Clicking "DRO (G54)" drops down the
+      selectable work offsets with the current one ticked; hovering one shows its X/Y/Z and
+      rotation. It works in **both** places the DRO appears — the Job tab and the run strip — which
+      is the point: the run strip is reachable when the Job tab is not.
+- [x] **A Go-to button** in the jog pad's empty 3-o'clock square (`bb20dd47`). It lists the stored
+      positions — fixtures, G28, G30, G59.3 and any non-zero offset — and moves there. **It drives
+      Z only for G30 and G59.3**, which are over clear air by definition; everything else is XY
+      only, at the current Z (`7e0556bb`). That distinction is a safety point, not a detail.
+- [x] **The Work Parameters offset dropdown no longer lists G28/G30/G92** (`4f1d17e4`). They are
+      stored *positions*, and selecting one sent its code to the controller — which **rapids the
+      machine** from a dropdown next to the tool selector. If the manual documents that list,
+      correct it and say why.
+
+### Screenshots to reshoot — **NOW ON THE REVIEW BOARD 2026-09-21**
+
+All of these are entries in **`tools/gen-image-review.ps1`** with a filename, a SHOOT instruction and a
+default-config-or-yours call, and each has a `shot-todo` placeholder waiting in `index.html` so a landed file
+becomes a figure rather than an orphan. **Shoot from `docs/manual/_image-review-pages.html`, not from this
+list** — regenerate with `tools\gen-image-review.ps1 -Pages`.
+- [ ] `machine-setup-probes.png` — step 5 whole. **Wants captured positions**, or the computed
+      search-distance line reads as the fixed-90 mm fallback.
+- [ ] `probe-definition.png` — the plate editor, **Corner** selected, so the note and Lip width both show.
+- [ ] `probe-motion-params.png` — motion params on a **Flat** plate: the absence of Edge standoff, Drop to
+      side and Travel speed is the whole point of the shot.
+- [ ] `dro-offset-menu.png` — the title dropdown open **with an entry hovered**, so the X/Y/Z + R tooltip is
+      in frame. One shot covers both places the DRO appears; they are one control.
+- [ ] `jog-goto-menu.png` — the Go to menu open, hovered. **Needs real targets** (a positioned fixture plus
+      G30/G59.3) or the menu has nothing in it.
+- [ ] `gcode-viewer.png` — **reshoot.** Now the figure most out of step with its own topic: the whole topic
+      was rewritten against the carve view and this shot is the old renderer.
+- [ ] `settings-grbl.png` — **reshoot.** The only picture of the settings tree, and the tree both gained
+      **Remote** and lost **GCode Viewer**. That covers the G Code item; there is no separate G Code figure.
+
+### Not manual debt, recorded so it is not mistaken for debt
+- The link gate (`7d7568b3`), the cone/envelope/marker late-arrival fixes and the remote debounce
+  (`f21bc167`) are behaviour fixes with **no UI surface**. Nothing to document.
+
+---
+
+## Debt from the shutter-remote and keyboard-panel work (2026-09-21)
+
+Two new settings pages' worth of behaviour, and one existing page that now treats keys differently.
+None of it is documented anywhere in the manual today.
+
+### New topic owed: the shutter remote — ✅ TEXT DONE 2026-09-21
+
+**Written as its own topic, `#remote` — "A shutter remote as a pendant"** — placed straight after
+`#settings`, with a `shot-todo` where its lead figure goes. It covers pairing, the arm-and-press binding and
+why the press picks the primary button, Rebind, the six-row table with the resolve ORDER stated (a prompt
+beats a height-map hold beats machine state), the ten functions as a table, the two safety callouts, and the
+one-action-per-press / only-the-bound-device / beep-means-heard details. `#settings` now names the **Remote**
+page in the User Interface row, `#heightmap` cross-links it from the hold-at-each-point bullet, and
+`#jogging`'s "a jog key jogs wherever you are" rule carries the Keyboard-panel exception.
+
+⚠️ **On the volume item below — it was right, and I briefly "corrected" it wrongly.** Both halves of it
+hold: `RIDEV_NOLEGACY` really is rejected with error 87 because it cannot be combined with `RIDEV_INPUTSINK`,
+and INPUTSINK is what makes an unfocused remote work at all (`RemoteDevices.cs`, the "on NOT being able to
+stop the volume moving" block — read to THERE, not just the file header, which only says the flag is
+deliberately not used). The extra fact worth having beside it: the hook CAN swallow a press that meant
+something, but on this remote the hook never sees the buttons, so there is nothing to swallow. Either way the
+volume moves and no setting fixes it.
+
+🔴 **What WAS wrong was an in-app string**, now fixed (`10afe296`): `lbl_remoteFallthrough` claimed a
+discarded press "never reach[es] the volume control", which holds only on the hook path. So did the Height map
+tab's own tooltip, which was additionally still describing the pre-#391 fixed button mapping.
+
+### (what it needed to say — the original list)
+
+The remote went from "a tick on the Height map tab that answers height-map holds" to a bound, per-state
+configurable pendant. The manual has **nothing** on it. Worth its own topic, or a section under Settings.
+What it needs to say:
+
+- **Pairing is Windows' job.** Pair the remote as an ordinary Bluetooth keyboard; ioSender never pairs to
+  it. Then tick **Settings → App → User Interface → Remote**.
+- **Binding**: ticking the box arms a one-shot bind, and the next button press claims the device *and*
+  decides which button is PRIMARY. Untick and retick to rebind after replacing a remote. There is a
+  **Rebind** button for the same thing without toggling the enable.
+- **The buttons are not labelled up/down** — and on the common PICO the larger top button sends volume
+  DOWN. That is why the binding press defines the primary button rather than the manual naming one.
+- **A bound remote's buttons belong to ioSender**: a press that means nothing right now beeps and is
+  discarded. Every other device is ignored entirely, so the machine keyboard's volume keys are untouched.
+- 🔴 **The volume still moves when you press the remote, and cannot be prevented.** Say so plainly; it
+  looks like a bug otherwise. The reason is in RemoteDevices' header (raw input cannot swallow; the
+  suppression flag is rejected alongside the one that makes an unfocused remote work at all).
+- **The function table**, six rows, each with an On tick: prompt / height map / running / holding / idle /
+  in alarm. The last four are assignable from ten functions (Nothing, Cycle Start, Feed Hold, Stop,
+  Peek/Resume, MDI, Status, Reset, Unlock, Reset and unlock). Defaults reproduce the old fixed behaviour.
+- Worth calling out for safety: **both buttons mean Feed Hold while a job runs**, deliberately, and a
+  prompt with no Cancel button takes **either** button as OK.
+
+### Keyboard panel: keys behave differently in there now — ✅ TEXT DONE 2026-09-21
+
+Covered by a callout in `#settings` under "Binding a key to a tab or menu entry", plus the exception added to
+`#jogging`'s jog-key rule. Nothing in the manual contradicted it; both additions are new.
+
+**Settings → App → User Interface → Keyboard**. Pressing a bound shortcut with that panel open **finds**
+it - expands its group and scrolls to it - instead of running it. An unbound combination with a modifier
+beeps. Unbound bare keys still navigate the list as before.
+
+The panel carries a one-line explanation on screen, so the manual mainly needs to not contradict it. If
+the manual anywhere implies shortcuts work normally while the settings page is open, fix that line.
+
+### Screenshots to reshoot / add — **NOW ON THE REVIEW BOARD 2026-09-21**
+- [ ] `settings-remote.png` — the lead figure for `#remote`. **Bind a remote first**: the status line
+      reading "Waiting" teaches the wrong thing.
+- [ ] `settings-keyboard.png` — the Keyboard page has never had a figure at all. Shoot it on a **default
+      config**: everything starting unbound is exactly what to show.
+- [x] ~~**Height map tab**~~ — **dissolved 2026-09-21.** The duplicate tick was removed from that tab
+      (`00d5c5d2`), so there is nothing there to caption. The Remote page is the only place it is set up, and
+      `#heightmap` points at it in words.
+- [x] **The settings navigation tree** — folded into the `settings-grbl.png` reshoot in the section above,
+      rather than tracked twice. That is the manual's only picture of the tree.
+
+### Not manual debt, recorded so it is not mistaken for debt
+- The pcorner/tlo travel-height clamp, the seek-to-latch probe guard, `ReachableLimit`'s force-set-origin
+  fix, the console-window Owner fix and the `locadd --sync` CSV fix are all behaviour or tooling with **no
+  UI surface**. Nothing to document.
+- The probe false-triggering was **a wiring fault** (bare foil shield), not an app change.
+
+---
+
+## Debt from the fixture rework (shipped 2026-09-22) — RECORDED AS IT SHIPPED
+
+Seven commits. **Test position stopped being a check and became the measurement**: it writes the
+probed corner straight into the fixture's position, replacing the reference the operator jogged to by
+eye, and the `CornerOffsetX/Y` pair it used to keep alongside is gone. It also lifts before it
+travels, which it did not. Separately, `ALARM:2` now explains itself with the arithmetic.
+
+The manual's step-6 section described the old behaviour in two ways that are now wrong, which is why
+this is text debt and not just a record.
+
+### `#machine-setup` step 6 — Test position — ✅ TEXT DONE 2026-09-26
+- [x] **"Test rapids to the saved position and probes it"** — it does not rapid there. It
+      **retracts to the top of travel, travels in X and Y, and descends last** (`fa63ede9`). The
+      diagonal it used to emit went from wherever the spindle was — beside a clamp, inside a vise,
+      below the stock top after a previous probe — straight to the fixture position. Same rule the
+      jog pad's Go to menu already states: the only clearance anyone has checked is at the top. The
+      retract height is **refused rather than guessed** when Z travel or pull-off cannot be read.
+- [x] **The probed corner IS the fixture position now** (`1a4037d2`). On an edge-probing fixture the
+      macro parks at the tight corner as its last move and that machine position is written into
+      Coords, replacing the eyeballed reference. Consumers lost the addition they each used to do —
+      corner 1's inset is aimed from the measurement, with no correction to remember.
+- [x] **Z is deliberately NOT rewritten.** Coords.Z is the height the operator jogged to and is the
+      **start of the capped downward search**, a travel reference rather than a datum. Overwriting it
+      with the stock top would have the next Test position begin its search already at the surface.
+- [x] **The delta is reported, not stored** — "Reference was out by X 0.369 Y 0.000" on the
+      completion message and in the fixture debug log. Worth documenting for the reason it exists:
+      **on a fixture tested before, a delta that has grown is the fence having moved.**
+- [x] **Test position is what validates a fixture** (`c6168e66`). Writing Coords normally clears the
+      validated tick — correct for a re-jogged reference, wrong for a probed corner — so Test
+      re-asserts it after the write. Set position still clears it, and that distinction is the thing
+      to state: Set records where you think it is, Test proves it.
+
+### `#errors-alarms` — `ALARM:2` carries the arithmetic — ✅ TEXT DONE 2026-09-26
+- [x] "Soft limit alarm. G-code motion target exceeds machine travel." names neither the axis nor
+      the number. The alarm message now appends the sum (`02fa93f5`,
+      `CNC Core/CNC Core/SoftLimitExplainer.cs`) — *"Z: -61.254 - 100.000 = -161.254, which is
+      15.254 mm below the limit of -146.000"* — and the offending line. Worth saying it
+      **says nothing rather than guessing**: a `G90` move is in work coordinates and on a rotated
+      system an X/Y target does not resolve by adding an offset at all, so an axis it cannot settle
+      honestly is skipped.
+
+### `#machine-setup` step 5 — what bounds Probe it — ✅ TEXT DONE 2026-09-26
+- [x] The **What bounds the probe** callout said the *only* thing that stops the descent is the
+      probe's Max search distance. Since `81a90d1e` it is the **smaller of that and the travel
+      actually left below where you are standing**, and the confirm dialog names which bound applies
+      rather than silently clamping. It refuses outright, with both numbers, when there is no room.
+      This was a real `ALARM:2` on the first run: standing at Z −61.254 it asked for the full 100 mm
+      against a −146 floor.
+      ⚠️ **A small app inconsistency left standing, deliberately not "fixed" here:** the live line on
+      the step-5 row still names only the probe's Max search distance, because it is a plan line and
+      does not follow the machine position. The dialog is the authority and says which bound applies.
+
+### Not manual debt, recorded so it is not mistaken for debt
+- **The load-time conversion of old fixtures** (`83836f93`, `b266d978`) is **transparent to the
+  reader**: a fixture saved before the rework has its saved correction folded into Coords as the
+  library loads, keeps its validated tick, and the retired elements leave `App.config` on the first
+  save. The manual never documented `CornerOffsetX/Y`, so there is nothing to correct — one sentence
+  saying an existing fixture needs nothing done to it is the whole of it. 🔴 One caveat that is
+  history rather than debt: two fixtures on the author's own machine lost their offsets to the
+  intermediate commit before the fold existed and want Test position re-run.
+- `Position` having no `ToString()` override (`b266d978`) and the `ShouldSerialize*` suppression are
+  implementation. No UI surface.

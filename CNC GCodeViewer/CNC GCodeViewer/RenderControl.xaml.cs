@@ -45,7 +45,10 @@ using CNC.GCode;
 
 namespace CNC.Controls.Viewer
 {
-    public partial class RenderControl : UserControl
+    // IToolpathView: Open/Close already had these exact signatures - the interface just states the
+    // contract its host relies on, instead of the host casting to this concrete type and getting null
+    // when it is handed the other implementation.
+    public partial class RenderControl : UserControl, IToolpathView
     {
         private static bool keyboardMappingsOk = false;
 
@@ -124,10 +127,10 @@ namespace CNC.Controls.Viewer
         {
             textOverlay.Visibility = AppConfig.Settings.GCodeViewer.ShowTextOverlay ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
 
-            if (!keyboardMappingsOk && DataContext is GrblViewModel)
+            // Keyboard is the portable JogController unless the host registered the WPF handler
+            // (see CNC.Controls.KeypressHandler.Register) - no handler, no view shortcuts to bind.
+            if (!keyboardMappingsOk && (DataContext as GrblViewModel)?.Keyboard is CNC.Controls.KeypressHandler keyboard)
             {
-                KeypressHandler keyboard = (DataContext as GrblViewModel).Keyboard;
-
                 keyboardMappingsOk = true;
 
                 keyboard.AddHandler(Key.V, ModifierKeys.Control, ResetView);

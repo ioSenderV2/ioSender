@@ -1,4 +1,4 @@
-/*
+﻿/*
  * TabRegistry.cs - part of CNC Controls library for Grbl
  *
  * Registry of the main-window tabs (Grbl, Probing, SD Card, ...). Phase 1 of the registration
@@ -65,6 +65,15 @@ namespace CNC.Controls
         public Func<UserControl> Create { get; }
         public Action<UserControl> Configure { get; }
 
+        // This view drives the SHARED Run bar (MacroProcessor's Generate-mode plumbing: it registers
+        // ActiveGenerate/ActiveRun while active, and the bar's own button is its only Generate button).
+        // That bar is docked in MainWindow and exists nowhere else, so hosting such a view in a
+        // ViewHostWindow puts the wizard in one window and the only button that drives it in another -
+        // behind it, or on another monitor, and clicking it deactivates the popup. A menu entry for one of
+        // these therefore opens it as a TAB instead (MainWindow.showViewAsTab); the menu placement itself
+        // stays perfectly legal, it is only the presentation that is forced.
+        public bool RequiresRunStrip { get; }
+
         public bool IsTab { get { return Presentation == ViewPresentation.MainTab; } }
 
         public TabDescriptor(ViewType viewType, string label, Func<UserControl> create,
@@ -72,7 +81,8 @@ namespace CNC.Controls
                              bool alwaysVisible = false, Action<UserControl> configure = null,
                              string name = null,
                              ViewPresentation presentation = ViewPresentation.MainTab,
-                             ViewMenu menu = ViewMenu.None)
+                             ViewMenu menu = ViewMenu.None,
+                             bool requiresRunStrip = false)
         {
             ViewType = viewType;
             Label = label;
@@ -84,6 +94,7 @@ namespace CNC.Controls
             Name = name ?? viewType.ToString();
             Presentation = presentation;
             Menu = menu;
+            RequiresRunStrip = requiresRunStrip;
         }
     }
 

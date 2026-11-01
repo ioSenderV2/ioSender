@@ -114,6 +114,26 @@ namespace CNC.Controls
             });
     }
 
+    // Program-outline group header -> that section's estimated run time, e.g. "~4 min".
+    //
+    // Two inputs on purpose: the section NAME (what to look up) and GCodeRunTimeIndex.Version (WHEN to
+    // look). The estimate is computed off the UI thread after the load, so it does not exist when these
+    // headers are first built; bumping Version is what brings the visible ones back to re-read it. The
+    // second value is deliberately unused beyond that.
+    public class SectionRunTimeConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            string section = values != null && values.Length > 0 ? values[0] as string : null;
+            return GCodeRunTimeIndex.Instance.Lookup(section);
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     // Adapted from: https://stackoverflow.com/questions/4353186/binding-observablecollection-to-a-textbox/8847910#8847910
     public class StringCollectionToTextConverter : IMultiValueConverter
     {
@@ -314,12 +334,49 @@ namespace CNC.Controls
 
     public class GrblStateToColorConverter : IValueConverter
     {
+        // Ported verbatim from GrblViewModel, where the colour used to be computed into GrblState.Color
+        // as the state was parsed. Which colour represents a machine state is presentation policy, so it
+        // belongs here rather than in the machine model - CNC.Core no longer references System.Windows.Media.
+        public static Color ForState(GrblState state)
+        {
+            switch (state.State)
+            {
+                case GrblStates.Run:
+                    return Colors.LightGreen;
+
+                case GrblStates.Alarm:
+                    return Colors.Red;
+
+                case GrblStates.Jog:
+                    return Colors.Yellow;
+
+                case GrblStates.Tool:
+                    return Colors.LightSalmon;
+
+                case GrblStates.Hold:
+                    return Colors.LightSalmon;
+
+                case GrblStates.Door:
+                    return state.Substate == 0 ? Colors.LightSalmon : (state.Substate == 1 ? Colors.Red : Colors.Beige);
+
+                case GrblStates.Home:
+                case GrblStates.Sleep:
+                    return Colors.LightSkyBlue;
+
+                case GrblStates.Check:
+                    return Colors.White;
+
+                default:
+                    return Colors.White;
+            }
+        }
+
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             Brush result = Brushes.White;
 
             if (value is GrblState)
-                result = new SolidColorBrush(((GrblState)value).Color);
+                result = new SolidColorBrush(ForState((GrblState)value));
 
             return result;
         }
@@ -422,7 +479,34 @@ namespace CNC.Controls
             Converters.grblState.Value.TryGetValue(((GrblState)value).State, out result);
             int substate = ((GrblState)value).State == GrblStates.Alarm && ((GrblState)value).LastAlarm > 0 ? ((GrblState)value).LastAlarm : ((GrblState)value).Substate;
 
-            if (value is GrblState && ((GrblState)value).State != GrblStates.Unknown) 
+            // A HOLD'S TWO SUBSTATES MEAN OPPOSITE THINGS TO THE OPERATOR, and as "HOLD:1"/"HOLD:0" the
+            // difference is a code nobody reads. Hold:1 is "your press was taken, I am decelerating";
+            // Hold:0 is "stopped, press cycle start to resume". On 2026-10-30 an operator pressed Pause
+            // during a job, watched HOLD:1 for six seconds while the machine wound down through a full
+            // planner buffer, concluded the button had not worked, and reset the machine instead.
+            //
+            // Measured the same day against the simulator, directly over its socket: the controller
+            // reports Hold:1 within 10 ms of the hold byte and keeps it until motion stops - the feed
+            // visibly winding down 500 -> 404 -> 302 -> 194 -> 68 -> 0 - then reports Hold:0. So this
+            // renders a substate the controller ACTUALLY SENDS, immediately. Nothing is invented, and no
+            // timeout or fall-back is needed: if the hold were never taken there would be no Hold state
+            // to name, and the readout would still say RUN.
+            //
+            // The number is dropped because the names carry it: a hold has only these two substates.
+            // Falls back to plain HOLD if the resource is missing - an empty State field would be worse
+            // than an unhelpful one.
+            if (value is GrblState && ((GrblState)value).State == GrblStates.Hold)
+            {
+                if (((GrblState)value).Substate == 1)
+                {
+                    string holding = LibStrings.FindResource("StateHolding");
+                    if (!string.IsNullOrEmpty(holding))
+                        return holding;
+                }
+                return result == string.Empty ? GrblStates.Hold.ToString().ToUpper() : result;
+            }
+
+            if (value is GrblState && ((GrblState)value).State != GrblStates.Unknown)
                 result = (result == string.Empty ? ((GrblState)value).State.ToString().ToUpper() : result) + (substate == -1 ? "" : (":" + substate.ToString()));
 
             return result;
@@ -449,6 +533,14 @@ namespace CNC.Controls
             string help;
             if (!Converters.grblStateHelp.Value.TryGetValue(gs.State, out help))
                 help = gs.State.ToString();
+
+            // The sibling of the State rename above: the one dictionary entry is keyed by state alone, so
+            // it cannot distinguish a hold that is still stopping from one that has stopped - and those
+            // need opposite things said about them. "Press Cycle Start to resume" is wrong and confusing
+            // while the machine is still moving, which is exactly the moment the operator is reading it.
+            if (gs.State == GrblStates.Hold && gs.Substate == 1)
+                help = "Stopping - the feed hold was received and the machine is decelerating. It will "
+                     + "hold as soon as it can stop; with a full planner buffer that can take several seconds.";
 
             if (gs.State == GrblStates.Alarm)
             {
@@ -542,18 +634,24 @@ namespace CNC.Controls
             if (string.IsNullOrEmpty(wcs) || values.Length < 2 || !(values[1] is double offset))
                 return null;
 
-            string line2;
-            if (values.Length <= 2)
-                line2 = string.Format(CultureInfo.CurrentCulture, "({0} + G92 combined)", wcs);
-            else
-            {
-                double? tlo = values[2] is double t && !double.IsNaN(t) ? t : (double?)null;
-                line2 = tlo.HasValue
-                    ? string.Format(CultureInfo.CurrentCulture, "({0} + G92 + TLO {1:0.000} combined)", wcs, tlo.Value)
-                    : string.Format(CultureInfo.CurrentCulture, "({0} + G92 + TLO combined)", wcs);
-            }
+            // What the offset is MADE OF. TLO is named only where it is actually tracked (the Z binding
+            // supplies it): naming it on an axis whose component list does not include it is how this
+            // tooltip came to contradict itself.
+            string parts = wcs + " + G92";
+            if (values.Length > 3 && values[3] is double tlo && !double.IsNaN(tlo))
+                parts += string.Format(CultureInfo.CurrentCulture, " + TLO {0:0.000}", tlo);
 
-            return string.Format(CultureInfo.CurrentCulture, "Total {0} offset: {1:0.000}\n{2}", parameter, offset, line2);
+            string components = string.Format(CultureInfo.CurrentCulture, "Offset {0:0.000} = {1}", offset, parts);
+
+            // "Total X offset: 148.341" on its own never said what it was an offset OF, and it is not the
+            // number in the box - it is what gets SUBTRACTED from the machine position to produce that
+            // number (GrblViewModel: Position.Set(MachinePosition - WorkPositionOffset)). Show the whole
+            // sum with the live values so the readout and the offset visibly reconcile.
+            if (values.Length > 2 && values[2] is double mpos && !double.IsNaN(mpos))
+                return string.Format(CultureInfo.CurrentCulture, "{0} {1:0.000} = machine {2:0.000} - offset {3:0.000}\n{4}",
+                                      parameter, mpos - offset, mpos, offset, components);
+
+            return components;
         }
         public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         {
@@ -639,6 +737,44 @@ namespace CNC.Controls
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             return value is bool && (bool)value ? Visibility.Visible : Visibility.Collapsed;
+        }
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is Visibility && (Visibility)value == Visibility.Visible;
+        }
+    }
+
+    // The selected probe INPUT as a single letter: P = the main probe input, T = the tool setter's.
+    // grblHAL routes one at a time (GrblCommand.ProbeSelect, "G65P5Q{0}", Q0 = main, Q1 = toolsetter), so
+    // one lamp whose letter changes says which input a G38 probe will actually listen to - which is the
+    // question the lamp exists to answer. GrblViewModel.Probe carries the id and raises PropertyChanged
+    // when the controller's parser state reports it, so a binding tracks a switch made anywhere.
+    public class ProbeIdToLetterConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            int id;
+            if (value is int)
+                id = (int)value;
+            else if (!int.TryParse(System.Convert.ToString(value, CultureInfo.InvariantCulture), out id))
+                return "P";
+
+            return id == 1 ? "T" : "P";
+        }
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    // Like BoolToVisibleConverter but false -> HIDDEN, so the element keeps the space it occupies.
+    // For a control inside a StackPanel whose neighbours must not move when it is turned off - the jog
+    // pad's go-to button between Z+ and Z-, which collapsing would let Z- slide up into.
+    public class BoolToVisibleHiddenConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is bool && (bool)value ? Visibility.Visible : Visibility.Hidden;
         }
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
